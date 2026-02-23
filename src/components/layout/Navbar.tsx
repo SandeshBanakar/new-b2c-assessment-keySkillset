@@ -22,6 +22,9 @@ export default function Navbar() {
     .toUpperCase()
     .slice(0, 2);
 
+  // Hide Navbar on pages that manage their own full-screen layout
+  if (pathname === '/onboarding') return null;
+
   return (
     <nav className="sticky top-0 z-40 bg-white border-b border-zinc-200">
       <div className="max-w-5xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between">

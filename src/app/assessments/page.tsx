@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
 import AssessmentCard from '@/components/assessment/AssessmentCard';
 import AssessmentFilterBar, { type FilterState } from '@/components/assessment/AssessmentFilterBar';
 import { getCardStatus, mockAssessments, mockProgressMap, mockUser } from '@/utils/assessmentUtils';
@@ -10,6 +10,14 @@ import type { AssessmentType, Exam } from '@/types';
 export default function AssessmentsPage() {
   const [selectedExam, setSelectedExam] = useState<Exam | 'all'>('all');
   const [selectedType, setSelectedType] = useState<AssessmentType | 'all'>('all');
+  // Read banner from sessionStorage on first client render; clear immediately so
+  // it doesn't persist on back-navigation. Returns null during SSR.
+  const [planBanner, setPlanBanner] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const msg = sessionStorage.getItem('plan_banner');
+    if (msg) sessionStorage.removeItem('plan_banner');
+    return msg;
+  });
 
   function handleFilterChange({ exam, type }: FilterState) {
     setSelectedExam(exam);
@@ -26,6 +34,20 @@ export default function AssessmentsPage() {
     // Light mode page — bg-zinc-50 per design-system.md
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <div className="max-w-5xl mx-auto px-4 py-6 md:px-8 md:py-8">
+
+        {/* Plan success banner */}
+        {planBanner && (
+          <div className="mb-6 flex items-center justify-between gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+            <p className="text-sm font-medium text-emerald-700">🎉 {planBanner}</p>
+            <button
+              onClick={() => setPlanBanner(null)}
+              className="text-emerald-500 hover:text-emerald-700 flex-shrink-0"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Page header */}
         <div className="mb-6 space-y-1">
