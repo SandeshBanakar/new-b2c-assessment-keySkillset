@@ -66,13 +66,22 @@ export interface QuizAttemptState {
 
 // -------------------------------------------------------
 
-export interface MockUser {
+export interface User {
   id: string;
-  name: string;
   email: string;
-  tier: Tier;
-  xp: number;                   // cumulative, never decreases
-  streak: number;               // consecutive days active
-  selectedExam: Exam | null;    // null until onboarding complete
-  onboardingComplete: boolean;
+  displayName: string | null;             // display_name
+  subscriptionTier: Tier;                 // subscription_tier
+  subscriptionStatus: string;             // subscription_status (e.g. 'free' | 'active' | 'cancelled')
+  subscriptionStartDate: string | null;   // subscription_start_date (ISO 8601)
+  subscriptionEndDate: string | null;     // subscription_end_date (ISO 8601)
+  razorpaySubscriptionId: string | null;  // razorpay_subscription_id
+  razorpayPlanId: string | null;          // razorpay_plan_id
+  razorpayCustomerId: string | null;      // razorpay_customer_id
+  userOnboarded: boolean;                 // user_onboarded
+  selectedExams: Exam[];                  // selected_exams TEXT[]
+  goal: string | null;                    // goal
+  xp: number;                             // cumulative, never decreases
+  streak: number;                         // consecutive days active
+  createdAt: string;                      // created_at (ISO 8601)
+  updatedAt: string;                      // updated_at (ISO 8601)
 }

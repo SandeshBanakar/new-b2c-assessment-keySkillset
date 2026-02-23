@@ -213,3 +213,137 @@ function getCardStatus(
 - `UserAssessmentProgress.masteryPercent` tracks rolling concept mastery per assessment (0–100).
 - Mastery increases as the learner answers concept-tagged questions correctly across attempts.
 - Mastery is displayed in the `ConceptBreakdown` component on `/quiz/results`.
+---
+## Chapter Tests Content Hierarchy
+Exam → Subject → Skill Group → Individual Chapter Test
+
+SAT:
+  Reading & Writing: [Single Passage Basics, Dual Passages, Craft & Structure, Information & Ideas, Standard English Conventions, Expression of Ideas]
+  Math: [Algebra, Advanced Math, Problem-Solving & Data Analysis, Geometry & Trigonometry]
+JEE:
+  Physics: [Mechanics, Thermodynamics, Electromagnetism, Optics, Modern Physics]
+  Chemistry: [Organic, Inorganic, Physical]
+  Math: [Calculus, Algebra, Coordinate Geometry, Trigonometry]
+NEET:
+  Biology: [Cell Biology, Genetics, Ecology, Human Physiology, Plant Physiology]
+  Physics: [Mechanics, Thermodynamics, Optics, Electromagnetism]
+  Chemistry: [Organic, Inorganic, Physical]
+PMP:
+  Domains: [Predictive, Agile, Hybrid, Stakeholder Engagement, Risk Management]
+
+Skill Group data is entered by Super Admin and stored in DB.
+Individual chapter tests belong to one skill group.
+
+## Chapter Tests UI Pattern
+- Subject = section header (sticky divider)
+- Skill Group = accordion row (expandable/collapsible, shows test count)
+- Individual tests = 2-column card grid inside accordion
+- Card anatomy: title, difficulty badge, description, duration, question count, attempts left, Start/Locked CTA
+- NO exam badge chip or subject chip on the card (subject is the section header)
+
+## Mock Pricing (No Razorpay for MVP)
+- /plans page shows 3 plan cards: Basic ₹299/mo, Professional ₹599/mo, Premium ₹999/mo
+- On CTA click → confirmation modal fires (see copy below)
+- On confirm → Supabase UPDATE users SET subscription_tier = '[tier]', subscription_status = 'active',
+  subscription_start_date = NOW(), subscription_end_date = NOW() + INTERVAL '30 days'
+- Redirect to /assessments with dismissable success banner
+
+UPGRADE modal copy (static, no real math):
+  "Upgrading from [CurrentPlan] → [NewPlan]. Your new plan activates immediately.
+   (₹[diff]/month difference — billing simulated)"
+
+DOWNGRADE modal copy:
+  "Downgrading from [CurrentPlan] → [NewPlan]. Takes effect immediately.
+   Access to [locked features] will be removed now.
+   (Proration simulated — no actual charge adjustment)"
+
+CANCEL modal copy:
+  "Cancelling your subscription. You will be moved to the Free plan immediately.
+   You will lose access to [feature list for current plan]."
+
+DOWNGRADE RULES (immediate, Option A):
+- Tier changes the moment user confirms
+- In-progress assessments above new tier = blocked immediately (Option A)
+- No cron jobs, no scheduled downgrade
+
+## Supabase users table additions (Razorpay-ready, nullable for mock)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAULT 'free';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'free';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start_date TIMESTAMPTZ NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_end_date TIMESTAMPTZ NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS razorpay_subscription_id TEXT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS razorpay_plan_id TEXT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS razorpay_customer_id TEXT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS user_onboarded BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_exams TEXT[] DEFAULT '{}';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS goal TEXT NULL;
+
+## Test Account (single)
+test@keyskillset.com — starts as Free, upgrade/downgrade via /plans
+
+## Dev Tier Switcher
+- Activated via ?dev=true query param on any page
+- Renders a floating pill (bottom-right, z-50) with 4 tier buttons
+- Clicking a tier = Supabase UPDATE subscription_tier for current user
+- Visible ONLY when process.env.NODE_ENV === 'development'
+- Never renders in production
+
+## Onboarding Flow
+- Step 1: display_name (text input) + goal (select: "Crack SAT", "Crack JEE", "Crack NEET", "PMP Certification", "General Skill Building")
+- Step 2: exam multi-select (SAT, IIT-JEE, NEET, PMP) — stored as selected_exams TEXT[]
+- On complete: subscription_tier = 'free', user_onboarded = false (tour not yet shown)
+- Redirect to: /assessments (auto-filtered to first selected exam)
+- First-visit banner on /assessments: "You're on the Free plan. Daily Quiz is free →  Upgrade to unlock all tests [Compare Plans]"
+
+## Welcome Tooltip Tour (Dashboard only)
+- 3–4 step anchored tooltip tour, shown ONCE after first Dashboard visit
+- Anchors: 1. Streak counter, 2. Today's Daily Quiz widget, 3. Quest Map preview, 4. Locked assessment teaser
+- On completion or dismiss: UPDATE users SET user_onboarded = true
+- Re-triggerable from Profile dropdown → "Retake Platform Tour" → resets user_onboarded = false,
+  redirects to /dashboard, tour re-fires
+
+## Profile Dropdown Structure (top-right nav)
+- Avatar + display_name
+- Current Plan badge (e.g., "Professional")
+- Menu items:
+    Subscription → /profile/subscription (manage plan)
+    Retake Platform Tour → resets + redirects
+    Settings → /profile/settings (placeholder for now)
+    Sign Out
+
+## Profile → Subscription Page (/profile/subscription)
+Current Plan: [tier name]  [Active badge]
+Simulated renewal: [subscription_end_date formatted]
+───────────────────────────
+[Upgrade to Premium →]     (hidden if already Premium)
+[Downgrade to Basic]       (hidden if already Basic or Free)
+[Cancel Subscription]      (hidden if already Free)
+───────────────────────────
+[Retake Platform Tour]
+
+## Chapter Tests Content Hierarchy
+Exam → Subject → Skill Group → Individual Chapter Test (accordion UI)
+
+SAT:
+  Reading & Writing: [Single Passage Basics, Dual Passages, Craft & Structure,
+                      Information & Ideas, Standard English Conventions, Expression of Ideas]
+  Math: [Algebra, Advanced Math, Problem-Solving & Data Analysis, Geometry & Trigonometry]
+JEE:
+  Physics: [Mechanics, Thermodynamics, Electromagnetism, Optics, Modern Physics]
+  Chemistry: [Organic Chemistry, Inorganic Chemistry, Physical Chemistry]
+  Math: [Calculus, Algebra, Coordinate Geometry, Trigonometry]
+NEET:
+  Biology: [Cell Biology, Genetics, Ecology, Human Physiology, Plant Physiology]
+  Physics: [Mechanics, Thermodynamics, Optics, Electromagnetism]
+  Chemistry: [Organic Chemistry, Inorganic Chemistry, Physical Chemistry]
+PMP:
+  Domains: [Predictive, Agile, Hybrid, Stakeholder Engagement, Risk Management]
+
+Chapter Tests UI pattern:
+  - Subject = sticky section header divider
+  - Skill Group = accordion row (expandable, shows test count, 0% progress)
+  - Tests = 2-col card grid inside expanded accordion
+  - Card: title, difficulty badge, description, duration, question count, attempts left, Start/Locked CTA
+  - NO exam badge chip or subject chip on individual cards
+  - Skill group metadata is Super Admin-entered, stored in DB

@@ -31,10 +31,10 @@ export default function AssessmentsPage() {
         <div className="mb-6 space-y-1">
           <h1 className="text-2xl font-bold text-zinc-900">Assessment Library</h1>
           <p className="text-sm text-zinc-500">
-            Logged in as <span className="font-medium text-zinc-700">{mockUser.name}</span>
+            Logged in as <span className="font-medium text-zinc-700">{mockUser.displayName}</span>
             {' · '}
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-600 text-white capitalize">
-              {mockUser.tier}
+              {mockUser.subscriptionTier}
             </span>
           </p>
         </div>
@@ -69,7 +69,7 @@ export default function AssessmentsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((assessment) => {
               const progress = mockProgressMap[assessment.id] ?? null;
-              const status = getCardStatus(assessment, progress, mockUser.tier);
+              const status = getCardStatus(assessment, progress, mockUser.subscriptionTier);
               return (
                 <AssessmentCard
                   key={assessment.id}

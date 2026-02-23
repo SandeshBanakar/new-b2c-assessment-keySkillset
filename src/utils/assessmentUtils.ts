@@ -2,8 +2,8 @@ import type {
   Assessment,
   AssessmentType,
   CardStatus,
-  MockUser,
   Tier,
+  User,
   UserAssessmentProgress,
 } from '@/types';
 
@@ -163,15 +163,24 @@ export const mockAssessments: Assessment[] = [
 // Mock user — Professional tier
 // -------------------------------------------------------
 
-export const mockUser: MockUser = {
+export const mockUser: User = {
   id: 'user-1',
-  name: 'Priya Sharma',
   email: 'priya@example.com',
-  tier: 'professional',
+  displayName: 'Priya Sharma',
+  subscriptionTier: 'professional',
+  subscriptionStatus: 'active',
+  subscriptionStartDate: null,
+  subscriptionEndDate: null,
+  razorpaySubscriptionId: null,
+  razorpayPlanId: null,
+  razorpayCustomerId: null,
+  userOnboarded: true,
+  selectedExams: ['SAT'],
+  goal: null,
   xp: 1250,
   streak: 7,
-  selectedExam: 'SAT',
-  onboardingComplete: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 // -------------------------------------------------------
