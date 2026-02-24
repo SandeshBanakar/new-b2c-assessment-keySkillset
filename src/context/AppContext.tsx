@@ -1,9 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { DEMO_SESSION_KEY, getDemoUserById } from '@/lib/demoAuth';
 import type { User, Exam } from '@/types';
 
 interface AppContextValue {
@@ -40,87 +38,55 @@ function mapRow(row: Record<string, unknown>): User {
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     const supabase = createClient();
-    let mounted = true;
-    const AUTH_PATHS = ['/auth', '/onboarding'];
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      async function resolve() {
-        // ── Path A: Real Supabase session ──────────────────────────────────
-        if (session) {
-          const { data: row } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+    async function fetchUserProfile(userId: string) {
+      setIsAuthLoading(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-          if (!mounted) return;
+      if (data) {
+        setUser(mapRow(data as Record<string, unknown>));
+      } else {
+        console.error('Profile fetch error:', error);
+        setUser(null);
+      }
+      setIsAuthLoading(false);
+    }
 
-          if (!row) {
-            setUser(null);
-            setIsAuthLoading(false);
-            if (!AUTH_PATHS.includes(pathname)) router.replace('/auth');
-            return;
-          }
-
-          setUser(mapRow(row as Record<string, unknown>));
-          setIsAuthLoading(false);
-
-          if (!row.user_onboarded && pathname !== '/onboarding' && pathname !== '/auth') {
-            router.replace('/onboarding');
-          }
-          return;
-        }
-
-        // ── Path B: No Supabase session — check for demo session ───────────
-        // Profile is embedded in demoAuth.ts — no DB query needed (avoids RLS block).
-        const demoUserId = localStorage.getItem(DEMO_SESSION_KEY);
-
-        if (demoUserId) {
-          const demoUser = getDemoUserById(demoUserId);
-
-          if (!mounted) return;
-
-          if (demoUser) {
-            setUser(demoUser);
-            setIsAuthLoading(false);
-
-            if (!demoUser.userOnboarded && pathname !== '/onboarding' && pathname !== '/auth') {
-              router.replace('/onboarding');
-            }
-            return;
-          }
-
-          // Stale / unrecognised demo ID — clear and fall through
-          localStorage.removeItem(DEMO_SESSION_KEY);
-        }
-
-        // ── Path C: No session at all — redirect to /auth ──────────────────
-        if (!mounted) return;
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchUserProfile(session.user.id);
+      } else {
         setUser(null);
         setIsAuthLoading(false);
-        if (!AUTH_PATHS.includes(pathname)) {
-          router.replace('/auth');
-        }
       }
-
-      void resolve();
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session) {
+          await fetchUserProfile(session.user.id);
+        } else {
+          setUser(null);
+          setIsAuthLoading(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   return (
     <AppContext.Provider value={{ user, isAuthLoading, setUser }}>
-      {isAuthLoading ? null : children}
+      {children}
     </AppContext.Provider>
   );
 }

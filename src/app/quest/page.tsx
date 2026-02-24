@@ -1,4 +1,12 @@
+'use client';
+
+import { AuthGuard } from '@/components/shared/AuthGuard';
+
 // TODO: implement /quest page
 export default function QuestPage() {
-  return null;
+  return (
+    <AuthGuard>
+      <div />
+    </AuthGuard>
+  );
 }

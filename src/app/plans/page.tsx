@@ -6,6 +6,7 @@ import { Flame, Zap, Map, Trophy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageWrapper from '@/components/layout/PageWrapper';
 import PlanCard from '@/components/shared/PlanCard';
+import { AuthGuard } from '@/components/shared/AuthGuard';
 import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import type { Tier } from '@/types';
@@ -209,13 +210,13 @@ function ConfirmModal({ fromTier, toTier, onConfirm, onCancel, loading }: ModalP
 // Plans page
 // -------------------------------------------------------
 
-export default function PlansPage() {
+function PlansContent() {
   const router = useRouter();
   const { user, setUser } = useAppContext();
-
   const [pendingTier, setPendingTier] = useState<PaidTier | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // user is guaranteed non-null by AuthGuard; null check here is for TypeScript narrowing only
   if (!user) return null;
 
   async function handleConfirm() {
@@ -312,5 +313,13 @@ export default function PlansPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function PlansPage() {
+  return (
+    <AuthGuard>
+      <PlansContent />
+    </AuthGuard>
   );
 }

@@ -1,4 +1,12 @@
+'use client';
+
+import { AuthGuard } from '@/components/shared/AuthGuard';
+
 // TODO: implement /quiz/daily page
 export default function DailyQuizPage() {
-  return null;
+  return (
+    <AuthGuard>
+      <div />
+    </AuthGuard>
+  );
 }

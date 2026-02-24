@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import PageWrapper from '@/components/layout/PageWrapper';
 import WelcomeTour from '@/components/shared/WelcomeTour';
+import { AuthGuard } from '@/components/shared/AuthGuard';
 import { useAppContext } from '@/context/AppContext';
 import { getLevelName } from '@/utils/xp';
 import type { Exam } from '@/types';
@@ -58,10 +59,9 @@ const HAS_PLAYED_TODAY = false;
 
 // -------------------------------------------------------
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { user } = useAppContext();
-
-  // Auth redirects are handled centrally by AppContext.
+  // user is guaranteed non-null by AuthGuard; null check here is for TypeScript narrowing only
   if (!user) return null;
 
   const primaryExam = user.selectedExams[0] ?? 'SAT';
@@ -266,5 +266,13 @@ export default function DashboardPage() {
       {/* Welcome tour — shows only when userOnboarded === false */}
       {!user.userOnboarded && <WelcomeTour />}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthGuard>
+      <DashboardContent />
+    </AuthGuard>
   );
 }

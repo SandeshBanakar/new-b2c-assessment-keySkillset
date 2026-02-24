@@ -5,11 +5,12 @@ import { CheckCircle2, SlidersHorizontal, Trophy, X } from 'lucide-react';
 import AssessmentCard from '@/components/assessment/AssessmentCard';
 import AssessmentFilterBar, { type FilterState } from '@/components/assessment/AssessmentFilterBar';
 import AssessmentLibraryBanner from '@/components/shared/AssessmentLibraryBanner';
+import { AuthGuard } from '@/components/shared/AuthGuard';
 import { getCardStatus, mockAssessments, mockProgressMap } from '@/utils/assessmentUtils';
 import { useAppContext } from '@/context/AppContext';
 import type { AssessmentType, Exam } from '@/types';
 
-export default function AssessmentsPage() {
+function AssessmentsContent() {
   const { user } = useAppContext();
   const tier = user?.subscriptionTier ?? 'free';
 
@@ -123,5 +124,13 @@ export default function AssessmentsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AssessmentsPage() {
+  return (
+    <AuthGuard>
+      <AssessmentsContent />
+    </AuthGuard>
   );
 }

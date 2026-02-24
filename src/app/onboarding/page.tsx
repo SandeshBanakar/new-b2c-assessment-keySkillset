@@ -75,44 +75,43 @@ export default function OnboardingPage() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        // No auth session — store selections for mock flow and proceed
-        localStorage.setItem(
-          'pending_onboarding',
-          JSON.stringify({
-            display_name: displayName.trim(),
-            goal,
-            selected_exams: selectedExams,
-          })
-        );
-      } else {
-        // Auth session exists — write to Supabase
-        await supabase
-          .from('users')
-          .update({
-            display_name: displayName.trim(),
-            goal,
-            selected_exams: selectedExams,
-            subscription_tier: 'free',
-            user_onboarded: true,
-          })
-          .eq('id', session.user.id);
-
-        if (user) {
-          setUser({
-            ...user,
-            displayName: displayName.trim(),
-            goal,
-            selectedExams,
-            subscriptionTier: 'free',
-            userOnboarded: true,
-          });
-        }
+        router.push('/auth');
+        return;
       }
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          display_name: displayName.trim(),
+          goal,
+          selected_exams: selectedExams,
+          subscription_tier: 'free',
+          user_onboarded: true,
+        })
+        .eq('id', session.user.id);
+
+      if (updateError) {
+        setError('Something went wrong. Please try again.');
+        return;
+      }
+
+      if (user) {
+        setUser({
+          ...user,
+          displayName: displayName.trim(),
+          goal,
+          selectedExams,
+          subscriptionTier: 'free',
+          userOnboarded: true,
+        });
+      }
+
+      router.push('/assessments');
     } catch (err) {
       console.error('[onboarding] handleSubmit failed:', err);
       setError('Something went wrong. Please try again.');
     } finally {
-      router.push('/assessments');
+      setLoading(false);
     }
   }
 

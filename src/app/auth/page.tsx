@@ -1,14 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
-import { isDemoCredential, getDemoUserByEmail, DEMO_SESSION_KEY } from '@/lib/demoAuth';
 
 export default function AuthPage() {
-  const router = useRouter();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,36 +17,19 @@ export default function AuthPage() {
     setError(null);
 
     const supabase = createClient();
-
-    // — Attempt 1: Real Supabase auth —
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (!signInError && data.session) {
-      const { data: userData } = await supabase
-        .from('users')
-        .select('user_onboarded')
-        .eq('id', data.session.user.id)
-        .single();
-
-      router.push(userData?.user_onboarded === false ? '/onboarding' : '/');
+    if (signInError) {
+      setError('Invalid email or password.');
+      setLoading(false);
       return;
     }
 
-    // — Attempt 2: Demo bypass (no DB query — profile is embedded in demoAuth.ts) —
-    if (isDemoCredential(email, password)) {
-      const demoUser = getDemoUserByEmail(email)!;
-      localStorage.setItem(DEMO_SESSION_KEY, demoUser.id);
-      // Full reload so AppContext remounts and picks up the localStorage session.
-      // router.push() is client-side and won't re-trigger onAuthStateChange.
-      window.location.href = demoUser.userOnboarded ? '/' : '/onboarding';
-      return;
-    }
-
-    setError('Invalid email or password.');
-    setLoading(false);
+    // Full page reload so AppContext remounts with fresh session cookie established
+    window.location.href = '/';
   }
 
   return (
@@ -113,7 +92,7 @@ export default function AuthPage() {
         </form>
 
         <p className="text-xs text-zinc-400 text-center mt-4">
-          Demo access only. Contact admin for credentials.
+          Contact admin for credentials.
         </p>
 
       </div>
