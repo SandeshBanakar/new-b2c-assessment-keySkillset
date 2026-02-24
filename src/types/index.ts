@@ -66,6 +66,82 @@ export interface QuizAttemptState {
 
 // -------------------------------------------------------
 
+// -------------------------------------------------------
+// Mock attempt types (for assessment detail + analysis)
+// -------------------------------------------------------
+
+export type AttemptStatus = 'completed' | 'in_progress' | 'abandoned' | 'not_started';
+
+export interface MockAttempt {
+  id: string;
+  assessmentId: string;
+  attemptNumber: number;      // 0 = free attempt, 1–5 = paid
+  status: AttemptStatus;
+  score: number;              // 0 if not completed
+  scoreRw?: number;           // SAT R&W section score
+  scoreMath?: number;         // SAT Math section score
+  durationMinutes: number | null;
+  correctCount: number;
+  incorrectCount: number;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+// -------------------------------------------------------
+// Question types for review/analysis
+// -------------------------------------------------------
+
+export type QuestionType =
+  | 'mcq-single'
+  | 'mcq-multiple'
+  | 'numeric'
+  | 'passage-single'
+  | 'passage-multi';
+
+export interface OptionBreakdown {
+  option: string;   // e.g. 'A', 'B', 'C', 'D'
+  text: string;     // explanation for this option
+}
+
+export interface ExplanationData {
+  correctAnswerLabel: string;   // e.g. "The correct answer is C"
+  optionBreakdowns?: OptionBreakdown[];
+  steps?: string[];
+  videoUrl?: string;
+}
+
+export interface MockQuestion {
+  id: string;
+  assessmentId: string;
+  questionNumber: number;
+  type: QuestionType;
+  passageText?: string;
+  questionText: string;
+  options?: string[];           // A/B/C/D label+text strings
+  correctAnswer: string;        // 'A'|'B'|'C'|'D' for MCQ, numeric string for numeric
+  correctAnswers?: string[];    // for mcq-multiple (e.g. ['A', 'C'])
+  explanation: ExplanationData;
+  conceptTag: string;
+  module?: string;              // SAT: 'RW-M1' | 'RW-M2' | 'Math-M1' | 'Math-M2'
+}
+
+export interface QuestionAttemptResult {
+  questionId: string;
+  questionNumber: number;
+  userAnswer: string | null;
+  isCorrect: boolean;
+  timeSpentSeconds: number;
+  module?: string;
+}
+
+export interface SyllabusSection {
+  number: number;
+  title: string;
+  topics: string[];
+}
+
+// -------------------------------------------------------
+
 export interface User {
   id: string;
   email: string;
