@@ -347,3 +347,9 @@ Chapter Tests UI pattern:
   - Card: title, difficulty badge, description, duration, question count, attempts left, Start/Locked CTA
   - NO exam badge chip or subject chip on individual cards
   - Skill group metadata is Super Admin-entered, stored in DB
+
+## Future Org Structure (DO NOT BUILD YET — reference only)
+users.organization_id  TEXT NULL  — null for B2C, org ID for B2B enrolled users
+users.role             TEXT DEFAULT 'student'  — student | content_creator | org_admin | client_admin | super_admin
+assessments.visibility TEXT DEFAULT 'global'   — global | org_specific
+assessments.org_id     TEXT NULL               — null for global content
