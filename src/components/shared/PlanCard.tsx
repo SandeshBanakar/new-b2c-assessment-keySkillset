@@ -1,6 +1,6 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { Check, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface PlanCardProps {
@@ -38,8 +38,8 @@ export default function PlanCard({
     >
       {/* Most Popular badge */}
       {badge && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-xs font-semibold px-3 py-0.5 rounded-full whitespace-nowrap">
-          ★ {badge}
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 bg-amber-500 text-white text-xs font-semibold px-3 py-0.5 rounded-full whitespace-nowrap">
+          <Star className="w-3 h-3 fill-white" /> {badge}
         </span>
       )}
 

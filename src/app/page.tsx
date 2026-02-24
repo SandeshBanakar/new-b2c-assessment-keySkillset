@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Flame } from 'lucide-react';
+import { Check, Flame, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import PageWrapper from '@/components/layout/PageWrapper';
@@ -101,7 +101,9 @@ export default function DashboardPage() {
               <p className="text-sm text-zinc-600">6 questions · ~5 min</p>
               {HAS_PLAYED_TODAY ? (
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-emerald-500">Played today ✓</p>
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-emerald-500">
+                    Played today <Check className="w-4 h-4" />
+                  </p>
                   <p className="text-xs text-zinc-400">Come back tomorrow</p>
                 </div>
               ) : (
@@ -128,8 +130,8 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3">
                 {[1, 2, 3].map((n) => (
                   <div key={n} className="flex-1 flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-zinc-200 border-2 border-zinc-300 flex items-center justify-center text-zinc-400 text-sm">
-                      🔒
+                    <div className="w-10 h-10 rounded-full bg-zinc-200 border-2 border-zinc-300 flex items-center justify-center">
+                      <Lock className="w-4 h-4 text-zinc-400" />
                     </div>
                     <div className="h-1.5 w-full bg-zinc-100 rounded-full" />
                   </div>
