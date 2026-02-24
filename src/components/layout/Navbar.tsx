@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
+import { DEMO_SESSION_KEY } from '@/lib/demoAuth';
 import { useAppContext } from '@/context/AppContext';
 
 const NAV_LINKS = [
@@ -32,8 +33,9 @@ export default function Navbar() {
 
   async function handleSignOut() {
     const supabase = createClient();
-    await supabase.auth.signOut();
-    setUser({ ...user! });
+    await supabase.auth.signOut();       // no-op if demo user, safe to call
+    localStorage.removeItem(DEMO_SESSION_KEY);
+    setUser(null);
     router.push('/auth');
   }
 

@@ -3,15 +3,39 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { DEMO_SESSION_KEY } from '@/lib/demoAuth';
 import type { User, Exam } from '@/types';
 
 interface AppContextValue {
   user: User | null;
   isAuthLoading: boolean;
-  setUser: (user: User) => void;
+  setUser: (user: User | null) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
+
+/** Maps a public.users row → our User type */
+function mapRow(row: Record<string, unknown>): User {
+  return {
+    id: row.id as string,
+    email: row.email as string,
+    displayName: row.display_name as string,
+    subscriptionTier: row.subscription_tier as User['subscriptionTier'],
+    subscriptionStatus: row.subscription_status as User['subscriptionStatus'],
+    subscriptionStartDate: row.subscription_start_date as string | null,
+    subscriptionEndDate: row.subscription_end_date as string | null,
+    razorpaySubscriptionId: row.razorpay_subscription_id as string | null,
+    razorpayPlanId: row.razorpay_plan_id as string | null,
+    razorpayCustomerId: row.razorpay_customer_id as string | null,
+    userOnboarded: row.user_onboarded as boolean,
+    selectedExams: ((row.selected_exams ?? []) as Exam[]),
+    goal: row.goal as string | null,
+    xp: (row.xp as number) ?? 0,
+    streak: (row.streak as number) ?? 0,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
 
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -22,63 +46,68 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const supabase = createClient();
     let mounted = true;
+    const AUTH_PATHS = ['/auth', '/onboarding'];
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       async function resolve() {
-        const AUTH_PATHS = ['/auth', '/onboarding'];
+        // ── Path A: Real Supabase session ──────────────────────────────────
+        if (session) {
+          const { data: row } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
 
-        if (!session) {
           if (!mounted) return;
-          setUser(null);
+
+          if (!row) {
+            setUser(null);
+            setIsAuthLoading(false);
+            if (!AUTH_PATHS.includes(pathname)) router.replace('/auth');
+            return;
+          }
+
+          setUser(mapRow(row as Record<string, unknown>));
           setIsAuthLoading(false);
-          if (!AUTH_PATHS.includes(pathname)) {
-            router.replace('/auth');
+
+          if (!row.user_onboarded && pathname !== '/onboarding' && pathname !== '/auth') {
+            router.replace('/onboarding');
           }
           return;
         }
 
-        const { data: row } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        // ── Path B: No Supabase session — check for demo session ───────────
+        const demoUserId = localStorage.getItem(DEMO_SESSION_KEY);
 
+        if (demoUserId) {
+          const { data: row } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', demoUserId)
+            .single();
+
+          if (!mounted) return;
+
+          if (row) {
+            setUser(mapRow(row as Record<string, unknown>));
+            setIsAuthLoading(false);
+
+            if (!row.user_onboarded && pathname !== '/onboarding' && pathname !== '/auth') {
+              router.replace('/onboarding');
+            }
+            return;
+          }
+
+          // Stale / invalid demo session — clear it and fall through
+          localStorage.removeItem(DEMO_SESSION_KEY);
+        }
+
+        // ── Path C: No session at all — redirect to /auth ──────────────────
         if (!mounted) return;
-
-        if (!row) {
-          setUser(null);
-          setIsAuthLoading(false);
-          if (!AUTH_PATHS.includes(pathname)) {
-            router.replace('/auth');
-          }
-          return;
-        }
-
-        const mapped: User = {
-          id: row.id,
-          email: row.email,
-          displayName: row.display_name,
-          subscriptionTier: row.subscription_tier,
-          subscriptionStatus: row.subscription_status,
-          subscriptionStartDate: row.subscription_start_date,
-          subscriptionEndDate: row.subscription_end_date,
-          razorpaySubscriptionId: row.razorpay_subscription_id,
-          razorpayPlanId: row.razorpay_plan_id,
-          razorpayCustomerId: row.razorpay_customer_id,
-          userOnboarded: row.user_onboarded,
-          selectedExams: (row.selected_exams ?? []) as Exam[],
-          goal: row.goal,
-          xp: row.xp ?? 0,
-          streak: row.streak ?? 0,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
-        };
-
-        setUser(mapped);
+        setUser(null);
         setIsAuthLoading(false);
-
-        if (!row.user_onboarded && pathname !== '/onboarding' && pathname !== '/auth') {
-          router.replace('/onboarding');
+        if (!AUTH_PATHS.includes(pathname)) {
+          router.replace('/auth');
         }
       }
 

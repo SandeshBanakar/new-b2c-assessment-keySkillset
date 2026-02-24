@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
+import { isDemoCredential, getDemoUserId, DEMO_SESSION_KEY } from '@/lib/demoAuth';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -21,28 +22,50 @@ export default function AuthPage() {
 
     const supabase = createClient();
 
+    // — Attempt 1: Real Supabase auth —
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (signInError || !data.session) {
-      setError('Invalid email or password.');
-      setLoading(false);
+    if (!signInError && data.session) {
+      // Real auth succeeded — fetch profile and redirect
+      const { data: userData } = await supabase
+        .from('users')
+        .select('user_onboarded')
+        .eq('id', data.session.user.id)
+        .single();
+
+      router.push(userData?.user_onboarded === false ? '/onboarding' : '/');
       return;
     }
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('user_onboarded')
-      .eq('id', data.session.user.id)
-      .single();
+    // — Attempt 2: Demo bypass (used when email confirmation is pending) —
+    if (isDemoCredential(email, password)) {
+      const userId = getDemoUserId(email)!;
+      localStorage.setItem(DEMO_SESSION_KEY, userId);
 
-    if (userData?.user_onboarded === false) {
-      router.push('/onboarding');
-    } else {
-      router.push('/');
+      const { data: userData } = await supabase
+        .from('users')
+        .select('user_onboarded')
+        .eq('id', userId)
+        .single();
+
+      if (!userData) {
+        // Profile row missing — clear and show error
+        localStorage.removeItem(DEMO_SESSION_KEY);
+        setError('Demo user profile not found in database. Check Supabase public.users.');
+        setLoading(false);
+        return;
+      }
+
+      router.push(userData.user_onboarded === false ? '/onboarding' : '/');
+      return;
     }
+
+    // — Both attempts failed —
+    setError('Invalid email or password.');
+    setLoading(false);
   }
 
   return (
