@@ -43,7 +43,9 @@ export default function AuthPage() {
     if (isDemoCredential(email, password)) {
       const demoUser = getDemoUserByEmail(email)!;
       localStorage.setItem(DEMO_SESSION_KEY, demoUser.id);
-      router.push(demoUser.userOnboarded ? '/' : '/onboarding');
+      // Full reload so AppContext remounts and picks up the localStorage session.
+      // router.push() is client-side and won't re-trigger onAuthStateChange.
+      window.location.href = demoUser.userOnboarded ? '/' : '/onboarding';
       return;
     }
 

@@ -1,14 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Check, Flame, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import PageWrapper from '@/components/layout/PageWrapper';
 import WelcomeTour from '@/components/shared/WelcomeTour';
-import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import { getLevelName } from '@/utils/xp';
 import type { Exam } from '@/types';
@@ -62,25 +59,9 @@ const HAS_PLAYED_TODAY = false;
 // -------------------------------------------------------
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const { user, isAuthLoading } = useAppContext();
+  const { user } = useAppContext();
 
-  useEffect(() => {
-    if (isAuthLoading) return;
-    async function checkSession() {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/auth');
-        return;
-      }
-      if (!user?.userOnboarded) {
-        router.push('/onboarding');
-      }
-    }
-    void checkSession();
-  }, [isAuthLoading, user, router]);
-
+  // Auth redirects are handled centrally by AppContext.
   if (!user) return null;
 
   const primaryExam = user.selectedExams[0] ?? 'SAT';
