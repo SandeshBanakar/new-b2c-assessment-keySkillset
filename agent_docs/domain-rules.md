@@ -353,3 +353,85 @@ users.organization_id  TEXT NULL  — null for B2C, org ID for B2B enrolled user
 users.role             TEXT DEFAULT 'student'  — student | content_creator | org_admin | client_admin | super_admin
 assessments.visibility TEXT DEFAULT 'global'   — global | org_specific
 assessments.org_id     TEXT NULL               — null for global content
+
+## Question Types (5 total)
+
+### 1. MCQ Single
+- Full-width question text
+- 4 options (A/B/C/D) as bordered rows
+- One correct answer
+- Review state: correct option = emerald-50 bg + emerald-600 border + CheckCircle icon
+  Wrong selected = rose-50 bg + rose-600 border + XCircle icon
+  Unselected options = zinc-50 bg
+
+### 2. MCQ Multiple
+- Same layout as MCQ Single
+- Multiple options can be correct
+- Review state: each correct option highlighted individually
+- User's selected wrong options highlighted in rose
+
+### 3. Numeric
+- Full-width question text (may include math notation)
+- Input display: "Your answer: [value]" vs "Correct answer: [value]"
+- No options — just two value rows
+- Correct: emerald row. Wrong: rose row.
+
+### 4. Passage Single
+- Split-screen layout: passage LEFT (50%), question + options RIGHT (50%)
+- Explanation appears BELOW the split as a full-width section
+- On mobile: passage stacked above question
+
+### 5. Passage Multi
+- Split-screen: passage LEFT (50%), multiple questions RIGHT (50%, scrollable)
+- Each question = independent MCQ Single within the right panel
+- Explanation per question appears inline below each question in review mode
+- CLAT will be primarily this type (V2)
+
+## Math Notation
+- Use superscript HTML (<sup>) for exponents in mock: x<sup>-12</sup>y<sup>16</sup>
+- KaTeX or MathJax integration = V2 (engineering to implement with real content)
+- All current mock math questions use plain text with <sup> tags
+
+## Explanation Component (all question types)
+Structure:
+  1. Explanation header: "EXPLANATION:" (blue-700, font-medium)
+  2. Answer statement: "Correct answer is [option/value]" (font-semibold)
+  3. Option-by-option breakdown (for MCQ types): why each option is right/wrong
+  4. Step-by-step for math (numeric + math MCQ): numbered steps
+  5. VIDEO SLOT: placeholder div with <VideoIcon /> + "Video explanation coming soon"
+     — hidden behind a feature flag: NEXT_PUBLIC_VIDEO_EXPLANATIONS_ENABLED=false
+     — When enabled, embeds video player here
+
+## Assessment Architecture: Linear vs Adaptive
+Linear (NEET, JEE):
+  - All questions in one sequence
+  - No modules, no breaks
+  - Single score at end
+  - question_order is fixed, stored in assessment.questions[]
+
+Adaptive/Modular (SAT):
+  - 4 modules: RW Module 1, RW Module 2, Math Module 1, Math Module 2
+  - Break screen between RW and Math sections
+  - Branch config: performance on Module 1 determines difficulty of Module 2
+  - Per-module scores + total score
+  - Stored in assessment.modules[] with branch_config
+
+## Attempt Locking Rule
+- Attempts are sequential: cannot start Attempt N+1 until Attempt N is completed OR abandoned
+- Abandoned = terminal status, counts as used attempt, unlocks next
+- Locked attempt row copy: "Complete Attempt [N] to unlock"
+- Abandon confirmation: "This will forfeit Attempt [N]. Score will be 0. Cannot be undone."
+
+## Score Tracking
+- best_score tracked per assessment per user
+- NEET + JEE: raw score (marks-based, can be negative for wrong)
+- SAT: scaled score 400–1600 (two section scores 200–800 each)
+- PMP: percentage-based pass/fail
+- Score trend tracked across all completed attempts for analytics tab
+
+## Content Creator DB (same Supabase project)
+- Role column: users.role — 'student' | 'content_creator' | 'org_admin' | 'client_admin' | 'super_admin'
+- Questions table: accessible to content_creator role and above
+- Assessments table: accessible to content_creator role and above
+- End user reads only — no write access to questions/assessments tables
+- Base44 platform = content creator UI (external tool, same DB via Supabase API keys)
