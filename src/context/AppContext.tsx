@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { DEMO_SESSION_KEY } from '@/lib/demoAuth';
+import { DEMO_SESSION_KEY, getDemoUserById } from '@/lib/demoAuth';
 import type { User, Exam } from '@/types';
 
 interface AppContextValue {
@@ -77,28 +77,25 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         }
 
         // ── Path B: No Supabase session — check for demo session ───────────
+        // Profile is embedded in demoAuth.ts — no DB query needed (avoids RLS block).
         const demoUserId = localStorage.getItem(DEMO_SESSION_KEY);
 
         if (demoUserId) {
-          const { data: row } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', demoUserId)
-            .single();
+          const demoUser = getDemoUserById(demoUserId);
 
           if (!mounted) return;
 
-          if (row) {
-            setUser(mapRow(row as Record<string, unknown>));
+          if (demoUser) {
+            setUser(demoUser);
             setIsAuthLoading(false);
 
-            if (!row.user_onboarded && pathname !== '/onboarding' && pathname !== '/auth') {
+            if (!demoUser.userOnboarded && pathname !== '/onboarding' && pathname !== '/auth') {
               router.replace('/onboarding');
             }
             return;
           }
 
-          // Stale / invalid demo session — clear it and fall through
+          // Stale / unrecognised demo ID — clear and fall through
           localStorage.removeItem(DEMO_SESSION_KEY);
         }
 

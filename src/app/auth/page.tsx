@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
-import { isDemoCredential, getDemoUserId, DEMO_SESSION_KEY } from '@/lib/demoAuth';
+import { isDemoCredential, getDemoUserByEmail, DEMO_SESSION_KEY } from '@/lib/demoAuth';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -29,7 +29,6 @@ export default function AuthPage() {
     });
 
     if (!signInError && data.session) {
-      // Real auth succeeded — fetch profile and redirect
       const { data: userData } = await supabase
         .from('users')
         .select('user_onboarded')
@@ -40,30 +39,14 @@ export default function AuthPage() {
       return;
     }
 
-    // — Attempt 2: Demo bypass (used when email confirmation is pending) —
+    // — Attempt 2: Demo bypass (no DB query — profile is embedded in demoAuth.ts) —
     if (isDemoCredential(email, password)) {
-      const userId = getDemoUserId(email)!;
-      localStorage.setItem(DEMO_SESSION_KEY, userId);
-
-      const { data: userData } = await supabase
-        .from('users')
-        .select('user_onboarded')
-        .eq('id', userId)
-        .single();
-
-      if (!userData) {
-        // Profile row missing — clear and show error
-        localStorage.removeItem(DEMO_SESSION_KEY);
-        setError('Demo user profile not found in database. Check Supabase public.users.');
-        setLoading(false);
-        return;
-      }
-
-      router.push(userData.user_onboarded === false ? '/onboarding' : '/');
+      const demoUser = getDemoUserByEmail(email)!;
+      localStorage.setItem(DEMO_SESSION_KEY, demoUser.id);
+      router.push(demoUser.userOnboarded ? '/' : '/onboarding');
       return;
     }
 
-    // — Both attempts failed —
     setError('Invalid email or password.');
     setLoading(false);
   }
@@ -72,12 +55,10 @@ export default function AuthPage() {
     <div className="min-h-screen bg-zinc-50 px-4">
       <div className="max-w-sm mx-auto mt-24 bg-white rounded-md shadow-sm p-8">
 
-        {/* Wordmark */}
         <p className="text-blue-700 font-bold text-xl text-center mb-6">
           keySkillset
         </p>
 
-        {/* Heading */}
         <h1 className="text-xl font-semibold text-zinc-900 text-center">
           Welcome back
         </h1>
@@ -86,7 +67,6 @@ export default function AuthPage() {
         </p>
 
         <form onSubmit={handleSignIn} className="space-y-4">
-          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1.5">
               Email
@@ -102,7 +82,6 @@ export default function AuthPage() {
             />
           </div>
 
-          {/* Password */}
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1.5">
               Password
@@ -118,12 +97,10 @@ export default function AuthPage() {
             />
           </div>
 
-          {/* Error */}
           {error && (
             <p className="text-sm text-rose-600">{error}</p>
           )}
 
-          {/* Submit */}
           <Button
             type="submit"
             disabled={loading}
@@ -133,7 +110,6 @@ export default function AuthPage() {
           </Button>
         </form>
 
-        {/* Footer */}
         <p className="text-xs text-zinc-400 text-center mt-4">
           Demo access only. Contact admin for credentials.
         </p>
