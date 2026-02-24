@@ -30,9 +30,9 @@ export default function PlanCard({
 }: PlanCardProps) {
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border bg-white p-6 ${
+      className={`relative flex flex-col rounded-md border bg-white p-6 ${
         isHighlighted
-          ? 'border-violet-600 shadow-md ring-1 ring-violet-600/20'
+          ? 'border-blue-700 shadow-md ring-1 ring-blue-700/20'
           : 'border-zinc-200 shadow-sm'
       }`}
     >
@@ -45,7 +45,7 @@ export default function PlanCard({
 
       {/* Current Plan badge */}
       {isCurrent && (
-        <span className="absolute top-4 right-4 bg-violet-600 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+        <span className="absolute top-4 right-4 bg-blue-700 text-white text-xs font-medium px-2 py-0.5 rounded-full">
           Current Plan
         </span>
       )}
@@ -54,7 +54,7 @@ export default function PlanCard({
       <div className="mb-4">
         <h3 className="text-base font-semibold text-zinc-900">{name}</h3>
         <div className="mt-1 flex items-baseline gap-1">
-          <span className="text-2xl font-bold text-zinc-900">₹{price}</span>
+          <span className="text-2xl font-semibold text-zinc-900">₹{price}</span>
           <span className="text-sm text-zinc-500">/month</span>
         </div>
         <p className="mt-2 text-xs text-zinc-500 italic">&ldquo;{bestFor}&rdquo;</p>
@@ -74,14 +74,14 @@ export default function PlanCard({
       {ctaVariant === 'disabled' ? (
         <Button
           disabled
-          className="w-full rounded-xl bg-zinc-100 text-zinc-400 cursor-not-allowed"
+          className="w-full rounded-md bg-zinc-100 text-zinc-400 cursor-not-allowed"
         >
           {ctaLabel}
         </Button>
       ) : ctaVariant === 'primary' ? (
         <Button
           onClick={onSelect}
-          className="w-full rounded-xl bg-violet-600 hover:bg-violet-700 text-white"
+          className="w-full rounded-md bg-blue-700 hover:bg-blue-800 text-white"
         >
           {ctaLabel}
         </Button>
@@ -89,7 +89,7 @@ export default function PlanCard({
         <Button
           variant="outline"
           onClick={onSelect}
-          className="w-full rounded-xl border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+          className="w-full rounded-md border-zinc-200 text-zinc-700 hover:bg-zinc-50"
         >
           {ctaLabel}
         </Button>

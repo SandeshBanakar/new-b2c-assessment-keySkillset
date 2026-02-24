@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Flame } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import PageWrapper from '@/components/layout/PageWrapper';
@@ -46,7 +47,7 @@ const RECENT_ACTIVITY: RecentAttempt[] = [
 ];
 
 const EXAM_BADGE_COLORS: Record<Exam, string> = {
-  SAT:  'bg-violet-100 text-violet-700',
+  SAT:  'bg-blue-100 text-blue-700',
   JEE:  'bg-amber-100 text-amber-700',
   NEET: 'bg-emerald-100 text-emerald-700',
   PMP:  'bg-blue-100 text-blue-700',
@@ -73,7 +74,7 @@ export default function DashboardPage() {
 
         {/* Page heading */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-zinc-900">
+          <h1 className="text-2xl font-semibold text-zinc-900">
             Welcome back{firstName ? `, ${firstName}` : ''}!
           </h1>
           <p className="text-sm text-zinc-500 mt-1">Here&apos;s your dashboard for today.</p>
@@ -85,13 +86,13 @@ export default function DashboardPage() {
           {/* ── Widget 1 — Today's Daily Quiz ── */}
           <Card
             data-tour="daily-quiz"
-            className="bg-white border border-zinc-200 rounded-2xl"
+            className="bg-white border border-zinc-200 rounded-md"
           >
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-zinc-900">Today&apos;s Daily Quiz</h2>
-                <span className="text-xs font-medium text-amber-500 bg-amber-50 px-2 py-1 rounded-full">
-                  Day {user.streak} 🔥
+                <span className="text-xs font-medium text-amber-500 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1">
+                  Day {user.streak} <Flame className="w-4 h-4 text-amber-500" />
                 </span>
               </div>
               <p className="text-sm text-zinc-500">{primaryExam}</p>
@@ -106,7 +107,7 @@ export default function DashboardPage() {
               ) : (
                 <Button
                   asChild
-                  className="w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl"
+                  className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md"
                 >
                   <Link href="/quiz/daily">Play Now →</Link>
                 </Button>
@@ -117,7 +118,7 @@ export default function DashboardPage() {
           {/* ── Widget 2 — Quest Map Preview ── */}
           <Card
             data-tour="quest-preview"
-            className="bg-white border border-zinc-200 rounded-2xl"
+            className="bg-white border border-zinc-200 rounded-md"
           >
             <CardHeader className="pb-2">
               <h2 className="text-lg font-semibold text-zinc-900">Your Learning Path</h2>
@@ -139,14 +140,14 @@ export default function DashboardPage() {
                 <Button
                   asChild
                   variant="outline"
-                  className="w-full rounded-xl border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+                  className="w-full rounded-md border-zinc-200 text-zinc-700 hover:bg-zinc-50"
                 >
                   <Link href="/plans">Compare Plans →</Link>
                 </Button>
               ) : (
                 <Button
                   asChild
-                  className="w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl"
+                  className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md"
                 >
                   <Link href="/quest">Continue Quest →</Link>
                 </Button>
@@ -157,7 +158,7 @@ export default function DashboardPage() {
           {/* ── Widget 3 — Stats Bar ── */}
           <Card
             data-tour="stats-bar"
-            className="bg-white border border-zinc-200 rounded-2xl"
+            className="bg-white border border-zinc-200 rounded-md"
           >
             <CardHeader className="pb-2">
               <h2 className="text-lg font-semibold text-zinc-900">Your Stats</h2>
@@ -178,7 +179,7 @@ export default function DashboardPage() {
                     <span className="text-sm font-medium text-amber-500">{user.streak} days</span>
                   </div>
                   <p className="text-xs text-zinc-400 pt-1">
-                    <Link href="/plans" className="text-violet-600 hover:underline">
+                    <Link href="/plans" className="text-blue-700 hover:underline">
                       Unlock with any plan
                     </Link>
                   </p>
@@ -191,7 +192,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-zinc-600">Level</span>
-                    <span className="text-sm font-semibold text-violet-600">{levelName}</span>
+                    <span className="text-sm font-semibold text-blue-700">{levelName}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-zinc-600">Streak</span>
@@ -203,7 +204,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* ── Widget 4 — Recent Activity ── */}
-          <Card className="bg-white border border-zinc-200 rounded-2xl">
+          <Card className="bg-white border border-zinc-200 rounded-md">
             <CardHeader className="pb-2">
               <h2 className="text-lg font-semibold text-zinc-900">Recent Activity</h2>
             </CardHeader>
@@ -212,7 +213,7 @@ export default function DashboardPage() {
                 <div className="py-6 text-center">
                   <p className="text-sm text-zinc-500">
                     No activity yet.{' '}
-                    <Link href="/quiz/daily" className="text-violet-600 hover:underline">
+                    <Link href="/quiz/daily" className="text-blue-700 hover:underline">
                       Start your first Daily Quiz →
                     </Link>
                   </p>
@@ -223,7 +224,7 @@ export default function DashboardPage() {
                     <Link
                       key={item.id}
                       href={`/assessments/${item.id}`}
-                      className="flex items-center justify-between rounded-lg px-2 py-1.5 -mx-2 hover:bg-zinc-50 transition-colors"
+                      className="flex items-center justify-between rounded-md px-2 py-1.5 -mx-2 hover:bg-zinc-50 transition-colors"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span

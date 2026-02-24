@@ -37,7 +37,7 @@ export default function AssessmentsPage() {
 
         {/* Plan success banner */}
         {planBanner && (
-          <div className="mb-6 flex items-center justify-between gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+          <div className="mb-6 flex items-center justify-between gap-3 rounded-md bg-emerald-50 border border-emerald-200 px-4 py-3">
             <p className="text-sm font-medium text-emerald-700">🎉 {planBanner}</p>
             <button
               onClick={() => setPlanBanner(null)}
@@ -51,11 +51,11 @@ export default function AssessmentsPage() {
 
         {/* Page header */}
         <div className="mb-6 space-y-1">
-          <h1 className="text-2xl font-bold text-zinc-900">Assessment Library</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">Assessment Library</h1>
           <p className="text-sm text-zinc-500">
             Logged in as <span className="font-medium text-zinc-700">{mockUser.displayName}</span>
             {' · '}
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-600 text-white capitalize">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-700 text-white capitalize">
               {mockUser.subscriptionTier}
             </span>
           </p>

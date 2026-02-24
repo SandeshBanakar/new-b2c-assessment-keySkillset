@@ -9,7 +9,7 @@ import type { Assessment, CardStatus, Difficulty, Exam, UserAssessmentProgress }
 // -------------------------------------------------------
 
 const examColors: Record<Exam, string> = {
-  SAT: 'bg-violet-100 text-violet-700',
+  SAT: 'bg-blue-100 text-blue-700',
   JEE: 'bg-blue-100 text-blue-700',
   NEET: 'bg-emerald-100 text-emerald-700',
   PMP: 'bg-amber-100 text-amber-700',
@@ -71,7 +71,7 @@ export default function AssessmentCard({ assessment, progress, status }: Assessm
   return (
     <div className="relative">
       <Card
-        className={`bg-white border border-zinc-200 rounded-2xl transition-opacity ${
+        className={`bg-white border border-zinc-200 rounded-md transition-opacity ${
           isLocked ? 'opacity-60' : ''
         }`}
       >
@@ -121,9 +121,9 @@ export default function AssessmentCard({ assessment, progress, status }: Assessm
           {/* CTA */}
           <Button
             asChild
-            className={`w-full rounded-xl ${
+            className={`w-full rounded-md ${
               isPrimary
-                ? 'bg-violet-600 hover:bg-violet-700 text-white'
+                ? 'bg-blue-700 hover:bg-blue-800 text-white'
                 : 'border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50'
             }`}
           >

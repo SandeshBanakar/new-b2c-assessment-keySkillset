@@ -47,19 +47,19 @@ export default function ExamSelector({ selectedExams, onToggle }: ExamSelectorPr
             key={value}
             type="button"
             onClick={() => onToggle(value)}
-            className={`relative text-left rounded-xl border-2 px-4 py-4 transition-all ${
+            className={`relative text-left rounded-md border-2 px-4 py-4 transition-all ${
               isSelected
-                ? 'border-violet-600 bg-violet-50'
+                ? 'border-blue-700 bg-blue-50'
                 : 'border-zinc-200 bg-white hover:border-zinc-300'
             }`}
           >
             {/* Checkmark */}
             {isSelected && (
-              <span className="absolute top-3 right-3 flex items-center justify-center w-5 h-5 rounded-full bg-violet-600">
+              <span className="absolute top-3 right-3 flex items-center justify-center w-5 h-5 rounded-full bg-blue-700">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </span>
             )}
-            <p className={`text-base font-semibold ${isSelected ? 'text-violet-700' : 'text-zinc-900'}`}>
+            <p className={`text-base font-semibold ${isSelected ? 'text-blue-700' : 'text-zinc-900'}`}>
               {label}
             </p>
             <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{description}</p>

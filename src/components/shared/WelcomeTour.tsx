@@ -140,7 +140,7 @@ export default function WelcomeTour() {
         role="dialog"
         aria-modal="true"
         aria-label={`Tour step ${step + 1} of ${steps.length}`}
-        className="fixed z-50 bg-white rounded-2xl shadow-xl border border-zinc-200 p-4"
+        className="fixed z-50 bg-white rounded-lg shadow-xl border border-zinc-200 p-4"
         style={{ top: position.top, left: position.left, width: TOOLTIP_WIDTH }}
       >
         {/* Header row */}
@@ -150,7 +150,7 @@ export default function WelcomeTour() {
               <span
                 key={i}
                 className={`block w-1.5 h-1.5 rounded-full ${
-                  i === step ? 'bg-violet-600' : 'bg-zinc-200'
+                  i === step ? 'bg-blue-700' : 'bg-zinc-200'
                 }`}
               />
             ))}
@@ -173,7 +173,7 @@ export default function WelcomeTour() {
               variant="outline"
               size="sm"
               onClick={handleBack}
-              className="rounded-xl border-zinc-200 text-zinc-600 text-xs h-8"
+              className="rounded-md border-zinc-200 text-zinc-600 text-xs h-8"
             >
               Back
             </Button>
@@ -182,7 +182,7 @@ export default function WelcomeTour() {
           <Button
             size="sm"
             onClick={handleNext}
-            className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs h-8"
+            className="bg-blue-700 hover:bg-blue-800 text-white rounded-md text-xs h-8"
           >
             {isLast ? 'Got it!' : 'Next →'}
           </Button>

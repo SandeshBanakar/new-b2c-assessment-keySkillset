@@ -31,15 +31,15 @@ function DevTierSwitcherInner() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 bg-zinc-900 rounded-xl shadow-lg p-1.5 flex items-center gap-1">
+    <div className="fixed bottom-4 right-4 z-50 bg-zinc-900 rounded-md shadow-lg p-1.5 flex items-center gap-1">
       <span className="text-xs text-zinc-500 px-2 select-none">DEV</span>
       {TIERS.map(({ label, value }) => (
         <button
           key={value}
           onClick={() => void switchTier(value)}
-          className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+          className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
             user.subscriptionTier === value
-              ? 'bg-violet-600 text-white'
+              ? 'bg-blue-700 text-white'
               : 'text-zinc-300 hover:bg-zinc-800'
           }`}
         >

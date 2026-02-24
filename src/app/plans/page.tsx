@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Flame, Zap, Map, Trophy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageWrapper from '@/components/layout/PageWrapper';
 import PlanCard from '@/components/shared/PlanCard';
@@ -97,7 +98,13 @@ const PLANS: PlanDef[] = [
   },
 ];
 
-const GAMIFICATION_ITEMS = ['🔥 Streaks', '⚡ XP', '🗺️ Quest Map', '🏆 Badges', '👥 Squad'];
+const GAMIFICATION_ITEMS = [
+  { icon: Flame, label: 'Streaks' },
+  { icon: Zap, label: 'XP' },
+  { icon: Map, label: 'Quest Map' },
+  { icon: Trophy, label: 'Badges' },
+  { icon: Users, label: 'Squad' },
+];
 
 // -------------------------------------------------------
 // Helpers
@@ -148,7 +155,7 @@ function ConfirmModal({ fromTier, toTier, onConfirm, onCancel, loading }: ModalP
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6"
+        className="w-full max-w-sm bg-white rounded-lg shadow-xl p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-semibold text-zinc-900 mb-3">
@@ -181,14 +188,14 @@ function ConfirmModal({ fromTier, toTier, onConfirm, onCancel, loading }: ModalP
           <Button
             variant="outline"
             onClick={onCancel}
-            className="flex-1 rounded-xl border-zinc-200 text-zinc-600"
+            className="flex-1 rounded-md border-zinc-200 text-zinc-600"
           >
             Cancel
           </Button>
           <Button
             onClick={onConfirm}
             disabled={loading}
-            className="flex-1 rounded-xl bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-60"
+            className="flex-1 rounded-md bg-blue-700 hover:bg-blue-800 text-white disabled:opacity-60"
           >
             {loading ? 'Confirming…' : 'Confirm'}
           </Button>
@@ -253,7 +260,7 @@ export default function PlansPage() {
 
         {/* Heading */}
         <div className="text-center mb-10">
-          <h1 className="text-2xl font-bold text-zinc-900">Choose Your Plan</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">Choose Your Plan</h1>
           <p className="text-sm text-zinc-500 mt-1">
             Unlock assessments for SAT, JEE, NEET, and PMP
           </p>
@@ -282,11 +289,12 @@ export default function PlansPage() {
         </div>
 
         {/* Gamification strip */}
-        <div className="mt-10 rounded-2xl bg-white border border-zinc-200 px-6 py-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+        <div className="mt-10 rounded-md bg-white border border-zinc-200 px-6 py-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
           <span className="text-sm font-medium text-zinc-700">Every plan unlocks:</span>
-          {GAMIFICATION_ITEMS.map((item) => (
-            <span key={item} className="text-sm text-zinc-600">
-              {item}
+          {GAMIFICATION_ITEMS.map(({ icon: Icon, label }) => (
+            <span key={label} className="flex items-center gap-1 text-sm text-zinc-600">
+              <Icon className="w-4 h-4 text-amber-500" />
+              {label}
             </span>
           ))}
         </div>
