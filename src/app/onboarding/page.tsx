@@ -57,6 +57,7 @@ export default function OnboardingPage() {
   const [goal, setGoal] = useState('');
   const [selectedExams, setSelectedExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function toggleExam(exam: Exam) {
     setSelectedExams((prev) =>
@@ -65,31 +66,54 @@ export default function OnboardingPage() {
   }
 
   async function handleSubmit() {
-    if (!user || selectedExams.length === 0 || loading) return;
+    if (selectedExams.length === 0 || loading) return;
     setLoading(true);
+    setError(null);
 
-    const supabase = createClient();
-    await supabase
-      .from('users')
-      .update({
-        display_name: displayName.trim(),
-        goal,
-        selected_exams: selectedExams,
-        subscription_tier: 'free',
-        user_onboarded: true,
-      })
-      .eq('id', user.id);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
 
-    setUser({
-      ...user,
-      displayName: displayName.trim(),
-      goal,
-      selectedExams,
-      subscriptionTier: 'free',
-      userOnboarded: true,
-    });
+      if (!session) {
+        // No auth session — store selections for mock flow and proceed
+        localStorage.setItem(
+          'pending_onboarding',
+          JSON.stringify({
+            display_name: displayName.trim(),
+            goal,
+            selected_exams: selectedExams,
+          })
+        );
+      } else {
+        // Auth session exists — write to Supabase
+        await supabase
+          .from('users')
+          .update({
+            display_name: displayName.trim(),
+            goal,
+            selected_exams: selectedExams,
+            subscription_tier: 'free',
+            user_onboarded: true,
+          })
+          .eq('id', session.user.id);
 
-    router.push('/assessments');
+        if (user) {
+          setUser({
+            ...user,
+            displayName: displayName.trim(),
+            goal,
+            selectedExams,
+            subscriptionTier: 'free',
+            userOnboarded: true,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[onboarding] handleSubmit failed:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      router.push('/assessments');
+    }
   }
 
   return (
@@ -181,6 +205,10 @@ export default function OnboardingPage() {
                 {loading ? 'Setting up…' : 'Start Learning →'}
               </Button>
             </div>
+
+            {error && (
+              <p className="mt-3 text-sm text-rose-600">{error}</p>
+            )}
           </div>
         )}
 
