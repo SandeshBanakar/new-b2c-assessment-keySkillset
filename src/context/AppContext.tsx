@@ -25,12 +25,14 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       async function resolve() {
+        const AUTH_PATHS = ['/auth', '/onboarding'];
+
         if (!session) {
           if (!mounted) return;
           setUser(null);
           setIsAuthLoading(false);
-          if (pathname !== '/onboarding') {
-            router.replace('/onboarding');
+          if (!AUTH_PATHS.includes(pathname)) {
+            router.replace('/auth');
           }
           return;
         }
@@ -46,8 +48,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         if (!row) {
           setUser(null);
           setIsAuthLoading(false);
-          if (pathname !== '/onboarding') {
-            router.replace('/onboarding');
+          if (!AUTH_PATHS.includes(pathname)) {
+            router.replace('/auth');
           }
           return;
         }
@@ -75,7 +77,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         setUser(mapped);
         setIsAuthLoading(false);
 
-        if (!row.user_onboarded && pathname !== '/onboarding') {
+        if (!row.user_onboarded && pathname !== '/onboarding' && pathname !== '/auth') {
           router.replace('/onboarding');
         }
       }

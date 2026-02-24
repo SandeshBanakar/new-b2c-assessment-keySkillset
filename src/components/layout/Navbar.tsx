@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { Flame, Zap } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { Flame, LogOut, Zap } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 
 const NAV_LINKS = [
@@ -14,7 +15,8 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { user } = useAppContext();
+  const router = useRouter();
+  const { user, setUser } = useAppContext();
 
   if (!user) return null;
 
@@ -26,7 +28,14 @@ export default function Navbar() {
     .slice(0, 2);
 
   // Hide Navbar on pages that manage their own full-screen layout
-  if (pathname === '/onboarding') return null;
+  if (pathname === '/onboarding' || pathname === '/auth') return null;
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUser({ ...user! });
+    router.push('/auth');
+  }
 
   return (
     <nav className="sticky top-0 z-40 bg-white border-b border-zinc-200">
@@ -85,6 +94,14 @@ export default function Navbar() {
               {initials}
             </AvatarFallback>
           </Avatar>
+
+          <button
+            onClick={() => void handleSignOut()}
+            className="flex items-center text-zinc-400 hover:text-zinc-600 transition-colors"
+            aria-label="Sign out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
 
       </div>
