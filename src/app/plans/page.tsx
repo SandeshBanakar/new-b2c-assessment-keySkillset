@@ -209,8 +209,10 @@ export default function PlansPage() {
   const [pendingTier, setPendingTier] = useState<PaidTier | null>(null);
   const [loading, setLoading] = useState(false);
 
+  if (!user) return null;
+
   async function handleConfirm() {
-    if (!pendingTier || loading) return;
+    if (!pendingTier || !user || loading) return;
     setLoading(true);
 
     const now = new Date().toISOString();

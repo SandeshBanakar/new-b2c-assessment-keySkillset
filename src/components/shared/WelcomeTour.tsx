@@ -71,7 +71,7 @@ function computePosition(rect: DOMRect): TooltipPosition {
 export default function WelcomeTour() {
   const { user, setUser } = useAppContext();
 
-  const isFree = user.subscriptionTier === 'free';
+  const isFree = user?.subscriptionTier === 'free';
   const steps = useMemo(() => buildSteps(isFree), [isFree]);
 
   const [step, setStep] = useState(0);
@@ -94,7 +94,10 @@ export default function WelcomeTour() {
     };
   }, [positionTooltip]);
 
+  if (!user) return null;
+
   async function completeTour() {
+    if (!user) return;
     const supabase = createClient();
     await supabase.from('users').update({ user_onboarded: true }).eq('id', user.id);
     setUser({ ...user, userOnboarded: true });

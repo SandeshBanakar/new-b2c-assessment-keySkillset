@@ -15,6 +15,8 @@ export default function Navbar() {
   const pathname = usePathname();
   const { user } = useAppContext();
 
+  if (!user) return null;
+
   const initials = (user.displayName ?? user.email)
     .split(/\s+/)
     .map((n) => n[0])

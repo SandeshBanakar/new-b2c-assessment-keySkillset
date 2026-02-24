@@ -18,7 +18,10 @@ const TIERS: { label: string; value: Tier }[] = [
 function DevTierSwitcherInner() {
   const { user, setUser } = useAppContext();
 
+  if (!user) return null;
+
   async function switchTier(tier: Tier) {
+    if (!user) return;
     const supabase = createClient();
     await supabase
       .from('users')

@@ -65,7 +65,7 @@ export default function OnboardingPage() {
   }
 
   async function handleSubmit() {
-    if (selectedExams.length === 0 || loading) return;
+    if (!user || selectedExams.length === 0 || loading) return;
     setLoading(true);
 
     const supabase = createClient();
@@ -76,6 +76,7 @@ export default function OnboardingPage() {
         goal,
         selected_exams: selectedExams,
         subscription_tier: 'free',
+        user_onboarded: true,
       })
       .eq('id', user.id);
 
@@ -85,6 +86,7 @@ export default function OnboardingPage() {
       goal,
       selectedExams,
       subscriptionTier: 'free',
+      userOnboarded: true,
     });
 
     router.push('/assessments');

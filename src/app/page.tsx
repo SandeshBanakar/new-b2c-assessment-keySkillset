@@ -60,6 +60,8 @@ const HAS_PLAYED_TODAY = false;
 export default function DashboardPage() {
   const { user } = useAppContext();
 
+  if (!user) return null;
+
   const primaryExam = user.selectedExams[0] ?? 'SAT';
   const isFree = user.subscriptionTier === 'free';
   const levelName = getLevelName(user.xp);
