@@ -12,7 +12,9 @@ import {
   Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SCORE_RANGES, mockSyllabus } from '@/data/assessments';
+import { SCORE_RANGES, mockSyllabus, ASSESSMENT_LIBRARY } from '@/data/assessments';
+import SubscribeModal from '@/components/assessment/SubscribeModal';
+import { useAppContext } from '@/context/AppContext';
 import type { Assessment, MockAttempt, SyllabusSection, Tier } from '@/types';
 
 interface OverviewTabProps {
@@ -28,6 +30,15 @@ function formatDuration(minutes: number): string {
   if (h === 0) return `${m} min`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
+}
+
+function tierAllowsType(tier: Tier, type: Assessment['type']): boolean {
+  switch (tier) {
+    case 'free':         return false;
+    case 'basic':        return type === 'full-test';
+    case 'professional': return type === 'full-test' || type === 'subject-test';
+    case 'premium':      return true;
+  }
 }
 
 const WHAT_YOULL_GET = [
@@ -87,43 +98,60 @@ export default function OverviewTab({
   onSwitchToAnalytics,
 }: OverviewTabProps) {
   const router = useRouter();
-  const isFree = userTier === 'free';
+  const { isSubscribed, subscribeVersion } = useAppContext();
+  // subscribeVersion triggers re-render after subscribe
+  void subscribeVersion;
+
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+
+  const subscribed = isSubscribed(assessment.id);
+  const tierAllows = tierAllowsType(userTier, assessment.type);
+
   const inProgress = attempts.find((a) => a.status === 'in_progress');
   const completedCount = attempts.filter((a) => a.status === 'completed').length;
-  const freeAttemptUsed = attempts.some((a) => a.attemptNumber === 0 && a.status !== 'not_started');
+  const freeAttemptUsed = attempts.some(
+    (a) => a.attemptNumber === 0 && a.status !== 'not_started',
+  );
   const allUsed = completedCount >= 5;
 
-  // Derive CTA
+  // Find library entry for the subscribe modal
+  const libraryEntry = ASSESSMENT_LIBRARY.find((a) => a.id === assessment.id);
+
+  // ── Derive CTA ──────────────────────────────────────────
   let ctaContent: React.ReactNode;
-  if (isFree && !freeAttemptUsed) {
+
+  if (!subscribed && tierAllows) {
+    // Tier allows but not yet subscribed → Subscribe Now
     ctaContent = (
       <>
         <Button
-          onClick={() => router.push(`/quiz/daily`)}
+          onClick={() => setShowSubscribeModal(true)}
           className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md"
         >
-          Start Free Attempt →
+          Subscribe Now
         </Button>
         <p className="text-xs text-zinc-400 mt-2 text-center">
-          No plan needed for your first attempt
+          Included in your{' '}
+          <span className="capitalize">{userTier}</span> plan. No extra charge.
         </p>
       </>
     );
-  } else if (isFree && freeAttemptUsed) {
+  } else if (!subscribed && !tierAllows) {
+    // Tier doesn't allow → Upgrade
     ctaContent = (
       <>
         <Button
           onClick={() => router.push('/plans')}
           className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md"
         >
-          Upgrade to unlock more attempts
+          Upgrade to Access
         </Button>
         <p className="text-xs text-zinc-400 mt-2 text-center">
-          You&apos;ve used your free attempt
+          This assessment type requires a higher plan
         </p>
       </>
     );
-  } else if (inProgress) {
+  } else if (subscribed && inProgress) {
     ctaContent = (
       <>
         <Button className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md">
@@ -134,18 +162,7 @@ export default function OverviewTab({
         </p>
       </>
     );
-  } else if (!allUsed) {
-    ctaContent = (
-      <>
-        <Button className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md">
-          Start Attempt →
-        </Button>
-        <p className="text-xs text-zinc-400 mt-2 text-center">
-          {completedCount} of 5 attempts used
-        </p>
-      </>
-    );
-  } else {
+  } else if (subscribed && allUsed) {
     ctaContent = (
       <>
         <p className="text-sm text-zinc-500 text-center mb-3">All attempts completed</p>
@@ -156,6 +173,28 @@ export default function OverviewTab({
         >
           View Analytics →
         </Button>
+      </>
+    );
+  } else if (subscribed && !freeAttemptUsed) {
+    ctaContent = (
+      <>
+        <Button className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md">
+          Start Free Attempt →
+        </Button>
+        <p className="text-xs text-zinc-400 mt-2 text-center">
+          No extra charge for your first attempt
+        </p>
+      </>
+    );
+  } else {
+    ctaContent = (
+      <>
+        <Button className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md">
+          Start Attempt →
+        </Button>
+        <p className="text-xs text-zinc-400 mt-2 text-center">
+          {completedCount} of 5 attempts used
+        </p>
       </>
     );
   }
@@ -212,11 +251,26 @@ export default function OverviewTab({
         {/* CTA — 1/3 width */}
         <div className="bg-white shadow-sm rounded-md p-6 flex flex-col justify-center">
           {ctaContent}
+          {/* Take Free Test link — always shown */}
+          <button
+            onClick={() => router.push(`/assessments/${assessment.id}`)}
+            className="mt-3 text-xs text-blue-700 hover:underline text-center"
+          >
+            Take Free Test →
+          </button>
         </div>
       </div>
 
       {/* Syllabus accordion */}
       <SyllabusAccordion sections={mockSyllabus} />
+
+      {/* Subscribe modal */}
+      {showSubscribeModal && libraryEntry && (
+        <SubscribeModal
+          assessment={libraryEntry}
+          onClose={() => setShowSubscribeModal(false)}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { DEMO_USERS, STORAGE_KEY } from '@/data/demoUsers';
+import { SUBSCRIBED_ASSESSMENTS } from '@/data/assessments';
 import type { User, Exam, Tier } from '@/types';
 
 interface AppContextValue {
@@ -9,6 +10,9 @@ interface AppContextValue {
   switchPersona: (userId: string) => void;
   simulateTierChange: (newTier: string) => void;
   logout: () => void;
+  isSubscribed: (assessmentId: string) => boolean;
+  subscribeToAssessment: (assessmentId: string) => void;
+  subscribeVersion: number;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -44,6 +48,7 @@ const getActiveUser = (): User | null => {
 
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(getActiveUser);
+  const [subscribeVersion, setSubscribeVersion] = useState(0);
 
   const switchPersona = (userId: string) => {
     const found = DEMO_USERS.find((u) => u.id === userId);
@@ -69,8 +74,32 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const isSubscribed = (assessmentId: string): boolean => {
+    if (!user) return false;
+    return (SUBSCRIBED_ASSESSMENTS[user.id] ?? []).includes(assessmentId);
+  };
+
+  const subscribeToAssessment = (assessmentId: string) => {
+    if (!user) return;
+    SUBSCRIBED_ASSESSMENTS[user.id] = [
+      ...(SUBSCRIBED_ASSESSMENTS[user.id] ?? []),
+      assessmentId,
+    ];
+    setSubscribeVersion((v) => v + 1);
+  };
+
   return (
-    <AppContext.Provider value={{ user, switchPersona, simulateTierChange, logout }}>
+    <AppContext.Provider
+      value={{
+        user,
+        switchPersona,
+        simulateTierChange,
+        logout,
+        isSubscribed,
+        subscribeToAssessment,
+        subscribeVersion,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );
