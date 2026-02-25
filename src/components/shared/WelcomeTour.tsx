@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 
 // -------------------------------------------------------
@@ -69,7 +68,8 @@ function computePosition(rect: DOMRect): TooltipPosition {
 // -------------------------------------------------------
 
 export default function WelcomeTour() {
-  const { user, setUser } = useAppContext();
+  const { user } = useAppContext();
+  const [isDone, setIsDone] = useState(false);
 
   const isFree = user?.subscriptionTier === 'free';
   const steps = useMemo(() => buildSteps(isFree), [isFree]);
@@ -94,13 +94,10 @@ export default function WelcomeTour() {
     };
   }, [positionTooltip]);
 
-  if (!user) return null;
+  if (!user || isDone) return null;
 
-  async function completeTour() {
-    if (!user) return;
-    const supabase = createClient();
-    await supabase.from('users').update({ user_onboarded: true }).eq('id', user.id);
-    setUser({ ...user, userOnboarded: true });
+  function completeTour() {
+    setIsDone(true);
   }
 
   function handleNext() {
@@ -108,7 +105,7 @@ export default function WelcomeTour() {
       setPosition(null); // clear while repositioning
       setStep((s) => s + 1);
     } else {
-      void completeTour();
+      completeTour();
     }
   }
 
@@ -131,7 +128,7 @@ export default function WelcomeTour() {
       {/* Dimmed backdrop — click to skip */}
       <div
         className="fixed inset-0 bg-black/30 z-40"
-        onClick={() => void completeTour()}
+        onClick={completeTour}
         aria-hidden="true"
       />
 
@@ -156,7 +153,7 @@ export default function WelcomeTour() {
             ))}
           </div>
           <button
-            onClick={() => void completeTour()}
+            onClick={completeTour}
             className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors"
           >
             Skip tour

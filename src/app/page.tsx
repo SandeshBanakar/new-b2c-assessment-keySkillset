@@ -1,278 +1,79 @@
 'use client';
 
-import Link from 'next/link';
-import { Check, Flame, Lock } from 'lucide-react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import PageWrapper from '@/components/layout/PageWrapper';
-import WelcomeTour from '@/components/shared/WelcomeTour';
-import { AuthGuard } from '@/components/shared/AuthGuard';
+import { useRouter } from 'next/navigation';
+import { Lock, Star, Zap, Trophy } from 'lucide-react';
+import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
-import { getLevelName } from '@/utils/xp';
-import type { Exam } from '@/types';
+import type { DemoUser } from '@/data/demoUsers';
 
-// -------------------------------------------------------
-// Mock recent activity — last 3 attempts
-// -------------------------------------------------------
-
-type RecentAttempt = {
-  id: string;
-  assessmentTitle: string;
-  score: number;
-  date: string;
-  exam: Exam;
+const TIER_AVATAR_BG: Record<DemoUser['subscription_tier'], string> = {
+  free:         'bg-zinc-600',
+  basic:        'bg-blue-700',
+  professional: 'bg-violet-700',
+  premium:      'bg-amber-600',
 };
 
-const RECENT_ACTIVITY: RecentAttempt[] = [
-  {
-    id: 'sat-full-1',
-    assessmentTitle: 'SAT Full Test 1',
-    score: 72,
-    date: '2 days ago',
-    exam: 'SAT',
-  },
-  {
-    id: 'jee-subject-physics-1',
-    assessmentTitle: 'JEE Physics — Subject Test',
-    score: 65,
-    date: '5 days ago',
-    exam: 'JEE',
-  },
-  {
-    id: 'neet-subject-biology-1',
-    assessmentTitle: 'NEET Biology — Subject Test',
-    score: 88,
-    date: '1 week ago',
-    exam: 'NEET',
-  },
-];
-
-const EXAM_BADGE_COLORS: Record<Exam, string> = {
-  SAT:  'bg-blue-100 text-blue-700',
-  JEE:  'bg-amber-100 text-amber-700',
-  NEET: 'bg-emerald-100 text-emerald-700',
-  PMP:  'bg-blue-100 text-blue-700',
+const TIER_BADGE_CLASSES: Record<DemoUser['subscription_tier'], string> = {
+  free:         'bg-zinc-700 text-zinc-300',
+  basic:        'bg-blue-900 text-blue-300',
+  professional: 'bg-violet-900 text-violet-300',
+  premium:      'bg-amber-900 text-amber-300',
 };
 
-// Mock: user hasn't played today — swap to true to test "played" state
-const HAS_PLAYED_TODAY = false;
+const TIER_ICONS: Record<DemoUser['subscription_tier'], React.ElementType> = {
+  free:         Lock,
+  basic:        Star,
+  professional: Zap,
+  premium:      Trophy,
+};
 
-// -------------------------------------------------------
+export default function PersonaSelectorPage() {
+  const router = useRouter();
+  const { switchPersona } = useAppContext();
 
-function DashboardContent() {
-  const { user } = useAppContext();
-  // user is guaranteed non-null by AuthGuard; null check here is for TypeScript narrowing only
-  if (!user) return null;
-
-  const primaryExam = user.selectedExams[0] ?? 'SAT';
-  const isFree = user.subscriptionTier === 'free';
-  const levelName = getLevelName(user.xp);
-  const firstName = user.displayName?.split(' ')[0] ?? null;
+  function handleSelect(userId: string) {
+    switchPersona(userId);
+    router.push('/assessments');
+  }
 
   return (
-    <div className="min-h-screen bg-zinc-50">
-      <PageWrapper>
+    <div className="bg-zinc-950 min-h-screen flex flex-col items-center justify-center gap-10">
+      <h1 className="text-3xl font-semibold text-white text-center">
+        Who&apos;s learning today?
+      </h1>
 
-        {/* Page heading */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-zinc-900">
-            Welcome back{firstName ? `, ${firstName}` : ''}!
-          </h1>
-          <p className="text-sm text-zinc-500 mt-1">Here&apos;s your dashboard for today.</p>
-        </div>
-
-        {/* 2-col grid on desktop, 1-col on mobile */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* ── Widget 1 — Today's Daily Quiz ── */}
-          <Card
-            data-tour="daily-quiz"
-            className="bg-white border border-zinc-200 rounded-md"
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-zinc-900">Today&apos;s Daily Quiz</h2>
-                <span className="text-xs font-medium text-amber-500 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1">
-                  Day {user.streak} <Flame className="w-4 h-4 text-amber-500" />
-                </span>
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 sm:gap-8">
+        {DEMO_USERS.map((persona) => {
+          const Icon = TIER_ICONS[persona.subscription_tier];
+          return (
+            <div
+              key={persona.id}
+              onClick={() => handleSelect(persona.id)}
+              className="cursor-pointer group flex flex-col items-center gap-3"
+            >
+              <div
+                className={`w-24 h-24 rounded-full flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 ${TIER_AVATAR_BG[persona.subscription_tier]}`}
+              >
+                <Icon className="w-10 h-10 text-white" />
               </div>
-              <p className="text-sm text-zinc-500">{primaryExam}</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-zinc-600">6 questions · ~5 min</p>
-              {HAS_PLAYED_TODAY ? (
-                <div className="space-y-1">
-                  <p className="flex items-center gap-1.5 text-sm font-medium text-emerald-500">
-                    Played today <Check className="w-4 h-4" />
-                  </p>
-                  <p className="text-xs text-zinc-400">Come back tomorrow</p>
-                </div>
-              ) : (
-                <Button
-                  asChild
-                  className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md"
-                >
-                  <Link href="/quiz/daily">Play Now →</Link>
-                </Button>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* ── Widget 2 — Quest Map Preview ── */}
-          <Card
-            data-tour="quest-preview"
-            className="bg-white border border-zinc-200 rounded-md"
-          >
-            <CardHeader className="pb-2">
-              <h2 className="text-lg font-semibold text-zinc-900">Your Learning Path</h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* 3 locked node previews */}
-              <div className="flex items-center gap-3">
-                {[1, 2, 3].map((n) => (
-                  <div key={n} className="flex-1 flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-zinc-200 border-2 border-zinc-300 flex items-center justify-center">
-                      <Lock className="w-4 h-4 text-zinc-400" />
-                    </div>
-                    <div className="h-1.5 w-full bg-zinc-100 rounded-full" />
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-zinc-400 text-center">Unlock your full quest map</p>
-              {isFree ? (
-                <Button
-                  asChild
-                  variant="outline"
-                  className="w-full rounded-md border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-                >
-                  <Link href="/plans">Compare Plans →</Link>
-                </Button>
-              ) : (
-                <Button
-                  asChild
-                  className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md"
-                >
-                  <Link href="/quest">Continue Quest →</Link>
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+              <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">
+                {persona.display_name}
+              </span>
 
-          {/* ── Widget 3 — Stats Bar ── */}
-          <Card
-            data-tour="stats-bar"
-            className="bg-white border border-zinc-200 rounded-md"
-          >
-            <CardHeader className="pb-2">
-              <h2 className="text-lg font-semibold text-zinc-900">Your Stats</h2>
-            </CardHeader>
-            <CardContent>
-              {isFree ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-400">XP</span>
-                    <span className="text-sm text-zinc-300">— pts</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-400">Level</span>
-                    <span className="text-sm text-zinc-300">—</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-600">Streak</span>
-                    <span className="text-sm font-medium text-amber-500">{user.streak} days</span>
-                  </div>
-                  <p className="text-xs text-zinc-400 pt-1">
-                    <Link href="/plans" className="text-blue-700 hover:underline">
-                      Unlock with any plan
-                    </Link>
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-600">XP</span>
-                    <span className="text-sm font-semibold text-amber-500">{user.xp} pts</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-600">Level</span>
-                    <span className="text-sm font-semibold text-blue-700">{levelName}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-600">Streak</span>
-                    <span className="text-sm font-medium text-amber-500">{user.streak} days</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              <span
+                className={`text-xs rounded-full px-2.5 py-0.5 font-medium capitalize ${TIER_BADGE_CLASSES[persona.subscription_tier]}`}
+              >
+                {persona.subscription_tier}
+              </span>
+            </div>
+          );
+        })}
+      </div>
 
-          {/* ── Widget 4 — Recent Activity ── */}
-          <Card className="bg-white border border-zinc-200 rounded-md">
-            <CardHeader className="pb-2">
-              <h2 className="text-lg font-semibold text-zinc-900">Recent Activity</h2>
-            </CardHeader>
-            <CardContent>
-              {RECENT_ACTIVITY.length === 0 ? (
-                <div className="py-6 text-center">
-                  <p className="text-sm text-zinc-500">
-                    No activity yet.{' '}
-                    <Link href="/quiz/daily" className="text-blue-700 hover:underline">
-                      Start your first Daily Quiz →
-                    </Link>
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {RECENT_ACTIVITY.map((item) => (
-                    <Link
-                      key={item.id}
-                      href={`/assessments/${item.id}`}
-                      className="flex items-center justify-between rounded-md px-2 py-1.5 -mx-2 hover:bg-zinc-50 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${EXAM_BADGE_COLORS[item.exam]}`}
-                        >
-                          {item.exam}
-                        </span>
-                        <span className="text-sm text-zinc-700 truncate">
-                          {item.assessmentTitle}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                        <span
-                          className={`text-sm font-semibold ${
-                            item.score >= 70
-                              ? 'text-emerald-500'
-                              : item.score >= 40
-                              ? 'text-orange-400'
-                              : 'text-rose-500'
-                          }`}
-                        >
-                          {item.score}%
-                        </span>
-                        <span className="text-xs text-zinc-400">{item.date}</span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-        </div>
-      </PageWrapper>
-
-      {/* Welcome tour — shows only when userOnboarded === false */}
-      {!user.userOnboarded && <WelcomeTour />}
+      <p className="text-xs text-zinc-600 text-center mt-4">
+        Demo mode — select a persona to explore
+      </p>
     </div>
-  );
-}
-
-export default function DashboardPage() {
-  return (
-    <AuthGuard>
-      <DashboardContent />
-    </AuthGuard>
   );
 }

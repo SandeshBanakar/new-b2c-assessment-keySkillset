@@ -1,6 +1,5 @@
 'use client';
 
-import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import type { Tier } from '@/types';
 
@@ -16,19 +15,9 @@ const TIERS: { label: string; value: Tier }[] = [
 // -------------------------------------------------------
 
 function DevTierSwitcherInner() {
-  const { user, setUser } = useAppContext();
+  const { user, simulateTierChange } = useAppContext();
 
   if (!user) return null;
-
-  async function switchTier(tier: Tier) {
-    if (!user) return;
-    const supabase = createClient();
-    await supabase
-      .from('users')
-      .update({ subscription_tier: tier })
-      .eq('id', user.id);
-    setUser({ ...user, subscriptionTier: tier });
-  }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 bg-zinc-900 rounded-md shadow-lg p-1.5 flex items-center gap-1">
@@ -36,7 +25,7 @@ function DevTierSwitcherInner() {
       {TIERS.map(({ label, value }) => (
         <button
           key={value}
-          onClick={() => void switchTier(value)}
+          onClick={() => simulateTierChange(value)}
           className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
             user.subscriptionTier === value
               ? 'bg-blue-700 text-white'

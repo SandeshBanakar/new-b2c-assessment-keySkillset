@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import PageWrapper from '@/components/layout/PageWrapper';
 import PlanCard from '@/components/shared/PlanCard';
 import { AuthGuard } from '@/components/shared/AuthGuard';
-import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import type { Tier } from '@/types';
 
@@ -212,38 +211,17 @@ function ConfirmModal({ fromTier, toTier, onConfirm, onCancel, loading }: ModalP
 
 function PlansContent() {
   const router = useRouter();
-  const { user, setUser } = useAppContext();
+  const { user, simulateTierChange } = useAppContext();
   const [pendingTier, setPendingTier] = useState<PaidTier | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // user is guaranteed non-null by AuthGuard; null check here is for TypeScript narrowing only
   if (!user) return null;
 
-  async function handleConfirm() {
-    if (!pendingTier || !user || loading) return;
+  function handleConfirm() {
+    if (!pendingTier || loading) return;
     setLoading(true);
 
-    const now = new Date().toISOString();
-    const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-
-    const supabase = createClient();
-    await supabase
-      .from('users')
-      .update({
-        subscription_tier: pendingTier,
-        subscription_status: 'active',
-        subscription_start_date: now,
-        subscription_end_date: endDate,
-      })
-      .eq('id', user.id);
-
-    setUser({
-      ...user,
-      subscriptionTier: pendingTier,
-      subscriptionStatus: 'active',
-      subscriptionStartDate: now,
-      subscriptionEndDate: endDate,
-    });
+    simulateTierChange(pendingTier);
 
     sessionStorage.setItem(
       'plan_banner',

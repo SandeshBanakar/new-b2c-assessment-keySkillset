@@ -1,91 +1,76 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import type { User, Exam } from '@/types';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { DEMO_USERS, STORAGE_KEY } from '@/data/demoUsers';
+import type { User, Exam, Tier } from '@/types';
 
 interface AppContextValue {
   user: User | null;
-  isAuthLoading: boolean;
-  setUser: (user: User | null) => void;
+  switchPersona: (userId: string) => void;
+  simulateTierChange: (newTier: string) => void;
+  logout: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-/** Maps a public.users row → our User type */
-function mapRow(row: Record<string, unknown>): User {
+function demoUserToUser(demo: (typeof DEMO_USERS)[number]): User {
   return {
-    id: row.id as string,
-    email: row.email as string,
-    displayName: row.display_name as string,
-    subscriptionTier: row.subscription_tier as User['subscriptionTier'],
-    subscriptionStatus: row.subscription_status as User['subscriptionStatus'],
-    subscriptionStartDate: row.subscription_start_date as string | null,
-    subscriptionEndDate: row.subscription_end_date as string | null,
-    razorpaySubscriptionId: row.razorpay_subscription_id as string | null,
-    razorpayPlanId: row.razorpay_plan_id as string | null,
-    razorpayCustomerId: row.razorpay_customer_id as string | null,
-    userOnboarded: row.user_onboarded as boolean,
-    selectedExams: ((row.selected_exams ?? []) as Exam[]),
-    goal: row.goal as string | null,
-    xp: (row.xp as number) ?? 0,
-    streak: (row.streak as number) ?? 0,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
+    id: demo.id,
+    email: demo.email,
+    displayName: demo.display_name,
+    subscriptionTier: demo.subscription_tier as Tier,
+    subscriptionStatus: demo.subscription_status,
+    subscriptionStartDate: null,
+    subscriptionEndDate: null,
+    razorpaySubscriptionId: null,
+    razorpayPlanId: null,
+    razorpayCustomerId: null,
+    userOnboarded: demo.user_onboarded,
+    selectedExams: demo.selected_exams as Exam[],
+    goal: demo.goal,
+    xp: demo.xp,
+    streak: demo.streak,
+    createdAt: '',
+    updatedAt: '',
   };
 }
 
+const getActiveUser = (): User | null => {
+  if (typeof window === 'undefined') return demoUserToUser(DEMO_USERS[2]); // SSR fallback = Priya
+  const stored = localStorage.getItem(STORAGE_KEY);
+  const demo = DEMO_USERS.find((u) => u.id === stored);
+  return demo ? demoUserToUser(demo) : null;
+};
+
 export function AppContextProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(getActiveUser);
 
-  useEffect(() => {
-    const supabase = createClient();
+  const switchPersona = (userId: string) => {
+    const found = DEMO_USERS.find((u) => u.id === userId);
+    if (!found) return;
+    localStorage.setItem(STORAGE_KEY, userId);
+    setUser(demoUserToUser(found));
+  };
 
-    async function fetchUserProfile(userId: string) {
-      setIsAuthLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (data) {
-        setUser(mapRow(data as Record<string, unknown>));
-      } else {
-        console.error('Profile fetch error:', error);
-        setUser(null);
-      }
-      setIsAuthLoading(false);
-    }
-
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        fetchUserProfile(session.user.id);
-      } else {
-        setUser(null);
-        setIsAuthLoading(false);
-      }
-    });
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (session) {
-          await fetchUserProfile(session.user.id);
-        } else {
-          setUser(null);
-          setIsAuthLoading(false);
-        }
-      }
+  const simulateTierChange = (newTier: string) => {
+    setUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            subscriptionTier: newTier as Tier,
+            subscriptionStatus: newTier === 'free' ? 'free' : 'active',
+          }
+        : prev,
     );
+  };
 
-    return () => subscription.unsubscribe();
-  }, []);
+  const logout = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setUser(null);
+  };
 
   return (
-    <AppContext.Provider value={{ user, isAuthLoading, setUser }}>
+    <AppContext.Provider value={{ user, switchPersona, simulateTierChange, logout }}>
       {children}
     </AppContext.Provider>
   );

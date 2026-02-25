@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import ExamSelector from '@/components/shared/ExamSelector';
-import { createClient } from '@/lib/supabase/client';
-import { useAppContext } from '@/context/AppContext';
 import type { Exam } from '@/types';
 
 // -------------------------------------------------------
@@ -50,14 +48,11 @@ function ProgressDots({ step }: { step: 1 | 2 }) {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, setUser } = useAppContext();
 
   const [step, setStep] = useState<1 | 2>(1);
   const [displayName, setDisplayName] = useState('');
   const [goal, setGoal] = useState('');
   const [selectedExams, setSelectedExams] = useState<Exam[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   function toggleExam(exam: Exam) {
     setSelectedExams((prev) =>
@@ -65,54 +60,9 @@ export default function OnboardingPage() {
     );
   }
 
-  async function handleSubmit() {
-    if (selectedExams.length === 0 || loading) return;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push('/auth');
-        return;
-      }
-
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          display_name: displayName.trim(),
-          goal,
-          selected_exams: selectedExams,
-          subscription_tier: 'free',
-          user_onboarded: true,
-        })
-        .eq('id', session.user.id);
-
-      if (updateError) {
-        setError('Something went wrong. Please try again.');
-        return;
-      }
-
-      if (user) {
-        setUser({
-          ...user,
-          displayName: displayName.trim(),
-          goal,
-          selectedExams,
-          subscriptionTier: 'free',
-          userOnboarded: true,
-        });
-      }
-
-      router.push('/assessments');
-    } catch (err) {
-      console.error('[onboarding] handleSubmit failed:', err);
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  function handleSubmit() {
+    if (selectedExams.length === 0) return;
+    router.push('/assessments');
   }
 
   return (
@@ -198,16 +148,12 @@ export default function OnboardingPage() {
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={selectedExams.length === 0 || loading}
+                disabled={selectedExams.length === 0}
                 className="flex-1 bg-blue-700 hover:bg-blue-800 text-white rounded-md disabled:opacity-40"
               >
-                {loading ? 'Setting up…' : 'Start Learning →'}
+                Start Learning →
               </Button>
             </div>
-
-            {error && (
-              <p className="mt-3 text-sm text-rose-600">{error}</p>
-            )}
           </div>
         )}
 

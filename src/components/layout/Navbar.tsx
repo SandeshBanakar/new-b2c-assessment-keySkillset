@@ -1,24 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { Flame, LogOut, Zap } from 'lucide-react';
+import { Flame, Users, Zap } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 
 const NAV_LINKS = [
-  { href: '/', label: 'Dashboard' },
   { href: '/assessments', label: 'Assessments' },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, setUser } = useAppContext();
+  const { user, logout } = useAppContext();
 
   if (!user) return null;
+
+  // Hide Navbar on pages that manage their own full-screen layout
+  if (pathname === '/onboarding' || pathname === '/') return null;
 
   const initials = (user.displayName ?? user.email)
     .split(/\s+/)
@@ -27,14 +28,9 @@ export default function Navbar() {
     .toUpperCase()
     .slice(0, 2);
 
-  // Hide Navbar on pages that manage their own full-screen layout
-  if (pathname === '/onboarding' || pathname === '/auth') return null;
-
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setUser(null);
-    router.push('/auth');
+  function handleSwitchProfile() {
+    logout();
+    router.push('/');
   }
 
   return (
@@ -64,7 +60,7 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Right — streak, XP, upgrade badge, avatar */}
+        {/* Right — streak, XP, upgrade badge, avatar, switch profile */}
         <div className="flex items-center gap-3">
           <span
             data-tour="streak"
@@ -96,11 +92,11 @@ export default function Navbar() {
           </Avatar>
 
           <button
-            onClick={() => void handleSignOut()}
+            onClick={handleSwitchProfile}
             className="flex items-center text-zinc-400 hover:text-zinc-600 transition-colors"
-            aria-label="Sign out"
+            aria-label="Switch Profile"
           >
-            <LogOut className="w-4 h-4" />
+            <Users className="w-4 h-4" />
           </button>
         </div>
 
