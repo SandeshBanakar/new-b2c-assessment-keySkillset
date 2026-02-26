@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flame, Zap, Map, Trophy, Users } from 'lucide-react';
+import { ChevronLeft, Flame, Zap, Map, Trophy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageWrapper from '@/components/layout/PageWrapper';
 import PlanCard from '@/components/shared/PlanCard';
@@ -235,6 +235,16 @@ function PlansContent() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      <div className="max-w-5xl mx-auto px-4 pt-4">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back to Assessments
+        </button>
+      </div>
+
       <PageWrapper>
 
         {/* Heading */}

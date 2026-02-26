@@ -219,7 +219,7 @@ export default function YourAssessmentsSection() {
           <ClipboardList className="w-8 h-8 text-zinc-300" />
           <p className="text-sm font-medium text-zinc-500 mt-3">No assessments yet</p>
           <p className="text-xs text-zinc-400 mt-1">
-            Browse the library below and subscribe to start practicing
+            Take a free test from the library below, or upgrade to subscribe.
           </p>
 
           {/* Upgrade nudge for free users */}
