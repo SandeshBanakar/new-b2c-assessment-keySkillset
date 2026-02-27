@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Lock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ClipboardList } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import {
   ASSESSMENT_LIBRARY,
@@ -131,7 +130,6 @@ function SubscribedCard({ assessment, userId }: { assessment: LibraryAssessment;
 // -------------------------------------------------------
 
 export default function YourAssessmentsSection() {
-  const router = useRouter();
   const { user, subscribeVersion } = useAppContext();
   // subscribeVersion read to trigger re-render on subscribe
   void subscribeVersion;
@@ -161,7 +159,6 @@ export default function YourAssessmentsSection() {
     return true;
   });
 
-  const isFree = user.subscriptionTier === 'free';
   const hasSubscribed = subscribedIds.length > 0;
 
   return (
@@ -221,26 +218,6 @@ export default function YourAssessmentsSection() {
           <p className="text-xs text-zinc-400 mt-1">
             Take a free test from the library below, or upgrade to subscribe.
           </p>
-
-          {/* Upgrade nudge for free users */}
-          {isFree && (
-            <div className="bg-blue-50 border border-blue-100 rounded-md px-5 py-4 mt-4 max-w-md w-full text-left">
-              <p className="flex items-center gap-1.5 text-sm font-medium text-blue-900">
-                <Lock className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                Upgrade your plan to subscribe to assessments
-              </p>
-              <p className="text-xs text-blue-700 mt-1">
-                Free users can take one free attempt from the library. Upgrade to subscribe and
-                unlock 5 full attempts per assessment.
-              </p>
-              <Button
-                onClick={() => router.push('/plans')}
-                className="mt-3 bg-blue-700 hover:bg-blue-800 text-white text-sm rounded-md px-4 py-2 h-auto"
-              >
-                Compare Plans →
-              </Button>
-            </div>
-          )}
         </div>
       )}
 

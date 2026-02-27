@@ -9,10 +9,7 @@ export default function AssessmentLibraryBanner() {
   const router = useRouter();
   const { user } = useAppContext();
 
-  const [dismissed, setDismissed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return sessionStorage.getItem('banner_dismissed') === 'true';
-  });
+  const [dismissed, setDismissed] = useState(false);
 
   const tier = user?.subscriptionTier ?? 'free';
 
@@ -45,10 +42,7 @@ export default function AssessmentLibraryBanner() {
             Compare Plans →
           </button>
           <button
-            onClick={() => {
-              sessionStorage.setItem('banner_dismissed', 'true');
-              setDismissed(true);
-            }}
+            onClick={() => setDismissed(true)}
             className="text-blue-400 hover:text-blue-700 transition-colors"
             aria-label="Dismiss"
           >
@@ -59,16 +53,27 @@ export default function AssessmentLibraryBanner() {
     );
   }
 
-  // Basic or Professional — slim non-dismissable strip
+  // Basic or Professional — slim dismissable strip
+  if (dismissed) return null;
+
   return (
-    <div className="mb-6 flex items-center rounded-md bg-amber-50 border border-amber-200 px-4 py-2">
-      <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mr-2" />
-      <span className="text-sm text-amber-900">Unlock everything with Premium</span>
+    <div className="mb-6 flex items-center justify-between gap-3 rounded-md bg-amber-50 border border-amber-200 px-4 py-2">
+      <div className="flex items-center">
+        <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mr-2" />
+        <span className="text-sm text-amber-900">Unlock everything with Premium</span>
+        <button
+          onClick={() => router.push('/plans#premium')}
+          className="text-amber-700 font-medium underline text-sm ml-2 hover:text-amber-800"
+        >
+          Go Premium →
+        </button>
+      </div>
       <button
-        onClick={() => router.push('/plans#premium')}
-        className="text-amber-700 font-medium underline text-sm ml-2 hover:text-amber-800"
+        onClick={() => setDismissed(true)}
+        className="text-amber-400 hover:text-amber-700 transition-colors flex-shrink-0"
+        aria-label="Dismiss"
       >
-        Go Premium →
+        <X className="w-4 h-4" />
       </button>
     </div>
   );
