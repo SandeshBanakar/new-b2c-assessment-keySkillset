@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd /c/Projects/keyskillset && npm run build 2>&1 && npm run lint 2>&1)"
+      "Bash(cd /c/Projects/keyskillset && npm run build 2>&1 && npm run lint 2>&1)",
+      "Bash(npm run:*)"
     ]
   }
 }

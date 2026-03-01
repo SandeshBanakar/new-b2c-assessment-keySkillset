@@ -18,10 +18,12 @@ export type LibraryAssessment = {
   difficulty: 'easy' | 'medium' | 'hard';
   questions: number;
   durationLabel: string;
+  thumbnailUrl: string;
 };
 
 export type DemoAttemptState = {
   attemptsUsed: number;
+  freeAttemptUsed: boolean;
   status: 'not_started' | 'in_progress' | 'completed';
 };
 
@@ -33,40 +35,45 @@ export const SUBSCRIBED_ASSESSMENTS: Record<string, string[]> = {
   'demo-premium': ['sat-full-1', 'jee-subject-math', 'sat-chapter-algebra'],
 };
 
-// Per-user attempt state for subscribed assessments
+// Per-user attempt state — covers subscribed AND non-subscribed assessments where a free attempt was used
 export const DEMO_ATTEMPT_STATES: Record<string, Record<string, DemoAttemptState>> = {
-  'demo-free': {},
+  'demo-free': {
+    // Used free attempt on NEET Full Test (tier=free → locked) → STATE 2 demo
+    'neet-full-1': { attemptsUsed: 1, freeAttemptUsed: true, status: 'in_progress' },
+  },
   'demo-basic': {
-    'sat-full-1': { attemptsUsed: 2, status: 'in_progress' },
+    'sat-full-1': { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress' },
+    // Used free attempt on subject-test (tier=basic → locked for subject) → STATE 2 demo
+    'sat-subject-math-1': { attemptsUsed: 1, freeAttemptUsed: true, status: 'completed' },
   },
   'demo-pro': {
-    'sat-full-1': { attemptsUsed: 2, status: 'in_progress' },
-    'neet-subject-physics': { attemptsUsed: 0, status: 'not_started' },
+    'sat-full-1': { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress' },
+    'neet-subject-physics': { attemptsUsed: 0, freeAttemptUsed: false, status: 'not_started' },
   },
   'demo-premium': {
-    'sat-full-1': { attemptsUsed: 2, status: 'in_progress' },
-    'jee-subject-math': { attemptsUsed: 5, status: 'completed' },
-    'sat-chapter-algebra': { attemptsUsed: 1, status: 'not_started' },
+    'sat-full-1': { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress' },
+    'jee-subject-math': { attemptsUsed: 5, freeAttemptUsed: true, status: 'completed' },
+    'sat-chapter-algebra': { attemptsUsed: 1, freeAttemptUsed: true, status: 'completed' },
   },
 };
 
 // Full assessment catalogue — used by both list sections
 export const ASSESSMENT_LIBRARY: LibraryAssessment[] = [
   // SAT
-  { id: 'sat-full-1',          title: 'SAT Full Test 1',                        exam: 'SAT',  type: 'full-test',    difficulty: 'hard',   questions: 98,  durationLabel: '2h 14m' },
-  { id: 'sat-subject-math-1',  title: 'SAT Math — Subject Test',                exam: 'SAT',  type: 'subject-test', difficulty: 'medium', questions: 50,  durationLabel: '1h 15m' },
-  { id: 'sat-chapter-algebra', title: 'SAT Chapter Test — Algebra',              exam: 'SAT',  type: 'chapter-test', difficulty: 'medium', questions: 25,  durationLabel: '30m'    },
+  { id: 'sat-full-1',          title: 'SAT Full Test 1',                           exam: 'SAT',  type: 'full-test',    difficulty: 'hard',   questions: 98,  durationLabel: '2h 14m', thumbnailUrl: '/images/full-test-cover.jpg'    },
+  { id: 'sat-subject-math-1',  title: 'SAT Math — Subject Test',                   exam: 'SAT',  type: 'subject-test', difficulty: 'medium', questions: 50,  durationLabel: '1h 15m', thumbnailUrl: '/images/subject-test-cover.jpg' },
+  { id: 'sat-chapter-algebra', title: 'SAT Chapter Test — Algebra',                exam: 'SAT',  type: 'chapter-test', difficulty: 'medium', questions: 25,  durationLabel: '30m',    thumbnailUrl: '/images/chapter-test-cover.jpg' },
   // JEE
-  { id: 'jee-full-1',          title: 'JEE Full Test 1',                        exam: 'JEE',  type: 'full-test',    difficulty: 'hard',   questions: 90,  durationLabel: '3h'     },
-  { id: 'jee-subject-math',    title: 'JEE Subject Test — Mathematics',          exam: 'JEE',  type: 'subject-test', difficulty: 'hard',   questions: 60,  durationLabel: '1h 20m' },
-  { id: 'jee-chapter-calculus',title: 'JEE Chapter Test — Calculus',             exam: 'JEE',  type: 'chapter-test', difficulty: 'hard',   questions: 25,  durationLabel: '30m'    },
+  { id: 'jee-full-1',          title: 'JEE Full Test 1',                           exam: 'JEE',  type: 'full-test',    difficulty: 'hard',   questions: 90,  durationLabel: '3h',     thumbnailUrl: '/images/full-test-cover.jpg'    },
+  { id: 'jee-subject-math',    title: 'JEE Subject Test — Mathematics',            exam: 'JEE',  type: 'subject-test', difficulty: 'hard',   questions: 60,  durationLabel: '1h 20m', thumbnailUrl: '/images/subject-test-cover.jpg' },
+  { id: 'jee-chapter-calculus',title: 'JEE Chapter Test — Calculus',               exam: 'JEE',  type: 'chapter-test', difficulty: 'hard',   questions: 25,  durationLabel: '30m',    thumbnailUrl: '/images/chapter-test-cover.jpg' },
   // NEET
-  { id: 'neet-full-1',         title: 'NEET Full Test 1',                       exam: 'NEET', type: 'full-test',    difficulty: 'medium', questions: 180, durationLabel: '3h 20m' },
-  { id: 'neet-subject-physics',title: 'NEET Subject Test — Physics',             exam: 'NEET', type: 'subject-test', difficulty: 'medium', questions: 45,  durationLabel: '1h'     },
-  { id: 'neet-chapter-bio',    title: 'NEET Chapter Test — Biology Cell Division', exam: 'NEET', type: 'chapter-test', difficulty: 'medium', questions: 25, durationLabel: '30m'  },
+  { id: 'neet-full-1',         title: 'NEET Full Test 1',                          exam: 'NEET', type: 'full-test',    difficulty: 'medium', questions: 180, durationLabel: '3h 20m', thumbnailUrl: '/images/full-test-cover.jpg'    },
+  { id: 'neet-subject-physics',title: 'NEET Subject Test — Physics',               exam: 'NEET', type: 'subject-test', difficulty: 'medium', questions: 45,  durationLabel: '1h',     thumbnailUrl: '/images/subject-test-cover.jpg' },
+  { id: 'neet-chapter-bio',    title: 'NEET Chapter Test — Biology Cell Division', exam: 'NEET', type: 'chapter-test', difficulty: 'medium', questions: 25,  durationLabel: '30m',    thumbnailUrl: '/images/chapter-test-cover.jpg' },
   // PMP
-  { id: 'pmp-full-1',          title: 'PMP Full Test 1',                        exam: 'PMP',  type: 'full-test',    difficulty: 'medium', questions: 180, durationLabel: '3h 50m' },
-  { id: 'pmp-subject-planning-1', title: 'PMP Planning — Subject Test',         exam: 'PMP',  type: 'subject-test', difficulty: 'easy',   questions: 40,  durationLabel: '1h'     },
+  { id: 'pmp-full-1',          title: 'PMP Full Test 1',                           exam: 'PMP',  type: 'full-test',    difficulty: 'medium', questions: 180, durationLabel: '3h 50m', thumbnailUrl: '/images/full-test-cover.jpg'    },
+  { id: 'pmp-subject-planning-1', title: 'PMP Planning — Subject Test',            exam: 'PMP',  type: 'subject-test', difficulty: 'easy',   questions: 40,  durationLabel: '1h',     thumbnailUrl: '/images/subject-test-cover.jpg' },
 ];
 
 // -------------------------------------------------------
