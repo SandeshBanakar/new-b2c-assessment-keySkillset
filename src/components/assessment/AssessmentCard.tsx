@@ -9,7 +9,7 @@ import type { Tier } from '@/types';
 // Tier access helper
 // -------------------------------------------------------
 
-function tierAllowsType(tier: Tier, type: LibraryAssessment['type']): boolean {
+export function tierAllowsType(tier: Tier, type: LibraryAssessment['type']): boolean {
   switch (tier) {
     case 'free':         return false;
     case 'basic':        return type === 'full-test';
@@ -39,9 +39,9 @@ const DIFF_BADGE: Record<LibraryAssessment['difficulty'], string> = {
 // Card state derivation — 7 states per spec
 // -------------------------------------------------------
 
-type CardState = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type CardState = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-function deriveCardState({
+export function deriveCardState({
   userTier,
   assessmentType,
   isSubscribed,

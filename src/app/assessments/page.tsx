@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
 import PageWrapper from '@/components/layout/PageWrapper';
-import AssessmentLibraryBanner from '@/components/shared/AssessmentLibraryBanner';
-import YourAssessmentsSection from '@/components/assessment/YourAssessmentsSection';
+import TierGateBanner from '@/components/assessment/TierGateBanner';
 import AssessmentLibrarySection from '@/components/assessment/AssessmentLibrarySection';
 
 export default function AssessmentsPage() {
@@ -35,13 +34,10 @@ export default function AssessmentsPage() {
           </div>
         )}
 
-        {/* Tier upgrade banner */}
-        <AssessmentLibraryBanner />
+        {/* Tier upgrade / awareness banner */}
+        <TierGateBanner />
 
-        {/* Section 1 — subscribed assessments */}
-        <YourAssessmentsSection />
-
-        {/* Section 2 — full library */}
+        {/* Assessment library with category grouping */}
         <AssessmentLibrarySection />
       </PageWrapper>
     </div>
