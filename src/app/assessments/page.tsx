@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, X } from 'lucide-react';
+import { CheckCircle2, CheckCircle, X } from 'lucide-react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import TierGateBanner from '@/components/assessment/TierGateBanner';
 import AssessmentLibrarySection from '@/components/assessment/AssessmentLibrarySection';
@@ -12,6 +12,13 @@ export default function AssessmentsPage() {
     const msg = sessionStorage.getItem('plan_banner');
     if (msg) sessionStorage.removeItem('plan_banner');
     return msg;
+  });
+
+  const [successPlan, setSuccessPlan] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const plan = sessionStorage.getItem('justSubscribed');
+    if (plan) sessionStorage.removeItem('justSubscribed');
+    return plan;
   });
 
   return (
@@ -30,6 +37,21 @@ export default function AssessmentsPage() {
               aria-label="Dismiss"
             >
               <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Checkout success banner */}
+        {successPlan && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <CheckCircle className="w-5 h-5 text-emerald-600 mr-2 flex-shrink-0" />
+              <p className="text-emerald-800 text-sm font-medium">
+                Your {successPlan} plan is active. Your learning quest begins now.
+              </p>
+            </div>
+            <button onClick={() => setSuccessPlan(null)}>
+              <X className="w-4 h-4 text-emerald-500 cursor-pointer" />
             </button>
           </div>
         )}
