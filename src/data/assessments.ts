@@ -25,6 +25,10 @@ export type DemoAttemptState = {
   attemptsUsed: number;
   freeAttemptUsed: boolean;
   status: 'not_started' | 'in_progress' | 'completed';
+  // In production, lastAccessedAt is stored in Supabase
+  // attempt_sessions table and updated via API route on
+  // every test interaction. For demo, using mock timestamps.
+  lastAccessedAt: number | null;
 };
 
 // Which assessments each demo user has subscribed to
@@ -39,21 +43,27 @@ export const SUBSCRIBED_ASSESSMENTS: Record<string, string[]> = {
 export const DEMO_ATTEMPT_STATES: Record<string, Record<string, DemoAttemptState>> = {
   'demo-free': {
     // Used free attempt on NEET Full Test (tier=free → locked) → STATE 2 demo
-    'neet-full-1': { attemptsUsed: 1, freeAttemptUsed: true, status: 'in_progress' },
+    'neet-full-1': { attemptsUsed: 1, freeAttemptUsed: true, status: 'in_progress', lastAccessedAt: null },
+    // SAT Full Test 1 — free attempt in progress (30 minutes ago)
+    'sat-full-1':  { attemptsUsed: 1, freeAttemptUsed: true, status: 'in_progress', lastAccessedAt: Date.now() - 30 * 60 * 1000 },
   },
   'demo-basic': {
-    'sat-full-1': { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress' },
+    // SAT Full Test 1 — in progress (1 day ago)
+    'sat-full-1':        { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress', lastAccessedAt: Date.now() - 1 * 24 * 60 * 60 * 1000 },
     // Used free attempt on subject-test (tier=basic → locked for subject) → STATE 2 demo
-    'sat-subject-math-1': { attemptsUsed: 1, freeAttemptUsed: true, status: 'completed' },
+    'sat-subject-math-1': { attemptsUsed: 1, freeAttemptUsed: true, status: 'completed',   lastAccessedAt: null },
   },
   'demo-pro': {
-    'sat-full-1': { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress' },
-    'neet-subject-physics': { attemptsUsed: 0, freeAttemptUsed: false, status: 'not_started' },
+    // SAT Full Test 1 — in progress (2 hours ago — most recent)
+    'sat-full-1':          { attemptsUsed: 2, freeAttemptUsed: true,  status: 'in_progress', lastAccessedAt: Date.now() - 2 * 60 * 60 * 1000 },
+    // NEET Subject Physics — not started, never accessed → do not show in CWYLOF
+    'neet-subject-physics': { attemptsUsed: 0, freeAttemptUsed: false, status: 'not_started', lastAccessedAt: null },
   },
   'demo-premium': {
-    'sat-full-1': { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress' },
-    'jee-subject-math': { attemptsUsed: 5, freeAttemptUsed: true, status: 'completed' },
-    'sat-chapter-algebra': { attemptsUsed: 1, freeAttemptUsed: true, status: 'completed' },
+    'sat-full-1':        { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress', lastAccessedAt: null },
+    // JEE Subject Math — completed (3 days ago — recently completed)
+    'jee-subject-math':  { attemptsUsed: 5, freeAttemptUsed: true, status: 'completed',   lastAccessedAt: Date.now() - 3 * 24 * 60 * 60 * 1000 },
+    'sat-chapter-algebra': { attemptsUsed: 1, freeAttemptUsed: true, status: 'completed', lastAccessedAt: null },
   },
 };
 

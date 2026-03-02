@@ -5,6 +5,17 @@ import { Lock, Star, Zap, Trophy } from 'lucide-react';
 import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
 import type { DemoUser } from '@/data/demoUsers';
+import PageWrapper from '@/components/layout/PageWrapper';
+import WelcomeTour from '@/components/shared/WelcomeTour';
+import ContinueLearningWidget from '@/components/dashboard/ContinueLearningWidget';
+import TodayQuestCard from '@/components/shared/TodayQuestCard';
+import QuestWorldMap from '@/components/gamification/QuestWorldMap';
+import StreakCounter from '@/components/shared/StreakCounter';
+import { AuthGuard } from '@/components/shared/AuthGuard';
+
+// -------------------------------------------------------
+// Persona Selector — pre-auth chooser
+// -------------------------------------------------------
 
 const TIER_AVATAR_BG: Record<DemoUser['subscription_tier'], string> = {
   free:         'bg-zinc-600',
@@ -27,7 +38,7 @@ const TIER_ICONS: Record<DemoUser['subscription_tier'], React.ElementType> = {
   premium:      Trophy,
 };
 
-export default function PersonaSelectorPage() {
+function PersonaSelector() {
   const router = useRouter();
   const { switchPersona } = useAppContext();
 
@@ -76,4 +87,39 @@ export default function PersonaSelectorPage() {
       </p>
     </div>
   );
+}
+
+// -------------------------------------------------------
+// Dashboard — shown when a persona is active
+// -------------------------------------------------------
+
+function Dashboard() {
+  return (
+    <AuthGuard>
+      <PageWrapper>
+        <WelcomeTour />
+        <ContinueLearningWidget />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+          <div data-tour="daily-quiz">
+            <TodayQuestCard />
+          </div>
+          <div data-tour="quest-preview">
+            <QuestWorldMap />
+          </div>
+          <div data-tour="stats-bar">
+            <StreakCounter />
+          </div>
+        </div>
+      </PageWrapper>
+    </AuthGuard>
+  );
+}
+
+// -------------------------------------------------------
+// Root page — conditional on auth state
+// -------------------------------------------------------
+
+export default function RootPage() {
+  const { user } = useAppContext();
+  return user ? <Dashboard /> : <PersonaSelector />;
 }

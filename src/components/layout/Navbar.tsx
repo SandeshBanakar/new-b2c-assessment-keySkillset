@@ -19,7 +19,7 @@ export default function Navbar() {
   if (!user) return null;
 
   // Hide Navbar on pages that manage their own full-screen layout
-  if (pathname === '/onboarding' || pathname === '/') return null;
+  if (pathname === '/onboarding') return null;
 
   const initials = (user.displayName ?? user.email)
     .split(/\s+/)
