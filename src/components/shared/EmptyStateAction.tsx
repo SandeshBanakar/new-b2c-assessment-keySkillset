@@ -23,7 +23,7 @@ export function EmptyStateAction({
       )}
       <a
         href={ctaHref}
-        className="text-sm font-medium text-violet-600
+        className="text-sm font-medium text-blue-600
                    hover:underline mt-1"
       >
         {ctaLabel} →

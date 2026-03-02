@@ -124,7 +124,7 @@ function ExamCategorySection({
           {hasMore && (
             <button
               onClick={() => setShowAll((v) => !v)}
-              className="mt-4 text-violet-600 text-sm font-medium cursor-pointer hover:underline"
+              className="mt-4 text-blue-600 text-sm font-medium cursor-pointer hover:underline"
             >
               {showAll ? 'Show less' : `Show all ${count} →`}
             </button>
@@ -236,7 +236,7 @@ export default function AssessmentLibrarySection() {
               }}
               className={
                 active
-                  ? 'bg-white border border-violet-300 text-violet-700 rounded-full px-4 py-1.5 text-sm font-medium shadow-sm'
+                  ? 'bg-white border border-blue-300 text-blue-700 rounded-full px-4 py-1.5 text-sm font-medium shadow-sm'
                   : 'text-zinc-500 px-4 py-1.5 text-sm hover:text-zinc-700 cursor-pointer rounded-full'
               }
             >
@@ -252,7 +252,7 @@ export default function AssessmentLibrarySection() {
         <select
           value={selectedExam}
           onChange={(e) => setSelectedExam(e.target.value)}
-          className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-300"
+          className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
           <option value="all">All Exams</option>
           <option value="SAT">SAT</option>
@@ -265,7 +265,7 @@ export default function AssessmentLibrarySection() {
         <select
           value={selectedProgress}
           onChange={(e) => setSelectedProgress(e.target.value)}
-          className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-300"
+          className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
           <option value="all">All Progress</option>
           <option value="not-started">Not Started</option>

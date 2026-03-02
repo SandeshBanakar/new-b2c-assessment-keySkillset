@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Lock, ArrowUp, Trophy } from 'lucide-react';
+import { Alert } from '@/components/ui/alert';
 import { useAppContext } from '@/context/AppContext';
 import type { Tier } from '@/types';
 
@@ -19,19 +20,19 @@ type BannerConfig = {
 const CONTENT: Record<Tier, BannerConfig> = {
   free: {
     iconName: 'lock',
-    iconClass: 'text-violet-500',
+    iconClass: 'text-blue-500',
     text: "You're on the Free plan. Upgrade to unlock Full Tests, Subject Tests, and Chapter Tests.",
     cta: 'Compare Plans →',
   },
   basic: {
     iconName: 'arrowUp',
-    iconClass: 'text-violet-500',
+    iconClass: 'text-blue-500',
     text: 'Unlock more with Professional — add Subject Tests and Puzzle Mode to your practice.',
     cta: 'Upgrade Plan →',
   },
   professional: {
     iconName: 'arrowUp',
-    iconClass: 'text-violet-500',
+    iconClass: 'text-blue-500',
     text: 'Go Premium for complete access — unlock Chapter Tests and rare badges.',
     cta: 'Upgrade to Premium →',
   },
@@ -62,11 +63,11 @@ export default function TierGateBanner() {
   const c = CONTENT[tier];
 
   return (
-    <div className="mb-6 flex items-center justify-between gap-3 rounded-md bg-violet-50 border border-violet-200 px-4 py-3">
+    <Alert className="mb-6 flex items-center justify-between gap-3 bg-blue-50 border-blue-200 px-4 py-3">
       {/* Left — icon + text */}
       <div className="flex items-center gap-3 min-w-0">
         <BannerIcon name={c.iconName} className={c.iconClass} />
-        <p className="text-sm text-violet-900">{c.text}</p>
+        <p className="text-sm text-blue-900">{c.text}</p>
       </div>
 
       {/* Right — CTA or badge */}
@@ -78,12 +79,12 @@ export default function TierGateBanner() {
         ) : (
           <button
             onClick={() => router.push('/plans')}
-            className="bg-violet-600 text-white text-sm rounded-md px-4 py-2 hover:bg-violet-700 transition-colors whitespace-nowrap"
+            className="bg-blue-600 text-white text-sm rounded-md px-4 py-2 hover:bg-blue-700 transition-colors whitespace-nowrap"
           >
             {c.cta}
           </button>
         )}
       </div>
-    </div>
+    </Alert>
   );
 }

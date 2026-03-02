@@ -11,7 +11,7 @@ export function Footer() {
         Need help?{' '}
         <a
           href="mailto:contact@keyskillset.com"
-          className="text-violet-600 hover:underline"
+          className="text-blue-600 hover:underline"
         >
           Contact support
         </a>

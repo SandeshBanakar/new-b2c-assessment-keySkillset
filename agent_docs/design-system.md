@@ -5,11 +5,12 @@ Closest references: Linear (structure), Notion (typography), Khan Academy (educa
 ## Color System
 
 PRIMARY (brand actions, active states, nav underlines):
-  bg-blue-700         #1D4ED8   — primary buttons, active nav
-  hover:bg-blue-800   #1E40AF   — button hover
+  bg-blue-600         #2563EB   — primary buttons, active nav
+  hover:bg-blue-700   #1D4ED8   — button hover
   bg-blue-50          #EFF6FF   — light tint backgrounds
   border-blue-200     #BFDBFE   — subtle branded borders
-  text-blue-700                   — links, active labels
+  text-blue-600                   — links, active labels
+  text-blue-700                   — active nav labels, dark text on blue-50
 
 GAMIFICATION (streak, XP, badges — warm contrast against blue):
   text-amber-500      #F59E0B   — Flame, Zap, Trophy icons + values
@@ -33,10 +34,20 @@ NEUTRAL (structure, text, surfaces):
   border-zinc-200               — default borders (when used)
 
 EXAM BADGE COLORS (pill badges on cards):
-  SAT:  bg-blue-100  text-blue-800
-  JEE:  bg-purple-100 text-purple-800
-  NEET: bg-green-100 text-green-800
-  PMP:  bg-orange-100 text-orange-800
+  SAT:  bg-blue-50   text-blue-700   border border-blue-200
+  JEE:  bg-orange-50 text-orange-700 border border-orange-200
+  NEET: bg-green-50  text-green-700  border border-green-200
+  PMP:  bg-purple-50 text-purple-700 border border-purple-200
+  CLAT: bg-rose-50   text-rose-700   border border-rose-200
+
+DIFFICULTY BADGE COLORS:
+  Easy:   bg-emerald-50 text-emerald-700 border border-emerald-200
+  Medium: bg-amber-50   text-amber-700   border border-amber-200
+  Hard:   bg-red-50     text-red-700     border border-red-200
+
+TIER CHIP COLORS:
+  "1 Free Attempt":        bg-blue-50  text-blue-700  border border-blue-200
+  "Free Attempt Exhausted": bg-amber-50 text-amber-700 border border-amber-200
 
 ## Border Radius
 System default: rounded-md (6px) — applied everywhere
@@ -92,7 +103,7 @@ Narrow inputs:        p-3
 Table rows:           py-3 px-4
 
 ## Component Defaults (override shadcn at usage site via Tailwind)
-Button primary:   bg-blue-700 hover:bg-blue-800 text-white rounded-md text-sm font-medium
+Button primary:   bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium
 Button outline:   border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700 rounded-md
 Button ghost:     hover:bg-zinc-100 text-zinc-600 rounded-md
 Badge:            rounded-full text-xs font-medium px-2.5 py-0.5

@@ -161,7 +161,7 @@ function PlansContent() {
                 key={plan.tier}
                 className={`bg-white rounded-2xl p-6 shadow-sm relative ${
                   plan.isHighlighted
-                    ? 'border-2 border-violet-500'
+                    ? 'border-2 border-blue-500'
                     : 'border border-zinc-200'
                 }`}
               >
@@ -219,7 +219,7 @@ function PlansContent() {
                 {isHigher && (
                   <button
                     onClick={() => router.push(`/checkout?plan=${plan.tier}`)}
-                    className="w-full mt-6 rounded-xl py-3 font-semibold text-base bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+                    className="w-full mt-6 rounded-xl py-3 font-semibold text-base bg-blue-600 hover:bg-blue-700 text-white transition-colors"
                   >
                     {getUpgradeLabel(userTier, plan.tier)}
                   </button>

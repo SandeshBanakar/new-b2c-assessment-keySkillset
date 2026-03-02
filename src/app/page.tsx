@@ -19,14 +19,14 @@ import { AuthGuard } from '@/components/shared/AuthGuard';
 const TIER_AVATAR_BG: Record<DemoUser['subscription_tier'], string> = {
   free:         'bg-zinc-600',
   basic:        'bg-blue-700',
-  professional: 'bg-violet-700',
+  professional: 'bg-blue-700',
   premium:      'bg-amber-600',
 };
 
 const TIER_BADGE_CLASSES: Record<DemoUser['subscription_tier'], string> = {
   free:         'bg-zinc-700 text-zinc-300',
   basic:        'bg-blue-900 text-blue-300',
-  professional: 'bg-violet-900 text-violet-300',
+  professional: 'bg-blue-900 text-blue-300',
   premium:      'bg-amber-900 text-amber-300',
 };
 

@@ -14,10 +14,10 @@ import type { LibraryAssessment } from '@/data/assessments';
 // -------------------------------------------------------
 
 const EXAM_BADGE: Record<LibraryAssessment['exam'], string> = {
-  SAT:  'bg-blue-100 text-blue-700',
-  JEE:  'bg-amber-100 text-amber-700',
-  NEET: 'bg-emerald-100 text-emerald-700',
-  PMP:  'bg-violet-100 text-violet-700',
+  SAT:  'bg-blue-50 text-blue-700',
+  JEE:  'bg-orange-50 text-orange-700',
+  NEET: 'bg-green-50 text-green-700',
+  PMP:  'bg-purple-50 text-purple-700',
 };
 
 function tierAllowsType(tier: Tier, type: LibraryAssessment['type']): boolean {
@@ -165,7 +165,7 @@ export default function ContinueLearningWidget() {
                     </div>
                     <div className="w-full h-1.5 bg-zinc-100 rounded-full">
                       <div
-                        className="h-1.5 bg-violet-500 rounded-full"
+                        className="h-1.5 bg-blue-500 rounded-full"
                         style={{ width: `${fillPct}%` }}
                       />
                     </div>
@@ -173,7 +173,7 @@ export default function ContinueLearningWidget() {
                   {/* CTA */}
                   <button
                     onClick={() => router.push(`/assessments/${assessment.id}`)}
-                    className="bg-violet-600 text-white text-xs font-semibold rounded-lg px-4 py-2 w-full mt-1 hover:bg-violet-700 transition-colors"
+                    className="bg-blue-600 text-white text-xs font-semibold rounded-lg px-4 py-2 w-full mt-1 hover:bg-blue-700 transition-colors"
                   >
                     Resume Test
                   </button>

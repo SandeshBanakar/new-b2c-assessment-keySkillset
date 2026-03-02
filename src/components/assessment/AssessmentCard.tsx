@@ -23,16 +23,16 @@ export function tierAllowsType(tier: Tier, type: LibraryAssessment['type']): boo
 // -------------------------------------------------------
 
 const EXAM_BADGE: Record<LibraryAssessment['exam'], string> = {
-  SAT:  'bg-blue-100 text-blue-700 border border-blue-200',
-  JEE:  'bg-amber-100 text-amber-700 border border-amber-200',
-  NEET: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-  PMP:  'bg-violet-100 text-violet-700 border border-violet-200',
+  SAT:  'bg-blue-50 text-blue-700 border border-blue-200',
+  JEE:  'bg-orange-50 text-orange-700 border border-orange-200',
+  NEET: 'bg-green-50 text-green-700 border border-green-200',
+  PMP:  'bg-purple-50 text-purple-700 border border-purple-200',
 };
 
 const DIFF_BADGE: Record<LibraryAssessment['difficulty'], string> = {
-  easy:   'bg-emerald-50 text-emerald-700',
-  medium: 'bg-amber-50 text-amber-700',
-  hard:   'bg-rose-50 text-rose-700',
+  easy:   'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  medium: 'bg-amber-50 text-amber-700 border border-amber-200',
+  hard:   'bg-red-50 text-red-700 border border-red-200',
 };
 
 // -------------------------------------------------------
@@ -156,7 +156,7 @@ export default function AssessmentCard({
             {assessment.exam}
           </span>
           {showFreeAttemptChip && (
-            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-violet-700">
+            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700">
               1 Free Attempt
             </span>
           )}
@@ -188,7 +188,7 @@ export default function AssessmentCard({
             </div>
             <div className="w-full h-1.5 bg-zinc-100 rounded-full">
               <div
-                className="h-1.5 bg-violet-500 rounded-full"
+                className="h-1.5 bg-blue-500 rounded-full"
                 style={{ width: `${fillPct}%` }}
               />
             </div>
@@ -202,7 +202,7 @@ export default function AssessmentCard({
           <div className="flex flex-col gap-2">
             <button
               onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-              className="bg-violet-600 hover:bg-violet-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
             >
               Take Free Test
             </button>
@@ -220,7 +220,7 @@ export default function AssessmentCard({
           <div className="flex flex-col gap-2">
             <button
               onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-              className="bg-violet-600 hover:bg-violet-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
             >
               Continue Your Test
             </button>
@@ -237,7 +237,7 @@ export default function AssessmentCard({
         {cardState === 3 && (
           <button
             onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-            className="bg-violet-600 hover:bg-violet-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
           >
             Take Free Test
           </button>
@@ -247,7 +247,7 @@ export default function AssessmentCard({
         {cardState === 4 && (
           <button
             onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-            className="bg-violet-600 hover:bg-violet-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
           >
             Start Your Test
           </button>
@@ -257,7 +257,7 @@ export default function AssessmentCard({
         {cardState === 5 && (
           <button
             onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-            className="border border-violet-600 text-violet-600 bg-white hover:bg-violet-50 w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
+            className="border border-blue-600 text-blue-600 bg-white hover:bg-blue-50 w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
           >
             Resume Test
           </button>
@@ -268,7 +268,7 @@ export default function AssessmentCard({
           <div className="flex gap-2">
             <button
               onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-              className="flex-1 bg-violet-600 hover:bg-violet-700 text-white rounded-lg py-2.5 text-sm font-semibold transition-colors"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-semibold transition-colors"
             >
               View Analysis
             </button>
