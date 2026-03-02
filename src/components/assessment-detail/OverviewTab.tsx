@@ -11,9 +11,7 @@ import {
   FileText,
   Globe,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { SCORE_RANGES, mockSyllabus, ASSESSMENT_LIBRARY } from '@/data/assessments';
-import SubscribeModal from '@/components/assessment/SubscribeModal';
+import { SCORE_RANGES, mockSyllabus, DEMO_ATTEMPT_STATES } from '@/data/assessments';
 import { useAppContext } from '@/context/AppContext';
 import type { Assessment, MockAttempt, SyllabusSection, Tier } from '@/types';
 
@@ -94,106 +92,127 @@ function SyllabusAccordion({ sections }: { sections: SyllabusSection[] }) {
 export default function OverviewTab({
   assessment,
   userTier,
-  attempts,
-  onSwitchToAnalytics,
 }: OverviewTabProps) {
   const router = useRouter();
-  const { isSubscribed, subscribeVersion } = useAppContext();
-  // subscribeVersion triggers re-render after subscribe
-  void subscribeVersion;
+  const { user } = useAppContext();
 
-  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
-
-  const subscribed = isSubscribed(assessment.id);
   const tierAllows = tierAllowsType(userTier, assessment.type);
+  const tierName = userTier.charAt(0).toUpperCase() + userTier.slice(1);
+  const attemptRoute = `/assessments/${assessment.id}/attempt`;
 
-  const inProgress = attempts.find((a) => a.status === 'in_progress');
-  const completedCount = attempts.filter((a) => a.status === 'completed').length;
-  const freeAttemptUsed = attempts.some(
-    (a) => a.attemptNumber === 0 && a.status !== 'not_started',
-  );
-  const allUsed = completedCount >= 5;
+  // Derive attempt state from mock data
+  const userId = user?.id ?? '';
+  const attemptState = DEMO_ATTEMPT_STATES[userId]?.[assessment.id] ?? {
+    attemptsUsed: 0,
+    freeAttemptUsed: false,
+    status: 'not_started' as const,
+    lastAccessedAt: null,
+  };
 
-  // Find library entry for the subscribe modal
-  const libraryEntry = ASSESSMENT_LIBRARY.find((a) => a.id === assessment.id);
+  const attemptsUsed = attemptState.attemptsUsed;
+  const freeAttemptUsed = attemptState.freeAttemptUsed;
+  const inProgress = attemptState.status === 'in_progress';
+  const allUsed = attemptsUsed >= 6;
 
   // ── Derive CTA ──────────────────────────────────────────
   let ctaContent: React.ReactNode;
 
-  if (!subscribed && tierAllows) {
-    // Tier allows but not yet subscribed → Subscribe Now
+  if (!tierAllows) {
+    if (!freeAttemptUsed) {
+      // STATE 1: Tier too low, free attempt not used
+      ctaContent = (
+        <>
+          <button
+            onClick={() => router.push(attemptRoute)}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold text-base transition-colors"
+          >
+            Take Free Test
+          </button>
+          <p className="text-xs text-zinc-500 text-center mt-2">
+            Want full access?{' '}
+            <span
+              onClick={() => router.push('/plans')}
+              className="text-blue-600 hover:underline cursor-pointer text-sm font-medium"
+            >
+              Upgrade to Access →
+            </span>
+          </p>
+        </>
+      );
+    } else {
+      // STATE 2: Tier too low, free attempt used
+      ctaContent = (
+        <>
+          <button
+            onClick={() => router.push(attemptRoute)}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold text-base transition-colors"
+          >
+            Continue Your Test
+          </button>
+          <p className="text-xs text-zinc-500 text-center mt-2">
+            Unlock 5 more attempts.{' '}
+            <span
+              onClick={() => router.push('/plans')}
+              className="text-blue-600 hover:underline cursor-pointer text-sm font-medium"
+            >
+              Upgrade to Access →
+            </span>
+          </p>
+        </>
+      );
+    }
+  } else if (allUsed) {
+    // STATE 6: All 6/6 attempts used
+    ctaContent = (
+      <button
+        onClick={() => router.push(`/assessments/${assessment.id}?tab=analytics`)}
+        className="w-full border border-zinc-300 text-zinc-700 bg-white rounded-xl py-3 font-medium text-base hover:bg-zinc-50 transition-colors"
+      >
+        View Analysis
+      </button>
+    );
+  } else if (inProgress) {
+    // STATE 4: Tier allows, in progress
+    ctaContent = (
+      <button
+        onClick={() => router.push(attemptRoute)}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold text-base transition-colors"
+      >
+        Resume Test
+      </button>
+    );
+  } else if (attemptsUsed === 0) {
+    // STATE 3: Tier allows, 0 attempts
     ctaContent = (
       <>
-        <Button
-          onClick={() => setShowSubscribeModal(true)}
-          className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md"
+        <button
+          onClick={() => router.push(attemptRoute)}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold text-base transition-colors"
         >
-          Subscribe Now
-        </Button>
-        <p className="text-xs text-zinc-400 mt-2 text-center">
-          Included in your{' '}
-          <span className="capitalize">{userTier}</span> plan. No extra charge.
-        </p>
-      </>
-    );
-  } else if (!subscribed && !tierAllows) {
-    // Tier doesn't allow → Upgrade
-    ctaContent = (
-      <>
-        <Button
-          onClick={() => router.push('/plans')}
-          className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md"
-        >
-          Upgrade to Access
-        </Button>
-        <p className="text-xs text-zinc-400 mt-2 text-center">
-          This assessment type requires a higher plan
-        </p>
-      </>
-    );
-  } else if (subscribed && inProgress) {
-    ctaContent = (
-      <>
-        <Button className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md">
-          Resume Test →
-        </Button>
-        <p className="text-xs text-zinc-400 mt-2 text-center">
-          You have an attempt in progress
-        </p>
-      </>
-    );
-  } else if (subscribed && allUsed) {
-    ctaContent = (
-      <>
-        <p className="text-sm text-zinc-500 text-center mb-3">All attempts completed</p>
-        <Button
-          variant="outline"
-          onClick={onSwitchToAnalytics}
-          className="w-full rounded-md border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-        >
-          View Analytics →
-        </Button>
-      </>
-    );
-  } else if (subscribed && !freeAttemptUsed) {
-    ctaContent = (
-      <>
-        <Button className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md">
-          Start Free Attempt →
-        </Button>
-        <p className="text-xs text-zinc-400 mt-2 text-center">
-          No extra charge for your first attempt
+          Start Your Test
+        </button>
+        <p className="text-xs text-zinc-400 text-center mt-2">
+          Included in your {tierName} plan. No extra charge.
         </p>
       </>
     );
   } else {
+    // STATE 5: Tier allows, 1–5 attempts used, last completed
     ctaContent = (
       <>
-        <Button className="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-md">
-          Start Attempt →
-        </Button>
-        <p className="text-xs text-zinc-400 mt-2 text-center">
-          {completedCount} of 5 attempts used
+        <button
+          onClick={() => router.push(attemptRoute)}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold text-base transition-colors"
+        >
+          Start New Attempt
+        </button>
+        <p className="text-xs text-zinc-400 text-center mt-2">
+          <span
+            onClick={() => router.push(`/assessments/${assessment.id}?tab=attempts`)}
+            className="text-blue-600 hover:underline cursor-pointer text-sm font-medium"
+          >
+            View Last Analysis →
+          </span>
         </p>
       </>
     );
@@ -248,29 +267,14 @@ export default function OverviewTab({
           </ul>
         </div>
 
-        {/* CTA — 1/3 width */}
-        <div className="bg-white shadow-sm rounded-md p-6 flex flex-col justify-center">
+        {/* CTA panel — 1/3 width */}
+        <div className="bg-white border border-zinc-200 rounded-2xl p-6 flex flex-col justify-center">
           {ctaContent}
-          {/* Take Free Test link — always shown */}
-          <button
-            onClick={() => router.push(`/assessments/${assessment.id}`)}
-            className="mt-3 text-xs text-blue-700 hover:underline text-center"
-          >
-            Take Free Test →
-          </button>
         </div>
       </div>
 
       {/* Syllabus accordion */}
       <SyllabusAccordion sections={mockSyllabus} />
-
-      {/* Subscribe modal */}
-      {showSubscribeModal && libraryEntry && (
-        <SubscribeModal
-          assessment={libraryEntry}
-          onClose={() => setShowSubscribeModal(false)}
-        />
-      )}
     </div>
   );
 }
