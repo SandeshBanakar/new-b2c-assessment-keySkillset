@@ -6,7 +6,6 @@ import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
 import type { DemoUser } from '@/data/demoUsers';
 import PageWrapper from '@/components/layout/PageWrapper';
-import WelcomeTour from '@/components/shared/WelcomeTour';
 import ContinueLearningWidget from '@/components/dashboard/ContinueLearningWidget';
 import TodayQuestCard from '@/components/shared/TodayQuestCard';
 import QuestWorldMap from '@/components/gamification/QuestWorldMap';
@@ -97,7 +96,6 @@ function Dashboard() {
   return (
     <AuthGuard>
       <PageWrapper>
-        <WelcomeTour />
         <ContinueLearningWidget />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
           <div data-tour="daily-quiz">

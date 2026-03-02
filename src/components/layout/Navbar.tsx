@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/context/AppContext';
 
 const NAV_LINKS = [
+  { href: '/', label: 'Dashboard' },
   { href: '/assessments', label: 'Assessments' },
 ];
 
