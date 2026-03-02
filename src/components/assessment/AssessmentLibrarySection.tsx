@@ -3,93 +3,55 @@
 import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
-import {
-  ASSESSMENT_LIBRARY,
-  SUBSCRIBED_ASSESSMENTS,
-  DEMO_ATTEMPT_STATES,
-} from '@/data/assessments';
-import AssessmentCard, {
-  deriveCardState,
-  type CardState,
-} from '@/components/assessment/AssessmentCard';
-import type { LibraryAssessment, DemoAttemptState } from '@/data/assessments';
+import { useAssessments } from '@/hooks/useAssessments';
+import { getAttemptData } from '@/data/mockAttempts';
+import AssessmentCard from '@/components/assessment/AssessmentCard';
+import type { SupabaseAssessment } from '@/types/assessment';
 import type { Tier } from '@/types';
 
 // -------------------------------------------------------
 // Constants
 // -------------------------------------------------------
 
-type ActiveType = LibraryAssessment['type'];
-type ExamKey   = LibraryAssessment['exam'];
+type ActiveType = 'full_test' | 'subject_test' | 'chapter_test';
 
 const TYPE_LABELS: Record<ActiveType, string> = {
-  'full-test':    'Full Tests',
-  'subject-test': 'Subject Tests',
-  'chapter-test': 'Chapter Tests',
-};
-
-// Display names shown in section headers and empty states
-const EXAM_DISPLAY: Record<string, string> = {
-  SAT:  'SAT',
-  JEE:  'IIT-JEE',
-  NEET: 'NEET',
-  PMP:  'PMP',
-  CLAT: 'CLAT',
+  full_test:    'Full Tests',
+  subject_test: 'Subject Tests',
+  chapter_test: 'Chapter Tests',
 };
 
 // Sort order for exam sections (alphabetical by display name)
-const EXAM_SORT_ORDER: ExamKey[] = ['JEE', 'NEET', 'PMP', 'SAT'];
+const EXAM_SORT_ORDER = ['CLAT', 'IIT-JEE', 'NEET', 'PMP', 'SAT'];
 
 // -------------------------------------------------------
-// Progress group helper
-// -------------------------------------------------------
-
-function progressGroup(state: CardState): 'not-started' | 'in-progress' | 'completed' {
-  if (state === 5) return 'in-progress';
-  if (state === 6 || state === 7) return 'completed';
-  return 'not-started'; // states 1, 2, 3, 4
-}
-
-// -------------------------------------------------------
-// Enriched assessment type (pre-computed per render)
-// -------------------------------------------------------
-
-type EnrichedItem = {
-  assessment: LibraryAssessment;
-  isSubscribed: boolean;
-  attemptsUsed: number;
-  freeAttemptUsed: boolean;
-  status: DemoAttemptState['status'];
-  cardState: CardState;
-};
-
-// -------------------------------------------------------
-// Per-exam category section (owns its own showAll state)
+// Per-exam category section
 // -------------------------------------------------------
 
 function ExamCategorySection({
-  exam,
+  examType,
   items,
+  userId,
   userTier,
   typeLabel,
 }: {
-  exam: ExamKey;
-  items: EnrichedItem[];
+  examType: string;
+  items: SupabaseAssessment[];
+  userId: string;
   userTier: Tier;
   typeLabel: string;
 }) {
   const [showAll, setShowAll] = useState(false);
 
-  const displayName = EXAM_DISPLAY[exam] ?? exam;
-  const count       = items.length;
-  const displayed   = showAll ? items : items.slice(0, 4);
-  const hasMore     = count > 4;
+  const count     = items.length;
+  const displayed = showAll ? items : items.slice(0, 4);
+  const hasMore   = count > 4;
 
   return (
     <div className="mt-10">
       {/* Section header */}
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-xl font-bold text-zinc-900">{displayName}</h2>
+        <h2 className="text-xl font-semibold text-zinc-900">{examType}</h2>
         <span className="bg-zinc-100 text-zinc-500 text-xs px-2.5 py-1 rounded-full">
           {count} {count === 1 ? 'assessment' : 'assessments'}
         </span>
@@ -97,9 +59,9 @@ function ExamCategorySection({
 
       {/* Empty state */}
       {count === 0 && (
-        <div className="border border-dashed border-zinc-200 rounded-xl py-8 text-center">
+        <div className="border border-dashed border-zinc-200 rounded-md py-8 text-center">
           <p className="text-sm text-zinc-500">
-            No {displayName} {typeLabel.toLowerCase()} match your current filters.
+            No {examType} {typeLabel.toLowerCase()} match your current filters.
           </p>
         </div>
       )}
@@ -108,15 +70,12 @@ function ExamCategorySection({
       {count > 0 && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {displayed.map(({ assessment, isSubscribed, attemptsUsed, freeAttemptUsed, status }) => (
+            {displayed.map((assessment) => (
               <AssessmentCard
                 key={assessment.id}
                 assessment={assessment}
+                attemptData={getAttemptData(userId, assessment.title)}
                 userTier={userTier}
-                isSubscribed={isSubscribed}
-                attemptsUsed={attemptsUsed}
-                freeAttemptUsed={freeAttemptUsed}
-                status={status}
               />
             ))}
           </div>
@@ -141,8 +100,9 @@ function ExamCategorySection({
 
 export default function AssessmentLibrarySection() {
   const { user } = useAppContext();
+  const { assessments, loading, error } = useAssessments();
 
-  const [activeType,       setActiveType]       = useState<ActiveType>('full-test');
+  const [activeType,       setActiveType]       = useState<ActiveType>('full_test');
   const [selectedExam,     setSelectedExam]     = useState<string>('all');
   const [selectedProgress, setSelectedProgress] = useState<string>('all');
 
@@ -152,29 +112,27 @@ export default function AssessmentLibrarySection() {
   const userId    = user.id;
   const isPremium = tier === 'premium';
 
-  // ── Enrich every assessment with derived card state ──────────────────────
-  const enriched: EnrichedItem[] = ASSESSMENT_LIBRARY.map((assessment) => {
-    const isSubscribed   = (SUBSCRIBED_ASSESSMENTS[userId] ?? []).includes(assessment.id);
-    const state          = DEMO_ATTEMPT_STATES[userId]?.[assessment.id];
-    const attemptsUsed   = state?.attemptsUsed   ?? 0;
-    const freeAttemptUsed = state?.freeAttemptUsed ?? false;
-    const status         = state?.status          ?? 'not_started';
-    const cardState      = deriveCardState({
-      userTier: tier,
-      assessmentType: assessment.type,
-      isSubscribed,
-      attemptsUsed,
-      freeAttemptUsed,
-      status,
-    });
-    return { assessment, isSubscribed, attemptsUsed, freeAttemptUsed, status, cardState };
-  });
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
-  // ── Determine which exams to show (have ≥1 assessment of activeType) ────
+  if (error) return (
+    <div className="text-center py-24">
+      <p className="text-sm text-rose-600 font-medium">Failed to load assessments.</p>
+      <p className="text-xs text-zinc-400 mt-1">Please refresh the page.</p>
+    </div>
+  );
+
+  // ── Filter by active type ─────────────────────────────────────────────────
+  const filteredByType = assessments.filter(
+    (a) => a.assessment_type === activeType,
+  );
+
+  // ── Derive unique exam groups, sorted ────────────────────────────────────
   const examsWithType = [
-    ...new Set(
-      ASSESSMENT_LIBRARY.filter((a) => a.type === activeType).map((a) => a.exam),
-    ),
+    ...new Set(filteredByType.map((a) => a.exam_type)),
   ].sort((a, b) => {
     const ai = EXAM_SORT_ORDER.indexOf(a);
     const bi = EXAM_SORT_ORDER.indexOf(b);
@@ -187,30 +145,41 @@ export default function AssessmentLibrarySection() {
       ? examsWithType.filter((e) => e === selectedExam)
       : examsWithType;
 
-  // ── Build per-section item lists (applying progress filter) ───────────────
-  const examSections = visibleExams.map((exam) => {
-    const items = enriched.filter((item) => {
-      if (item.assessment.type  !== activeType) return false;
-      if (item.assessment.exam  !== exam)       return false;
-      if (selectedProgress !== 'all') {
-        const pg = progressGroup(item.cardState);
-        if (selectedProgress === 'not-started' && pg !== 'not-started') return false;
-        if (selectedProgress === 'in-progress'  && pg !== 'in-progress')  return false;
-        if (selectedProgress === 'completed'    && pg !== 'completed')    return false;
-      }
-      return true;
-    });
-    return { exam, items };
+  // ── Apply progress filter per exam section ────────────────────────────────
+  const examSections = visibleExams.map((examType) => {
+    let items = filteredByType.filter((a) => a.exam_type === examType);
+
+    if (selectedProgress !== 'all') {
+      items = items.filter((a) => {
+        const attempt = getAttemptData(userId, a.title);
+        const status  = attempt.status;
+        if (selectedProgress === 'not-started' && status !== 'not_started') return false;
+        if (selectedProgress === 'in-progress'  && status !== 'inprogress')  return false;
+        if (selectedProgress === 'completed'    && status !== 'completed')   return false;
+        return true;
+      });
+    }
+
+    return { examType, items };
   });
 
   const typeLabel = TYPE_LABELS[activeType];
+
+  // ── All unique exam options for the dropdown ─────────────────────────────
+  const allExamOptions = [
+    ...new Set(assessments.map((a) => a.exam_type)),
+  ].sort((a, b) => {
+    const ai = EXAM_SORT_ORDER.indexOf(a);
+    const bi = EXAM_SORT_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
 
   // -------------------------------------------------------
   return (
     <div>
       {/* ── Heading row ─────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-1">
-        <h1 className="text-2xl font-bold text-zinc-900">Assessment Library</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900">Assessment Library</h1>
         {isPremium && (
           <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-medium ml-3 inline-flex items-center gap-1">
             <Trophy className="w-3 h-3" />
@@ -218,7 +187,7 @@ export default function AssessmentLibrarySection() {
           </span>
         )}
       </div>
-      <p className="text-sm text-zinc-500 mt-1 mb-6">
+      <p className="text-sm text-zinc-600 mt-1 mb-6">
         Practice at every level — full tests, subjects, and chapters.
       </p>
 
@@ -252,20 +221,19 @@ export default function AssessmentLibrarySection() {
         <select
           value={selectedExam}
           onChange={(e) => setSelectedExam(e.target.value)}
-          className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="bg-white border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-700"
         >
           <option value="all">All Exams</option>
-          <option value="SAT">SAT</option>
-          <option value="JEE">IIT-JEE</option>
-          <option value="NEET">NEET</option>
-          <option value="PMP">PMP</option>
+          {allExamOptions.map((exam) => (
+            <option key={exam} value={exam}>{exam}</option>
+          ))}
         </select>
 
         {/* Progress dropdown */}
         <select
           value={selectedProgress}
           onChange={(e) => setSelectedProgress(e.target.value)}
-          className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="bg-white border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-700"
         >
           <option value="all">All Progress</option>
           <option value="not-started">Not Started</option>
@@ -276,17 +244,18 @@ export default function AssessmentLibrarySection() {
 
       {/* ── Category sections ────────────────────────────────── */}
       {examSections.length === 0 ? (
-        <div className="border border-dashed border-zinc-200 rounded-xl py-8 text-center mt-6">
+        <div className="border border-dashed border-zinc-200 rounded-md py-8 text-center mt-6">
           <p className="text-sm text-zinc-500">
             No {typeLabel.toLowerCase()} match your current filters.
           </p>
         </div>
       ) : (
-        examSections.map(({ exam, items }) => (
+        examSections.map(({ examType, items }) => (
           <ExamCategorySection
-            key={exam}
-            exam={exam}
+            key={examType}
+            examType={examType}
             items={items}
+            userId={userId}
             userTier={tier}
             typeLabel={typeLabel}
           />

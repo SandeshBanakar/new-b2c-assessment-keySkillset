@@ -2,84 +2,74 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { LibraryAssessment } from '@/data/assessments';
+import { tierAllows } from '@/types/assessment';
+import type { SupabaseAssessment } from '@/types/assessment';
+import type { MockAttemptData } from '@/data/mockAttempts';
 import type { Tier } from '@/types';
-
-// -------------------------------------------------------
-// Tier access helper
-// -------------------------------------------------------
-
-export function tierAllowsType(tier: Tier, type: LibraryAssessment['type']): boolean {
-  switch (tier) {
-    case 'free':         return false;
-    case 'basic':        return type === 'full-test';
-    case 'professional': return type === 'full-test' || type === 'subject-test';
-    case 'premium':      return true;
-  }
-}
 
 // -------------------------------------------------------
 // Badge tokens
 // -------------------------------------------------------
 
-const EXAM_BADGE: Record<LibraryAssessment['exam'], string> = {
-  SAT:  'bg-blue-50 text-blue-700 border border-blue-200',
-  JEE:  'bg-orange-50 text-orange-700 border border-orange-200',
-  NEET: 'bg-green-50 text-green-700 border border-green-200',
-  PMP:  'bg-purple-50 text-purple-700 border border-purple-200',
+const EXAM_BADGE: Record<string, string> = {
+  SAT:      'bg-blue-50 text-blue-700 border border-blue-200',
+  'IIT-JEE':'bg-orange-50 text-orange-700 border border-orange-200',
+  NEET:     'bg-green-50 text-green-700 border border-green-200',
+  PMP:      'bg-purple-50 text-purple-700 border border-purple-200',
+  CLAT:     'bg-rose-50 text-rose-700 border border-rose-200',
 };
 
-const DIFF_BADGE: Record<LibraryAssessment['difficulty'], string> = {
-  easy:   'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  medium: 'bg-amber-50 text-amber-700 border border-amber-200',
-  hard:   'bg-red-50 text-red-700 border border-red-200',
+const DIFF_BADGE: Record<string, string> = {
+  Easy:   'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  Medium: 'bg-amber-50 text-amber-700 border border-amber-200',
+  Hard:   'bg-red-50 text-red-700 border border-red-200',
 };
 
 // -------------------------------------------------------
-// Card state derivation — 7 states per spec
+// Gradient placeholder per exam type
 // -------------------------------------------------------
 
-export type CardState = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+const EXAM_GRADIENT: Record<string, string> = {
+  SAT:      'from-blue-100 to-blue-200',
+  'IIT-JEE':'from-orange-100 to-orange-200',
+  NEET:     'from-green-100 to-green-200',
+  PMP:      'from-purple-100 to-purple-200',
+  CLAT:     'from-rose-100 to-rose-200',
+};
+
+// -------------------------------------------------------
+// Card state derivation — 6 states
+// -------------------------------------------------------
+
+export type CardState = 1 | 2 | 4 | 5 | 6 | 7;
 
 export function deriveCardState({
   userTier,
-  assessmentType,
-  isSubscribed,
-  attemptsUsed,
-  freeAttemptUsed,
-  status,
+  assessment,
+  attemptData,
 }: {
   userTier: Tier;
-  assessmentType: LibraryAssessment['type'];
-  isSubscribed: boolean;
-  attemptsUsed: number;
-  freeAttemptUsed: boolean;
-  status: 'not_started' | 'in_progress' | 'completed';
+  assessment: SupabaseAssessment;
+  attemptData: MockAttemptData;
 }): CardState {
-  // STATE 7: all 6 attempts consumed
+  const tierAllowsAccess = tierAllows(userTier, assessment.min_tier);
+  const attemptsUsed = attemptData.attemptsUsed;
+  const freeAttemptUsed = attemptData.isFreeAttempt && attemptsUsed > 0;
+  const status = attemptData.status;
+
+  // State 7: all 6 attempts consumed
   if (attemptsUsed >= 6) return 7;
 
-  // Premium override: unlocks all types, always sees states 4–7
-  if (userTier === 'premium') {
+  // Tier allows → subscribed states 4–6
+  if (tierAllowsAccess) {
     if (attemptsUsed === 0) return 4;
-    if (status === 'in_progress') return 5;
-    return 6;
+    if (status === 'inprogress') return 5;
+    return 6; // completed, attempts remain
   }
 
-  // Subscribed assessments: states 4–6
-  if (isSubscribed) {
-    if (attemptsUsed === 0) return 4;
-    if (status === 'in_progress') return 5;
-    return 6;
-  }
-
-  // Not subscribed — check tier access
-  if (!tierAllowsType(userTier, assessmentType)) {
-    return freeAttemptUsed ? 2 : 1;
-  }
-
-  // Tier allows, not yet subscribed
-  return 3;
+  // Tier does not allow
+  if (!freeAttemptUsed) return 1; // free attempt available
+  return 2;                        // free attempt exhausted
 }
 
 // -------------------------------------------------------
@@ -87,12 +77,9 @@ export function deriveCardState({
 // -------------------------------------------------------
 
 export interface AssessmentCardProps {
-  assessment: LibraryAssessment;
+  assessment: SupabaseAssessment;
+  attemptData: MockAttemptData;
   userTier: Tier;
-  isSubscribed: boolean;
-  attemptsUsed: number;
-  freeAttemptUsed: boolean;
-  status: 'not_started' | 'in_progress' | 'completed';
 }
 
 // -------------------------------------------------------
@@ -101,50 +88,48 @@ export interface AssessmentCardProps {
 
 export default function AssessmentCard({
   assessment,
+  attemptData,
   userTier,
-  isSubscribed,
-  attemptsUsed,
-  freeAttemptUsed,
-  status,
 }: AssessmentCardProps) {
   const router = useRouter();
   const [imgError, setImgError] = useState(false);
 
-  const cardState = deriveCardState({
-    userTier,
-    assessmentType: assessment.type,
-    isSubscribed,
-    attemptsUsed,
-    freeAttemptUsed,
-    status,
-  });
-
+  const cardState = deriveCardState({ userTier, assessment, attemptData });
   const detailHref = `/assessments/${assessment.id}`;
 
-  // Chips: only in states 1, 2, 3
-  const showFreeAttemptChip = cardState === 1 || cardState === 3;
+  const showFreeAttemptChip = cardState === 1;
   const showExhaustedChip   = cardState === 2;
+  const showProgressBar     = cardState === 5 || cardState === 6 || cardState === 7;
+  const fillPct = Math.min((attemptData.attemptsUsed / 6) * 100, 100);
 
-  // Progress bar: only in states 5, 6, 7
-  const showProgressBar = cardState === 5 || cardState === 6 || cardState === 7;
-  const fillPct = Math.min((attemptsUsed / 6) * 100, 100);
+  const gradientClass = EXAM_GRADIENT[assessment.exam_type] ?? 'from-zinc-100 to-zinc-200';
+  const examBadgeClass = EXAM_BADGE[assessment.exam_type] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200';
+  const diffBadgeClass = DIFF_BADGE[assessment.difficulty] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200';
+
+  const showPlaceholder = !assessment.thumbnail_url || imgError;
 
   return (
     <div
       className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
       onClick={() => router.push(detailHref)}
     >
-      {/* Image section */}
-      {!imgError ? (
+      {/* Image / gradient placeholder */}
+      {showPlaceholder ? (
+        <div
+          className={`w-full h-40 bg-gradient-to-br ${gradientClass} flex items-center justify-center`}
+        >
+          <span className="text-2xl font-bold text-white opacity-40">
+            {assessment.exam_type}
+          </span>
+        </div>
+      ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={assessment.thumbnailUrl}
+          src={assessment.thumbnail_url!}
           alt={assessment.title}
           className="w-full h-40 object-cover"
           onError={() => setImgError(true)}
         />
-      ) : (
-        <div className="w-full h-40 bg-zinc-100" />
       )}
 
       {/* Content section */}
@@ -152,8 +137,8 @@ export default function AssessmentCard({
 
         {/* Row 1 — Chips */}
         <div className="flex flex-wrap gap-2">
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${EXAM_BADGE[assessment.exam]}`}>
-            {assessment.exam}
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${examBadgeClass}`}>
+            {assessment.exam_type}
           </span>
           {showFreeAttemptChip && (
             <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700">
@@ -168,13 +153,13 @@ export default function AssessmentCard({
         </div>
 
         {/* Row 2 — Title */}
-        <h3 className="text-base font-bold text-zinc-900">{assessment.title}</h3>
+        <h3 className="text-base font-medium text-zinc-900">{assessment.title}</h3>
 
         {/* Row 3 — Metadata */}
         <div className="flex items-center gap-3 text-xs text-zinc-500 flex-wrap">
-          <span>{assessment.questions} questions</span>
-          <span>{assessment.durationLabel}</span>
-          <span className={`px-2 py-0.5 rounded-full font-medium capitalize ${DIFF_BADGE[assessment.difficulty]}`}>
+          <span>{assessment.total_questions} questions</span>
+          <span>{assessment.duration_minutes}m</span>
+          <span className={`px-2 py-0.5 rounded-full font-medium ${diffBadgeClass}`}>
             {assessment.difficulty}
           </span>
         </div>
@@ -184,7 +169,7 @@ export default function AssessmentCard({
           <div>
             <div className="flex justify-between text-xs text-zinc-500 mb-1">
               <span>Attempts</span>
-              <span>{attemptsUsed}/6 used</span>
+              <span>{attemptData.attemptsUsed}/6 used</span>
             </div>
             <div className="w-full h-1.5 bg-zinc-100 rounded-full">
               <div
@@ -197,7 +182,7 @@ export default function AssessmentCard({
 
         {/* Row 5 — CTAs */}
 
-        {/* STATE 1: Locked, free attempt available */}
+        {/* STATE 1: Tier locked, free attempt available */}
         {cardState === 1 && (
           <div className="flex flex-col gap-2">
             <button
@@ -215,7 +200,7 @@ export default function AssessmentCard({
           </div>
         )}
 
-        {/* STATE 2: Free attempt exhausted, tier still locked */}
+        {/* STATE 2: Tier locked, free attempt exhausted */}
         {cardState === 2 && (
           <div className="flex flex-col gap-2">
             <button
@@ -233,17 +218,7 @@ export default function AssessmentCard({
           </div>
         )}
 
-        {/* STATE 3: Tier allows, not subscribed, free attempt available */}
-        {cardState === 3 && (
-          <button
-            onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-            className="bg-blue-600 hover:bg-blue-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
-          >
-            Take Free Test
-          </button>
-        )}
-
-        {/* STATE 4: Subscribed / Premium, 0 attempts */}
+        {/* STATE 4: Tier allows, 0 attempts */}
         {cardState === 4 && (
           <button
             onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
@@ -253,7 +228,7 @@ export default function AssessmentCard({
           </button>
         )}
 
-        {/* STATE 5: Subscribed, in progress */}
+        {/* STATE 5: Tier allows, in progress */}
         {cardState === 5 && (
           <button
             onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
@@ -263,7 +238,7 @@ export default function AssessmentCard({
           </button>
         )}
 
-        {/* STATE 6: Subscribed, completed, attempts remain */}
+        {/* STATE 6: Tier allows, completed, attempts remain */}
         {cardState === 6 && (
           <div className="flex gap-2">
             <button

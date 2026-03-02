@@ -4,28 +4,22 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
-import { DEMO_ATTEMPT_STATES, ASSESSMENT_LIBRARY } from '@/data/assessments';
+import { useAssessments } from '@/hooks/useAssessments';
+import { getAttemptData } from '@/data/mockAttempts';
+import { tierAllows } from '@/types/assessment';
 import { EmptyStateAction } from '@/components/shared/EmptyStateAction';
-import type { Tier } from '@/types';
-import type { LibraryAssessment } from '@/data/assessments';
 
 // -------------------------------------------------------
 // Helpers
 // -------------------------------------------------------
 
-const EXAM_BADGE: Record<LibraryAssessment['exam'], string> = {
-  SAT:  'bg-blue-50 text-blue-700',
-  JEE:  'bg-orange-50 text-orange-700',
-  NEET: 'bg-green-50 text-green-700',
-  PMP:  'bg-purple-50 text-purple-700',
+const EXAM_BADGE: Record<string, string> = {
+  SAT:      'bg-blue-50 text-blue-700',
+  'IIT-JEE':'bg-orange-50 text-orange-700',
+  NEET:     'bg-green-50 text-green-700',
+  PMP:      'bg-purple-50 text-purple-700',
+  CLAT:     'bg-rose-50 text-rose-700',
 };
-
-function tierAllowsType(tier: Tier, type: LibraryAssessment['type']): boolean {
-  if (tier === 'free')         return false;
-  if (tier === 'basic')        return type === 'full-test';
-  if (tier === 'professional') return type === 'full-test' || type === 'subject-test';
-  return true; // premium
-}
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -46,51 +40,47 @@ type Tab = 'in-progress' | 'recently-completed';
 export default function ContinueLearningWidget() {
   const router = useRouter();
   const { user } = useAppContext();
+  const { assessments } = useAssessments();
 
   const { inProgress, recentlyCompleted } = useMemo(() => {
     if (!user) return { inProgress: [], recentlyCompleted: [] };
 
-    const attempts = DEMO_ATTEMPT_STATES[user.id] ?? {};
-
-    const inProgress = Object.entries(attempts)
-      .filter(([assessmentId, attempt]) => {
-        if (attempt.status !== 'in_progress') return false;
+    const inProgress = assessments
+      .filter((a) => {
+        const attempt = getAttemptData(user.id, a.title);
+        if (attempt.status !== 'inprogress') return false;
         if (attempt.lastAccessedAt === null) return false;
-        const lib = ASSESSMENT_LIBRARY.find((a) => a.id === assessmentId);
-        if (!lib) return false;
-        return attempt.freeAttemptUsed || tierAllowsType(user.subscriptionTier, lib.type);
+        const isFreeAndInProgress = attempt.isFreeAttempt && attempt.status === 'inprogress';
+        const isPaidAndAccessible =
+          tierAllows(user.subscriptionTier, a.min_tier) && attempt.status === 'inprogress';
+        return isFreeAndInProgress || isPaidAndAccessible;
       })
-      .map(([assessmentId, attempt]) => ({
-        assessment: ASSESSMENT_LIBRARY.find((a) => a.id === assessmentId)!,
-        attempt,
-        lastAccessedAt: attempt.lastAccessedAt as number,
+      .map((a) => ({
+        assessment: a,
+        attempt: getAttemptData(user.id, a.title),
+        lastAccessedAt: getAttemptData(user.id, a.title).lastAccessedAt as number,
       }))
       .sort((a, b) => b.lastAccessedAt - a.lastAccessedAt)
       .slice(0, 3);
 
-    const recentlyCompleted = Object.entries(attempts)
-      .filter(([assessmentId, attempt]) => {
-        if (attempt.status !== 'completed') return false;
-        if (attempt.lastAccessedAt === null) return false;
-        return !!ASSESSMENT_LIBRARY.find((a) => a.id === assessmentId);
+    const recentlyCompleted = assessments
+      .filter((a) => {
+        const attempt = getAttemptData(user.id, a.title);
+        return attempt.status === 'completed' && attempt.lastAccessedAt !== null;
       })
-      .map(([assessmentId, attempt]) => ({
-        assessment: ASSESSMENT_LIBRARY.find((a) => a.id === assessmentId)!,
-        attempt,
-        lastAccessedAt: attempt.lastAccessedAt as number,
+      .map((a) => ({
+        assessment: a,
+        attempt: getAttemptData(user.id, a.title),
+        lastAccessedAt: getAttemptData(user.id, a.title).lastAccessedAt as number,
       }))
       .sort((a, b) => b.lastAccessedAt - a.lastAccessedAt)
       .slice(0, 3);
 
     return { inProgress, recentlyCompleted };
-  }, [user]);
+  }, [user, assessments]);
 
-  // Explicit user selection (null = no preference yet)
   const [userTab, setUserTab] = useState<Tab | null>(null);
 
-  // Derive effective tab without side effects:
-  // If user wants in-progress (or has no preference) but there are no in-progress items,
-  // fall back to recently-completed. This also handles the tier-switch scenario.
   const activeTab: Tab =
     (userTab === null || userTab === 'in-progress') && inProgress.length === 0
       ? 'recently-completed'
@@ -103,7 +93,7 @@ export default function ContinueLearningWidget() {
     <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm mb-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-base font-bold text-zinc-900">
+        <span className="text-base font-medium text-zinc-900">
           Continue Where You Left Off
         </span>
       </div>
@@ -135,29 +125,28 @@ export default function ContinueLearningWidget() {
       {/* In Progress tab */}
       {activeTab === 'in-progress' && (
         inProgress.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden"
-               style={{ scrollSnapType: 'x mandatory' }}>
+          <div
+            className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
             {inProgress.map(({ assessment, attempt, lastAccessedAt }) => {
               const fillPct = Math.min((attempt.attemptsUsed / 6) * 100, 100);
+              const badgeClass = EXAM_BADGE[assessment.exam_type] ?? 'bg-zinc-50 text-zinc-700';
               return (
                 <div
                   key={assessment.id}
                   className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 flex flex-col gap-2 flex-shrink-0"
                   style={{ minWidth: 260, maxWidth: 260, scrollSnapAlign: 'start' }}
                 >
-                  {/* Exam badge */}
-                  <span className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${EXAM_BADGE[assessment.exam]}`}>
-                    {assessment.exam}
+                  <span className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${badgeClass}`}>
+                    {assessment.exam_type}
                   </span>
-                  {/* Title */}
-                  <p className="text-sm font-bold text-zinc-900 leading-snug">
+                  <p className="text-sm font-medium text-zinc-900 leading-snug">
                     {assessment.title}
                   </p>
-                  {/* Last accessed */}
                   <p className="text-xs text-zinc-400">
                     Last accessed {relativeTime(lastAccessedAt)}
                   </p>
-                  {/* Progress bar */}
                   <div>
                     <div className="flex justify-between text-xs text-zinc-500 mb-1">
                       <span>Attempts</span>
@@ -170,10 +159,9 @@ export default function ContinueLearningWidget() {
                       />
                     </div>
                   </div>
-                  {/* CTA */}
                   <button
                     onClick={() => router.push(`/assessments/${assessment.id}`)}
-                    className="bg-blue-600 text-white text-xs font-semibold rounded-lg px-4 py-2 w-full mt-1 hover:bg-blue-700 transition-colors"
+                    className="bg-blue-600 text-white text-xs font-semibold rounded-md px-4 py-2 w-full mt-1 hover:bg-blue-700 transition-colors"
                   >
                     Resume Test
                   </button>
@@ -194,35 +182,36 @@ export default function ContinueLearningWidget() {
       {/* Recently Completed tab */}
       {activeTab === 'recently-completed' && (
         recentlyCompleted.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden"
-               style={{ scrollSnapType: 'x mandatory' }}>
-            {recentlyCompleted.map(({ assessment, lastAccessedAt }) => (
-              <div
-                key={assessment.id}
-                className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 flex flex-col gap-2 flex-shrink-0"
-                style={{ minWidth: 260, maxWidth: 260, scrollSnapAlign: 'start' }}
-              >
-                {/* Exam badge */}
-                <span className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${EXAM_BADGE[assessment.exam]}`}>
-                  {assessment.exam}
-                </span>
-                {/* Title */}
-                <p className="text-sm font-bold text-zinc-900 leading-snug">
-                  {assessment.title}
-                </p>
-                {/* Last accessed */}
-                <p className="text-xs text-zinc-400">
-                  Last accessed {relativeTime(lastAccessedAt)}
-                </p>
-                {/* CTA */}
-                <button
-                  onClick={() => router.push(`/assessments/${assessment.id}`)}
-                  className="border border-zinc-300 text-zinc-700 text-xs font-medium rounded-lg px-4 py-2 w-full mt-1 hover:bg-zinc-50 transition-colors"
+          <div
+            className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
+            {recentlyCompleted.map(({ assessment, lastAccessedAt }) => {
+              const badgeClass = EXAM_BADGE[assessment.exam_type] ?? 'bg-zinc-50 text-zinc-700';
+              return (
+                <div
+                  key={assessment.id}
+                  className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 flex flex-col gap-2 flex-shrink-0"
+                  style={{ minWidth: 260, maxWidth: 260, scrollSnapAlign: 'start' }}
                 >
-                  View Analysis
-                </button>
-              </div>
-            ))}
+                  <span className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${badgeClass}`}>
+                    {assessment.exam_type}
+                  </span>
+                  <p className="text-sm font-medium text-zinc-900 leading-snug">
+                    {assessment.title}
+                  </p>
+                  <p className="text-xs text-zinc-400">
+                    Last accessed {relativeTime(lastAccessedAt)}
+                  </p>
+                  <button
+                    onClick={() => router.push(`/assessments/${assessment.id}`)}
+                    className="border border-zinc-300 text-zinc-700 text-xs font-medium rounded-md px-4 py-2 w-full mt-1 hover:bg-zinc-50 transition-colors"
+                  >
+                    View Analysis
+                  </button>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <EmptyStateAction
