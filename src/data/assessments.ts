@@ -5,6 +5,238 @@ import type {
   QuestionAttemptResult,
   SyllabusSection,
 } from '@/types';
+import { SupabaseAssessment } from '@/types/assessment'
+
+// -------------------------------------------------------
+// Supabase/Local Assessment Data
+// -------------------------------------------------------
+
+export const ASSESSMENTS: SupabaseAssessment[] = [
+  // ── SAT FULL TESTS ──
+  {
+    id: 'sat-full-1',
+    title: 'SAT Full Test 1',
+    description: 'Complete SAT simulation with adaptive modules',
+    exam_type: 'SAT',
+    assessment_type: 'full_test',
+    subject: 'All Subjects',
+    difficulty: 'Medium',
+    duration_minutes: 200,
+    total_questions: 98,
+    score_min: 400,
+    score_max: 1600,
+    min_tier: 'basic',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['sat', 'full-test'],
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'sat-full-2',
+    title: 'SAT Full Test 2',
+    description: 'Full-length SAT practice with score prediction',
+    exam_type: 'SAT',
+    assessment_type: 'full_test',
+    subject: 'All Subjects',
+    difficulty: 'Hard',
+    duration_minutes: 200,
+    total_questions: 98,
+    score_min: 400,
+    score_max: 1600,
+    min_tier: 'basic',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['sat', 'full-test'],
+    created_at: new Date().toISOString(),
+  },
+  // ── JEE FULL TESTS ──
+  {
+    id: 'jee-full-1',
+    title: 'JEE Full Test 1',
+    description: 'Complete JEE Main simulation paper',
+    exam_type: 'IIT-JEE',
+    assessment_type: 'full_test',
+    subject: 'All Subjects',
+    difficulty: 'Hard',
+    duration_minutes: 180,
+    total_questions: 90,
+    score_min: 0,
+    score_max: 300,
+    min_tier: 'basic',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['jee', 'full-test'],
+    created_at: new Date().toISOString(),
+  },
+  // ── NEET FULL TESTS ──
+  {
+    id: 'neet-full-1',
+    title: 'NEET Full Test 1',
+    description: 'Full-length NEET mock paper with solutions',
+    exam_type: 'NEET',
+    assessment_type: 'full_test',
+    subject: 'All Subjects',
+    difficulty: 'Hard',
+    duration_minutes: 200,
+    total_questions: 180,
+    score_min: -180,
+    score_max: 720,
+    min_tier: 'basic',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['neet', 'full-test'],
+    created_at: new Date().toISOString(),
+  },
+  // ── PMP FULL TESTS ──
+  {
+    id: 'pmp-full-1',
+    title: 'PMP Full Test 1',
+    description: 'Full PMP certification mock exam',
+    exam_type: 'PMP',
+    assessment_type: 'full_test',
+    subject: 'All Subjects',
+    difficulty: 'Hard',
+    duration_minutes: 230,
+    total_questions: 180,
+    score_min: 0,
+    score_max: 100,
+    min_tier: 'basic',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['pmp', 'full-test'],
+    created_at: new Date().toISOString(),
+  },
+  // ── SAT SUBJECT TESTS ──
+  {
+    id: 'sat-subject-rw',
+    title: 'SAT Reading & Writing',
+    description: 'Focused subject test for SAT verbal section',
+    exam_type: 'SAT',
+    assessment_type: 'subject_test',
+    subject: 'Reading & Writing',
+    difficulty: 'Medium',
+    duration_minutes: 64,
+    total_questions: 54,
+    score_min: 200,
+    score_max: 800,
+    min_tier: 'professional',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['sat', 'subject-test', 'reading', 'writing'],
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'sat-subject-math',
+    title: 'SAT Math',
+    description: 'Focused subject test for SAT math section',
+    exam_type: 'SAT',
+    assessment_type: 'subject_test',
+    subject: 'Math',
+    difficulty: 'Medium',
+    duration_minutes: 70,
+    total_questions: 44,
+    score_min: 200,
+    score_max: 800,
+    min_tier: 'professional',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['sat', 'subject-test', 'math'],
+    created_at: new Date().toISOString(),
+  },
+  // ── NEET SUBJECT TESTS ──
+  {
+    id: 'neet-subject-biology',
+    title: 'NEET Biology',
+    description: 'Subject test covering full NEET biology syllabus',
+    exam_type: 'NEET',
+    assessment_type: 'subject_test',
+    subject: 'Biology',
+    difficulty: 'Medium',
+    duration_minutes: 60,
+    total_questions: 90,
+    score_min: 0,
+    score_max: 360,
+    min_tier: 'professional',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['neet', 'subject-test', 'biology'],
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'neet-subject-physics',
+    title: 'NEET Physics',
+    description: 'Subject test covering NEET physics topics',
+    exam_type: 'NEET',
+    assessment_type: 'subject_test',
+    subject: 'Physics',
+    difficulty: 'Hard',
+    duration_minutes: 60,
+    total_questions: 45,
+    score_min: -45,
+    score_max: 180,
+    min_tier: 'professional',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['neet', 'subject-test', 'physics'],
+    created_at: new Date().toISOString(),
+  },
+  // ── SAT CHAPTER TESTS ──
+  {
+    id: 'sat-chapter-craft',
+    title: 'Craft & Structure',
+    description: 'SAT R&W chapter test — Craft & Structure module',
+    exam_type: 'SAT',
+    assessment_type: 'chapter_test',
+    subject: 'Reading & Writing',
+    difficulty: 'Easy',
+    duration_minutes: 30,
+    total_questions: 25,
+    score_min: 0,
+    score_max: 100,
+    min_tier: 'premium',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['sat', 'chapter-test', 'reading'],
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'sat-chapter-info',
+    title: 'Information & Ideas',
+    description: 'SAT R&W chapter test — Information & Ideas module',
+    exam_type: 'SAT',
+    assessment_type: 'chapter_test',
+    subject: 'Reading & Writing',
+    difficulty: 'Medium',
+    duration_minutes: 30,
+    total_questions: 25,
+    score_min: 0,
+    score_max: 100,
+    min_tier: 'premium',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['sat', 'chapter-test', 'reading'],
+    created_at: new Date().toISOString(),
+  },
+  // ── JEE CHAPTER TESTS ──
+  {
+    id: 'jee-chapter-mechanics',
+    title: 'JEE — Mechanics',
+    description: 'Chapter test covering JEE Physics: Mechanics',
+    exam_type: 'IIT-JEE',
+    assessment_type: 'chapter_test',
+    subject: 'Physics',
+    difficulty: 'Hard',
+    duration_minutes: 30,
+    total_questions: 25,
+    score_min: 0,
+    score_max: 100,
+    min_tier: 'premium',
+    is_active: true,
+    thumbnail_url: null,
+    tags: ['jee', 'chapter-test', 'physics'],
+    created_at: new Date().toISOString(),
+  },
+]
 
 // -------------------------------------------------------
 // Assessment Library — unified data model for list pages
@@ -25,9 +257,6 @@ export type DemoAttemptState = {
   attemptsUsed: number;
   freeAttemptUsed: boolean;
   status: 'not_started' | 'in_progress' | 'completed';
-  // In production, lastAccessedAt is stored in Supabase
-  // attempt_sessions table and updated via API route on
-  // every test interaction. For demo, using mock timestamps.
   lastAccessedAt: number | null;
 };
 
@@ -39,29 +268,22 @@ export const SUBSCRIBED_ASSESSMENTS: Record<string, string[]> = {
   'demo-premium': ['sat-full-1', 'jee-subject-math', 'sat-chapter-algebra'],
 };
 
-// Per-user attempt state — covers subscribed AND non-subscribed assessments where a free attempt was used
+// Per-user attempt state
 export const DEMO_ATTEMPT_STATES: Record<string, Record<string, DemoAttemptState>> = {
   'demo-free': {
-    // Used free attempt on NEET Full Test (tier=free → locked) → STATE 2 demo
     'neet-full-1': { attemptsUsed: 1, freeAttemptUsed: true, status: 'in_progress', lastAccessedAt: null },
-    // SAT Full Test 1 — free attempt in progress (30 minutes ago)
     'sat-full-1':  { attemptsUsed: 1, freeAttemptUsed: true, status: 'in_progress', lastAccessedAt: Date.now() - 30 * 60 * 1000 },
   },
   'demo-basic': {
-    // SAT Full Test 1 — in progress (1 day ago)
     'sat-full-1':        { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress', lastAccessedAt: Date.now() - 1 * 24 * 60 * 60 * 1000 },
-    // Used free attempt on subject-test (tier=basic → locked for subject) → STATE 2 demo
     'sat-subject-math-1': { attemptsUsed: 1, freeAttemptUsed: true, status: 'completed',   lastAccessedAt: null },
   },
   'demo-pro': {
-    // SAT Full Test 1 — in progress (2 hours ago — most recent)
     'sat-full-1':          { attemptsUsed: 2, freeAttemptUsed: true,  status: 'in_progress', lastAccessedAt: Date.now() - 2 * 60 * 60 * 1000 },
-    // NEET Subject Physics — not started, never accessed → do not show in CWYLOF
     'neet-subject-physics': { attemptsUsed: 0, freeAttemptUsed: false, status: 'not_started', lastAccessedAt: null },
   },
   'demo-premium': {
     'sat-full-1':        { attemptsUsed: 2, freeAttemptUsed: true, status: 'in_progress', lastAccessedAt: null },
-    // JEE Subject Math — completed (3 days ago — recently completed)
     'jee-subject-math':  { attemptsUsed: 5, freeAttemptUsed: true, status: 'completed',   lastAccessedAt: Date.now() - 3 * 24 * 60 * 60 * 1000 },
     'sat-chapter-algebra': { attemptsUsed: 1, freeAttemptUsed: true, status: 'completed', lastAccessedAt: null },
   },
@@ -246,11 +468,11 @@ const passageQ1Explanation: ExplanationData = {
 };
 
 const mathQ2Explanation: ExplanationData = {
-  correctAnswerLabel: 'The correct answer is A: x\u207b\u00b9\u00b2y\u00b9\u2076.',
+  correctAnswerLabel: 'The correct answer is A: x⁻¹²y¹⁶.',
   steps: [
-    'Apply the Quotient Rule inside the parentheses: x\u2074/x\u207b\u00b2 = x\u2074\u207b(\u207b\u00b2) = x\u2076, and y\u00b3/y\u207b\u2075 = y\u00b3\u207b(\u207b\u2075) = y\u2078. Expression becomes (x\u2076y\u2078)\u207b\u00b2.',
-    'Apply the Power Rule: multiply each exponent by \u22122. x\u2076 \u00d7 (\u22122) = x\u207b\u00b9\u00b2, and y\u2078 \u00d7 (\u22122) = y\u207b\u00b9\u2076.',
-    'Final answer: x\u207b\u00b9\u00b2y\u207b\u00b9\u2076 — which matches option A.',
+    'Apply the Quotient Rule inside the parentheses: x⁴/x⁻² = x⁴⁻(⁻²) = x⁶, and y³/y⁻⁵ = y³⁻(⁻⁵) = y⁸. Expression becomes (x⁶y⁸)⁻².',
+    'Apply the Power Rule: multiply each exponent by −2. x⁶ × (−2) = x⁻¹², and y⁸ × (−2) = y⁻¹⁶.',
+    'Final answer: x⁻¹²y⁻¹⁶ — which matches option A.',
   ],
 };
 
@@ -258,7 +480,7 @@ const numericQ3Explanation: ExplanationData = {
   correctAnswerLabel: 'The correct answer is 5.',
   steps: [
     'Start with the equation: 3x + 7 = 22.',
-    'Subtract 7 from both sides: 3x = 22 \u2212 7 = 15.',
+    'Subtract 7 from both sides: 3x = 22 − 7 = 15.',
     'Divide both sides by 3: x = 15 / 3 = 5.',
   ],
 };
@@ -268,7 +490,7 @@ const multipleQ4Explanation: ExplanationData = {
   optionBreakdowns: [
     {
       option: 'A',
-      text: 'Correct. This choice directly cites the study\u2019s quantitative findings, providing specific evidence that supports the central claim about deforestation rates.',
+      text: "Correct. This choice directly cites the study's quantitative findings, providing specific evidence that supports the central claim about deforestation rates.",
     },
     {
       option: 'B',
@@ -388,3 +610,5 @@ export const mockSyllabus: SyllabusSection[] = [
     ],
   },
 ];
+
+export default ASSESSMENTS
