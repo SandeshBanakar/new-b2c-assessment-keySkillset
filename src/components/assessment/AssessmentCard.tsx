@@ -95,7 +95,7 @@ export default function AssessmentCard({
   const [imgError, setImgError] = useState(false);
 
   const cardState = deriveCardState({ userTier, assessment, attemptData });
-  const detailHref = `/assessments/${assessment.id}`;
+  const detailHref = `/assessments/${assessment.id}?from=assessments`;
 
   const showFreeAttemptChip = cardState === 1;
   const showExhaustedChip   = cardState === 2;

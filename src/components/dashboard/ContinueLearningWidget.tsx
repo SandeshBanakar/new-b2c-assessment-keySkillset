@@ -160,7 +160,7 @@ export default function ContinueLearningWidget() {
                     </div>
                   </div>
                   <button
-                    onClick={() => router.push(`/assessments/${assessment.id}`)}
+                    onClick={() => router.push(`/assessments/${assessment.id}?from=dashboard`)}
                     className="bg-blue-600 text-white text-xs font-semibold rounded-md px-4 py-2 w-full mt-1 hover:bg-blue-700 transition-colors"
                   >
                     Resume Test
@@ -204,7 +204,7 @@ export default function ContinueLearningWidget() {
                     Last accessed {relativeTime(lastAccessedAt)}
                   </p>
                   <button
-                    onClick={() => router.push(`/assessments/${assessment.id}`)}
+                    onClick={() => router.push(`/assessments/${assessment.id}?from=dashboard`)}
                     className="border border-zinc-300 text-zinc-700 text-xs font-medium rounded-md px-4 py-2 w-full mt-1 hover:bg-zinc-50 transition-colors"
                   >
                     View Analysis

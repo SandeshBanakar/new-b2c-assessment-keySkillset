@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, Star, Users } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { Star, Users } from 'lucide-react';
 import PageWrapper from '@/components/layout/PageWrapper';
+import { BackButton } from '@/components/navigation/BackButton';
 import OverviewTab from '@/components/assessment-detail/OverviewTab';
 import AttemptsTab from '@/components/assessment-detail/AttemptsTab';
 import AnalyticsTab from '@/components/assessment-detail/AnalyticsTab';
@@ -21,7 +22,6 @@ const TABS: { id: Tab; label: string }[] = [
 
 export default function AssessmentDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const { user } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -43,13 +43,7 @@ export default function AssessmentDetailPage() {
       {/* Hero band — dark bg, this section only */}
       <div className="bg-zinc-900 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
-          <button
-            onClick={() => router.push('/assessments')}
-            className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors mb-4 text-sm"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Back to Assessments
-          </button>
+          <BackButton className="mb-4 text-zinc-400 hover:text-white" />
 
           <h1 className="text-2xl font-semibold text-white">{assessment.title}</h1>
 

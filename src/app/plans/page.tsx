@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import {
-  ChevronLeft,
   CheckCircle,
   AlertTriangle,
   Flame,
@@ -11,6 +10,7 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
+import { BackButton } from '@/components/navigation/BackButton';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { AuthGuard } from '@/components/shared/AuthGuard';
 import { useAppContext } from '@/context/AppContext';
@@ -122,13 +122,7 @@ function PlansContent() {
 
       {/* Back link */}
       <div className="max-w-5xl mx-auto px-4 pt-4">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back to Assessments
-        </button>
+        <BackButton />
       </div>
 
       <PageWrapper>
