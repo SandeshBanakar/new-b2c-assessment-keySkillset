@@ -218,17 +218,17 @@ export default function AttemptAnalysisPage() {
                 <div key={result.questionId} className="border-b border-zinc-100 last:border-0">
                   <div className="flex items-center gap-3 py-3 px-6">
                     {/* Q number */}
-                    <span className="text-xs text-zinc-400 w-8 flex-shrink-0">
+                    <span className="text-xs text-zinc-400 w-8 shrink-0">
                       Q{result.questionNumber}
                     </span>
 
                     {/* Status badge */}
                     {result.isCorrect ? (
-                      <span className="text-xs font-medium bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5 flex-shrink-0">
+                      <span className="text-xs font-medium bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5 shrink-0">
                         Correct
                       </span>
                     ) : (
-                      <span className="text-xs font-medium bg-rose-50 text-rose-600 rounded-full px-2 py-0.5 flex-shrink-0">
+                      <span className="text-xs font-medium bg-rose-50 text-rose-600 rounded-full px-2 py-0.5 shrink-0">
                         Incorrect
                       </span>
                     )}
@@ -252,7 +252,7 @@ export default function AttemptAnalysisPage() {
                     {question && (
                       <button
                         onClick={() => setExpandedQ(isExpanded ? null : result.questionId)}
-                        className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 border border-zinc-200 rounded-md px-2 py-1 transition-colors flex-shrink-0"
+                        className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 border border-zinc-200 rounded-md px-2 py-1 transition-colors shrink-0"
                       >
                         View {isExpanded ? 'Less' : 'Question & Explanation'}
                         {isExpanded ? (
