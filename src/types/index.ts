@@ -1,5 +1,5 @@
 // Exam identifiers
-export type Exam = 'SAT' | 'JEE' | 'NEET' | 'PMP';
+export type Exam = 'SAT' | 'JEE' | 'NEET' | 'PMP' | 'CLAT';
 
 // Assessment type identifiers
 export type AssessmentType = 'full-test' | 'subject-test' | 'chapter-test' | 'daily-quiz';
@@ -26,6 +26,9 @@ export interface Assessment {
   duration: number;             // in minutes
   tier: Tier;                   // minimum tier required to access
   isPuzzleMode: boolean;        // true when this variant flips MCQ format
+  description?: string;
+  rating?: number;
+  totalUsers?: number;
 }
 
 // -------------------------------------------------------
@@ -77,7 +80,7 @@ export interface MockAttempt {
   assessmentId: string;
   attemptNumber: number;      // 0 = free attempt, 1–5 = paid
   status: AttemptStatus;
-  score: number;              // 0 if not completed
+  score: number | null;       // null if not yet completed
   scoreRw?: number;           // SAT R&W section score
   scoreMath?: number;         // SAT Math section score
   durationMinutes: number | null;
@@ -85,6 +88,8 @@ export interface MockAttempt {
   incorrectCount: number;
   startedAt: string | null;
   completedAt: string | null;
+  label?: string;             // display label e.g. "Free Attempt", "Attempt 1"
+  isLocked?: boolean;         // true if attempt requires unlock
 }
 
 // -------------------------------------------------------

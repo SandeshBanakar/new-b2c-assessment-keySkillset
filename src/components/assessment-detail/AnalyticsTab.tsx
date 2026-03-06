@@ -41,7 +41,7 @@ export default function AnalyticsTab({
     );
   }
 
-  const scores = completed.map((a) => a.score);
+  const scores = completed.map((a) => a.score ?? 0);
   const bestScore = Math.max(...scores);
   const avgScore = Math.round(scores.reduce((s, v) => s + v, 0) / scores.length);
   const maxScore = MAX_SCORES[assessment.exam] ?? 100;
@@ -87,7 +87,7 @@ export default function AnalyticsTab({
         <h3 className="text-base font-medium text-zinc-900 mb-4">Score Trend</h3>
         <div className="space-y-3">
           {completed.map((attempt) => {
-            const pct = Math.round((attempt.score / maxScore) * 100);
+            const pct = Math.round(((attempt.score ?? 0) / maxScore) * 100);
             const label =
               attempt.attemptNumber === 0 ? 'Free' : `Attempt ${attempt.attemptNumber}`;
             return (

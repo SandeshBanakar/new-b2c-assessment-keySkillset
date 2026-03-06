@@ -101,7 +101,7 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
   );
   const bestScore =
     completedAttempts.length > 0
-      ? Math.max(...completedAttempts.map((a) => a.score))
+      ? Math.max(...completedAttempts.map((a) => a.score ?? 0))
       : null;
 
   async function handleAbandon() {
@@ -128,7 +128,7 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
   }
 
   const freeScoreDisplay =
-    freeAttempt.status === 'not_started' || freeAttempt.status === 'in_progress'
+    freeAttempt.status === 'not_started' || freeAttempt.status === 'in_progress' || freeAttempt.score === null
       ? '—'
       : String(freeAttempt.score);
 
@@ -209,7 +209,7 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
             {freeAttempt.status === 'not_started' && (
               <Button
                 size="sm"
-                onClick={() => router.push(`/assessments/${assessmentId}`)}
+                onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
                 className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
               >
                 Start Free Attempt
@@ -228,7 +228,7 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
               prevAttempt.status !== 'abandoned';
 
             const scoreDisplay =
-              attempt.status === 'not_started' || attempt.status === 'in_progress'
+              attempt.status === 'not_started' || attempt.status === 'in_progress' || attempt.score === null
                 ? '—'
                 : String(attempt.score);
 

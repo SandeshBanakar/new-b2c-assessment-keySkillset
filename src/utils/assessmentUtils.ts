@@ -106,10 +106,27 @@ export const mockAssessments: Assessment[] = [
     isPuzzleMode: false,
   },
 
+  // CLAT ────────────────────────────────────────────────
+  {
+    id: 'clat-full-test-1',
+    title: 'CLAT Full Mock Test 1',
+    exam: 'CLAT',
+    type: 'full-test',
+    subject: null,
+    difficulty: 'medium',
+    questionCount: 140,
+    duration: 120,
+    tier: 'basic',
+    isPuzzleMode: false,
+    description: 'Complete CLAT mock test covering all 5 sections — English Language, Current Affairs & GK, Legal Reasoning, Logical Reasoning, and Quantitative Techniques.',
+    rating: 4.8,
+    totalUsers: 500,
+  },
+
   // NEET ────────────────────────────────────────────────
   {
-    id: 'neet-full-1',
-    title: 'NEET Full Test 1',
+    id: 'neet-full-test-1',
+    title: 'NEET Full Mock Test 1',
     exam: 'NEET',
     type: 'full-test',
     subject: null,
@@ -118,18 +135,9 @@ export const mockAssessments: Assessment[] = [
     duration: 200,
     tier: 'basic',
     isPuzzleMode: false,
-  },
-  {
-    id: 'neet-subject-biology-1',
-    title: 'NEET Biology — Subject Test',
-    exam: 'NEET',
-    type: 'subject-test',
-    subject: 'Biology',
-    difficulty: 'easy',
-    questionCount: 60,
-    duration: 90,
-    tier: 'professional',
-    isPuzzleMode: false,
+    description: 'Full NEET mock test with Physics (45Q), Chemistry (45Q), and Biology (90Q) following the latest NTA pattern.',
+    rating: 4.9,
+    totalUsers: 800,
   },
 
   // PMP ─────────────────────────────────────────────────
@@ -159,18 +167,6 @@ export const mockAssessments: Assessment[] = [
   },
 
   // Additional assessments for the library section
-  {
-    id: 'neet-subject-physics',
-    title: 'NEET Subject Test — Physics',
-    exam: 'NEET',
-    type: 'subject-test',
-    subject: 'Physics',
-    difficulty: 'medium',
-    questionCount: 45,
-    duration: 60,
-    tier: 'professional',
-    isPuzzleMode: false,
-  },
   {
     id: 'jee-subject-math',
     title: 'JEE Subject Test — Mathematics',
@@ -202,18 +198,6 @@ export const mockAssessments: Assessment[] = [
     type: 'chapter-test',
     subject: 'Calculus',
     difficulty: 'hard',
-    questionCount: 25,
-    duration: 30,
-    tier: 'premium',
-    isPuzzleMode: false,
-  },
-  {
-    id: 'neet-chapter-bio',
-    title: 'NEET Chapter Test — Biology Cell Division',
-    exam: 'NEET',
-    type: 'chapter-test',
-    subject: 'Biology Cell Division',
-    difficulty: 'medium',
     questionCount: 25,
     duration: 30,
     tier: 'premium',
