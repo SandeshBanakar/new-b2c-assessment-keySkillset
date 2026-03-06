@@ -231,10 +231,9 @@ export const mockUser: User = {
 
 // -------------------------------------------------------
 // Mock progress — varied states to demonstrate all statuses
-//   sat-full-1          → 2 attempts used  → 'continue'
-//   jee-full-1          → 5 attempts used  → 'upgrade'
-//   neet-subject-bio-1  → 1 attempt used   → 'continue'
-//   all others          → no progress      → 'start'
+//   sat-full-1  → 2 attempts used  → 'continue'
+//   jee-full-1  → 5 attempts used  → 'upgrade'
+//   all others  → no progress      → 'start'
 // -------------------------------------------------------
 
 export const mockProgressMap: Record<string, UserAssessmentProgress> = {
@@ -255,14 +254,5 @@ export const mockProgressMap: Record<string, UserAssessmentProgress> = {
     isPaid: true,
     lastScore: 65,
     masteryPercent: 60,
-  },
-  'neet-subject-biology-1': {
-    userId: 'user-1',
-    assessmentId: 'neet-subject-biology-1',
-    attemptsUsed: 1,
-    attemptsMax: 5,
-    isPaid: false,
-    lastScore: 88,
-    masteryPercent: 85,
   },
 };
