@@ -221,7 +221,7 @@ export default function AssessmentLibrarySection() {
         <select
           value={selectedExam}
           onChange={(e) => setSelectedExam(e.target.value)}
-          className="bg-white border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-700"
+          className="bg-white border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-700 min-w-35 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-700"
         >
           <option value="all">All Exams</option>
           {allExamOptions.map((exam) => (
@@ -233,7 +233,7 @@ export default function AssessmentLibrarySection() {
         <select
           value={selectedProgress}
           onChange={(e) => setSelectedProgress(e.target.value)}
-          className="bg-white border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-700 min-w-[140px] cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-700"
+          className="bg-white border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-700 min-w-35 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-700"
         >
           <option value="all">All Progress</option>
           <option value="not-started">Not Started</option>
