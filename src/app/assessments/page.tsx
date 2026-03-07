@@ -145,12 +145,12 @@ export default function AssessmentsPage() {
         {planBanner && (
           <div className="mb-6 flex items-center justify-between gap-3 rounded-md bg-emerald-50 border border-emerald-200 px-4 py-3">
             <p className="flex items-center gap-2 text-sm font-medium text-emerald-700">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               {planBanner}
             </p>
             <button
               onClick={() => setPlanBanner(null)}
-              className="text-emerald-500 hover:text-emerald-700 flex-shrink-0"
+              className="text-emerald-500 hover:text-emerald-700 shrink-0"
               aria-label="Dismiss"
             >
               <X className="w-4 h-4" />

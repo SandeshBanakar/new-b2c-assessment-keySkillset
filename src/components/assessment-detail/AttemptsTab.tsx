@@ -178,7 +178,7 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
           </div>
 
           {/* Right — CTA */}
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             {freeAttempt.status === 'completed' && (
               <Button
                 variant="outline"
@@ -275,7 +275,7 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
                 )}
 
                 {/* Right — actions */}
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-3 shrink-0">
                   {attempt.status === 'completed' && (
                     <Button
                       variant="outline"
