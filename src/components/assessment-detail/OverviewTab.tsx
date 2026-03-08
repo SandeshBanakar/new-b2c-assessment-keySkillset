@@ -32,10 +32,10 @@ function formatDuration(minutes: number): string {
 
 function tierAllowsType(tier: Tier, type: Assessment['type']): boolean {
   switch (tier) {
-    case 'free':         return false;
-    case 'basic':        return type === 'full-test';
+    case 'free': return false;
+    case 'basic': return type === 'full-test';
     case 'professional': return type === 'full-test' || type === 'subject-test';
-    case 'premium':      return true;
+    case 'premium': return true;
   }
 }
 
@@ -67,16 +67,16 @@ function SyllabusAccordion({ sections }: { sections: SyllabusSection[] }) {
                 {section.number}. {section.title}
               </span>
               {isOpen ? (
-                <ChevronUp className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                <ChevronUp className="w-4 h-4 text-zinc-400 shrink-0" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
               )}
             </button>
             {isOpen && (
               <ul className="px-6 pb-4 space-y-1.5">
                 {section.topics.map((topic) => (
                   <li key={topic} className="flex items-start gap-2 text-sm text-zinc-600">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-zinc-300 flex-shrink-0" />
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-zinc-300 shrink-0" />
                     {topic}
                   </li>
                 ))}
@@ -260,7 +260,7 @@ export default function OverviewTab({
           <ul className="space-y-3">
             {WHAT_YOULL_GET.map((item) => (
               <li key={item} className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                 <span className="text-sm text-zinc-700">{item}</span>
               </li>
             ))}
