@@ -44,35 +44,54 @@ function ExamHeader({
   router: ReturnType<typeof useRouter>
 }) {
   return (
-    <header className="bg-[#1E3A5F] text-white flex items-center px-4 shrink-0 h-14">
-      <div className="flex items-center gap-6 flex-1 overflow-x-auto">
-        <span className="font-bold text-sm shrink-0">keySkillset</span>
-
-        {config.sections.map(section => {
-          const answered = Object.values(engine.state.questionStates).filter(
-            qs =>
-              qs.questionId.startsWith(section.id) &&
-              (qs.status === 'answered' || qs.status === 'answered_and_marked')
-          ).length
-
-          return (
-            <button
-              key={section.id}
-              onClick={() => engine.switchSection(section.id)}
-              className={`shrink-0 text-xs font-medium pb-1 border-b-2 transition-colors whitespace-nowrap ${
-                engine.state.activeSectionId === section.id
-                  ? 'border-white text-white'
-                  : 'border-transparent text-white/60 hover:text-white/80'
-              }`}
-            >
-              {section.label.toUpperCase()} ({answered}/{section.questionCount})
-            </button>
-          )
-        })}
+    <div className="shrink-0">
+      {/* Row 1 — White: logo + exit */}
+      <div className="bg-white border-b border-zinc-200 flex items-center justify-between px-4 h-12">
+        <span className="text-blue-700 font-semibold text-base">keySkillset</span>
+        <button
+          onClick={() => {
+            if (
+              confirm(
+                'Are you sure you want to exit? Your progress is saved automatically.'
+              )
+            ) {
+              router.push(`/assessments/${assessmentId}`)
+            }
+          }}
+          className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded px-3 py-1.5 transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Exit Exam
+        </button>
       </div>
 
-      <div className="flex items-center gap-4 shrink-0">
-        <div className="flex items-center gap-1 font-mono text-sm">
+      {/* Row 2 — Dark: section tabs + timer */}
+      <div className="bg-[#1E3A5F] text-white flex items-center px-4 h-11">
+        <div className="flex items-center gap-6 flex-1 overflow-x-auto">
+          {config.sections.map(section => {
+            const answered = Object.values(engine.state.questionStates).filter(
+              qs =>
+                qs.questionId.startsWith(section.id) &&
+                (qs.status === 'answered' || qs.status === 'answered_and_marked')
+            ).length
+
+            return (
+              <button
+                key={section.id}
+                onClick={() => engine.switchSection(section.id)}
+                className={`shrink-0 text-xs font-medium pb-1 border-b-2 transition-colors whitespace-nowrap ${
+                  engine.state.activeSectionId === section.id
+                    ? 'border-white text-white'
+                    : 'border-transparent text-white/60 hover:text-white/80'
+                }`}
+              >
+                {section.label.toUpperCase()} ({answered}/{section.questionCount})
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="flex items-center gap-1 font-mono text-sm shrink-0">
           <Clock className="w-4 h-4 text-white/70" />
           <span
             className={
@@ -84,24 +103,8 @@ function ExamHeader({
             {engine.formattedTime}
           </span>
         </div>
-
-        <button
-          onClick={() => {
-            if (
-              confirm(
-                'Are you sure you want to exit? Your progress is saved automatically.'
-              )
-            ) {
-              router.push(`/assessments/${assessmentId}`)
-            }
-          }}
-          className="flex items-center gap-1 text-xs text-white/70 hover:text-white border border-white/30 rounded px-3 py-1.5 transition-colors"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          Exit Exam
-        </button>
       </div>
-    </header>
+    </div>
   )
 }
 
