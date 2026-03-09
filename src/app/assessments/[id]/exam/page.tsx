@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Bookmark,
   X,
+  Flag,
 } from 'lucide-react'
 import { useExamEngine } from '@/hooks/useExamEngine'
 import clatFullTest1 from '@/data/exams/clat-full-test-1'
@@ -198,6 +199,10 @@ function PaletteSidebar({
   engine: Engine
   config: ExamConfig
 }) {
+  const activeSection = config.sections.find(
+    s => s.id === engine.state.activeSectionId
+  )
+
   const allStates = Object.values(engine.state.questionStates)
   const answered = allStates.filter(
     s => s.status === 'answered' || s.status === 'answered_and_marked'
@@ -207,6 +212,14 @@ function PaletteSidebar({
     s => s.status === 'marked_for_review' || s.status === 'answered_and_marked'
   ).length
   const notVisited = allStates.filter(s => s.status === 'not_visited').length
+
+  const legend = [
+    { color: 'bg-zinc-100', label: 'Not Visited', flag: false },
+    { color: 'bg-emerald-500', label: 'Answered', flag: false },
+    { color: 'bg-rose-500', label: 'Not Answered', flag: false },
+    { color: 'bg-violet-500', label: 'Marked for Review', flag: false },
+    { color: 'bg-violet-500', label: 'Ans & Marked', flag: true },
+  ]
 
   return (
     <aside className="w-64 shrink-0 bg-white border-l border-gray-200 flex flex-col overflow-hidden">
@@ -218,74 +231,76 @@ function PaletteSidebar({
 
       <div className="px-4 py-3 border-b border-gray-100">
         <div className="grid grid-cols-2 gap-1.5">
-          {[
-            { color: 'bg-gray-200', label: 'Not Visited' },
-            { color: 'bg-red-400', label: 'Not Answered' },
-            { color: 'bg-green-500', label: 'Answered' },
-            { color: 'bg-amber-400', label: 'Marked' },
-            { color: 'bg-purple-500', label: 'Ans & Marked' },
-          ].map(({ color, label }) => (
+          {legend.map(({ color, label, flag }) => (
             <div key={label} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 rounded-sm ${color}`} />
-              <span className="text-[10px] text-gray-500">{label}</span>
+              <div className={`w-6 h-6 rounded ${color} relative flex items-center justify-center`}>
+                {flag && (
+                  <Flag
+                    className="absolute top-0 right-0 w-2 h-2 text-white"
+                    fill="currentColor"
+                  />
+                )}
+              </div>
+              <span className="text-[10px] text-zinc-600">{label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-        {config.sections.map(section => (
-          <div key={section.id}>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">
-              {section.label}
-            </p>
-            <div className="grid grid-cols-5 gap-1">
-              {section.questions.map((q, idx) => {
-                const qs = engine.state.questionStates[q.id]
-                const isActive =
-                  engine.state.activeSectionId === section.id &&
-                  engine.state.activeQuestionIndex === idx
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {activeSection && (
+          <div className="grid grid-cols-5 gap-1">
+            {activeSection.questions.map((q, idx) => {
+              const qs = engine.state.questionStates[q.id]
+              const isActive = engine.state.activeQuestionIndex === idx
 
-                const bgColor = (() => {
-                  if (isActive) return 'bg-[#1E3A5F] text-white'
-                  switch (qs?.status) {
-                    case 'answered':
-                      return 'bg-green-500 text-white'
-                    case 'answered_and_marked':
-                      return 'bg-purple-500 text-white'
-                    case 'marked_for_review':
-                      return 'bg-amber-400 text-white'
-                    case 'visited_unanswered':
-                      return 'bg-red-400 text-white'
-                    default:
-                      return 'bg-gray-200 text-gray-600'
-                  }
-                })()
+              const colorClass = (() => {
+                if (isActive) return 'bg-[#1E3A5F] text-white'
+                switch (qs?.status) {
+                  case 'answered':
+                    return 'bg-emerald-500 text-white'
+                  case 'answered_and_marked':
+                    return 'bg-violet-500 text-white'
+                  case 'marked_for_review':
+                    return 'bg-violet-500 text-white'
+                  case 'visited_unanswered':
+                    return 'bg-rose-500 text-white'
+                  default:
+                    return 'bg-zinc-100 text-zinc-500'
+                }
+              })()
 
-                return (
-                  <button
-                    key={q.id}
-                    onClick={() => engine.jumpToQuestion(section.id, idx)}
-                    className={`w-9 h-9 rounded text-xs font-semibold transition-all hover:opacity-80 ${bgColor} ${
-                      isActive ? 'ring-2 ring-[#1E3A5F] ring-offset-1' : ''
-                    }`}
-                  >
-                    {idx + 1}
-                  </button>
-                )
-              })}
-            </div>
+              const showFlag = qs?.status === 'answered_and_marked'
+
+              return (
+                <button
+                  key={q.id}
+                  onClick={() => engine.jumpToQuestion(activeSection.id, idx)}
+                  className={`w-9 h-9 rounded flex items-center justify-center text-xs font-medium relative cursor-pointer select-none transition-all hover:opacity-80 ${colorClass} ${
+                    isActive ? 'ring-2 ring-[#1E3A5F] ring-offset-1' : ''
+                  }`}
+                >
+                  {idx + 1}
+                  {showFlag && (
+                    <Flag
+                      className="absolute top-0 right-0 w-2 h-2 text-white"
+                      fill="currentColor"
+                    />
+                  )}
+                </button>
+              )
+            })}
           </div>
-        ))}
+        )}
       </div>
 
       <div className="border-t border-gray-100 px-4 py-3">
         <div className="grid grid-cols-2 gap-2 text-center mb-3">
           {[
-            { val: answered, label: 'Answered', cls: 'text-green-600' },
-            { val: notAnswered, label: 'Not Answered', cls: 'text-red-500' },
-            { val: marked, label: 'Marked', cls: 'text-amber-500' },
-            { val: notVisited, label: 'Not Visited', cls: 'text-gray-400' },
+            { val: answered, label: 'Answered', cls: 'text-emerald-600' },
+            { val: notAnswered, label: 'Not Answered', cls: 'text-rose-500' },
+            { val: marked, label: 'Marked', cls: 'text-violet-500' },
+            { val: notVisited, label: 'Not Visited', cls: 'text-zinc-400' },
           ].map(({ val, label, cls }) => (
             <div key={label}>
               <p className={`text-base font-bold ${cls}`}>{val}</p>
