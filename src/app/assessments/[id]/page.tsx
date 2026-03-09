@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Star, Users } from 'lucide-react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { BackButton } from '@/components/navigation/BackButton';
@@ -20,11 +20,16 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'analytics', label: 'Analytics' },
 ];
 
-export default function AssessmentDetailPage() {
+function AssessmentDetailPageInner() {
   const params = useParams<{ id: string }>();
   const { user } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') as Tab | null
+  const validTabs: Tab[] = ['overview', 'attempts', 'analytics']
+  const [activeTab, setActiveTab] = useState<Tab>(
+    tabParam && validTabs.includes(tabParam) ? tabParam : 'overview'
+  );
 
   const assessment = mockAssessments.find((a) => a.id === params.id);
   const attempts = mockAttempts.filter((a) => a.assessmentId === params.id);
@@ -41,6 +46,7 @@ export default function AssessmentDetailPage() {
   return (
     <div className="min-h-screen bg-zinc-50">
       {/* Hero band — dark bg, this section only */}
+
       <div className="bg-zinc-900 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <BackButton className="mb-4 text-zinc-400 hover:text-white" />
@@ -114,4 +120,16 @@ export default function AssessmentDetailPage() {
       </PageWrapper>
     </div>
   );
+}
+
+export default function AssessmentDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <AssessmentDetailPageInner />
+    </Suspense>
+  )
 }

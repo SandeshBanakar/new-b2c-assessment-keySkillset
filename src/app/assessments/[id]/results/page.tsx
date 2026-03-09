@@ -55,10 +55,22 @@ export default function ResultsPage() {
     }
   })
 
+  const [countdown, setCountdown] = useState(3)
+
   // Redirect via effect — no setState here
   useEffect(() => {
     if (data.redirect) router.replace(data.redirect)
   }, [data.redirect, router])
+
+  useEffect(() => {
+    if (data.redirect) return
+    if (countdown <= 0) {
+      router.push(`/assessments/${params.id}?tab=analytics`)
+      return
+    }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [countdown, data.redirect, params.id, router])
 
   if (data.redirect || !data.attempt || !config) return null
 
@@ -78,6 +90,22 @@ export default function ResultsPage() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <PageWrapper>
+
+        {/* Countdown redirect banner */}
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-md bg-blue-50 border border-blue-200 px-4 py-3">
+          <p className="text-sm font-medium text-blue-700">
+            Redirecting to Analysis in {countdown}s...
+          </p>
+          <button
+            onClick={() => {
+              setCountdown(0)
+              router.push(`/assessments/${params.id}?tab=analytics`)
+            }}
+            className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors shrink-0"
+          >
+            Go Now →
+          </button>
+        </div>
 
         {/* Score header card */}
         <div className="bg-white shadow-sm rounded-md p-6 mb-4">
