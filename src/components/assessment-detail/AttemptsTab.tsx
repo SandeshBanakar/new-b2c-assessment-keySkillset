@@ -13,8 +13,6 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import { mockAssessments } from '@/utils/assessmentUtils';
-import { ASSESSMENT_LIBRARY } from '@/data/assessments';
-import SubscribeModal from '@/components/assessment/SubscribeModal';
 import type { MockAttempt } from '@/types';
 
 interface AttemptsTabProps {
@@ -50,33 +48,17 @@ function StatusBadge({ status }: { status: MockAttempt['status'] }) {
   return null;
 }
 
-function canAccessByTier(userTier: string, assessmentType: string): boolean {
-  switch (assessmentType) {
-    case 'daily-quiz': return true;
-    case 'full-test': return userTier === 'basic' || userTier === 'professional' || userTier === 'premium';
-    case 'subject-test': return userTier === 'professional' || userTier === 'premium';
-    case 'chapter-test': return userTier === 'premium';
-    default: return false;
-  }
-}
 
 export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps) {
   const router = useRouter();
-  const { user, isSubscribed } = useAppContext();
+  const { isSubscribed } = useAppContext();
   const [localAttempts, setLocalAttempts] = useState<MockAttempt[]>(attempts);
   const [abandonTarget, setAbandonTarget] = useState<MockAttempt | null>(null);
   const [abandoning, setAbandoning] = useState(false);
-  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
-
   const subscribed = isSubscribed(assessmentId);
-  const userTier = user?.subscriptionTier ?? 'free';
 
   // Find assessment info for tier/access checks
   const assessmentMeta = mockAssessments.find((a) => a.id === assessmentId);
-  const libraryAssessment = ASSESSMENT_LIBRARY.find((a) => a.id === assessmentId);
-  const hasAccessByTier = assessmentMeta
-    ? canAccessByTier(userTier, assessmentMeta.type)
-    : false;
 
   // Free attempt: find in data or synthesize
   const freeAttempt: MockAttempt =
@@ -320,43 +302,36 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
           })}
       </div>
 
-      {/* Locked row — shown when not subscribed */}
+      {/* Locked rows — shown when not subscribed */}
       {!subscribed && (
-        <div className="bg-zinc-50 border border-zinc-200 rounded-md px-4 py-3 mt-2 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-zinc-400" />
-            <span className="text-sm text-zinc-400">
-              Subscribe to unlock 5 additional attempts
-            </span>
-          </div>
-          {hasAccessByTier && libraryAssessment ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-sm rounded-md"
-              onClick={() => setShowSubscribeModal(true)}
-            >
-              Subscribe Now
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-sm rounded-md"
-              onClick={() => router.push('/plans')}
-            >
-              Upgrade to Access
-            </Button>
-          )}
+        <div className="bg-white shadow-sm rounded-md divide-y divide-zinc-100 mt-2">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-4 py-4 px-6">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Lock className="w-4 h-4 text-zinc-300" />
+                <span className="text-sm font-medium text-zinc-400">
+                  Attempt {i + 1}
+                </span>
+              </div>
+              <div className="hidden md:flex items-center gap-4 text-xs text-zinc-300">
+                <span className="flex items-center gap-1">
+                  <FileText className="w-3.5 h-3.5" />
+                  {assessmentMeta
+                    ? `${assessmentMeta.questionCount} Questions`
+                    : '— Questions'}
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-sm rounded-md text-zinc-400 border-zinc-200 shrink-0"
+                onClick={() => router.push('/plans')}
+              >
+                Upgrade to Access
+              </Button>
+            </div>
+          ))}
         </div>
-      )}
-
-      {/* Subscribe modal */}
-      {showSubscribeModal && libraryAssessment && (
-        <SubscribeModal
-          assessment={libraryAssessment}
-          onClose={() => setShowSubscribeModal(false)}
-        />
       )}
 
       {/* Abandon confirmation dialog */}
