@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Info, Clock, ArrowRight } from 'lucide-react'
+import { Info, ArrowRight } from 'lucide-react'
 import PageWrapper from '@/components/layout/PageWrapper'
 import clatFullTest1 from '@/data/exams/clat-full-test-1'
 import neetFullTest1 from '@/data/exams/neet-full-test-1'
@@ -102,10 +102,12 @@ export default function ExamInstructionsPage() {
             </label>
 
             <div className="flex justify-between items-center mt-6">
-              <div className="flex items-center gap-2 text-sm text-gray-400 font-mono">
-                <Clock className="w-4 h-4" />
-                Exam starts in: 00:00
-              </div>
+              <button
+                onClick={() => router.back()}
+                className="border border-zinc-300 text-zinc-700 bg-white rounded-md px-6 py-2.5 font-medium text-sm hover:bg-zinc-50 transition-colors"
+              >
+                Go Back
+              </button>
 
               <button
                 disabled={!agreed}
