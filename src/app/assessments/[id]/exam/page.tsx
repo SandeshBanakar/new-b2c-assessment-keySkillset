@@ -333,15 +333,6 @@ function PaletteSidebar({
 function ExamFooter({ engine }: { engine: Engine }) {
   return (
     <footer className="border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-between shrink-0">
-      <button
-        onClick={engine.previous}
-        disabled={engine.state.activeQuestionIndex === 0}
-        className="flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        Previous
-      </button>
-
       <div className="flex items-center gap-2">
         <button
           onClick={engine.markForReview}
@@ -365,13 +356,24 @@ function ExamFooter({ engine }: { engine: Engine }) {
         </button>
       </div>
 
-      <button
-        onClick={engine.saveAndNext}
-        className="flex items-center gap-1.5 px-5 py-2 text-sm bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white font-semibold rounded-lg transition-colors"
-      >
-        Save & Next
-        <ChevronRight className="w-4 h-4" />
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={engine.previous}
+          disabled={engine.state.activeQuestionIndex === 0}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Previous
+        </button>
+
+        <button
+          onClick={engine.saveAndNext}
+          className="flex items-center gap-1.5 px-5 py-2 text-sm bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white font-semibold rounded-lg transition-colors"
+        >
+          Save & Next
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
     </footer>
   )
 }
