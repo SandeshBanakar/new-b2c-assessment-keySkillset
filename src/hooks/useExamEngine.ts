@@ -20,6 +20,7 @@ type ExamAction =
   | { type: 'SWITCH_SECTION'; sectionId: string }
   | { type: 'TICK' }
   | { type: 'SUBMIT_EXAM' }
+  | { type: 'MARK_AND_NEXT' }
 
 // ─── Status Derivation ───────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ function examReducer(
 
     case 'SAVE_AND_NEXT': {
       const qs = { ...state.questionStates[activeQId] }
-      qs.status = qs.selectedOption ? 'answered' : 'visited_unanswered'
+      qs.status = deriveStatus(qs)
       const updatedStates = { ...state.questionStates, [activeQId]: qs }
 
       const isLastInSection =
@@ -191,6 +192,40 @@ function examReducer(
     case 'SUBMIT_EXAM':
       return { ...state, isSubmitted: true }
 
+    case 'MARK_AND_NEXT': {
+      // Step 1 — toggle mark on current question
+      const qs = { ...state.questionStates[activeQId] }
+      qs.isMarkedForReview = !qs.isMarkedForReview
+      qs.status = deriveStatus(qs)
+      const updatedStates = {
+        ...state.questionStates,
+        [activeQId]: qs,
+      }
+
+      // Step 2 — advance to next question if not last
+      const isLastInSection =
+        state.activeQuestionIndex >=
+        activeSection.questions.length - 1
+
+      if (isLastInSection) {
+        return { ...state, questionStates: updatedStates }
+      }
+
+      const nextIndex = state.activeQuestionIndex + 1
+      const nextQId = activeSection.questions[nextIndex].id
+      const nextQs = { ...updatedStates[nextQId] }
+      if (nextQs.status === 'not_visited') {
+        nextQs.status = 'visited_unanswered'
+        updatedStates[nextQId] = nextQs
+      }
+
+      return {
+        ...state,
+        questionStates: updatedStates,
+        activeQuestionIndex: nextIndex,
+      }
+    }
+
     default:
       return state
   }
@@ -277,6 +312,10 @@ export function useExamEngine(config: ExamConfig) {
     (sectionId: string) => dispatchRaw({ type: 'SWITCH_SECTION', sectionId }),
     []
   )
+  const markAndNext = useCallback(
+    () => dispatchRaw({ type: 'MARK_AND_NEXT' }),
+    []
+  )
   const submitExam = useCallback(() => dispatchRaw({ type: 'SUBMIT_EXAM' }), [])
 
   return {
@@ -289,6 +328,7 @@ export function useExamEngine(config: ExamConfig) {
     saveAndNext,
     previous,
     markForReview,
+    markAndNext,
     clearResponse,
     jumpToQuestion,
     switchSection,
