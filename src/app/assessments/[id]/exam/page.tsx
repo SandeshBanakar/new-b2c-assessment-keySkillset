@@ -13,6 +13,7 @@ import {
   Info,
 } from 'lucide-react'
 import { useExamEngine } from '@/hooks/useExamEngine'
+import { useAppContext } from '@/context/AppContext'
 import clatFullTest1 from '@/data/exams/clat-full-test-1'
 import neetFullTest1 from '@/data/exams/neet-full-test-1'
 import type { ExamConfig } from '@/types/exam'
@@ -444,7 +445,9 @@ function ExamPlayer({
   assessmentId: string
 }) {
   const router = useRouter()
-  const engine = useExamEngine(config)
+  const { user } = useAppContext()
+  const userId = user?.id ?? 'anonymous'
+  const engine = useExamEngine(config, userId)
 
   useEffect(() => {
     if (engine.state.isSubmitted) {

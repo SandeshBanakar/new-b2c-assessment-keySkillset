@@ -14,7 +14,7 @@ export type DemoUser = {
 
 export const DEMO_USERS: DemoUser[] = [
   {
-    id: 'demo-free',
+    id: '9a3b56a5-31f6-4a58-81fa-66157c68d4f0',
     email: 'free@keyskillset.com',
     display_name: 'Free User',
     subscription_tier: 'free',
@@ -27,7 +27,7 @@ export const DEMO_USERS: DemoUser[] = [
     role: 'student',
   },
   {
-    id: 'demo-basic',
+    id: 'a0c16137-7fd5-44f5-96e6-60e4617d9230',
     email: 'basic@keyskillset.com',
     display_name: 'Basic User',
     subscription_tier: 'basic',
@@ -40,7 +40,7 @@ export const DEMO_USERS: DemoUser[] = [
     role: 'student',
   },
   {
-    id: 'demo-pro',
+    id: 'e150d59c-13c1-4db3-b6d7-4f30c29178e9',
     email: 'pro@keyskillset.com',
     display_name: 'Priya Sharma',
     subscription_tier: 'professional',
@@ -53,7 +53,7 @@ export const DEMO_USERS: DemoUser[] = [
     role: 'student',
   },
   {
-    id: 'demo-premium',
+    id: '191c894d-b532-4fa8-b1fe-746e5cdcdcc8',
     email: 'premium@keyskillset.com',
     display_name: 'Premium User',
     subscription_tier: 'premium',

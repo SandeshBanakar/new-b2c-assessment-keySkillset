@@ -1,6 +1,7 @@
 'use client'
 
 import { useReducer, useEffect, useCallback, useRef } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import type {
   ExamConfig,
   ExamAttemptState,
@@ -235,9 +236,67 @@ function examReducer(
 
 const storageKey = (examId: string) => `exam_attempt_${examId}`
 
+// ─── Supabase attempt writer ──────────────────────────────────────────────────
+
+async function writeAttemptToSupabase(
+  userId: string,
+  assessmentId: string,
+  score: number,
+  correctCount: number,
+  incorrectCount: number,
+  skippedCount: number,
+  timeSpentSeconds: number,
+  isFreeAttempt: boolean
+) {
+  try {
+    const supabase = createClient()
+
+    const { data: assessmentData } = await supabase
+      .from('assessments')
+      .select('id')
+      .eq('slug', assessmentId)
+      .limit(1)
+      .single()
+
+    if (!assessmentData) {
+      console.warn('[Supabase] No assessment found for slug:', assessmentId)
+      return
+    }
+
+    await supabase.from('attempts').insert({
+      user_id: userId,
+      assessment_id: assessmentData.id,
+      attempt_number: isFreeAttempt ? 0 : 1,
+      status: 'completed',
+      score,
+      correct_count: correctCount,
+      incorrect_count: incorrectCount,
+      skipped_count: skippedCount,
+      time_spent_seconds: timeSpentSeconds,
+      is_free_attempt: isFreeAttempt,
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    })
+
+    if (isFreeAttempt) {
+      await supabase
+        .from('users')
+        .update({ free_attempt_used: true })
+        .eq('id', userId)
+    }
+
+    localStorage.setItem(
+      `kss_free_attempt_used_${assessmentId}`,
+      'true'
+    )
+  } catch (err) {
+    console.error('[Supabase attempt write failed]', err)
+  }
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useExamEngine(config: ExamConfig) {
+export function useExamEngine(config: ExamConfig, userId: string) {
   const [state, dispatchRaw] = useReducer(
     (s: ExamAttemptState, a: ExamAction) => examReducer(s, a, config),
     undefined,
@@ -316,7 +375,36 @@ export function useExamEngine(config: ExamConfig) {
     () => dispatchRaw({ type: 'MARK_AND_NEXT' }),
     []
   )
-  const submitExam = useCallback(() => dispatchRaw({ type: 'SUBMIT_EXAM' }), [])
+  const submitExam = useCallback(() => {
+    dispatchRaw({ type: 'SUBMIT_EXAM' })
+
+    const allStates = Object.values(state.questionStates)
+    const correctCount = allStates.filter(
+      qs => qs.status === 'answered' ||
+        qs.status === 'answered_and_marked'
+    ).length
+    const incorrectCount = allStates.filter(
+      qs => qs.status === 'visited_unanswered'
+    ).length
+    const skippedCount = allStates.filter(
+      qs => qs.status === 'not_visited'
+    ).length
+    const timeSpentSeconds =
+      config.totalDurationMinutes * 60 -
+      state.timeRemainingSeconds
+    const isFreeAttempt = true
+
+    writeAttemptToSupabase(
+      userId,
+      config.id,
+      0,
+      correctCount,
+      incorrectCount,
+      skippedCount,
+      timeSpentSeconds,
+      isFreeAttempt
+    )
+  }, [state, config, userId])
 
   return {
     state,
