@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AppContextProvider } from '@/context/AppContext';
 import Navbar from '@/components/layout/Navbar';
-import DevTierSwitcher from '@/components/shared/DevTierSwitcher';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,7 +30,6 @@ export default function RootLayout({
         <AppContextProvider>
           <Navbar />
           {children}
-          <DevTierSwitcher />
         </AppContextProvider>
       </body>
     </html>
