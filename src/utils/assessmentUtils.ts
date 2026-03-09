@@ -2,6 +2,7 @@ import type {
   Assessment,
   AssessmentType,
   CardStatus,
+  MockAttempt,
   Tier,
   User,
   UserAssessmentProgress,
@@ -256,3 +257,22 @@ export const mockProgressMap: Record<string, UserAssessmentProgress> = {
     masteryPercent: 60,
   },
 };
+
+export function isFreeAttemptExhausted(
+  assessmentId: string,
+  attempts: MockAttempt[]
+): boolean {
+  const freeAttempt = attempts.find(
+    a => a.assessmentId === assessmentId && a.attemptNumber === 0
+  )
+  const fromAttempts =
+    freeAttempt?.status === 'completed' ||
+    freeAttempt?.status === 'abandoned'
+  const fromStorage =
+    typeof window !== 'undefined'
+      ? localStorage.getItem(
+          `kss_free_attempt_used_${assessmentId}`
+        ) === 'true'
+      : false
+  return fromAttempts || fromStorage
+}

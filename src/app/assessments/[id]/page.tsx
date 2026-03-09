@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Star, Users } from 'lucide-react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { BackButton } from '@/components/navigation/BackButton';
@@ -9,7 +9,7 @@ import OverviewTab from '@/components/assessment-detail/OverviewTab';
 import AttemptsTab from '@/components/assessment-detail/AttemptsTab';
 import AnalyticsTab from '@/components/assessment-detail/AnalyticsTab';
 import { useAppContext } from '@/context/AppContext';
-import { mockAssessments } from '@/utils/assessmentUtils';
+import { mockAssessments, isFreeAttemptExhausted } from '@/utils/assessmentUtils';
 import { mockAttempts } from '@/data/assessments';
 
 type Tab = 'overview' | 'attempts' | 'analytics';
@@ -34,6 +34,10 @@ function AssessmentDetailPageInner() {
   const assessment = mockAssessments.find((a) => a.id === params.id);
   const attempts = mockAttempts.filter((a) => a.assessmentId === params.id);
   const userTier = user?.subscriptionTier ?? 'free';
+  const router = useRouter()
+  const showUpgradeBanner =
+    userTier === 'free' &&
+    isFreeAttemptExhausted(params.id, attempts)
 
   if (!assessment) {
     return (
@@ -50,6 +54,20 @@ function AssessmentDetailPageInner() {
       <div className="bg-zinc-900 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <BackButton className="mb-4 text-zinc-400 hover:text-white" />
+
+          {showUpgradeBanner && (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-md bg-amber-500/10 border border-amber-500/30 px-4 py-3">
+              <p className="text-sm font-medium text-amber-300">
+                You&apos;ve used your free attempt
+              </p>
+              <button
+                onClick={() => router.push('/plans')}
+                className="text-sm font-medium text-amber-300 hover:text-amber-100 transition-colors shrink-0"
+              >
+                Upgrade →
+              </button>
+            </div>
+          )}
 
           <h1 className="text-2xl font-semibold text-white">{assessment.title}</h1>
 
