@@ -92,14 +92,14 @@ export default function AnalyticsTab({
               attempt.attemptNumber === 0 ? 'Free' : `Attempt ${attempt.attemptNumber}`;
             return (
               <div key={attempt.id} className="flex items-center gap-3">
-                <span className="text-xs text-zinc-500 w-16 flex-shrink-0">{label}</span>
+                <span className="text-xs text-zinc-500 w-16 shrink-0">{label}</span>
                 <div className="flex-1 bg-zinc-100 rounded-full h-2">
                   <div
                     className="bg-blue-700 h-2 rounded-full"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <span className="text-xs font-medium text-zinc-700 w-12 text-right flex-shrink-0">
+                <span className="text-xs font-medium text-zinc-700 w-12 text-right shrink-0">
                   {attempt.score}
                 </span>
               </div>
