@@ -11,6 +11,7 @@ import {
   X,
   Flag,
   Info,
+  Monitor,
 } from 'lucide-react'
 import { useExamEngine } from '@/hooks/useExamEngine'
 import { useAppContext } from '@/context/AppContext'
@@ -438,6 +439,33 @@ function ExamFooter({ engine }: { engine: Engine }) {
   )
 }
 
+// ─── MobileBlockModal ─────────────────────────────────────────────────────────
+
+function MobileBlockModal() {
+  const router = useRouter()
+  return (
+    <div className="fixed inset-0 z-[200] bg-white flex items-center justify-center p-6">
+      <div className="bg-white rounded-md shadow-lg max-w-sm w-full p-6 text-center">
+        <div className="w-12 h-12 bg-amber-50 rounded-md flex items-center justify-center mx-auto mb-4">
+          <Monitor className="w-6 h-6 text-amber-600" />
+        </div>
+        <h2 className="text-base font-semibold text-zinc-900 mb-2">
+          Heads up!
+        </h2>
+        <p className="text-sm text-zinc-500 leading-relaxed mb-6">
+          You can do more on your phone, but on a bigger screen you can do it all day. Please use a laptop or tablet for a better exam experience!
+        </p>
+        <button
+          onClick={() => router.push('/assessments')}
+          className="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium py-2.5 rounded-md transition-colors"
+        >
+          Go Back
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── ExamPlayer (inner — calls useExamEngine unconditionally) ─────────────────
 
 function ExamPlayer({
@@ -481,12 +509,28 @@ export default function ExamPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const config = getExamConfig(params.id)
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined'
+      ? window.innerWidth < 768
+      : false
+  )
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () =>
+      window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     if (!config) router.replace('/assessments')
   }, [config, router])
 
   if (!config) return null
+
+  if (isMobile) return <MobileBlockModal />
 
   return <ExamPlayer config={config} assessmentId={params.id} />
 }
