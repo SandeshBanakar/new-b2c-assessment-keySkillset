@@ -607,6 +607,34 @@ function CalculatorWidget({
   const [operator, setOperator] = useState<string | null>(null)
   const [waitingForOperand, setWaitingForOperand] = useState(false)
 
+  const PANEL_WIDTH = 256
+  const PANEL_HEIGHT = 320
+  const PANEL_GAP = 8
+  const BUTTON_SIZE = 40
+  const VIEWPORT_PADDING = 8
+
+  function getPanelPosition() {
+    const viewportW = window.innerWidth
+
+    const spaceAbove = btnPos.y
+    let top: number
+    if (spaceAbove >= PANEL_HEIGHT + PANEL_GAP) {
+      top = btnPos.y - PANEL_HEIGHT - PANEL_GAP
+    } else {
+      top = btnPos.y + BUTTON_SIZE + PANEL_GAP
+    }
+
+    let left = btnPos.x + BUTTON_SIZE / 2 - PANEL_WIDTH / 2
+    if (left < VIEWPORT_PADDING) {
+      left = VIEWPORT_PADDING
+    }
+    if (left + PANEL_WIDTH > viewportW - VIEWPORT_PADDING) {
+      left = viewportW - PANEL_WIDTH - VIEWPORT_PADDING
+    }
+
+    return { top, left }
+  }
+
   const dragging = useRef(false)
   const hasDragged = useRef(false)
   const dragOffset = useRef({ x: 0, y: 0 })
@@ -751,6 +779,8 @@ function CalculatorWidget({
     ],
   ]
 
+  const panelPos = getPanelPosition()
+
   return (
     <>
       {/* Panel */}
@@ -758,8 +788,8 @@ function CalculatorWidget({
         <div
           style={{
             position: 'fixed',
-            left: btnPos.x - 108,
-            top: btnPos.y - 328,
+            left: panelPos.left,
+            top: panelPos.top,
             zIndex: 50,
           }}
           className={`bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl w-64 overflow-hidden ${isCalcOpen ? 'block' : 'hidden'}`}
