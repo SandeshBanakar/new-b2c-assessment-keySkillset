@@ -87,28 +87,83 @@ function examReducer(
 
     case 'SAVE_AND_NEXT': {
       const qs = { ...state.questionStates[activeQId] }
+
+      // Save & Next clears mark flag per spec:
+      // marked_for_review → visited_unanswered
+      // answered_and_marked → answered
+      qs.isMarkedForReview = false
       qs.status = deriveStatus(qs)
-      const updatedStates = { ...state.questionStates, [activeQId]: qs }
 
+      const updatedStates = {
+        ...state.questionStates,
+        [activeQId]: qs,
+      }
+
+      const currentSectionIdx = config.sections.findIndex(
+        s => s.id === state.activeSectionId
+      )
       const isLastInSection =
-        state.activeQuestionIndex >= activeSection.questions.length - 1
+        state.activeQuestionIndex >=
+        activeSection.questions.length - 1
 
-      if (isLastInSection) {
-        return { ...state, questionStates: updatedStates }
+      // Mid-section: advance normally
+      if (!isLastInSection) {
+        const nextIndex = state.activeQuestionIndex + 1
+        const nextQId =
+          activeSection.questions[nextIndex].id
+        const nextQs = { ...updatedStates[nextQId] }
+        if (nextQs.status === 'not_visited') {
+          nextQs.status = 'visited_unanswered'
+          updatedStates[nextQId] = nextQs
+        }
+        return {
+          ...state,
+          questionStates: updatedStates,
+          activeQuestionIndex: nextIndex,
+        }
       }
 
-      const nextIndex = state.activeQuestionIndex + 1
-      const nextQId = activeSection.questions[nextIndex].id
-      const nextQs = { ...updatedStates[nextQId] }
-      if (nextQs.status === 'not_visited') {
-        nextQs.status = 'visited_unanswered'
-        updatedStates[nextQId] = nextQs
+      const isLastSection =
+        currentSectionIdx === config.sections.length - 1
+
+      // Last question of last section → wrap to Section 1 Q1
+      if (isLastSection) {
+        const firstSection = config.sections[0]
+        const firstQId = firstSection.questions[0].id
+        const wrappedStates = { ...updatedStates }
+        const firstQs = { ...wrappedStates[firstQId] }
+        if (firstQs.status === 'not_visited') {
+          firstQs.status = 'visited_unanswered'
+          wrappedStates[firstQId] = firstQs
+        }
+        return {
+          ...state,
+          questionStates: wrappedStates,
+          activeSectionId: firstSection.id,
+          activeQuestionIndex: 0,
+        }
       }
 
+      // Last question of non-final section
+      // → advance to next section Q1 silently
+      const nextSection =
+        config.sections[currentSectionIdx + 1]
+      const nextSectionFirstQId =
+        nextSection.questions[0].id
+      const advancedStates = { ...updatedStates }
+      const nextSectionFirstQs = {
+        ...advancedStates[nextSectionFirstQId],
+      }
+      if (nextSectionFirstQs.status === 'not_visited') {
+        nextSectionFirstQs.status = 'visited_unanswered'
+        advancedStates[nextSectionFirstQId] =
+          nextSectionFirstQs
+      }
       return {
         ...state,
-        questionStates: updatedStates,
-        activeQuestionIndex: nextIndex,
+        questionStates: advancedStates,
+        activeSectionId: nextSection.id,
+        activeQuestionIndex: 0,
       }
     }
 
@@ -166,7 +221,8 @@ function examReducer(
 
     case 'MARK_FOR_REVIEW': {
       const qs = { ...state.questionStates[activeQId] }
-      qs.isMarkedForReview = !qs.isMarkedForReview
+      // One-directional — always marks, never unmarks
+      qs.isMarkedForReview = true
       qs.status = deriveStatus(qs)
       return {
         ...state,
@@ -229,9 +285,11 @@ function examReducer(
       return { ...state, isSubmitted: true }
 
     case 'MARK_AND_NEXT': {
-      // Step 1 — toggle mark on current question
+      // Step 1 — mark current question
       const qs = { ...state.questionStates[activeQId] }
-      qs.isMarkedForReview = !qs.isMarkedForReview
+      // One-directional — always marks, never unmarks
+      // Bank exam / TCS / SSC compliant behaviour
+      qs.isMarkedForReview = true
       qs.status = deriveStatus(qs)
       const updatedStates = {
         ...state.questionStates,
