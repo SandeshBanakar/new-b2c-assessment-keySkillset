@@ -167,9 +167,91 @@ function ExamHeader({
   )
 }
 
+// ─── NumericPanel ─────────────────────────────────────────────────────────────
+
+function NumericPanel({ engine }: { engine: Engine }) {
+  const current = engine.activeQuestionState
+  const value = (current.numericAnswer ?? '') as string
+
+  function handleKey(key: string) {
+    let next = value
+    if (key === 'backspace') {
+      next = value.slice(0, -1)
+    } else if (key === '+') {
+      // Explicitly set positive — remove leading minus
+      next = value.startsWith('-') ? value.slice(1) : value
+    } else if (key === '-') {
+      // Prepend minus if not already negative and input is not empty
+      next = (!value.startsWith('-') && value !== '') ? '-' + value : value
+    } else if (key === '.') {
+      if (!next.includes('.')) next = next + '.'
+    } else {
+      next = next + key
+    }
+    engine.setNumericAnswer(next)
+  }
+
+  const rows = [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    ['+', '-', '0', '.', 'backspace'],
+  ]
+
+  return (
+    <div className="bg-white rounded-md border border-zinc-200 p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm font-semibold text-zinc-900">
+          Question {engine.state.activeQuestionIndex + 1}
+        </span>
+        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+          Numeric
+        </span>
+      </div>
+      <p className="text-sm text-zinc-800 leading-relaxed mb-5">
+        {engine.activeQuestion.text}
+      </p>
+      <input
+        readOnly
+        value={value}
+        onKeyDown={e => e.preventDefault()}
+        placeholder="Enter your answer"
+        className="w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono text-zinc-900 bg-zinc-50 mb-4 cursor-not-allowed"
+      />
+      <div className="space-y-2">
+        {rows.map((row, ri) => (
+          <div key={ri} className="flex gap-2">
+            {row.map(key => (
+              <button
+                key={key}
+                onClick={() => handleKey(key)}
+                className="flex-1 border border-zinc-200 rounded-md py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                {key === 'backspace' ? '⌫' : key}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── QuestionPanel ────────────────────────────────────────────────────────────
 
 function QuestionPanel({ engine }: { engine: Engine }) {
+  const qType = engine.activeQuestion.type
+
+  const badgeLabel =
+    qType === 'passage_based' ? 'Passage Based'
+    : qType === 'mcq_multi' ? 'Multiple Correct'
+    : 'Single Correct'
+
+  // MCQ_MULTI: partial marking rules are content-creator
+  // defined and evaluated server-side.
+  // Client tracks selected options only.
+  const selectedOptions = engine.activeQuestionState.selectedOptions ?? []
+
   return (
     <div className="bg-white rounded-md border border-zinc-200 p-5">
       <div className="flex items-center gap-2 mb-4">
@@ -177,9 +259,7 @@ function QuestionPanel({ engine }: { engine: Engine }) {
           Question {engine.state.activeQuestionIndex + 1}
         </span>
         <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-          {engine.activeQuestion.type === 'passage_based'
-            ? 'Passage Based'
-            : 'Single Correct'}
+          {badgeLabel}
         </span>
       </div>
 
@@ -187,33 +267,60 @@ function QuestionPanel({ engine }: { engine: Engine }) {
         {engine.activeQuestion.text}
       </p>
 
-      {engine.activeQuestion.options.map(option => {
-        const isSelected =
-          engine.activeQuestionState.selectedOption === option.id
-
-        return (
-          <button
-            key={option.id}
-            onClick={() => engine.selectOption(option.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${
-              isSelected
-                ? 'border-2 border-blue-700 bg-blue-50 text-blue-700 font-medium'
-                : 'border-zinc-200 hover:bg-blue-50 hover:border-blue-200 text-zinc-700'
-            }`}
-          >
-            <span
-              className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${
+      {qType === 'mcq_multi' ? (
+        engine.activeQuestion.options.map(option => {
+          const isSelected = selectedOptions.includes(option.id)
+          return (
+            <button
+              key={option.id}
+              onClick={() => engine.selectOption(option.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-blue-700 text-white'
-                  : 'bg-zinc-100 text-gray-600'
+                  ? 'border-2 border-blue-700 bg-blue-50 text-blue-700 font-medium'
+                  : 'border-zinc-200 hover:bg-blue-50 hover:border-blue-200 text-zinc-700'
               }`}
             >
-              {option.id}
-            </span>
-            {option.text}
-          </button>
-        )
-      })}
+              <span
+                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${
+                  isSelected
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-zinc-100 text-gray-600'
+                }`}
+              >
+                {isSelected ? '✓' : option.id}
+              </span>
+              {option.text}
+            </button>
+          )
+        })
+      ) : (
+        engine.activeQuestion.options.map(option => {
+          const isSelected =
+            engine.activeQuestionState.selectedOption === option.id
+          return (
+            <button
+              key={option.id}
+              onClick={() => engine.selectOption(option.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${
+                isSelected
+                  ? 'border-2 border-blue-700 bg-blue-50 text-blue-700 font-medium'
+                  : 'border-zinc-200 hover:bg-blue-50 hover:border-blue-200 text-zinc-700'
+              }`}
+            >
+              <span
+                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${
+                  isSelected
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-zinc-100 text-gray-600'
+                }`}
+              >
+                {option.id}
+              </span>
+              {option.text}
+            </button>
+          )
+        })
+      )}
     </div>
   )
 }
@@ -221,11 +328,11 @@ function QuestionPanel({ engine }: { engine: Engine }) {
 // ─── QuestionArea ─────────────────────────────────────────────────────────────
 
 function QuestionArea({ engine }: { engine: Engine }) {
-  const isPassage = engine.activeQuestion.type === 'passage_based'
+  const qType = engine.activeQuestion.type
 
   return (
     <div className="flex-1 overflow-y-auto bg-zinc-50 p-4">
-      {isPassage ? (
+      {qType === 'passage_based' ? (
         <div className="h-full flex gap-4">
           <div className="w-1/2 bg-white rounded-md border border-zinc-200 p-4 overflow-y-auto">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
@@ -238,6 +345,10 @@ function QuestionArea({ engine }: { engine: Engine }) {
           <div className="w-1/2 overflow-y-auto">
             <QuestionPanel engine={engine} />
           </div>
+        </div>
+      ) : qType === 'numeric' ? (
+        <div className="max-w-2xl mx-auto">
+          <NumericPanel engine={engine} />
         </div>
       ) : (
         <div className="max-w-2xl mx-auto">
@@ -406,7 +517,11 @@ function ExamFooter({ engine }: { engine: Engine }) {
 
         <button
           onClick={engine.clearResponse}
-          disabled={engine.activeQuestionState.selectedOption === null}
+          disabled={
+            engine.activeQuestionState.selectedOption === null &&
+            (engine.activeQuestionState.selectedOptions?.length ?? 0) === 0 &&
+            !engine.activeQuestionState.numericAnswer
+          }
           className="flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <X className="w-4 h-4" />

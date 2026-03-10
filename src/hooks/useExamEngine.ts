@@ -22,11 +22,14 @@ type ExamAction =
   | { type: 'TICK' }
   | { type: 'SUBMIT_EXAM' }
   | { type: 'MARK_AND_NEXT' }
+  | { type: 'SET_NUMERIC_ANSWER'; value: string }
 
 // ─── Status Derivation ───────────────────────────────────────────────────────
 
 function deriveStatus(qs: QuestionState): QuestionStatus {
-  const hasAnswer = qs.selectedOption !== null
+  const hasAnswer =
+    qs.selectedOption !== null ||
+    (qs.selectedOptions?.length ?? 0) > 0
   const marked = qs.isMarkedForReview
   if (hasAnswer && marked) return 'answered_and_marked'
   if (hasAnswer) return 'answered'
@@ -76,8 +79,21 @@ function examReducer(
 
   switch (action.type) {
     case 'SELECT_OPTION': {
+      const question = activeSection.questions.find(
+        q => q.id === action.questionId
+      )
       const qs = { ...state.questionStates[action.questionId] }
-      qs.selectedOption = action.option
+
+      if (question?.type === 'mcq_multi') {
+        const current = qs.selectedOptions ?? []
+        const alreadySelected = current.includes(action.option)
+        qs.selectedOptions = alreadySelected
+          ? current.filter(o => o !== action.option)
+          : [...current, action.option]
+      } else {
+        qs.selectedOption = action.option
+      }
+
       qs.status = deriveStatus(qs)
       return {
         ...state,
@@ -233,6 +249,8 @@ function examReducer(
     case 'CLEAR_RESPONSE': {
       const qs = { ...state.questionStates[activeQId] }
       qs.selectedOption = null
+      qs.selectedOptions = []
+      qs.numericAnswer = ''
       qs.status = qs.isMarkedForReview ? 'marked_for_review' : 'visited_unanswered'
       return {
         ...state,
@@ -317,6 +335,23 @@ function examReducer(
         ...state,
         questionStates: updatedStates,
         activeQuestionIndex: nextIndex,
+      }
+    }
+
+    case 'SET_NUMERIC_ANSWER': {
+      const qs = {
+        ...state.questionStates[activeQId],
+        numericAnswer: action.value,
+      }
+      qs.status = action.value !== ''
+        ? 'answered'
+        : 'visited_unanswered'
+      return {
+        ...state,
+        questionStates: {
+          ...state.questionStates,
+          [activeQId]: qs,
+        },
       }
     }
 
@@ -468,6 +503,11 @@ export function useExamEngine(config: ExamConfig, userId: string) {
     () => dispatchRaw({ type: 'MARK_AND_NEXT' }),
     []
   )
+  const setNumericAnswer = useCallback(
+    (value: string) =>
+      dispatchRaw({ type: 'SET_NUMERIC_ANSWER', value }),
+    []
+  )
   const submitExam = useCallback(() => {
     dispatchRaw({ type: 'SUBMIT_EXAM' })
 
@@ -514,6 +554,7 @@ export function useExamEngine(config: ExamConfig, userId: string) {
     jumpToQuestion,
     switchSection,
     submitExam,
+    setNumericAnswer,
     formattedTime,
   }
 }

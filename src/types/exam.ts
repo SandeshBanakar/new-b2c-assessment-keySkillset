@@ -52,6 +52,8 @@ export interface ExamConfig {
 export interface QuestionState {
   questionId: string
   selectedOption: 'A' | 'B' | 'C' | 'D' | null
+  selectedOptions?: string[]   // mcq_multi
+  numericAnswer?: string       // numeric
   isMarkedForReview: boolean
   status: QuestionStatus
 }
