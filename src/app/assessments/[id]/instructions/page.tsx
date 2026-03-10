@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Info, ArrowRight } from 'lucide-react'
+import { Info, ArrowRight, ChevronLeft } from 'lucide-react'
 import PageWrapper from '@/components/layout/PageWrapper'
 import clatFullTest1 from '@/data/exams/clat-full-test-1'
 import neetFullTest1 from '@/data/exams/neet-full-test-1'
@@ -103,10 +103,11 @@ export default function ExamInstructionsPage() {
 
             <div className="flex justify-between items-center mt-6">
               <button
-                onClick={() => router.back()}
-                className="border border-zinc-300 text-zinc-700 bg-white rounded-md px-6 py-2.5 font-medium text-sm hover:bg-zinc-50 transition-colors"
+                onClick={() => router.push(`/assessments/${params.id}`)}
+                className="flex items-center gap-1 border border-zinc-300 text-zinc-700 bg-white rounded-md px-6 py-2.5 font-medium text-sm hover:bg-zinc-50 transition-colors"
               >
-                Go Back
+                <ChevronLeft className="w-4 h-4" />
+                Back
               </button>
 
               <button
