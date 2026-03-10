@@ -113,7 +113,42 @@ function examReducer(
     }
 
     case 'PREVIOUS': {
-      if (state.activeQuestionIndex === 0) return state
+      const isFirstQuestionInSection =
+        state.activeQuestionIndex === 0
+      const currentSectionIdx = config.sections.findIndex(
+        s => s.id === state.activeSectionId
+      )
+      const isFirstSection = currentSectionIdx === 0
+
+      // Disabled: Q1 of Section 1 — do nothing
+      if (isFirstQuestionInSection && isFirstSection) {
+        return state
+      }
+
+      // Cross-section: Q1 of Section N (N > 1)
+      // → navigate to last question of Section N-1 silently
+      if (isFirstQuestionInSection && !isFirstSection) {
+        const prevSection =
+          config.sections[currentSectionIdx - 1]
+        const prevSectionLastIdx =
+          prevSection.questions.length - 1
+        const prevQId =
+          prevSection.questions[prevSectionLastIdx].id
+        const updatedStates = { ...state.questionStates }
+        const prevQs = { ...updatedStates[prevQId] }
+        if (prevQs.status === 'not_visited') {
+          prevQs.status = 'visited_unanswered'
+          updatedStates[prevQId] = prevQs
+        }
+        return {
+          ...state,
+          questionStates: updatedStates,
+          activeSectionId: prevSection.id,
+          activeQuestionIndex: prevSectionLastIdx,
+        }
+      }
+
+      // Mid-section: navigate to previous question normally
       const prevIndex = state.activeQuestionIndex - 1
       const prevQId = activeSection.questions[prevIndex].id
       const updatedStates = { ...state.questionStates }

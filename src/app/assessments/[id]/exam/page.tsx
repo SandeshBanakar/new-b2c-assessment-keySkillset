@@ -416,7 +416,10 @@ function ExamFooter({ engine }: { engine: Engine }) {
       <div className="flex items-center gap-2">
         <button
           onClick={engine.previous}
-          disabled={engine.state.activeQuestionIndex === 0}
+          disabled={
+            engine.state.activeQuestionIndex === 0 &&
+            engine.config.sections.findIndex(s => s.id === engine.state.activeSectionId) === 0
+          }
           className="flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
