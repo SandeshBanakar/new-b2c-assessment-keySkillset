@@ -138,11 +138,10 @@ function ExamHeader({
               <button
                 key={section.id}
                 onClick={() => engine.switchSection(section.id)}
-                className={`shrink-0 text-xs font-medium pb-1 border-b-2 transition-colors whitespace-nowrap ${
-                  engine.state.activeSectionId === section.id
+                className={`shrink-0 text-xs font-medium pb-1 border-b-2 transition-colors whitespace-nowrap ${engine.state.activeSectionId === section.id
                     ? 'border-white text-white'
                     : 'border-transparent text-white/60 hover:text-white/80'
-                }`}
+                  }`}
               >
                 {section.label.toUpperCase()} ({answered}/{section.questionCount})
               </button>
@@ -245,8 +244,8 @@ function QuestionPanel({ engine }: { engine: Engine }) {
 
   const badgeLabel =
     qType === 'passage_based' ? 'Passage Based'
-    : qType === 'mcq_multi' ? 'Multiple Correct'
-    : 'Single Correct'
+      : qType === 'mcq_multi' ? 'Multiple Correct'
+        : 'Single Correct'
 
   // MCQ_MULTI: partial marking rules are content-creator
   // defined and evaluated server-side.
@@ -275,18 +274,16 @@ function QuestionPanel({ engine }: { engine: Engine }) {
             <button
               key={option.id}
               onClick={() => engine.selectOption(option.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${
-                isSelected
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${isSelected
                   ? 'border-2 border-blue-700 bg-blue-50 text-blue-700 font-medium'
                   : 'border-zinc-200 hover:bg-blue-50 hover:border-blue-200 text-zinc-700'
-              }`}
+                }`}
             >
               <span
-                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${
-                  isSelected
+                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${isSelected
                     ? 'bg-blue-700 text-white'
                     : 'bg-zinc-100 text-gray-600'
-                }`}
+                  }`}
               >
                 {isSelected ? '✓' : option.id}
               </span>
@@ -302,18 +299,16 @@ function QuestionPanel({ engine }: { engine: Engine }) {
             <button
               key={option.id}
               onClick={() => engine.selectOption(option.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${
-                isSelected
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${isSelected
                   ? 'border-2 border-blue-700 bg-blue-50 text-blue-700 font-medium'
                   : 'border-zinc-200 hover:bg-blue-50 hover:border-blue-200 text-zinc-700'
-              }`}
+                }`}
             >
               <span
-                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${
-                  isSelected
+                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${isSelected
                     ? 'bg-blue-700 text-white'
                     : 'bg-zinc-100 text-gray-600'
-                }`}
+                  }`}
               >
                 {option.id}
               </span>
@@ -452,9 +447,8 @@ function PaletteSidebar({
                 <button
                   key={q.id}
                   onClick={() => engine.jumpToQuestion(activeSection.id, idx)}
-                  className={`w-9 h-9 rounded flex items-center justify-center text-xs font-medium relative cursor-pointer select-none transition-all hover:opacity-80 ${colorClass} ${
-                    isActive ? 'ring-2 ring-blue-700 ring-offset-1' : ''
-                  }`}
+                  className={`w-9 h-9 rounded flex items-center justify-center text-xs font-medium relative cursor-pointer select-none transition-all hover:opacity-80 ${colorClass} ${isActive ? 'ring-2 ring-blue-700 ring-offset-1' : ''
+                    }`}
                 >
                   {idx + 1}
                   {showFlag && (
@@ -512,11 +506,10 @@ function ExamFooter({ engine }: { engine: Engine }) {
       <div className="flex items-center gap-2">
         <button
           onClick={engine.markAndNext}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border transition-colors ${
-            engine.activeQuestionState.isMarkedForReview
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border transition-colors ${engine.activeQuestionState.isMarkedForReview
               ? 'bg-amber-50 border-amber-400 text-amber-700'
               : 'border-gray-300 text-gray-600 hover:bg-zinc-50'
-          }`}
+            }`}
         >
           <Bookmark className="w-4 h-4" />
           Mark for Review & Next
@@ -566,7 +559,7 @@ function ExamFooter({ engine }: { engine: Engine }) {
 function MobileBlockModal() {
   const router = useRouter()
   return (
-    <div className="fixed inset-0 z-[200] bg-white flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-200 bg-white flex items-center justify-center p-6">
       <div className="bg-white rounded-md shadow-lg max-w-sm w-full p-6 text-center">
         <div className="w-12 h-12 bg-amber-50 rounded-md flex items-center justify-center mx-auto mb-4">
           <Monitor className="w-6 h-6 text-amber-600" />
