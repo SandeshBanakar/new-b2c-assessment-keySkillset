@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Clock,
@@ -12,6 +12,7 @@ import {
   Flag,
   Info,
   Monitor,
+  Calculator,
 } from 'lucide-react'
 import { useExamEngine } from '@/hooks/useExamEngine'
 import { useAppContext } from '@/context/AppContext'
@@ -581,6 +582,145 @@ function MobileBlockModal() {
   )
 }
 
+// ─── DraggableCalculator ──────────────────────────────────────────────────────
+
+function DraggableCalculator({ onClose }: { onClose: () => void }) {
+  const [pos, setPos] = useState(() => ({
+    x: typeof window !== 'undefined' ? window.innerWidth - 260 : 0,
+    y: typeof window !== 'undefined' ? window.innerHeight - 340 : 0,
+  }))
+  const [dragging, setDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [display, setDisplay] = useState('0')
+  const [prev, setPrev] = useState('')
+  const [op, setOp] = useState('')
+  const [waitNext, setWaitNext] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!dragging) return
+      setPos({
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y,
+      })
+    }
+    function onUp() { setDragging(false) }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [dragging, dragOffset])
+
+  function handleMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    setDragging(true)
+    setDragOffset({
+      x: e.clientX - pos.x,
+      y: e.clientY - pos.y,
+    })
+  }
+
+  function input(val: string) {
+    if (waitNext) {
+      setDisplay(val)
+      setWaitNext(false)
+      return
+    }
+    setDisplay(display === '0' ? val : display + val)
+  }
+
+  function handleOp(o: string) {
+    setPrev(display)
+    setOp(o)
+    setWaitNext(true)
+  }
+
+  function calculate() {
+    const a = parseFloat(prev)
+    const b = parseFloat(display)
+    let result = 0
+    if (op === '+') result = a + b
+    if (op === '-') result = a - b
+    if (op === '×') result = a * b
+    if (op === '÷') result = b !== 0 ? a / b : 0
+    setDisplay(String(result))
+    setOp('')
+    setPrev('')
+    setWaitNext(true)
+  }
+
+  const rows = [
+    [
+      { label: 'C', action: () => { setDisplay('0'); setPrev(''); setOp('') } },
+      { label: '÷', action: () => handleOp('÷') },
+      { label: '×', action: () => handleOp('×') },
+      { label: '⌫', action: () => setDisplay(display.length > 1 ? display.slice(0, -1) : '0') },
+    ],
+    ['7', '8', '9'].map(n => ({ label: n, action: () => input(n) })).concat([
+      { label: '-', action: () => handleOp('-') },
+    ]),
+    ['4', '5', '6'].map(n => ({ label: n, action: () => input(n) })).concat([
+      { label: '+', action: () => handleOp('+') },
+    ]),
+    ['1', '2', '3'].map(n => ({ label: n, action: () => input(n) })).concat([
+      { label: '=', action: calculate },
+    ]),
+    [
+      { label: '0', action: () => input('0') },
+      { label: '.', action: () => { if (!display.includes('.')) setDisplay(display + '.') } },
+    ],
+  ]
+
+  return (
+    <div
+      ref={ref}
+      style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 150 }}
+      className="w-56 bg-white border border-zinc-200 rounded-md shadow-lg select-none"
+    >
+      {/* Header — drag handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="flex items-center justify-between px-3 py-2 bg-zinc-100 rounded-t-md cursor-move border-b border-zinc-200"
+      >
+        <span className="text-xs font-medium text-zinc-600">Calculator</span>
+        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Display */}
+      <div className="px-3 py-2 text-right text-lg font-mono text-zinc-900 bg-zinc-50 border-b border-zinc-200 min-h-[2.5rem] overflow-hidden">
+        {display}
+      </div>
+
+      {/* Keys */}
+      <div className="p-2 space-y-1">
+        {rows.map((row, ri) => (
+          <div key={ri} className="flex gap-1">
+            {(row as { label: string; action: () => void }[]).map(({ label, action }) => (
+              <button
+                key={label}
+                onClick={action}
+                className={`flex-1 py-2 text-sm font-medium rounded transition-colors ${
+                  label === '='
+                    ? 'bg-blue-700 text-white hover:bg-blue-800'
+                    : label === 'C'
+                    ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200'
+                    : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── ExamPlayer (inner — calls useExamEngine unconditionally) ─────────────────
 
 function ExamPlayer({
@@ -594,6 +734,7 @@ function ExamPlayer({
   const { user } = useAppContext()
   const userId = user?.id ?? 'anonymous'
   const engine = useExamEngine(config, userId)
+  const [showCalc, setShowCalc] = useState(false)
 
   useEffect(() => {
     if (engine.state.isSubmitted) {
@@ -614,6 +755,21 @@ function ExamPlayer({
         <PaletteSidebar engine={engine} config={config} />
       </main>
       <ExamFooter engine={engine} />
+
+      {/* Calculator toggle */}
+      <div className="fixed bottom-16 right-4 z-[140]">
+        <button
+          onClick={() => setShowCalc(v => !v)}
+          className="w-9 h-9 bg-white border border-zinc-200 rounded-md shadow-sm flex items-center justify-center hover:bg-zinc-50 transition-colors"
+          title="Calculator"
+        >
+          <Calculator className="w-4 h-4 text-zinc-600" />
+        </button>
+      </div>
+
+      {showCalc && (
+        <DraggableCalculator onClose={() => setShowCalc(false)} />
+      )}
     </div>
   )
 }
