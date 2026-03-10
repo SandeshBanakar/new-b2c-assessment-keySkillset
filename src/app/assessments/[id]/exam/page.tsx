@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Clock,
@@ -12,6 +12,7 @@ import {
   Flag,
   Info,
   Monitor,
+  Calculator as CalculatorIcon,
 } from 'lucide-react'
 import { useExamEngine } from '@/hooks/useExamEngine'
 import { useAppContext } from '@/context/AppContext'
@@ -327,11 +328,17 @@ function QuestionPanel({ engine }: { engine: Engine }) {
 
 // ─── QuestionArea ─────────────────────────────────────────────────────────────
 
-function QuestionArea({ engine }: { engine: Engine }) {
+function QuestionArea({
+  engine,
+  examContentRef,
+}: {
+  engine: Engine
+  examContentRef: React.RefObject<HTMLDivElement | null>
+}) {
   const qType = engine.activeQuestion.type
 
   return (
-    <div className="flex-1 overflow-y-auto bg-zinc-50 p-4">
+    <div ref={examContentRef} className="flex-1 overflow-y-auto bg-zinc-50 p-4">
       {qType === 'passage_based' ? (
         <div className="h-full flex gap-4">
           <div className="w-1/2 bg-white rounded-md border border-zinc-200 p-4 overflow-y-auto">
@@ -581,6 +588,249 @@ function MobileBlockModal() {
   )
 }
 
+// ─── CalculatorWidget ─────────────────────────────────────────────────────────
+
+function CalculatorWidget({
+  btnPos,
+  setBtnPos,
+  examContentRef,
+  btnPosReady,
+}: {
+  btnPos: { x: number; y: number }
+  setBtnPos: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>
+  examContentRef: React.RefObject<HTMLDivElement | null>
+  btnPosReady: boolean
+}) {
+  const [isCalcOpen, setIsCalcOpen] = useState(false)
+  const [display, setDisplay] = useState('0')
+  const [prevValue, setPrevValue] = useState<string | null>(null)
+  const [operator, setOperator] = useState<string | null>(null)
+  const [waitingForOperand, setWaitingForOperand] = useState(false)
+
+  const dragging = useRef(false)
+  const hasDragged = useRef(false)
+  const dragOffset = useRef({ x: 0, y: 0 })
+
+  function onPointerDown(e: React.PointerEvent) {
+    dragging.current = true
+    hasDragged.current = false
+    dragOffset.current = {
+      x: e.clientX - btnPos.x,
+      y: e.clientY - btnPos.y,
+    }
+    e.currentTarget.setPointerCapture(e.pointerId)
+    e.stopPropagation()
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging.current) return
+    if (!examContentRef.current) return
+    hasDragged.current = true
+
+    const zone = examContentRef.current.getBoundingClientRect()
+    const BUTTON_SIZE = 40
+    const PADDING = 8
+
+    const clamped = {
+      x: Math.max(
+        zone.left + PADDING,
+        Math.min(zone.right - BUTTON_SIZE - PADDING, e.clientX - dragOffset.current.x)
+      ),
+      y: Math.max(
+        zone.top + PADDING,
+        Math.min(zone.bottom - BUTTON_SIZE - PADDING, e.clientY - dragOffset.current.y)
+      ),
+    }
+    setBtnPos(clamped)
+  }
+
+  function onPointerUp() {
+    dragging.current = false
+  }
+
+  // ── Calc logic ──
+
+  function inputDigit(digit: string) {
+    if (waitingForOperand) {
+      setDisplay(digit)
+      setWaitingForOperand(false)
+    } else {
+      setDisplay(display === '0' ? digit : display + digit)
+    }
+  }
+
+  function inputDecimal() {
+    if (waitingForOperand) {
+      setDisplay('0.')
+      setWaitingForOperand(false)
+      return
+    }
+    if (!display.includes('.')) setDisplay(display + '.')
+  }
+
+  function clear() {
+    setDisplay('0')
+    setPrevValue(null)
+    setOperator(null)
+    setWaitingForOperand(false)
+  }
+
+  function toggleSign() {
+    const val = parseFloat(display)
+    setDisplay(String(val * -1))
+  }
+
+  function percentage() {
+    const val = parseFloat(display)
+    setDisplay(String(val / 100))
+  }
+
+  function handleOperator(nextOp: string) {
+    const current = parseFloat(display)
+    if (prevValue !== null && operator && !waitingForOperand) {
+      const result = calculate(parseFloat(prevValue), current, operator)
+      setDisplay(String(result))
+      setPrevValue(String(result))
+    } else {
+      setPrevValue(display)
+    }
+    setOperator(nextOp)
+    setWaitingForOperand(true)
+  }
+
+  function calculate(a: number, b: number, op: string): number {
+    switch (op) {
+      case '+': return a + b
+      case '-': return a - b
+      case '×': return a * b
+      case '÷': return b !== 0 ? a / b : 0
+      default: return b
+    }
+  }
+
+  function handleEquals() {
+    if (prevValue === null || operator === null) return
+    const current = parseFloat(display)
+    const result = calculate(parseFloat(prevValue), current, operator)
+    const resultStr = Number.isFinite(result) ? String(parseFloat(result.toPrecision(10))) : 'Error'
+    setDisplay(resultStr)
+    setPrevValue(null)
+    setOperator(null)
+    setWaitingForOperand(true)
+  }
+
+  const calcRows = [
+    [
+      { label: 'AC', action: clear, cls: 'bg-zinc-400 hover:bg-zinc-300 text-zinc-900' },
+      { label: '+/-', action: toggleSign, cls: 'bg-zinc-400 hover:bg-zinc-300 text-zinc-900' },
+      { label: '%', action: percentage, cls: 'bg-zinc-400 hover:bg-zinc-300 text-zinc-900' },
+      { label: '÷', action: () => handleOperator('÷'), cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
+    ],
+    [
+      { label: '7', action: () => inputDigit('7'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '8', action: () => inputDigit('8'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '9', action: () => inputDigit('9'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '×', action: () => handleOperator('×'), cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
+    ],
+    [
+      { label: '4', action: () => inputDigit('4'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '5', action: () => inputDigit('5'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '6', action: () => inputDigit('6'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '-', action: () => handleOperator('-'), cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
+    ],
+    [
+      { label: '1', action: () => inputDigit('1'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '2', action: () => inputDigit('2'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '3', action: () => inputDigit('3'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '+', action: () => handleOperator('+'), cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
+    ],
+    [
+      { label: '0', action: () => inputDigit('0'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white col-span-2' },
+      { label: '.', action: inputDecimal, cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '=', action: handleEquals, cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
+    ],
+  ]
+
+  return (
+    <>
+      {/* Panel */}
+      {btnPosReady && (
+        <div
+          style={{
+            position: 'fixed',
+            left: btnPos.x - 108,
+            top: btnPos.y - 328,
+            zIndex: 50,
+          }}
+          className={`bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl w-64 overflow-hidden ${isCalcOpen ? 'block' : 'hidden'}`}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-700 bg-zinc-800 select-none">
+            <span className="text-xs font-medium text-zinc-400">Calculator</span>
+            <button
+              onClick={() => setIsCalcOpen(false)}
+              className="text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Display */}
+          <div className="px-4 py-3 text-right">
+            <span className="text-2xl font-light text-white truncate block">
+              {display.length > 9 ? parseFloat(display).toExponential(3) : display}
+            </span>
+          </div>
+
+          {/* Buttons */}
+          <div className="px-2 pb-3 space-y-1.5">
+            {calcRows.map((row, ri) => (
+              <div key={ri} className="grid grid-cols-4 gap-1.5">
+                {row.map(({ label, action, cls }) => (
+                  <button
+                    key={label}
+                    onClick={action}
+                    className={`h-12 rounded-full text-sm font-semibold transition-colors ${cls}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Trigger button */}
+      {btnPosReady && (
+        <div
+          style={{
+            position: 'fixed',
+            left: btnPos.x,
+            top: btnPos.y,
+            zIndex: 40,
+          }}
+        >
+          <button
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onClick={() => {
+              if (!hasDragged.current) {
+                setIsCalcOpen(prev => !prev)
+              }
+              hasDragged.current = false
+            }}
+            className="w-10 h-10 rounded-md bg-blue-700 hover:bg-blue-800 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-md transition-colors select-none"
+          >
+            <CalculatorIcon className="w-5 h-5 text-white" />
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── ExamPlayer (inner — calls useExamEngine unconditionally) ─────────────────
 
 function ExamPlayer({
@@ -594,6 +844,21 @@ function ExamPlayer({
   const { user } = useAppContext()
   const userId = user?.id ?? 'anonymous'
   const engine = useExamEngine(config, userId)
+
+  const examContentRef = useRef<HTMLDivElement>(null)
+  const [btnPos, setBtnPos] = useState({ x: 0, y: 0 })
+  const [btnPosReady, setBtnPosReady] = useState(false)
+
+  useEffect(() => {
+    if (examContentRef.current) {
+      const rect = examContentRef.current.getBoundingClientRect()
+      setBtnPos({
+        x: rect.right - 64,
+        y: rect.bottom - 64,
+      })
+      setBtnPosReady(true)
+    }
+  }, [])
 
   useEffect(() => {
     if (engine.state.isSubmitted) {
@@ -610,10 +875,16 @@ function ExamPlayer({
         router={router}
       />
       <main className="flex flex-1 overflow-hidden">
-        <QuestionArea engine={engine} />
+        <QuestionArea engine={engine} examContentRef={examContentRef} />
         <PaletteSidebar engine={engine} config={config} />
       </main>
       <ExamFooter engine={engine} />
+      <CalculatorWidget
+        btnPos={btnPos}
+        setBtnPos={setBtnPos}
+        examContentRef={examContentRef}
+        btnPosReady={btnPosReady}
+      />
     </div>
   )
 }
