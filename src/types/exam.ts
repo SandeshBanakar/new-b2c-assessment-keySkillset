@@ -16,12 +16,16 @@ export interface Question {
   id: string
   sectionId: string
   index: number              // 0-based within section
-  type: 'single_correct' | 'passage_based'
+  type: 'single_correct' | 'passage_based' | 'mcq_multi' | 'numeric'
   passage?: string           // present if type === 'passage_based'
   text: string
   options: Option[]
-  correctOption: 'A' | 'B' | 'C' | 'D'
-  explanation: string
+  correctOption?: 'A' | 'B' | 'C' | 'D'   // single_correct / passage_based
+  correctAnswers?: string[]                 // mcq_multi
+  correctAnswer?: number                    // numeric
+  explanation?: string
+  marks?: number
+  negativeMarks?: number
 }
 
 export interface Section {

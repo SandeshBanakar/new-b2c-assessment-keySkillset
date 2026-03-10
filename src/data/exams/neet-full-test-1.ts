@@ -36,6 +36,38 @@ function buildSection(
   return { id, label, questionCount, questions }
 }
 
+const physicsSection = buildSection('physics', 'Physics', 45)
+physicsSection.questions.push(
+  {
+    id: 'neet-phy-multi-1',
+    sectionId: 'physics',
+    index: 45,
+    type: 'mcq_multi',
+    text: 'Which of the following are vector quantities? (Select all that apply)',
+    options: [
+      { id: 'A', text: 'Displacement' },
+      { id: 'B', text: 'Speed' },
+      { id: 'C', text: 'Velocity' },
+      { id: 'D', text: 'Distance' },
+    ],
+    correctAnswers: ['A', 'C'],
+    marks: 4,
+    negativeMarks: -2,
+  },
+  {
+    id: 'neet-phy-numeric-1',
+    sectionId: 'physics',
+    index: 46,
+    type: 'numeric',
+    text: 'A body travels 60 metres in the first 10 seconds and 40 metres in the next 5 seconds. What is the average speed (in m/s) for the entire journey?',
+    options: [],
+    correctAnswer: 6.67,
+    marks: 4,
+    negativeMarks: 0,
+  }
+)
+physicsSection.questionCount = 47
+
 const neetFullTest1: ExamConfig = {
   id: 'neet-full-test-1',
   title: 'NEET Full Mock Test 1',
@@ -44,7 +76,7 @@ const neetFullTest1: ExamConfig = {
   navigationPolicy: 'free',
   markingScheme: { correct: 4, incorrect: -1, unanswered: 0 },
   sections: [
-    buildSection('physics', 'Physics', 45),
+    physicsSection,
     buildSection('chemistry', 'Chemistry', 45),
     buildSection('biology', 'Biology', 90),
   ],
