@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   CheckCircle,
@@ -16,9 +16,9 @@ import MCQSingleReview from '@/components/question-review/MCQSingleReview';
 import MCQMultipleReview from '@/components/question-review/MCQMultipleReview';
 import NumericReview from '@/components/question-review/NumericReview';
 import PassageSingleReview from '@/components/question-review/PassageSingleReview';
-import { mockAssessments } from '@/utils/assessmentUtils';
+import { getAssessments } from '@/utils/assessmentUtils';
 import { mockAttempts, mockQuestionResults, mockQuestions } from '@/data/assessments';
-import type { MockQuestion, QuestionAttemptResult } from '@/types';
+import type { Assessment, MockQuestion, QuestionAttemptResult } from '@/types';
 
 // -------------------------------------------------------
 // Question review dispatcher
@@ -65,9 +65,26 @@ export default function AttemptAnalysisPage() {
 
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
   const [activeModule, setActiveModule] = useState<SATModule>('RW-M1');
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [assessmentsLoaded, setAssessmentsLoaded] = useState(false);
 
-  const assessment = mockAssessments.find((a) => a.id === params.id);
+  useEffect(() => {
+    getAssessments().then((data) => {
+      setAssessments(data);
+      setAssessmentsLoaded(true);
+    });
+  }, []);
+
+  const assessment = assessments.find((a) => a.id === params.id);
   const attempt = mockAttempts.find((a) => a.id === params.attemptId);
+
+  if (!assessmentsLoaded) {
+    return (
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!assessment || !attempt) {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Star, Users } from 'lucide-react';
 import PageWrapper from '@/components/layout/PageWrapper';
@@ -9,7 +9,8 @@ import OverviewTab from '@/components/assessment-detail/OverviewTab';
 import AttemptsTab from '@/components/assessment-detail/AttemptsTab';
 import AnalyticsTab from '@/components/assessment-detail/AnalyticsTab';
 import { useAppContext } from '@/context/AppContext';
-import { mockAssessments, isFreeAttemptExhausted } from '@/utils/assessmentUtils';
+import { getAssessments, isFreeAttemptExhausted } from '@/utils/assessmentUtils';
+import type { Assessment } from '@/types';
 import { mockAttempts } from '@/data/assessments';
 
 type Tab = 'overview' | 'attempts' | 'analytics';
@@ -31,13 +32,31 @@ function AssessmentDetailPageInner() {
     tabParam && validTabs.includes(tabParam) ? tabParam : 'overview'
   );
 
-  const assessment = mockAssessments.find((a) => a.id === params.id);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [assessmentsLoaded, setAssessmentsLoaded] = useState(false);
+
+  useEffect(() => {
+    getAssessments().then((data) => {
+      setAssessments(data);
+      setAssessmentsLoaded(true);
+    });
+  }, []);
+
+  const assessment = assessments.find((a) => a.id === params.id);
   const attempts = mockAttempts.filter((a) => a.assessmentId === params.id);
   const userTier = user?.subscriptionTier ?? 'free';
   const router = useRouter()
   const showUpgradeBanner =
     userTier === 'free' &&
     isFreeAttemptExhausted(params.id, attempts)
+
+  if (!assessmentsLoaded) {
+    return (
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!assessment) {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock, FileText, Lock, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
-import { mockAssessments } from '@/utils/assessmentUtils';
-import type { MockAttempt } from '@/types';
+import { getAssessments } from '@/utils/assessmentUtils';
+import type { Assessment, MockAttempt } from '@/types';
 
 interface AttemptsTabProps {
   attempts: MockAttempt[];
@@ -58,7 +58,10 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
   const subscribed = isSubscribed(assessmentId);
 
   // Find assessment info for tier/access checks
-  const assessmentMeta = mockAssessments.find((a) => a.id === assessmentId);
+  const [assessmentMeta, setAssessmentMeta] = useState<Assessment | undefined>(undefined);
+  useEffect(() => {
+    getAssessments().then((all) => setAssessmentMeta(all.find((a) => a.id === assessmentId)));
+  }, [assessmentId]);
 
   // Free attempt: find in data or synthesize
   const freeAttempt: MockAttempt =
@@ -91,7 +94,6 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
     setAbandoning(true);
 
     try {
-      const supabase = createClient();
       await supabase
         .from('attempts')
         .update({ status: 'abandoned', score: 0 })

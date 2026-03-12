@@ -1,7 +1,7 @@
 'use client'
 
 import { useReducer, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 import type {
   ExamConfig,
   ExamAttemptState,
@@ -377,8 +377,6 @@ async function writeAttemptToSupabase(
   isFreeAttempt: boolean
 ) {
   try {
-    const supabase = createClient()
-
     const { data: assessmentData } = await supabase
       .from('assessments')
       .select('id')

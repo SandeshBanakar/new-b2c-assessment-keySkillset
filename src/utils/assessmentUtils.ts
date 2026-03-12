@@ -2,11 +2,14 @@ import type {
   Assessment,
   AssessmentType,
   CardStatus,
+  Difficulty,
+  Exam,
   MockAttempt,
   Tier,
   User,
   UserAssessmentProgress,
 } from '@/types';
+import { supabase } from '@/lib/supabase/client';
 
 // -------------------------------------------------------
 // Tier access check
@@ -47,6 +50,40 @@ export function getCardStatus(
   if (attemptsUsed === 0) return 'start';
   if (attemptsUsed < 5) return 'continue';
   return 'upgrade';
+}
+
+// -------------------------------------------------------
+// Live Supabase query — returns all assessments ordered by created_at
+// -------------------------------------------------------
+
+export async function getAssessments(): Promise<Assessment[]> {
+  const { data, error } = await supabase
+    .from('assessments')
+    .select(
+      'id, title, description, duration_minutes, total_questions, exam, type, subject, difficulty, tier, is_puzzle_mode, rating, total_users',
+    )
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('getAssessments error:', error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    title: row.title as string,
+    exam: row.exam as Exam,
+    type: row.type as AssessmentType,
+    subject: (row.subject as string | null) ?? null,
+    difficulty: row.difficulty as Difficulty,
+    questionCount: row.total_questions as number,
+    duration: row.duration_minutes as number,
+    tier: row.tier as Tier,
+    isPuzzleMode: (row.is_puzzle_mode as boolean) ?? false,
+    description: (row.description as string | undefined) ?? undefined,
+    rating: (row.rating as number | undefined) ?? undefined,
+    totalUsers: (row.total_users as number | undefined) ?? undefined,
+  }));
 }
 
 // -------------------------------------------------------
