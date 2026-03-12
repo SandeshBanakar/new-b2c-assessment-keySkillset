@@ -12,7 +12,7 @@ import {
   Flag,
   Info,
   Monitor,
-  Calculator,
+  Calculator as CalculatorIcon,
 } from 'lucide-react'
 import { useExamEngine } from '@/hooks/useExamEngine'
 import { useAppContext } from '@/context/AppContext'
@@ -138,11 +138,10 @@ function ExamHeader({
               <button
                 key={section.id}
                 onClick={() => engine.switchSection(section.id)}
-                className={`shrink-0 text-xs font-medium pb-1 border-b-2 transition-colors whitespace-nowrap ${
-                  engine.state.activeSectionId === section.id
+                className={`shrink-0 text-xs font-medium pb-1 border-b-2 transition-colors whitespace-nowrap ${engine.state.activeSectionId === section.id
                     ? 'border-white text-white'
                     : 'border-transparent text-white/60 hover:text-white/80'
-                }`}
+                  }`}
               >
                 {section.label.toUpperCase()} ({answered}/{section.questionCount})
               </button>
@@ -245,8 +244,8 @@ function QuestionPanel({ engine }: { engine: Engine }) {
 
   const badgeLabel =
     qType === 'passage_based' ? 'Passage Based'
-    : qType === 'mcq_multi' ? 'Multiple Correct'
-    : 'Single Correct'
+      : qType === 'mcq_multi' ? 'Multiple Correct'
+        : 'Single Correct'
 
   // MCQ_MULTI: partial marking rules are content-creator
   // defined and evaluated server-side.
@@ -275,18 +274,16 @@ function QuestionPanel({ engine }: { engine: Engine }) {
             <button
               key={option.id}
               onClick={() => engine.selectOption(option.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${
-                isSelected
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${isSelected
                   ? 'border-2 border-blue-700 bg-blue-50 text-blue-700 font-medium'
                   : 'border-zinc-200 hover:bg-blue-50 hover:border-blue-200 text-zinc-700'
-              }`}
+                }`}
             >
               <span
-                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${
-                  isSelected
+                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${isSelected
                     ? 'bg-blue-700 text-white'
                     : 'bg-zinc-100 text-gray-600'
-                }`}
+                  }`}
               >
                 {isSelected ? '✓' : option.id}
               </span>
@@ -302,18 +299,16 @@ function QuestionPanel({ engine }: { engine: Engine }) {
             <button
               key={option.id}
               onClick={() => engine.selectOption(option.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${
-                isSelected
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left mb-2 transition-all cursor-pointer ${isSelected
                   ? 'border-2 border-blue-700 bg-blue-50 text-blue-700 font-medium'
                   : 'border-zinc-200 hover:bg-blue-50 hover:border-blue-200 text-zinc-700'
-              }`}
+                }`}
             >
               <span
-                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${
-                  isSelected
+                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${isSelected
                     ? 'bg-blue-700 text-white'
                     : 'bg-zinc-100 text-gray-600'
-                }`}
+                  }`}
               >
                 {option.id}
               </span>
@@ -328,11 +323,17 @@ function QuestionPanel({ engine }: { engine: Engine }) {
 
 // ─── QuestionArea ─────────────────────────────────────────────────────────────
 
-function QuestionArea({ engine }: { engine: Engine }) {
+function QuestionArea({
+  engine,
+  examContentRef,
+}: {
+  engine: Engine
+  examContentRef: React.RefObject<HTMLDivElement | null>
+}) {
   const qType = engine.activeQuestion.type
 
   return (
-    <div className="flex-1 overflow-y-auto bg-zinc-50 p-4">
+    <div ref={examContentRef} className="flex-1 overflow-y-auto bg-zinc-50 p-4">
       {qType === 'passage_based' ? (
         <div className="h-full flex gap-4">
           <div className="w-1/2 bg-white rounded-md border border-zinc-200 p-4 overflow-y-auto">
@@ -446,9 +447,8 @@ function PaletteSidebar({
                 <button
                   key={q.id}
                   onClick={() => engine.jumpToQuestion(activeSection.id, idx)}
-                  className={`w-9 h-9 rounded flex items-center justify-center text-xs font-medium relative cursor-pointer select-none transition-all hover:opacity-80 ${colorClass} ${
-                    isActive ? 'ring-2 ring-blue-700 ring-offset-1' : ''
-                  }`}
+                  className={`w-9 h-9 rounded flex items-center justify-center text-xs font-medium relative cursor-pointer select-none transition-all hover:opacity-80 ${colorClass} ${isActive ? 'ring-2 ring-blue-700 ring-offset-1' : ''
+                    }`}
                 >
                   {idx + 1}
                   {showFlag && (
@@ -506,11 +506,10 @@ function ExamFooter({ engine }: { engine: Engine }) {
       <div className="flex items-center gap-2">
         <button
           onClick={engine.markAndNext}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border transition-colors ${
-            engine.activeQuestionState.isMarkedForReview
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border transition-colors ${engine.activeQuestionState.isMarkedForReview
               ? 'bg-amber-50 border-amber-400 text-amber-700'
               : 'border-gray-300 text-gray-600 hover:bg-zinc-50'
-          }`}
+            }`}
         >
           <Bookmark className="w-4 h-4" />
           Mark for Review & Next
@@ -560,7 +559,7 @@ function ExamFooter({ engine }: { engine: Engine }) {
 function MobileBlockModal() {
   const router = useRouter()
   return (
-    <div className="fixed inset-0 z-[200] bg-white flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-200 bg-white flex items-center justify-center p-6">
       <div className="bg-white rounded-md shadow-lg max-w-sm w-full p-6 text-center">
         <div className="w-12 h-12 bg-amber-50 rounded-md flex items-center justify-center mx-auto mb-4">
           <Monitor className="w-6 h-6 text-amber-600" />
@@ -582,142 +581,276 @@ function MobileBlockModal() {
   )
 }
 
-// ─── DraggableCalculator ──────────────────────────────────────────────────────
+// ─── CalculatorWidget ─────────────────────────────────────────────────────────
 
-function DraggableCalculator({ onClose }: { onClose: () => void }) {
-  const [pos, setPos] = useState(() => ({
-    x: typeof window !== 'undefined' ? window.innerWidth - 260 : 0,
-    y: typeof window !== 'undefined' ? window.innerHeight - 340 : 0,
-  }))
-  const [dragging, setDragging] = useState(false)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+function CalculatorWidget({
+  btnPos,
+  setBtnPos,
+  examContentRef,
+  btnPosReady,
+}: {
+  btnPos: { x: number; y: number }
+  setBtnPos: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>
+  examContentRef: React.RefObject<HTMLDivElement | null>
+  btnPosReady: boolean
+}) {
+  const [isCalcOpen, setIsCalcOpen] = useState(false)
   const [display, setDisplay] = useState('0')
-  const [prev, setPrev] = useState('')
-  const [op, setOp] = useState('')
-  const [waitNext, setWaitNext] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [prevValue, setPrevValue] = useState<string | null>(null)
+  const [operator, setOperator] = useState<string | null>(null)
+  const [waitingForOperand, setWaitingForOperand] = useState(false)
 
-  useEffect(() => {
-    function onMove(e: MouseEvent) {
-      if (!dragging) return
-      setPos({
-        x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y,
-      })
-    }
-    function onUp() { setDragging(false) }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [dragging, dragOffset])
+  const PANEL_WIDTH = 256
+  const PANEL_HEIGHT = 320
+  const PANEL_GAP = 8
+  const BUTTON_SIZE = 40
+  const VIEWPORT_PADDING = 8
 
-  function handleMouseDown(e: React.MouseEvent<HTMLDivElement>) {
-    setDragging(true)
-    setDragOffset({
-      x: e.clientX - pos.x,
-      y: e.clientY - pos.y,
-    })
+  function getPanelPosition() {
+    const viewportW = window.innerWidth
+
+    const spaceAbove = btnPos.y
+    let top: number
+    if (spaceAbove >= PANEL_HEIGHT + PANEL_GAP) {
+      top = btnPos.y - PANEL_HEIGHT - PANEL_GAP
+    } else {
+      top = btnPos.y + BUTTON_SIZE + PANEL_GAP
+    }
+
+    let left = btnPos.x + BUTTON_SIZE / 2 - PANEL_WIDTH / 2
+    if (left < VIEWPORT_PADDING) {
+      left = VIEWPORT_PADDING
+    }
+    if (left + PANEL_WIDTH > viewportW - VIEWPORT_PADDING) {
+      left = viewportW - PANEL_WIDTH - VIEWPORT_PADDING
+    }
+
+    return { top, left }
   }
 
-  function input(val: string) {
-    if (waitNext) {
-      setDisplay(val)
-      setWaitNext(false)
+  const dragging = useRef(false)
+  const hasDragged = useRef(false)
+  const dragOffset = useRef({ x: 0, y: 0 })
+
+  function onPointerDown(e: React.PointerEvent) {
+    dragging.current = true
+    hasDragged.current = false
+    dragOffset.current = {
+      x: e.clientX - btnPos.x,
+      y: e.clientY - btnPos.y,
+    }
+    e.currentTarget.setPointerCapture(e.pointerId)
+    e.stopPropagation()
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging.current) return
+    if (!examContentRef.current) return
+    hasDragged.current = true
+
+    const zone = examContentRef.current.getBoundingClientRect()
+    const BUTTON_SIZE = 40
+    const PADDING = 8
+
+    const clamped = {
+      x: Math.max(
+        zone.left + PADDING,
+        Math.min(zone.right - BUTTON_SIZE - PADDING, e.clientX - dragOffset.current.x)
+      ),
+      y: Math.max(
+        zone.top + PADDING,
+        Math.min(zone.bottom - BUTTON_SIZE - PADDING, e.clientY - dragOffset.current.y)
+      ),
+    }
+    setBtnPos(clamped)
+  }
+
+  function onPointerUp() {
+    dragging.current = false
+  }
+
+  // ── Calc logic ──
+
+  function inputDigit(digit: string) {
+    if (waitingForOperand) {
+      setDisplay(digit)
+      setWaitingForOperand(false)
+    } else {
+      setDisplay(display === '0' ? digit : display + digit)
+    }
+  }
+
+  function inputDecimal() {
+    if (waitingForOperand) {
+      setDisplay('0.')
+      setWaitingForOperand(false)
       return
     }
-    setDisplay(display === '0' ? val : display + val)
+    if (!display.includes('.')) setDisplay(display + '.')
   }
 
-  function handleOp(o: string) {
-    setPrev(display)
-    setOp(o)
-    setWaitNext(true)
+  function clear() {
+    setDisplay('0')
+    setPrevValue(null)
+    setOperator(null)
+    setWaitingForOperand(false)
   }
 
-  function calculate() {
-    const a = parseFloat(prev)
-    const b = parseFloat(display)
-    let result = 0
-    if (op === '+') result = a + b
-    if (op === '-') result = a - b
-    if (op === '×') result = a * b
-    if (op === '÷') result = b !== 0 ? a / b : 0
-    setDisplay(String(result))
-    setOp('')
-    setPrev('')
-    setWaitNext(true)
+  function toggleSign() {
+    const val = parseFloat(display)
+    setDisplay(String(val * -1))
   }
 
-  const rows = [
+  function percentage() {
+    const val = parseFloat(display)
+    setDisplay(String(val / 100))
+  }
+
+  function handleOperator(nextOp: string) {
+    const current = parseFloat(display)
+    if (prevValue !== null && operator && !waitingForOperand) {
+      const result = calculate(parseFloat(prevValue), current, operator)
+      setDisplay(String(result))
+      setPrevValue(String(result))
+    } else {
+      setPrevValue(display)
+    }
+    setOperator(nextOp)
+    setWaitingForOperand(true)
+  }
+
+  function calculate(a: number, b: number, op: string): number {
+    switch (op) {
+      case '+': return a + b
+      case '-': return a - b
+      case '×': return a * b
+      case '÷': return b !== 0 ? a / b : 0
+      default: return b
+    }
+  }
+
+  function handleEquals() {
+    if (prevValue === null || operator === null) return
+    const current = parseFloat(display)
+    const result = calculate(parseFloat(prevValue), current, operator)
+    const resultStr = Number.isFinite(result) ? String(parseFloat(result.toPrecision(10))) : 'Error'
+    setDisplay(resultStr)
+    setPrevValue(null)
+    setOperator(null)
+    setWaitingForOperand(true)
+  }
+
+  const calcRows = [
     [
-      { label: 'C', action: () => { setDisplay('0'); setPrev(''); setOp('') } },
-      { label: '÷', action: () => handleOp('÷') },
-      { label: '×', action: () => handleOp('×') },
-      { label: '⌫', action: () => setDisplay(display.length > 1 ? display.slice(0, -1) : '0') },
+      { label: 'AC', action: clear, cls: 'bg-zinc-400 hover:bg-zinc-300 text-zinc-900' },
+      { label: '+/-', action: toggleSign, cls: 'bg-zinc-400 hover:bg-zinc-300 text-zinc-900' },
+      { label: '%', action: percentage, cls: 'bg-zinc-400 hover:bg-zinc-300 text-zinc-900' },
+      { label: '÷', action: () => handleOperator('÷'), cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
     ],
-    ['7', '8', '9'].map(n => ({ label: n, action: () => input(n) })).concat([
-      { label: '-', action: () => handleOp('-') },
-    ]),
-    ['4', '5', '6'].map(n => ({ label: n, action: () => input(n) })).concat([
-      { label: '+', action: () => handleOp('+') },
-    ]),
-    ['1', '2', '3'].map(n => ({ label: n, action: () => input(n) })).concat([
-      { label: '=', action: calculate },
-    ]),
     [
-      { label: '0', action: () => input('0') },
-      { label: '.', action: () => { if (!display.includes('.')) setDisplay(display + '.') } },
+      { label: '7', action: () => inputDigit('7'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '8', action: () => inputDigit('8'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '9', action: () => inputDigit('9'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '×', action: () => handleOperator('×'), cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
+    ],
+    [
+      { label: '4', action: () => inputDigit('4'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '5', action: () => inputDigit('5'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '6', action: () => inputDigit('6'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '-', action: () => handleOperator('-'), cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
+    ],
+    [
+      { label: '1', action: () => inputDigit('1'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '2', action: () => inputDigit('2'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '3', action: () => inputDigit('3'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '+', action: () => handleOperator('+'), cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
+    ],
+    [
+      { label: '0', action: () => inputDigit('0'), cls: 'bg-zinc-700 hover:bg-zinc-600 text-white col-span-2' },
+      { label: '.', action: inputDecimal, cls: 'bg-zinc-700 hover:bg-zinc-600 text-white' },
+      { label: '=', action: handleEquals, cls: 'bg-amber-400 hover:bg-amber-300 text-white' },
     ],
   ]
 
+  const panelPos = getPanelPosition()
+
   return (
-    <div
-      ref={ref}
-      style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 150 }}
-      className="w-56 bg-white border border-zinc-200 rounded-md shadow-lg select-none"
-    >
-      {/* Header — drag handle */}
-      <div
-        onMouseDown={handleMouseDown}
-        className="flex items-center justify-between px-3 py-2 bg-zinc-100 rounded-t-md cursor-move border-b border-zinc-200"
-      >
-        <span className="text-xs font-medium text-zinc-600">Calculator</span>
-        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700">
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
+    <>
+      {/* Panel */}
+      {btnPosReady && (
+        <div
+          style={{
+            position: 'fixed',
+            left: panelPos.left,
+            top: panelPos.top,
+            zIndex: 50,
+          }}
+          className={`bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl w-64 overflow-hidden ${isCalcOpen ? 'block' : 'hidden'}`}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-700 bg-zinc-800 select-none">
+            <span className="text-xs font-medium text-zinc-400">Calculator</span>
+            <button
+              onClick={() => setIsCalcOpen(false)}
+              className="text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-      {/* Display */}
-      <div className="px-3 py-2 text-right text-lg font-mono text-zinc-900 bg-zinc-50 border-b border-zinc-200 min-h-[2.5rem] overflow-hidden">
-        {display}
-      </div>
+          {/* Display */}
+          <div className="px-4 py-3 text-right">
+            <span className="text-2xl font-light text-white truncate block">
+              {display.length > 9 ? parseFloat(display).toExponential(3) : display}
+            </span>
+          </div>
 
-      {/* Keys */}
-      <div className="p-2 space-y-1">
-        {rows.map((row, ri) => (
-          <div key={ri} className="flex gap-1">
-            {(row as { label: string; action: () => void }[]).map(({ label, action }) => (
-              <button
-                key={label}
-                onClick={action}
-                className={`flex-1 py-2 text-sm font-medium rounded transition-colors ${
-                  label === '='
-                    ? 'bg-blue-700 text-white hover:bg-blue-800'
-                    : label === 'C'
-                    ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200'
-                    : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
-                }`}
-              >
-                {label}
-              </button>
+          {/* Buttons */}
+          <div className="px-2 pb-3 space-y-1.5">
+            {calcRows.map((row, ri) => (
+              <div key={ri} className="grid grid-cols-4 gap-1.5">
+                {row.map(({ label, action, cls }) => (
+                  <button
+                    key={label}
+                    onClick={action}
+                    className={`h-12 rounded-full text-sm font-semibold transition-colors ${cls}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      )}
+
+      {/* Trigger button */}
+      {btnPosReady && (
+        <div
+          style={{
+            position: 'fixed',
+            left: btnPos.x,
+            top: btnPos.y,
+            zIndex: 40,
+          }}
+        >
+          <button
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onClick={() => {
+              if (!hasDragged.current) {
+                setIsCalcOpen(prev => !prev)
+              }
+              hasDragged.current = false
+            }}
+            className="w-10 h-10 rounded-md bg-blue-700 hover:bg-blue-800 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-md transition-colors select-none"
+          >
+            <CalculatorIcon className="w-5 h-5 text-white" />
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -734,7 +867,21 @@ function ExamPlayer({
   const { user } = useAppContext()
   const userId = user?.id ?? 'anonymous'
   const engine = useExamEngine(config, userId)
-  const [showCalc, setShowCalc] = useState(false)
+
+  const examContentRef = useRef<HTMLDivElement>(null)
+  const [btnPos, setBtnPos] = useState({ x: 0, y: 0 })
+  const [btnPosReady, setBtnPosReady] = useState(false)
+
+  useEffect(() => {
+    if (examContentRef.current) {
+      const rect = examContentRef.current.getBoundingClientRect()
+      setBtnPos({
+        x: rect.right - 64,
+        y: rect.bottom - 64,
+      })
+      setBtnPosReady(true)
+    }
+  }, [])
 
   useEffect(() => {
     if (engine.state.isSubmitted) {
@@ -751,25 +898,16 @@ function ExamPlayer({
         router={router}
       />
       <main className="flex flex-1 overflow-hidden">
-        <QuestionArea engine={engine} />
+        <QuestionArea engine={engine} examContentRef={examContentRef} />
         <PaletteSidebar engine={engine} config={config} />
       </main>
       <ExamFooter engine={engine} />
-
-      {/* Calculator toggle */}
-      <div className="fixed bottom-16 right-4 z-[140]">
-        <button
-          onClick={() => setShowCalc(v => !v)}
-          className="w-9 h-9 bg-white border border-zinc-200 rounded-md shadow-sm flex items-center justify-center hover:bg-zinc-50 transition-colors"
-          title="Calculator"
-        >
-          <Calculator className="w-4 h-4 text-zinc-600" />
-        </button>
-      </div>
-
-      {showCalc && (
-        <DraggableCalculator onClose={() => setShowCalc(false)} />
-      )}
+      <CalculatorWidget
+        btnPos={btnPos}
+        setBtnPos={setBtnPos}
+        examContentRef={examContentRef}
+        btnPosReady={btnPosReady}
+      />
     </div>
   )
 }
