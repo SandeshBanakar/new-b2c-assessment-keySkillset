@@ -1,34 +1,30 @@
 'use client'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
 import type { SupabaseAssessment } from '@/types/assessment'
-import ASSESSMENTS from '@/data/assessments'
 
 export function useAssessments() {
-  // Local data — no network call needed
-  // Initialize with filtered active assessments
-  const assessments: SupabaseAssessment[] = ASSESSMENTS.filter(a => a.is_active)
+  const [assessments, setAssessments] = useState<SupabaseAssessment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // No loading needed for sync local data
-  const loading = false
-  const error = null
+  useEffect(() => {
+    supabase
+      .from('assessments')
+      .select(
+        'id, title, description, exam_type, assessment_type, subject, difficulty, duration_minutes, total_questions, min_tier, is_active, thumbnail_url, created_at, slug',
+      )
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .then(({ data, error: err }) => {
+        if (err) {
+          setError(err.message)
+        } else {
+          setAssessments((data ?? []) as unknown as SupabaseAssessment[])
+        }
+        setLoading(false)
+      })
+  }, [])
 
   return { assessments, loading, error }
 }
-
-// PRODUCTION NOTE:
-// When ready for production, swap this hook body with:
-// import { useState, useEffect } from 'react'
-// const [assessments, setAssessments] = useState<SupabaseAssessment[]>(() => [])
-// const [loading, setLoading] = useState(true)
-// const [error, setError] = useState<string | null>(null)
-// useEffect(() => {
-//   const supabase = createClient()
-//   const { data, error } = await supabase
-//     .from('assessments').select('*').eq('is_active', true)
-//   if (error) {
-//     setError(error.message)
-//   } else {
-//     setAssessments(data ?? [])
-//   }
-//   setLoading(false)
-// }, [])
-// The rest of the codebase stays identical.

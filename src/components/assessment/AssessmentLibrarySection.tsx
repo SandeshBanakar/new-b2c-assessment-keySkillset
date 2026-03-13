@@ -13,12 +13,12 @@ import type { Tier } from '@/types';
 // Constants
 // -------------------------------------------------------
 
-type ActiveType = 'full_test' | 'subject_test' | 'chapter_test';
+type ActiveType = 'full-test' | 'subject-test' | 'chapter-test';
 
 const TYPE_LABELS: Record<ActiveType, string> = {
-  full_test:    'Full Tests',
-  subject_test: 'Subject Tests',
-  chapter_test: 'Chapter Tests',
+  'full-test':    'Full Tests',
+  'subject-test': 'Subject Tests',
+  'chapter-test': 'Chapter Tests',
 };
 
 // Sort order for exam sections (alphabetical by display name)
@@ -102,7 +102,7 @@ export default function AssessmentLibrarySection() {
   const { user } = useAppContext();
   const { assessments, loading, error } = useAssessments();
 
-  const [activeType,       setActiveType]       = useState<ActiveType>('full_test');
+  const [activeType,       setActiveType]       = useState<ActiveType>('full-test');
   const [selectedExam,     setSelectedExam]     = useState<string>('all');
   const [selectedProgress, setSelectedProgress] = useState<string>('all');
 
@@ -199,7 +199,7 @@ export default function AssessmentLibrarySection() {
             <button
               key={type}
               onClick={() => {
-                setActiveType(type);
+                setActiveType(type as ActiveType);
                 setSelectedExam('all');
                 setSelectedProgress('all');
               }}

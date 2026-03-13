@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { DEMO_USERS, STORAGE_KEY } from '@/data/demoUsers';
 import { SUBSCRIBED_ASSESSMENTS } from '@/data/assessments';
 import type { User, Exam, Tier } from '@/types';
@@ -39,15 +39,18 @@ function demoUserToUser(demo: (typeof DEMO_USERS)[number]): User {
   };
 }
 
-const getActiveUser = (): User | null => {
-  if (typeof window === 'undefined') return demoUserToUser(DEMO_USERS[2]); // SSR fallback = Priya
-  const stored = localStorage.getItem(STORAGE_KEY);
-  const demo = DEMO_USERS.find((u) => u.id === stored);
-  return demo ? demoUserToUser(demo) : null;
-};
-
 export function AppContextProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(getActiveUser);
+  const [user, setUser] = useState<User | null>(null);
+
+  // Load persisted persona after hydration — null on SSR keeps server/client HTML in sync
+  useEffect(() => {
+    const loadStoredPersona = async () => {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const demo = DEMO_USERS.find((u) => u.id === stored);
+      if (demo) setUser(demoUserToUser(demo));
+    };
+    void loadStoredPersona();
+  }, []);
   const [subscribeVersion, setSubscribeVersion] = useState(0);
 
   const switchPersona = (userId: string) => {

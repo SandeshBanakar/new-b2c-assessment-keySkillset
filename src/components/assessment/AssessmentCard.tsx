@@ -20,9 +20,9 @@ const EXAM_BADGE: Record<string, string> = {
 };
 
 const DIFF_BADGE: Record<string, string> = {
-  Easy:   'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  Medium: 'bg-amber-50 text-amber-700 border border-amber-200',
-  Hard:   'bg-red-50 text-red-700 border border-red-200',
+  easy:   'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  medium: 'bg-amber-50 text-amber-700 border border-amber-200',
+  hard:   'bg-red-50 text-red-700 border border-red-200',
 };
 
 // -------------------------------------------------------
@@ -95,7 +95,7 @@ export default function AssessmentCard({
   const [imgError, setImgError] = useState(false);
 
   const cardState = deriveCardState({ userTier, assessment, attemptData });
-  const detailHref = `/assessments/${assessment.id}?from=assessments`;
+  const detailHref = `/assessments/${assessment.slug ?? assessment.id}?from=assessments`;
 
   const showFreeAttemptChip = cardState === 1;
   const showExhaustedChip   = cardState === 2;

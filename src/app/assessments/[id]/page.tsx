@@ -9,7 +9,7 @@ import OverviewTab from '@/components/assessment-detail/OverviewTab';
 import AttemptsTab from '@/components/assessment-detail/AttemptsTab';
 import AnalyticsTab from '@/components/assessment-detail/AnalyticsTab';
 import { useAppContext } from '@/context/AppContext';
-import { getAssessments, isFreeAttemptExhausted } from '@/utils/assessmentUtils';
+import { getAssessmentBySlug, isFreeAttemptExhausted } from '@/utils/assessmentUtils';
 import type { Assessment } from '@/types';
 import { mockAttempts } from '@/data/assessments';
 
@@ -32,17 +32,15 @@ function AssessmentDetailPageInner() {
     tabParam && validTabs.includes(tabParam) ? tabParam : 'overview'
   );
 
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [assessmentsLoaded, setAssessmentsLoaded] = useState(false);
 
   useEffect(() => {
-    getAssessments().then((data) => {
-      setAssessments(data);
+    getAssessmentBySlug(params.id).then((data) => {
+      setAssessment(data);
       setAssessmentsLoaded(true);
     });
-  }, []);
-
-  const assessment = assessments.find((a) => a.slug === params.id || a.id === params.id);
+  }, [params.id]);
   const attempts = mockAttempts.filter((a) => a.assessmentId === params.id);
   const userTier = user?.subscriptionTier ?? 'free';
   const router = useRouter()

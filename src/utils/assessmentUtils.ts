@@ -81,10 +81,46 @@ export async function getAssessments(): Promise<Assessment[]> {
     tier: row.min_tier as Tier,
     isPuzzleMode: (row.is_puzzle_mode as boolean) ?? false,
     description: (row.description as string | undefined) ?? undefined,
-    rating: (row.rating as number | undefined) ?? undefined,
+    rating: row.rating != null ? Number(row.rating) : undefined,
     totalUsers: (row.total_users as number | undefined) ?? undefined,
     slug: (row.slug as string | undefined) ?? undefined,
   }));
+}
+
+// -------------------------------------------------------
+// Single-assessment Supabase query — fetch by slug
+// -------------------------------------------------------
+
+export async function getAssessmentBySlug(slug: string): Promise<Assessment | null> {
+  const { data, error } = await supabase
+    .from('assessments')
+    .select(
+      'id, title, description, duration_minutes, total_questions, exam_type, assessment_type, subject, difficulty, min_tier, is_puzzle_mode, rating, total_users, slug',
+    )
+    .eq('slug', slug)
+    .single();
+
+  if (error) {
+    console.error('getAssessmentBySlug error:', error);
+    return null;
+  }
+
+  return {
+    id: data.id as string,
+    title: data.title as string,
+    slug: (data.slug as string | undefined) ?? undefined,
+    exam: data.exam_type as Exam,
+    type: data.assessment_type as AssessmentType,
+    subject: (data.subject as string | null) ?? null,
+    difficulty: data.difficulty as Difficulty,
+    questionCount: data.total_questions as number,
+    duration: data.duration_minutes as number,
+    tier: data.min_tier as Tier,
+    isPuzzleMode: (data.is_puzzle_mode as boolean) ?? false,
+    description: (data.description as string | undefined) ?? undefined,
+    rating: data.rating != null ? Number(data.rating) : undefined,
+    totalUsers: (data.total_users as number | undefined) ?? undefined,
+  };
 }
 
 // -------------------------------------------------------

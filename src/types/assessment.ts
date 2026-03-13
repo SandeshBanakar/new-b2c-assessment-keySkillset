@@ -10,17 +10,18 @@ export interface SupabaseAssessment {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   duration_minutes: number;
   total_questions: number;
-  score_min: number;
-  score_max: number;
+  score_min?: number;
+  score_max?: number;
   min_tier: 'basic' | 'professional' | 'premium';
   is_active: boolean;
   thumbnail_url: string | null;
-  tags: string[];
+  tags?: string[];
   created_at: string;
+  slug?: string;
 }
 
 export type ExamType = 'SAT' | 'IIT-JEE' | 'NEET' | 'CLAT' | 'PMP';
-export type SupabaseAssessmentType = 'full_test' | 'subject_test' | 'chapter_test';
+export type SupabaseAssessmentType = 'full-test' | 'subject-test' | 'chapter-test';
 export type SupabaseDifficulty = 'Easy' | 'Medium' | 'Hard';
 
 export const TIER_ORDER: Record<Tier, number> = {
