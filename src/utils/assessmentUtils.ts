@@ -60,7 +60,7 @@ export async function getAssessments(): Promise<Assessment[]> {
   const { data, error } = await supabase
     .from('assessments')
     .select(
-      'id, title, description, duration_minutes, total_questions, exam, type, subject, difficulty, tier, is_puzzle_mode, rating, total_users',
+      'id, title, description, duration_minutes, total_questions, exam_type, assessment_type, subject, difficulty, min_tier, is_puzzle_mode, rating, total_users, slug',
     )
     .order('created_at', { ascending: true });
 
@@ -72,13 +72,13 @@ export async function getAssessments(): Promise<Assessment[]> {
   return (data ?? []).map((row) => ({
     id: row.id as string,
     title: row.title as string,
-    exam: row.exam as Exam,
-    type: row.type as AssessmentType,
+    exam: row.exam_type as Exam,
+    type: row.assessment_type as AssessmentType,
     subject: (row.subject as string | null) ?? null,
     difficulty: row.difficulty as Difficulty,
     questionCount: row.total_questions as number,
     duration: row.duration_minutes as number,
-    tier: row.tier as Tier,
+    tier: row.min_tier as Tier,
     isPuzzleMode: (row.is_puzzle_mode as boolean) ?? false,
     description: (row.description as string | undefined) ?? undefined,
     rating: (row.rating as number | undefined) ?? undefined,
