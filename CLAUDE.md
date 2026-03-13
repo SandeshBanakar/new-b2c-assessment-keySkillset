@@ -77,7 +77,7 @@ Puzzle Mode → A question FORMAT variant, NOT a separate assessment type. Avail
 
 ## Design tokens
 
-Primary:        violet-600  (#7C3AED)
+Primary:        blue-700    (#1D4ED8)
 Gamification:   amber-500   (#F59E0B)
 Success:        emerald-500 (#10B981)
 Danger:         rose-500    (#F43F5E)
