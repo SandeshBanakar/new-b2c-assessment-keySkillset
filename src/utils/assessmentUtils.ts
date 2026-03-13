@@ -83,6 +83,7 @@ export async function getAssessments(): Promise<Assessment[]> {
     description: (row.description as string | undefined) ?? undefined,
     rating: (row.rating as number | undefined) ?? undefined,
     totalUsers: (row.total_users as number | undefined) ?? undefined,
+    slug: (row.slug as string | undefined) ?? undefined,
   }));
 }
 

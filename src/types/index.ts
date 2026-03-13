@@ -29,6 +29,7 @@ export interface Assessment {
   description?: string;
   rating?: number;
   totalUsers?: number;
+  slug?: string;
 }
 
 // -------------------------------------------------------

@@ -42,7 +42,7 @@ function AssessmentDetailPageInner() {
     });
   }, []);
 
-  const assessment = assessments.find((a) => a.id === params.id);
+  const assessment = assessments.find((a) => a.slug === params.id || a.id === params.id);
   const attempts = mockAttempts.filter((a) => a.assessmentId === params.id);
   const userTier = user?.subscriptionTier ?? 'free';
   const router = useRouter()
