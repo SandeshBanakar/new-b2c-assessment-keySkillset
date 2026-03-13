@@ -116,7 +116,7 @@ export default function AssessmentCard({
       {/* Image / gradient placeholder */}
       {showPlaceholder ? (
         <div
-          className={`w-full h-40 bg-gradient-to-br ${gradientClass} flex items-center justify-center`}
+          className={`w-full h-40 bg-linear-to-br ${gradientClass} flex items-center justify-center`}
         >
           <span className="text-2xl font-bold text-white opacity-40">
             {assessment.exam_type}
