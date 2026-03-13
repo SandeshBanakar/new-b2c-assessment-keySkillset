@@ -110,7 +110,7 @@ export default function AssessmentCard({
 
   return (
     <div
-      className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
       onClick={() => router.push(detailHref)}
     >
       {/* Image / gradient placeholder */}
@@ -127,7 +127,7 @@ export default function AssessmentCard({
         <img
           src={assessment.thumbnail_url!}
           alt={assessment.title}
-          className="w-full h-40 object-cover"
+          className="w-full h-40 object-cover cursor-pointer"
           onError={() => setImgError(true)}
         />
       )}

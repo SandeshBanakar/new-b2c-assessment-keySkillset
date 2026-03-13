@@ -98,7 +98,7 @@ export default function OverviewTab({
 
   const tierAllows = tierAllowsType(userTier, assessment.type);
   const tierName = userTier.charAt(0).toUpperCase() + userTier.slice(1);
-  const attemptRoute = `/assessments/${assessment.id}/instructions`;
+  const attemptRoute = `/assessments/${assessment.slug ?? assessment.id}/instructions`;
 
   // Derive attempt state from mock data
   const userId = user?.id ?? '';

@@ -92,3 +92,7 @@
     @apply bg-background text-foreground;
   }
 }
+
+button:not(:disabled) {
+  @apply cursor-pointer;
+}
