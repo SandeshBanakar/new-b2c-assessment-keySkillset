@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { CheckCircle2, X, ChevronRight, Zap, Target, Crown } from 'lucide-react';
 import PageWrapper from '@/components/layout/PageWrapper';
