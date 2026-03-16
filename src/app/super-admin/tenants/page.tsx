@@ -222,38 +222,51 @@ export default function TenantsPage() {
     setLoading(true)
     setFetchError(false)
     try {
-      const [tRes, cRes, lRes, catRes] = await Promise.all([
-        supabase.from('tenants').select('*').eq('type', 'B2B').order('created_at', { ascending: false }),
-        supabase.from('contracts').select('tenant_id, seat_count'),
-        supabase.from('learners').select('tenant_id').eq('status', 'ACTIVE'),
-        supabase.from('exam_categories').select('id, name'),
+      const [tenantsRes, contractsRes, learnersRes, categoriesRes] = await Promise.all([
+        supabase
+          .from('tenants')
+          .select('id, name, type, feature_toggle_mode, licensed_categories, is_active, created_at')
+          .eq('type', 'B2B')
+          .order('created_at', { ascending: false }),
+
+        supabase
+          .from('contracts')
+          .select('tenant_id, seat_count'),
+
+        supabase
+          .from('learners')
+          .select('id, tenant_id')
+          .eq('status', 'ACTIVE'),
+
+        supabase
+          .from('exam_categories')
+          .select('id, name')
+          .eq('is_active', true),
       ])
-      if (tRes.error) throw tRes.error
 
-      const cats: ExamCategory[] = catRes.data || []
-      setExamCategories(cats)
-      const catMap = new Map<string, string>(cats.map(c => [c.id, c.name]))
+      if (tenantsRes.error) throw tenantsRes.error
+      if (contractsRes.error) throw contractsRes.error
+      if (learnersRes.error) throw learnersRes.error
+      if (categoriesRes.error) throw categoriesRes.error
 
-      const seatMap = new Map<string, number>()
-      ;(cRes.data || []).forEach((c: { tenant_id: string; seat_count: number }) =>
-        seatMap.set(c.tenant_id, c.seat_count)
-      )
+      setExamCategories((categoriesRes.data ?? []) as ExamCategory[])
 
-      const learnerMap = new Map<string, number>()
-      ;(lRes.data || []).forEach((l: { tenant_id: string }) =>
-        learnerMap.set(l.tenant_id, (learnerMap.get(l.tenant_id) || 0) + 1)
-      )
+      const combined = (tenantsRes.data ?? []).map((tenant: Tenant) => {
+        const contract = contractsRes.data?.find(c => c.tenant_id === tenant.id)
+        const learnerCount = learnersRes.data?.filter(l => l.tenant_id === tenant.id).length ?? 0
+        const categoryNames = (tenant.licensed_categories ?? [])
+          .map((catId: string) => categoriesRes.data?.find(c => c.id === catId)?.name)
+          .filter(Boolean) as string[]
 
-      setTenants(
-        (tRes.data || []).map((t: Tenant) => ({
-          ...t,
-          seat_count: seatMap.get(t.id) ?? null,
-          learner_count: learnerMap.get(t.id) || 0,
-          category_names: (t.licensed_categories || [])
-            .map((id: string) => catMap.get(id))
-            .filter((n): n is string => Boolean(n)),
-        }))
-      )
+        return {
+          ...tenant,
+          seat_count: contract?.seat_count ?? 0,
+          learner_count: learnerCount,
+          category_names: categoryNames,
+        }
+      })
+
+      setTenants(combined)
     } catch {
       setFetchError(true)
     } finally {
