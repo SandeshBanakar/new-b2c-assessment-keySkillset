@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client'
 import {
   ChevronRight, AlertTriangle, CheckCircle, X, Loader2,
   Lock, UploadCloud, Plus, Users, Download,
+  Pencil, Copy, PowerOff, Power,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -173,15 +174,29 @@ function exportLearnersCSV(learners: RawLearner[], tenantSlug: string) {
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
-function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+function Toast({
+  message,
+  onDismiss,
+  variant = 'success',
+}: {
+  message: string
+  onDismiss: () => void
+  variant?: 'success' | 'error'
+}) {
   useEffect(() => {
     const t = setTimeout(onDismiss, 3000)
     return () => clearTimeout(t)
   }, [onDismiss])
 
   return (
-    <div className="fixed bottom-4 right-4 bg-green-50 border border-green-200 text-green-700 text-sm rounded-md px-4 py-2.5 flex items-center gap-2 z-50">
-      <CheckCircle className="w-4 h-4" />
+    <div
+      className={`fixed bottom-4 right-4 text-sm rounded-md px-4 py-2.5 flex items-center gap-2 z-50 ${
+        variant === 'error'
+          ? 'bg-rose-50 border border-rose-200 text-rose-600'
+          : 'bg-green-50 border border-green-200 text-green-700'
+      }`}
+    >
+      {variant === 'error' ? <X className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
       {message}
     </div>
   )
@@ -1413,6 +1428,16 @@ export default function TenantDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('Overview')
 
+  // ── Inline name edit
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState('')
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameError, setNameError] = useState('')
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Page-level toast (header actions)
+  const [pageToast, setPageToast] = useState<{ msg: string; variant: 'success' | 'error' } | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -1446,6 +1471,73 @@ export default function TenantDetailPage() {
     setAdminUsers((data || []) as AdminUser[])
   }, [id])
 
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.focus()
+  }, [editingName])
+
+  const saveName = async () => {
+    if (!tenant) return
+    const trimmed = nameValue.trim()
+    if (!trimmed || trimmed === tenant.name) {
+      setEditingName(false)
+      setNameError('')
+      return
+    }
+    setNameSaving(true)
+    const oldName = tenant.name
+    const { error } = await supabase
+      .from('tenants')
+      .update({ name: trimmed })
+      .eq('id', id)
+    if (error) {
+      if (error.code === '23505') {
+        setNameError('A tenant with this name already exists.')
+      } else {
+        setPageToast({ msg: 'Failed to update name.', variant: 'error' })
+        setEditingName(false)
+        setNameError('')
+      }
+      setNameSaving(false)
+      return
+    }
+    await supabase.from('audit_logs').insert({
+      action: 'TENANT_UPDATED',
+      entity_type: 'tenant',
+      entity_id: id,
+      actor_name: 'Super Admin',
+      before_state: { name: oldName },
+      after_state: { name: trimmed },
+    })
+    setTenant(prev => prev ? { ...prev, name: trimmed } : prev)
+    setEditingName(false)
+    setNameError('')
+    setNameSaving(false)
+    setPageToast({ msg: 'Tenant name updated.', variant: 'success' })
+  }
+
+  const toggleActive = async () => {
+    if (!tenant) return
+    const newActive = !tenant.is_active
+    const { error } = await supabase
+      .from('tenants')
+      .update({ is_active: newActive })
+      .eq('id', id)
+    if (error) {
+      setPageToast({ msg: `Failed to ${newActive ? 'reactivate' : 'deactivate'} tenant.`, variant: 'error' })
+      return
+    }
+    await supabase.from('audit_logs').insert({
+      action: 'TENANT_UPDATED',
+      entity_type: 'tenant',
+      entity_id: id,
+      actor_name: 'Super Admin',
+      before_state: { is_active: tenant.is_active },
+      after_state: { is_active: newActive },
+    })
+    setTenant(prev => prev ? { ...prev, is_active: newActive } : prev)
+    setPageToast({ msg: newActive ? 'Tenant reactivated.' : 'Tenant deactivated.', variant: 'success' })
+  }
+
   if (loading) {
     return (
       <div className="p-6 space-y-3">
@@ -1474,16 +1566,69 @@ export default function TenantDetailPage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-xl font-semibold text-zinc-900">{tenant.name}</h1>
-        <span className="text-xs font-medium bg-blue-50 text-blue-700 rounded-md px-2 py-0.5">B2B</span>
-        <span
-          className={`text-xs font-medium rounded-md px-2 py-0.5 ${
-            tenant.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
-          }`}
-        >
-          {tenant.is_active ? 'Active' : 'Inactive'}
-        </span>
+      <div className="flex justify-between items-start mb-6">
+        {/* Left: name + badges */}
+        <div className="flex items-center gap-3">
+          {editingName ? (
+            <div>
+              <input
+                ref={nameInputRef}
+                value={nameValue}
+                onChange={e => { setNameValue(e.target.value); setNameError('') }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveName()
+                  if (e.key === 'Escape') { setEditingName(false); setNameError('') }
+                }}
+                onBlur={saveName}
+                disabled={nameSaving}
+                className="text-xl font-semibold text-zinc-900 border-b-2 border-blue-700 bg-transparent outline-none min-w-48 disabled:opacity-60"
+              />
+              {nameError && <p className="text-sm text-rose-600 mt-1">{nameError}</p>}
+            </div>
+          ) : (
+            <h1 className="text-xl font-semibold text-zinc-900">{tenant.name}</h1>
+          )}
+          <span className="text-xs font-medium bg-blue-50 text-blue-700 rounded-md px-2 py-0.5">B2B</span>
+          <span
+            className={`text-xs font-medium rounded-md px-2 py-0.5 ${
+              tenant.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
+            }`}
+          >
+            {tenant.is_active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+
+        {/* Right: quick actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setNameValue(tenant.name); setEditingName(true); setNameError('') }}
+            className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 flex items-center"
+          >
+            <Pencil className="w-4 h-4 mr-1.5" />
+            Edit Name
+          </button>
+          <button
+            onClick={() => console.log('Duplicate — available in future prompt')}
+            className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 flex items-center"
+          >
+            <Copy className="w-4 h-4 mr-1.5" />
+            Duplicate
+          </button>
+          <button
+            onClick={toggleActive}
+            className={`border rounded-md px-3 py-1.5 text-sm font-medium flex items-center ${
+              tenant.is_active
+                ? 'border-rose-200 text-rose-600 hover:bg-rose-50'
+                : 'border-green-200 text-green-600 hover:bg-green-50'
+            }`}
+          >
+            {tenant.is_active ? (
+              <><PowerOff className="w-4 h-4 mr-1.5" />Deactivate</>
+            ) : (
+              <><Power className="w-4 h-4 mr-1.5" />Reactivate</>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Tab Nav */}
@@ -1539,6 +1684,14 @@ export default function TenantDetailPage() {
         <TabAuditHistory
           logs={auditLogs}
           tenantName={tenant.name}
+        />
+      )}
+
+      {pageToast && (
+        <Toast
+          message={pageToast.msg}
+          variant={pageToast.variant}
+          onDismiss={() => setPageToast(null)}
         />
       )}
     </div>
