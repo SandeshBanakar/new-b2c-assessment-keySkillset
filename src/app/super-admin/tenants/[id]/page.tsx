@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase/client'
 import {
   ChevronRight, AlertTriangle, CheckCircle, X, Loader2,
   Lock, UploadCloud, Plus, Users, Download,
-  Pencil, Copy, PowerOff, Power,
+  Pencil, Copy, PowerOff, Power, BookOpen,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1001,34 +1001,22 @@ function getContentStatusBadge(status: string): string {
   return 'bg-zinc-100 text-zinc-500'
 }
 
-function TabContent({ tenantId }: { tenantId: string }) {
+function TabContent({ tenantId: _tenantId }: { tenantId: string }) {
   const [platformItems, setPlatformItems] = useState<RawContentItem[]>([])
-  const [tenantItems, setTenantItems] = useState<RawContentItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true)
-      const [platformRes, tenantRes] = await Promise.all([
-        supabase
-          .from('content_items')
-          .select('*, exam_categories(name)')
-          .eq('source', 'PLATFORM')
-          .eq('status', 'LIVE')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('content_items')
-          .select('*, exam_categories(name), admin_users(name)')
-          .eq('source', 'TENANT')
-          .eq('tenant_scope_id', tenantId)
-          .order('created_at', { ascending: false }),
-      ])
-      setPlatformItems((platformRes.data ?? []) as RawContentItem[])
-      setTenantItems((tenantRes.data ?? []) as RawContentItem[])
-      setLoading(false)
-    }
-    fetchAll()
-  }, [tenantId])
+    supabase
+      .from('content_items')
+      .select('*, exam_categories(name)')
+      .eq('source', 'PLATFORM')
+      .eq('status', 'LIVE')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setPlatformItems((data ?? []) as RawContentItem[])
+        setLoading(false)
+      })
+  }, [])
 
   const skeletonRows = (
     <tbody>
@@ -1049,8 +1037,11 @@ function TabContent({ tenantId }: { tenantId: string }) {
         Platform content available globally + content created by this tenant.
       </p>
 
-      {/* Section A: Platform Content */}
-      <p className="text-sm font-semibold text-zinc-700 mb-3">Platform Content</p>
+      {/* Section A: Platform Assessments */}
+      <p className="text-sm font-semibold text-zinc-700 mb-1">Platform Assessments</p>
+      <p className="text-sm text-zinc-500 mb-3">
+        Live assessments available to all tenants via the global content bank.
+      </p>
       <div className="bg-white rounded-md border border-zinc-200 overflow-hidden mb-2">
         <table className="w-full">
           <thead>
@@ -1096,59 +1087,14 @@ function TabContent({ tenantId }: { tenantId: string }) {
 
       <div className="border-t border-zinc-200 my-6" />
 
-      {/* Section B: Tenant Content */}
-      <p className="text-sm font-semibold text-zinc-700 mb-1">Tenant Content</p>
-      <p className="text-xs text-zinc-400 mb-3">Content created by this tenant.</p>
-      <div className="bg-white rounded-md border border-zinc-200 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-zinc-50 border-b border-zinc-200">
-              {['Title', 'Category', 'Type', 'Status', 'Created By'].map(col => (
-                <th
-                  key={col}
-                  className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide"
-                >
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          {loading ? (
-            <tbody>
-              {[0, 1].map(i => (
-                <tr key={i}>
-                  <td colSpan={5} className="px-4 py-3">
-                    <div className="h-8 animate-pulse bg-zinc-100 rounded-md" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          ) : tenantItems.length === 0 ? (
-            <tbody>
-              <tr>
-                <td colSpan={5} className="px-4 py-4 text-sm text-zinc-400">
-                  This tenant has not created any content yet.
-                </td>
-              </tr>
-            </tbody>
-          ) : (
-            <tbody>
-              {tenantItems.map(item => (
-                <tr key={item.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-zinc-900">{item.title}</td>
-                  <td className="px-4 py-3 text-sm text-zinc-500">{item.exam_categories?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-sm text-zinc-500">{item.test_type ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium rounded-md px-2 py-0.5 ${getContentStatusBadge(item.status)}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-zinc-500">{item.admin_users?.name ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          )}
-        </table>
+      {/* Section B: Platform Courses */}
+      <p className="text-sm font-semibold text-zinc-700 mb-1">Platform Courses</p>
+      <p className="text-xs text-zinc-400 mb-3">
+        Courses will appear here once the Courses module is configured.
+      </p>
+      <div className="py-8 flex flex-col items-center justify-center border border-dashed border-zinc-200 rounded-md">
+        <BookOpen className="w-6 h-6 text-zinc-300 mb-2" />
+        <p className="text-sm text-zinc-400">Courses module coming soon</p>
       </div>
     </div>
   )
