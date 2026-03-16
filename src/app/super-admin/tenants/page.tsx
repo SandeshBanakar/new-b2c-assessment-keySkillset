@@ -222,6 +222,8 @@ export default function TenantsPage() {
     setLoading(true)
     setFetchError(false)
     try {
+      console.log('DEBUG: starting tenant fetch')
+
       const [tenantsRes, contractsRes, learnersRes, categoriesRes] = await Promise.all([
         supabase
           .from('tenants')
@@ -243,6 +245,17 @@ export default function TenantsPage() {
           .select('id, name')
           .eq('is_active', true),
       ])
+
+      console.log('DEBUG: fetch complete', {
+        tenantsError: tenantsRes.error,
+        contractsError: contractsRes.error,
+        learnersError: learnersRes.error,
+        categoriesError: categoriesRes.error,
+        tenantsCount: tenantsRes.data?.length,
+        contractsCount: contractsRes.data?.length,
+        learnersCount: learnersRes.data?.length,
+        categoriesCount: categoriesRes.data?.length,
+      })
 
       if (tenantsRes.error) throw tenantsRes.error
       if (contractsRes.error) throw contractsRes.error
@@ -267,7 +280,8 @@ export default function TenantsPage() {
       })
 
       setTenants(combined)
-    } catch {
+    } catch (err) {
+      console.error('DEBUG: tenant fetch failed', err)
       setFetchError(true)
     } finally {
       setLoading(false)
