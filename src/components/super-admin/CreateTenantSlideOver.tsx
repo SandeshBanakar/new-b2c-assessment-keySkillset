@@ -15,11 +15,6 @@ import { supabase } from '@/lib/supabase/client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ExamCategory {
-  id: string
-  name: string
-}
-
 interface AdminUser {
   id: string
   name: string
@@ -35,7 +30,6 @@ interface FormState {
   selectedAdmin: { id: string; name: string; email: string } | null
   inviteAdmin: { name: string; email: string }
   featureMode: 'RUN_ONLY' | 'FULL_CREATOR'
-  selectedCategories: string[]
   // Section 2
   contactName: string
   contactEmail: string
@@ -71,7 +65,6 @@ const INITIAL_FORM: FormState = {
   selectedAdmin: null,
   inviteAdmin: { name: '', email: '' },
   featureMode: 'RUN_ONLY',
-  selectedCategories: [],
   contactName: '',
   contactEmail: '',
   contactPhone: '',
@@ -467,25 +460,10 @@ export default function CreateTenantSlideOver({
 }) {
   const router = useRouter()
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
-  const [categories, setCategories] = useState<ExamCategory[]>([])
-  const [catsLoading, setCatsLoading] = useState(true)
   const [showDiscard, setShowDiscard] = useState(false)
   const [toast, setToast] = useState<ToastInfo | null>(null)
   const [contractError, setContractError] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
-
-  // Load categories
-  useEffect(() => {
-    supabase
-      .from('exam_categories')
-      .select('*')
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => {
-        setCategories((data ?? []) as ExamCategory[])
-        setCatsLoading(false)
-      })
-  }, [])
 
   // Escape key
   useEffect(() => {
@@ -510,20 +488,6 @@ export default function CreateTenantSlideOver({
     onClose()
   }
 
-  const toggleCategory = (id: string) => {
-    setForm(f => {
-      const already = f.selectedCategories.includes(id)
-      return {
-        ...f,
-        selectedCategories: already
-          ? f.selectedCategories.filter(c => c !== id)
-          : [...f.selectedCategories, id],
-        isDirty: true,
-        errors: { ...f.errors, categories: '' },
-      }
-    })
-  }
-
   // ─── Validation ──────────────────────────────────────────────────────────────
 
   const validate = (): Record<string, string> => {
@@ -535,7 +499,6 @@ export default function CreateTenantSlideOver({
         form.inviteAdmin.name.trim() &&
         form.inviteAdmin.email.trim())
     if (!hasAdmin) e.clientAdmin = 'Select or invite a Client Admin.'
-    if (form.selectedCategories.length === 0) e.categories = 'Select at least one category.'
     if (!form.contactName.trim()) e.contactName = 'Contact name is required.'
     if (!form.contactEmail.trim()) e.contactEmail = 'Contact email is required.'
     if (!form.contactPhone.trim()) e.contactPhone = 'Contact phone is required.'
@@ -553,7 +516,7 @@ export default function CreateTenantSlideOver({
 
   const scrollToFirstError = (errors: Record<string, string>) => {
     const order = [
-      'name', 'clientAdmin', 'categories',
+      'name', 'clientAdmin',
       'contactName', 'contactEmail', 'contactPhone', 'timezone', 'dateFormat',
       'addressLine1', 'city', 'state', 'country', 'zipCode',
     ]
@@ -583,7 +546,6 @@ export default function CreateTenantSlideOver({
           name: form.name.trim(),
           type: 'B2B',
           feature_toggle_mode: form.featureMode,
-          licensed_categories: form.selectedCategories,
           is_active: true,
           contact_name: form.contactName.trim(),
           contact_email: form.contactEmail.trim(),
@@ -640,7 +602,6 @@ export default function CreateTenantSlideOver({
         after_state: {
           name: form.name.trim(),
           feature_toggle_mode: form.featureMode,
-          licensed_categories: form.selectedCategories,
           contact_name: form.contactName.trim(),
           contact_email: form.contactEmail.trim(),
           timezone: form.timezone,
@@ -665,7 +626,6 @@ export default function CreateTenantSlideOver({
           end_date: form.endDate || null,
           stripe_customer_id: form.stripeCustomerId.trim() || null,
           notes: form.notes.trim() || null,
-          licensed_categories: form.selectedCategories,
         })
 
         if (cErr) {
@@ -714,7 +674,6 @@ export default function CreateTenantSlideOver({
       end_date: form.endDate || null,
       stripe_customer_id: form.stripeCustomerId.trim() || null,
       notes: form.notes.trim() || null,
-      licensed_categories: form.selectedCategories,
     })
     if (!cErr) {
       setContractError(false)
@@ -793,46 +752,6 @@ export default function CreateTenantSlideOver({
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Licensed Categories */}
-          <div className="mb-5" data-field="categories">
-            <FieldLabel required>Licensed Categories</FieldLabel>
-            <p className="text-xs text-zinc-500 mb-2">Select categories this tenant can access.</p>
-            <div className="max-h-48 overflow-y-auto border border-zinc-200 rounded-md p-3">
-              {catsLoading ? (
-                <div className="space-y-2">
-                  {[0, 1].map(i => (
-                    <div key={i} className="h-6 animate-pulse bg-zinc-100 rounded" />
-                  ))}
-                </div>
-              ) : categories.length === 0 ? (
-                <p className="text-sm text-zinc-400">No categories available.</p>
-              ) : (
-                categories.map(cat => {
-                  const checked = form.selectedCategories.includes(cat.id)
-                  return (
-                    <label
-                      key={cat.id}
-                      onClick={() => toggleCategory(cat.id)}
-                      className={`flex items-center gap-3 py-1.5 cursor-pointer rounded-sm -mx-3 px-3 ${
-                        checked ? 'bg-blue-50' : ''
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCategory(cat.id)}
-                        className="accent-blue-700"
-                        onClick={e => e.stopPropagation()}
-                      />
-                      <span className="text-sm text-zinc-900 select-none">{cat.name}</span>
-                    </label>
-                  )
-                })
-              )}
-            </div>
-            <FieldError msg={form.errors.categories} />
           </div>
 
           {/* ── SECTION 2: CLIENT PROFILE ── */}
