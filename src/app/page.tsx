@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Lock, Star, Zap, Trophy } from 'lucide-react';
+import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase } from 'lucide-react';
 import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
 import type { DemoUser } from '@/data/demoUsers';
@@ -46,11 +46,72 @@ function PersonaSelector() {
     router.push('/assessments');
   }
 
+  function handleAdminSelect(path: string) {
+    router.push(path);
+  }
+
   return (
     <div className="bg-zinc-950 min-h-screen flex flex-col items-center justify-center gap-10">
       <h1 className="text-3xl font-semibold text-white text-center">
         Who&apos;s learning today?
       </h1>
+
+      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide text-center">
+        Admin Access
+      </p>
+
+      <div className="flex items-center justify-center gap-6">
+        <div
+          onClick={() => handleAdminSelect('/super-admin')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-blue-700">
+            <Shield className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">
+            Super Admin
+          </span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-blue-900 text-blue-300">
+            SUPER_ADMIN
+          </span>
+        </div>
+
+        <div
+          onClick={() => handleAdminSelect('/client-admin/akash')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-violet-700">
+            <Building2 className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">
+            Akash Institute
+          </span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-violet-900 text-violet-300">
+            CLIENT_ADMIN
+          </span>
+        </div>
+
+        <div
+          onClick={() => handleAdminSelect('/client-admin/techcorp')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-teal-700">
+            <Briefcase className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">
+            TechCorp India
+          </span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-teal-900 text-teal-300">
+            CLIENT_ADMIN
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 w-full max-w-lg mx-auto">
+        <div className="flex-1 h-px bg-zinc-800" />
+        <p className="text-xs text-zinc-600 whitespace-nowrap">Learner Personas</p>
+        <div className="flex-1 h-px bg-zinc-800" />
+      </div>
 
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 sm:gap-8">
         {DEMO_USERS.map((persona) => {
