@@ -1392,8 +1392,8 @@ function TabAuditHistory({
 
 const TABS = [
   'Overview',
-  'Users & Roles',
   'Plans',
+  'Users & Roles',
   'Learners',
   'Content',
   'Contract',
@@ -1512,6 +1512,7 @@ export default function TenantDetailPage() {
           clientAdminEmail={clientAdmin?.email ?? ''}
         />
       )}
+      {activeTab === 'Plans' && <TabPlans />}
       {activeTab === 'Users & Roles' && (
         <TabUsersRoles
           tenantId={id}
@@ -1519,7 +1520,6 @@ export default function TenantDetailPage() {
           onRefresh={refreshUsers}
         />
       )}
-      {activeTab === 'Plans' && <TabPlans />}
       {activeTab === 'Learners' && (
         <TabLearners
           tenantId={id}
