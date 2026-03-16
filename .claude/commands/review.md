@@ -1,16 +1,21 @@
 # /review — Review Changes Before Committing
 
-## Your job
+## Step 1 — Detect context
 
-Review all uncommitted changes in this session 
-before a git commit is made.
+Check which files were modified:
+  src/app/super-admin/* → Super Admin review
+  anything else         → B2C review
+  both modified         → run both checklists
 
-## Checklist
+---
+
+## B2C Checklist
 
 ### Correctness
-- [ ] Does the code do what the plan said it would?
-- [ ] Are there any edge cases unhandled?
-- [ ] Does subscription tier access logic work correctly? (Free / Basic / Professional / Premium)
+- [ ] Code does what the plan said
+- [ ] Edge cases handled
+- [ ] Subscription tier access logic correct
+      (Free / Basic / Professional / Premium)
 
 ### Code quality
 - [ ] No inline styles except dynamic values
@@ -20,7 +25,38 @@ before a git commit is made.
 - [ ] No hardcoded user data in production components
 - [ ] TypeScript types defined, no implicit 'any'
 
-### Build check
+---
+
+## Super Admin Checklist
+
+### Correctness
+- [ ] Data loads from Supabase — no hardcoded mock data
+- [ ] Loading skeleton shown while fetching
+- [ ] Error state shown on Supabase query failure
+- [ ] No auth checks or session guards anywhere
+
+### Design tokens
+- [ ] Primary color: blue-700 (not violet, not blue-600)
+- [ ] Background: zinc-50
+- [ ] Surface: white
+- [ ] Border: zinc-200
+- [ ] Radius: rounded-md only — no rounded-xl, no rounded-full
+- [ ] Weight: font-medium or font-semibold — no font-bold
+- [ ] Icons: lucide-react only
+- [ ] No custom hex values anywhere
+
+### Structure
+- [ ] New page renders inside super-admin layout
+      (no duplicate sidebar or header)
+- [ ] New route has a page.tsx in
+      src/app/super-admin/[route]/
+- [ ] Unbuilt routes use ComingSoonPage component
+- [ ] Nav item added to layout.tsx for new route
+
+---
+
+## Build check (both contexts)
+
 - [ ] npm run build passes
 - [ ] npm run lint passes
 
@@ -28,4 +64,4 @@ before a git commit is made.
 
 List: what looks good
 List: what needs fixing before commit
-Recommendation: commit / fix first
+Recommendation: COMMIT / FIX FIRST

@@ -6,6 +6,9 @@ import {
   LayoutDashboard,
   Library,
   ShoppingBag,
+  Users,
+  PenTool,
+  Building2,
   GitBranch,
   BookMarked,
   FileEdit,
@@ -15,11 +18,10 @@ import {
   Keyboard,
   Play,
   Layers,
-  Building2,
   CreditCard,
   Megaphone,
-  Shield,
   BarChart2,
+  Shield,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -73,34 +75,54 @@ export default function SuperAdminLayout({
           </span>
         </div>
 
-        <nav className="flex-1 px-2 py-2">
+        <nav className="flex-1 px-2 py-3 space-y-0.5">
           <NavItem href="/super-admin/dashboard" icon={LayoutDashboard} label="Dashboard" />
 
-          <SectionLabel label="Content" />
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Content
+          </p>
           <NavItem href="/super-admin/content-bank" icon={Library} label="Content Bank" />
+
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Monetisation
+          </p>
+          <NavItem href="/super-admin/plans" icon={CreditCard} label="Plans & Pricing" />
           <NavItem href="/super-admin/course-store" icon={ShoppingBag} label="Course Store" />
 
-          <SectionLabel label="Assessment Creation" />
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Master Organisation
+          </p>
+          <NavItem href="/super-admin/b2c-users" icon={Users} label="B2C Users" />
+          <NavItem href="/super-admin/content-creators" icon={PenTool} label="Content Creators" />
+
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Organisations
+          </p>
+          <NavItem href="/super-admin/tenants" icon={Building2} label="Tenants" />
+
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Assessment Creation
+          </p>
           <NavItem href="/super-admin/sources-questions" icon={GitBranch} label="Sources & Questions" />
           <NavItem href="/super-admin/question-bank" icon={BookMarked} label="Question Bank" />
           <NavItem href="/super-admin/create-assessments" icon={FileEdit} label="Create Assessments" />
           <NavItem href="/super-admin/bulk-upload" icon={Upload} label="Bulk Upload" />
 
-          <SectionLabel label="Course Creation" />
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Course Creation
+          </p>
           <NavItem href="/super-admin/click-based-course" icon={MousePointerClick} label="Click-based Course" />
           <NavItem href="/super-admin/coding-sandbox-course" icon={Terminal} label="Coding Sandbox" />
           <NavItem href="/super-admin/keyboard-trainer-course" icon={Keyboard} label="Keyboard Trainer" />
           <NavItem href="/super-admin/video-based-course" icon={Play} label="Video-based Course" />
           <NavItem href="/super-admin/combination-course" icon={Layers} label="Combination Course" />
 
-          <SectionLabel label="Platform" />
-          <NavItem href="/super-admin/tenants" icon={Building2} label="Tenants" />
-          <NavItem href="/super-admin/plans" icon={CreditCard} label="Plans & Pricing" />
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Configuration
+          </p>
           <NavItem href="/super-admin/marketing" icon={Megaphone} label="Marketing Config" />
-
-          <SectionLabel label="System" />
-          <NavItem href="/super-admin/audit-log" icon={Shield} label="Audit Log" />
           <NavItem href="/super-admin/analytics" icon={BarChart2} label="Analytics" />
+          <NavItem href="/super-admin/audit-log" icon={Shield} label="Audit Log" />
         </nav>
 
         <div className="mt-auto px-4 py-4 border-t border-zinc-200">

@@ -6,7 +6,15 @@
 - [ ] CLAUDE.md has been read this session
 - [ ] Relevant agent_docs/ file has been read
 
-## Build rules
+## Detect context before building
+
+Check which route is being modified:
+  /super-admin/* → Super Admin context
+  anything else  → B2C context
+
+---
+
+## B2C Build Rules
 
 1. Follow the approved plan exactly — no scope creep
 2. Check src/components/ first — reuse before creating
@@ -17,8 +25,25 @@
 7. All routes go in src/app/ using Next.js App Router
 8. Use lib/supabase/client.ts for Client Components
 9. Use lib/supabase/server.ts for Server Components
+10. Design tokens: violet-600 primary, zinc-50 bg, rounded-xl
 
-## After building
+## Super Admin Build Rules
+
+1. Follow the approved plan exactly — no scope creep
+2. Check src/app/super-admin/_components/ first — reuse before creating
+3. No shadcn/ui — Tailwind only
+4. Use lucide-react for all icons — no exceptions
+5. Add 'use client' to any component with hooks or events
+6. All routes go in src/app/super-admin/ using Next.js App Router
+7. Use src/lib/supabase/client.ts — import { supabase }
+8. No auth, no RLS, no session checks — demo only
+9. Design tokens: blue-700 primary, zinc-50 bg, rounded-md only
+10. Never use: rounded-xl, rounded-full, font-bold, custom hex values
+11. Coming Soon pages use ComingSoonPage component — never a blank page
+
+---
+
+## After building (both contexts)
 
 Run these and fix ALL errors before marking done:
   npm run build
