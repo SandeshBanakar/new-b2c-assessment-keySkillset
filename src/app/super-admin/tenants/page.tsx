@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
-import { AlertTriangle, X, Loader2 } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
+import CreateTenantSlideOver from '@/components/super-admin/CreateTenantSlideOver'
 
 interface Tenant {
   id: string
@@ -21,189 +22,12 @@ interface TenantRow extends Tenant {
   category_names: string[]
 }
 
-interface ExamCategory {
-  id: string
-  name: string
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   })
-}
-
-// ─── Create Tenant Modal ──────────────────────────────────────────────────────
-
-function CreateTenantModal({
-  examCategories,
-  onClose,
-  onCreated,
-}: {
-  examCategories: ExamCategory[]
-  onClose: () => void
-  onCreated: () => void
-}) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [mode, setMode] = useState<'RUN_ONLY' | 'FULL_CREATOR'>('RUN_ONLY')
-  const [selectedCats, setSelectedCats] = useState<string[]>([])
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
-
-  const toggleCat = (id: string) =>
-    setSelectedCats(prev => (prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]))
-
-  const save = async () => {
-    if (!name.trim()) { setErr('Tenant name is required.'); return }
-    if (!email.trim()) { setErr('Client admin email is required.'); return }
-    setErr('')
-    setSaving(true)
-    try {
-      const { data: tenant, error: tErr } = await supabase
-        .from('tenants')
-        .insert({
-          name: name.trim(),
-          type: 'B2B',
-          feature_toggle_mode: mode,
-          licensed_categories: selectedCats,
-          is_active: true,
-        })
-        .select('id')
-        .single()
-      if (tErr) throw tErr
-
-      await supabase.from('admin_users').insert({
-        tenant_id: tenant.id,
-        email: email.trim(),
-        name: email.split('@')[0],
-        role: 'CLIENT_ADMIN',
-        is_active: true,
-      })
-      await supabase.from('audit_logs').insert({
-        tenant_id: tenant.id,
-        actor_name: 'Super Admin',
-        action: 'TENANT_CREATED',
-        entity_type: 'Tenant',
-        entity_id: tenant.id,
-        before_state: null,
-        after_state: {
-          name: name.trim(),
-          type: 'B2B',
-          feature_toggle_mode: mode,
-          licensed_categories: selectedCats,
-        },
-      })
-      onCreated()
-    } catch {
-      setErr('Failed to create tenant. Please try again.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-[480px] bg-white shadow-xl flex flex-col z-50">
-        <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center">
-          <p className="text-base font-semibold text-zinc-900">Create Tenant</p>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {err && <p className="text-sm text-rose-600">{err}</p>}
-
-          <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1">
-              Tenant Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Acme Corp"
-              className="text-sm border border-zinc-200 rounded-md px-3 py-1.5 w-full focus:ring-1 focus:ring-blue-700 outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1">
-              Client Admin Email <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="admin@acme.com"
-              className="text-sm border border-zinc-200 rounded-md px-3 py-1.5 w-full focus:ring-1 focus:ring-blue-700 outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-2">Feature Mode</label>
-            <div className="flex flex-col gap-2">
-              {(['RUN_ONLY', 'FULL_CREATOR'] as const).map(m => (
-                <div
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={`border rounded-md p-3 cursor-pointer transition-colors ${
-                    mode === m ? 'border-blue-700 bg-blue-50' : 'border-zinc-200'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-zinc-900">
-                    {m === 'RUN_ONLY' ? 'Run Only' : 'Full Creator'}
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    {m === 'RUN_ONLY'
-                      ? 'Tenant can run existing assessments only.'
-                      : 'Tenant can create and run their own assessments.'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-2">Licensed Categories</label>
-            <div className="space-y-2">
-              {examCategories.map(cat => (
-                <label key={cat.id} className="flex items-center gap-2 text-sm text-zinc-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedCats.includes(cat.id)}
-                    onChange={() => toggleCat(cat.id)}
-                    className="rounded border-zinc-300"
-                  />
-                  {cat.name}
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md px-4 py-2 hover:bg-zinc-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70"
-          >
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Create Tenant
-          </button>
-        </div>
-      </div>
-    </>
-  )
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -216,7 +40,6 @@ export default function TenantsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modeFilter, setModeFilter] = useState<'all' | 'RUN_ONLY' | 'FULL_CREATOR'>('all')
   const [showCreate, setShowCreate] = useState(false)
-  const [examCategories, setExamCategories] = useState<ExamCategory[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -243,26 +66,14 @@ export default function TenantsPage() {
         supabase
           .from('exam_categories')
           .select('id, name')
-          .eq('is_active', true),
+          .eq('is_active', true)
+          .order('name'),
       ])
-
-      console.log('DEBUG: fetch complete', {
-        tenantsError: tenantsRes.error,
-        contractsError: contractsRes.error,
-        learnersError: learnersRes.error,
-        categoriesError: categoriesRes.error,
-        tenantsCount: tenantsRes.data?.length,
-        contractsCount: contractsRes.data?.length,
-        learnersCount: learnersRes.data?.length,
-        categoriesCount: categoriesRes.data?.length,
-      })
 
       if (tenantsRes.error) throw tenantsRes.error
       if (contractsRes.error) throw contractsRes.error
       if (learnersRes.error) throw learnersRes.error
       if (categoriesRes.error) throw categoriesRes.error
-
-      setExamCategories((categoriesRes.data ?? []) as ExamCategory[])
 
       const combined = (tenantsRes.data ?? []).map((tenant: Tenant) => {
         const contract = contractsRes.data?.find(c => c.tenant_id === tenant.id)
@@ -455,8 +266,7 @@ export default function TenantsPage() {
       )}
 
       {showCreate && (
-        <CreateTenantModal
-          examCategories={examCategories}
+        <CreateTenantSlideOver
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false)
