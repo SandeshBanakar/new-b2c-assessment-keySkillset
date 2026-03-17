@@ -78,14 +78,15 @@ export default function NewPlanPage() {
   // Section 1 — Identity
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const audienceType = 'B2C'
-  // audience_type locked to B2C for V1 — no UI toggle needed
-
   // Section 2 — Pricing
   const [price, setPrice] = useState<number | ''>('')
   const billingCycle = 'MONTHLY'
 
-  // Section 3 — Access Rules
+  // Section 3 — Assessment Access
+  const [scope, setScope] = useState<'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'>(
+    'PLATFORM_WIDE'
+  )
+  const [category, setCategory] = useState<string | null>(null)
   const [allowedTypes, setAllowedTypes] = useState<AssessmentType[]>([])
   const [maxAttempts, setMaxAttempts] = useState<number>(5)
 
@@ -111,6 +112,8 @@ export default function NewPlanPage() {
     if (price === '' || price < 0) return 'Price must be 0 or a positive number.'
     if (allowedTypes.length === 0)
       return 'Select at least one allowed assessment type.'
+    if (scope === 'CATEGORY_BUNDLE' && !category)
+      return 'Select an exam category for this Category Bundle plan.'
     if (maxAttempts < 1 || maxAttempts > 20)
       return 'Max attempts must be between 1 and 20.'
     return null
@@ -138,12 +141,13 @@ export default function NewPlanPage() {
       const planId = await createPlan({
         name:                        name.trim(),
         description:                 description.trim(),
-        audience_type:               audienceType,
         price:                       price as number,
         billing_cycle:               billingCycle,
         status,
         max_attempts_per_assessment: maxAttempts,
         allowed_assessment_types:    allowedTypes,
+        scope,
+        category: scope === 'CATEGORY_BUNDLE' ? category : null,
       })
 
       // Step 2 — Insert content map rows using the UUID from Step 1
@@ -201,9 +205,8 @@ export default function NewPlanPage() {
           <SectionHeading
             number="1"
             title="Plan Identity"
-            subtitle="Name and describe this plan. Audience type is B2C for all V1 plans."
+            subtitle="Name and describe this plan."
           />
-
           <div className="space-y-4">
             <div>
               <FieldLabel label="Plan name" required />
@@ -215,7 +218,6 @@ export default function NewPlanPage() {
                 className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
               />
             </div>
-
             <div>
               <FieldLabel label="Description" />
               <textarea
@@ -225,16 +227,6 @@ export default function NewPlanPage() {
                 rows={3}
                 className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none"
               />
-            </div>
-
-            <div>
-              <FieldLabel label="Audience type" />
-              <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-md">
-                <span className="text-sm text-zinc-500">B2C</span>
-                <span className="text-xs text-zinc-400">
-                  — B2B plans via Contracts (V2)
-                </span>
-              </div>
             </div>
           </div>
         </div>
@@ -284,15 +276,85 @@ export default function NewPlanPage() {
           </div>
         </div>
 
-        {/* SECTION 3 — Access Rules */}
+        {/* SECTION 3 — Assessment Access */}
         <div className="bg-white border border-zinc-200 rounded-md p-6 mb-4">
           <SectionHeading
             number="3"
-            title="Access Rules"
-            subtitle="Define what assessment types and attempt limits this plan grants."
+            title="Assessment Access"
+            subtitle="Define the scope, allowed assessment types, and attempt limits."
           />
-
           <div className="space-y-5">
+
+            {/* Scope toggle */}
+            <div>
+              <FieldLabel label="Plan scope" required />
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    {
+                      value: 'PLATFORM_WIDE',
+                      label: 'Platform-wide',
+                      description: 'All exam categories included',
+                    },
+                    {
+                      value: 'CATEGORY_BUNDLE',
+                      label: 'Category Bundle',
+                      description: 'One exam category only',
+                    },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setScope(opt.value)
+                      if (opt.value === 'PLATFORM_WIDE') setCategory(null)
+                    }}
+                    className={`flex flex-col items-start px-3 py-2.5 rounded-md border text-left transition-colors ${
+                      scope === opt.value
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50'
+                    }`}
+                  >
+                    <span
+                      className={`text-sm font-medium ${
+                        scope === opt.value ? 'text-blue-900' : 'text-zinc-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </span>
+                    <span className="text-xs text-zinc-400 mt-0.5">
+                      {opt.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category selector — only when CATEGORY_BUNDLE */}
+            {scope === 'CATEGORY_BUNDLE' && (
+              <div>
+                <FieldLabel label="Exam category" required />
+                <div className="flex flex-wrap gap-2">
+                  {['SAT', 'NEET', 'JEE', 'CLAT', 'PMP'].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategory(cat)}
+                      className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${
+                        category === cat
+                          ? 'border-blue-600 bg-blue-50 text-blue-900'
+                          : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assessment type checkboxes */}
             <div>
               <FieldLabel label="Allowed assessment types" required />
               <div className="grid grid-cols-3 gap-2 mt-1">
@@ -325,6 +387,7 @@ export default function NewPlanPage() {
               </div>
             </div>
 
+            {/* Max attempts */}
             <div>
               <FieldLabel label="Max paid attempts per assessment" />
               <div className="flex items-center gap-3">
@@ -338,10 +401,11 @@ export default function NewPlanPage() {
                 />
                 <div className="flex items-center gap-1.5 text-xs text-zinc-400">
                   <Info className="w-3.5 h-3.5" />
-                  Free attempt is always included (1 per assessment, all tiers)
+                  Free attempt always included (1 per assessment, all tiers)
                 </div>
               </div>
             </div>
+
           </div>
         </div>
 

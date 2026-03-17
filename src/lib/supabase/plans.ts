@@ -3,13 +3,14 @@ import { supabase } from '@/lib/supabase/client'
 export type CreatePlanPayload = {
   name: string
   description: string
-  audience_type: string
   price: number
   billing_cycle: string
   status: 'DRAFT' | 'PUBLISHED'
   max_attempts_per_assessment: number
   allowed_assessment_types: string[]
-  // stored as JSON array: ['FULL_TEST', 'SUBJECT_TEST', 'CHAPTER_TEST']
+  scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
+  category: string | null
+  // null when scope = PLATFORM_WIDE
 }
 
 export type PlanRow = {
@@ -71,13 +72,16 @@ export async function createPlan(
   const { data, error } = await supabase
     .from('plans')
     .insert({
-      name:                        payload.name,
-      description:                 payload.description,
-      audience_type:               payload.audience_type,
-      price:                       payload.price,
-      billing_cycle:               payload.billing_cycle,
-      status:                      payload.status,
-      max_attempts_per_assessment: payload.max_attempts_per_assessment,
+      name:                          payload.name,
+      description:                   payload.description,
+      audience_type:                 'B2C',
+      // hardcoded — B2B plans via Contracts in V2
+      price:                         payload.price,
+      billing_cycle:                 payload.billing_cycle,
+      status:                        payload.status,
+      max_attempts_per_assessment:   payload.max_attempts_per_assessment,
+      scope:                         payload.scope,
+      category:                      payload.category,
     })
     .select('id')
     .single()
@@ -111,7 +115,7 @@ export async function fetchLiveAssessments(): Promise<
   const { data, error } = await supabase
     .from('assessments')
     .select('id, title, exam_type, assessment_type')
-    .eq('status', 'active')
+    .eq('is_active', true)
     .order('title', { ascending: true })
 
   if (error) throw new Error(error.message)
