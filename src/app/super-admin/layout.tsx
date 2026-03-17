@@ -52,13 +52,6 @@ function NavItem({
   )
 }
 
-function SectionLabel({ label }: { label: string }) {
-  return (
-    <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
-      {label}
-    </p>
-  )
-}
 
 export default function SuperAdminLayout({
   children,

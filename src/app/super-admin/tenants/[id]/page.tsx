@@ -312,13 +312,11 @@ function TabOverview({
   contract,
   learnerCount,
   clientAdmin,
-  onEditDetails,
 }: {
   tenant: TenantDetail
   contract: Contract | null
   learnerCount: number
   clientAdmin: { name: string; email: string } | null
-  onEditDetails: () => void
 }) {
   const seatCount = contract?.seat_count ?? 0
   const fillPct = seatCount > 0 ? Math.min((learnerCount / seatCount) * 100, 100) : 0
@@ -1626,7 +1624,6 @@ export default function TenantDetailPage() {
           contract={contract}
           learnerCount={learnerCount}
           clientAdmin={clientAdmin}
-          onEditDetails={() => setShowEditDetails(true)}
         />
       )}
       {activeTab === 'Plans' && <TabPlans />}
