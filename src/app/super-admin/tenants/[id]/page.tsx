@@ -11,10 +11,6 @@ import {
 } from 'lucide-react'
 import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
 import ContentTab from '@/components/tenant-detail/ContentTab'
-import {
-  fetchPublishedPlans,
-  type PublishedPlanOption,
-} from '@/lib/supabase/plans'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1058,17 +1054,6 @@ function TabContract({
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(false)
   const [arrError, setArrError] = useState('')
-  // 2b — plan selector state
-  const [publishedPlans, setPublishedPlans] = useState<PublishedPlanOption[]>([])
-  const [selectedPlanId, setSelectedPlanId] = useState<string>(
-    contract?.plan_id ?? ''   // 2f — initialised from loaded contract
-  )
-
-  // 2c — load published plans once on mount
-  useEffect(() => {
-    fetchPublishedPlans().then(setPublishedPlans)
-  }, [])
-
   const set = (key: keyof typeof form, val: string | number) =>
     setForm(prev => ({ ...prev, [key]: val }))
 
@@ -1090,7 +1075,6 @@ function TabContract({
         stripe_subscription_id: form.stripe_subscription_id,
         notes: form.notes,
         updated_at: new Date().toISOString(),
-        plan_id: selectedPlanId || null,
       }
       if (contract?.id) {
         await supabase.from('contracts').update(payload).eq('id', contract.id)
@@ -1122,54 +1106,17 @@ function TabContract({
       {/* Contract Details form */}
       <div className="space-y-4">
 
-        {/* Row 1 — Linked Plan + Stripe Subscription ID */}
-        <div className="grid grid-cols-2 gap-4">
-
-          {/* Linked Plan */}
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-              Linked Plan
-            </label>
-            <select
-              value={selectedPlanId}
-              onChange={(e) => setSelectedPlanId(e.target.value)}
-              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-            >
-              <option value="">— Select a plan —</option>
-              {publishedPlans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ·{' '}
-                  {p.scope === 'PLATFORM_WIDE' ? 'Platform-wide' : 'Category Bundle'}{' '}
-                  · ₹{p.price}/mo
-                </option>
-              ))}
-            </select>
-            {selectedPlanId && (() => {
-              const plan = publishedPlans.find((p) => p.id === selectedPlanId)
-              if (!plan || !form.seat_count) return null
-              const suggested = plan.price * Number(form.seat_count) * 12
-              return (
-                <p className="text-xs text-zinc-400 mt-1.5">
-                  Suggested ARR: ₹{suggested.toLocaleString('en-IN')}
-                  &nbsp;({form.seat_count} seats × ₹{plan.price}/mo × 12)
-                </p>
-              )
-            })()}
-          </div>
-
-          {/* Stripe Subscription ID */}
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-              Stripe Subscription ID
-            </label>
-            <input
-              type="text"
-              value={form.stripe_subscription_id}
-              onChange={e => set('stripe_subscription_id', e.target.value)}
-              className={inputCls}
-            />
-          </div>
-
+        {/* Stripe Subscription ID */}
+        <div>
+          <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+            Stripe Subscription ID
+          </label>
+          <input
+            type="text"
+            value={form.stripe_subscription_id}
+            onChange={e => set('stripe_subscription_id', e.target.value)}
+            className={inputCls}
+          />
         </div>
 
         {/* Row 2 — Seat Count + ARR */}
