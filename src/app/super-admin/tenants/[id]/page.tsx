@@ -1589,7 +1589,7 @@ export default function TenantDetailPage() {
         />
       )}
       {activeTab === 'Content' && (
-        <ContentTab tenantId={id} />
+        <ContentTab tenantId={id} onGoToPlans={() => setActiveTab('Plans')} />
       )}
       {activeTab === 'Contract' && (
         <TabContract

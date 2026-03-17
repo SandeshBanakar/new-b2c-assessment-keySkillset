@@ -78,10 +78,28 @@ Basic:   a0c16137-7fd5-44f5-96e6-60e4617d9230
 Pro:     e150d59c-13c1-4db3-b6d7-4f30c29178e9
 Premium: 191c894d-b532-4fa8-b1fe-746e5cdcdcc8
 
+### courses table — confirmed columns (March 17, 2026 — KSS-DB-SA-001 complete)
+id (uuid), title (text), description (text), course_type (text),
+status (text — LIVE/INACTIVE/DRAFT/ARCHIVED), source (text),
+tenant_id (uuid nullable), created_by (uuid nullable),
+created_at (timestamptz), updated_at (timestamptz)
+
+### tenant_plan_map table — created March 17, 2026
+id (uuid PK), tenant_id (uuid FK → tenants), plan_id (uuid FK → plans),
+created_at (timestamptz DEFAULT now())
+Purpose: assigns plans to B2B tenants. ContentTab queries through this.
+RLS: OFF (consistent with all Super Admin tables).
+
+### Content table join path (locked)
+Plan content uses content_items table (NOT assessments table).
+plan_content_map.content_id → content_items.id for ASSESSMENT rows.
+plan_content_map.content_id → courses.id for COURSE rows.
+
 ### Super Admin Tables (row counts for reference)
 exam_categories(6), tenants(3), admin_users(4), content_items(12),
-plans(6), plan_content_map(23), contracts(2), departments(6),
-teams(18), learners(25), audit_logs(5)
+plans(6), plan_content_map(23+), contracts(2), departments(6),
+teams(18), learners(25), audit_logs(5), courses(5),
+tenant_plan_map(seeded — all plans × B2B tenants)
 
 ---
 
@@ -266,10 +284,12 @@ Empty state (no plans assigned — correct state until SA-004):
   "Assign plans in the Plans tab to make content available."
   Button: "Go to Plans tab" → setActiveTab('plans')
 
-Content removal: via Plans tab only — not here.
+Content removal: via Plans tab only — not here. Tab is READ-ONLY.
 
-FALLBACK RULE: if plan_content_map has no tenant path yet
-  (SA-004 pending), empty state renders. DO NOT mock data.
+Data path: tenant_plan_map → plans → plan_content_map → content_items
+FALLBACK RULE: if tenant has no plans in tenant_plan_map,
+  empty state renders. Empty state is the correct state for tenants
+  with no assigned plans.
 
 ---
 
@@ -330,8 +350,14 @@ PRD: https://keyskillset-product-management.atlassian.net/
 5. Learner removal = two-tier: Archive (operational) vs
    Hard Delete (GDPR only). Both available to SA and CA.
 
-6. Content tab = plan-scoped only. Empty state is correct state
-   until SA-004 wires plans to tenants.
+6. Content tab = plan-scoped, read-only. Data via tenant_plan_map.
+   Empty state shown when no plans assigned to tenant.
+   Plan content managed from Plan detail page Content tab (manual model).
+
+7. PlanContentTab = manual add/remove. No auto-include engine.
+   Assessments: content_items (LIVE). Courses: courses table (LIVE).
+   Add Assessment / Add Course buttons open separate slide-overs.
+   Remove: inline trash icon → confirm modal.
 
 ---
 
@@ -445,14 +471,15 @@ Client Admin routes → 404 until sprint scoped.
 ✅ BUG-SA-001-FINAL     Header cleanup, Duplicate removed — DONE
 ✅ BUG-SA-002-FINAL     ARR NaN fully resolved — DONE
 ✅ FIX-SA-003-OVERVIEW-v2  Overview tab rebuilt — DONE
-✅ FIX-SA-003-CONTENT      Content tab built — DONE
+✅ FIX-SA-003-CONTENT      Content tab built (v1) — DONE
+✅ KSS-DB-SA-001          courses table migration — DONE (seeded 5 courses)
+✅ FIX-SA-003-CONTENT-V2  Content tab rebuilt — plan-grouped, read-only,
+                           tenant_plan_map data path, duplicate badge — DONE
+✅ KSS-SA-004-CONTENT     Plan Content tab rebuilt — manual add/remove,
+                           Assessments + Courses sections, no auto-include — DONE
 
-🔴 KSS-DB-SA-001   courses table migration — NEXT (before SA-004)
-               Branch: feat/KSS-DB-SA-001
-               PRD: https://keyskillset-product-management.atlassian.net/
-                    wiki/spaces/EKSS/pages/93093890
-
-🟡 KSS-SA-004   Plans & Pricing
+🟡 KSS-SA-004   Plans & Pricing — full feature (pricing page config,
+               plan lifecycle, swimlane layout)
                PRD: https://keyskillset-product-management.atlassian.net/
                     wiki/spaces/EKSS/pages/93093890
 

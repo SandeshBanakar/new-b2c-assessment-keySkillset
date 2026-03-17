@@ -1,195 +1,238 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
-import { Search, X } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { Plus, Trash2, FileX, BookX } from 'lucide-react'
 import {
-  fetchAllAssessmentsForPlan,
-  writePlanAuditLog,
+  fetchPlanAssignedAssessments,
+  fetchPlanAssignedCourses,
 } from '@/lib/supabase/plans'
-import type { PlanDetail, PlanContentItem } from '@/lib/supabase/plans'
+import type { PlanDetail, PlanAssignedAssessment, PlanAssignedCourse } from '@/lib/supabase/plans'
+import { AddContentSlideOver } from './AddContentSlideOver'
+import { RemoveFromPlanModal } from './RemoveFromPlanModal'
 
 type Props = { plan: PlanDetail }
 
-function deriveAutoIncluded(
-  assessment: Omit<PlanContentItem, 'include_mode' | 'excluded'>,
-  plan: PlanDetail
-): boolean {
-  if (!assessment.is_active) return false
-
-  const typeMatch = (plan as unknown as {
-    allowed_assessment_types?: string[]
-  }).allowed_assessment_types?.includes(
-    assessment.assessment_type.toUpperCase().replace('-', '_')
-  ) ?? true
-
-  if (plan.scope === 'PLATFORM_WIDE') return typeMatch
-
-  return (
-    assessment.exam_type.toUpperCase() ===
-      (plan.category ?? '').toUpperCase() && typeMatch
-  )
-}
-
 export function PlanContentTab({ plan }: Props) {
-  const [allAssessments, setAllAssessments] = useState<
-    Omit<PlanContentItem, 'include_mode' | 'excluded'>[]
-  >([])
-  const [excluded, setExcluded] = useState<Set<string>>(new Set())
-  const [search, setSearch]     = useState('')
-  const [loading, setLoading]   = useState(true)
+  const [assessments, setAssessments] = useState<PlanAssignedAssessment[]>([])
+  const [courses, setCourses] = useState<PlanAssignedCourse[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [addSlideOver, setAddSlideOver] = useState<'ASSESSMENT' | 'COURSE' | null>(null)
+  const [removeItem, setRemoveItem] = useState<{
+    pcmId: string
+    title: string
+    contentType: 'ASSESSMENT' | 'COURSE'
+  } | null>(null)
+
+  const fetchContent = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [a, c] = await Promise.all([
+        fetchPlanAssignedAssessments(plan.id),
+        fetchPlanAssignedCourses(plan.id),
+      ])
+      setAssessments(a)
+      setCourses(c)
+    } finally {
+      setLoading(false)
+    }
+  }, [plan.id])
 
   useEffect(() => {
-    fetchAllAssessmentsForPlan()
-      .then(setAllAssessments)
-      .finally(() => setLoading(false))
-  }, [])
-
-  const autoIncluded = useMemo(
-    () =>
-      allAssessments.filter(
-        (a) => deriveAutoIncluded(a, plan) && !excluded.has(a.id)
-      ),
-    [allAssessments, plan, excluded]
-  )
-
-  const excludedItems = useMemo(
-    () => allAssessments.filter((a) => excluded.has(a.id)),
-    [allAssessments, excluded]
-  )
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return autoIncluded
-    const q = search.toLowerCase()
-    return autoIncluded.filter(
-      (a) =>
-        a.title.toLowerCase().includes(q) ||
-        a.exam_type.toLowerCase().includes(q)
-    )
-  }, [autoIncluded, search])
-
-  async function handleExclude(id: string, title: string) {
-    setExcluded((prev) => new Set([...prev, id]))
-    await writePlanAuditLog(plan.id, 'CONTENT_REMOVED', {
-      content_title: title,
-    })
-  }
-
-  async function handleReinclude(id: string, title: string) {
-    setExcluded((prev) => {
-      const next = new Set(prev)
-      next.delete(id)
-      return next
-    })
-    await writePlanAuditLog(plan.id, 'CONTENT_ADDED', {
-      content_title: title,
-    })
-  }
+    fetchContent()
+  }, [fetchContent])
 
   if (loading) {
     return (
-      <p className="text-sm text-zinc-400 py-8 text-center">
-        Loading content...
-      </p>
+      <div className="space-y-4">
+        {[0, 1].map((s) => (
+          <div key={s} className="space-y-2">
+            <div className="h-4 w-28 rounded bg-zinc-100 animate-pulse" />
+            {[0, 1, 2].map((r) => (
+              <div key={r} className="h-10 rounded bg-zinc-100 animate-pulse" />
+            ))}
+          </div>
+        ))}
+      </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
 
-      {/* Auto-include explanation banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-md px-4 py-3">
-        <p className="text-sm text-blue-700">
-          <span className="font-medium">Auto-included by rule:</span>{' '}
-          {plan.scope === 'PLATFORM_WIDE'
-            ? 'All active assessments on the platform'
-            : `All active ${plan.category} assessments`}{' '}
-          matching this plan&apos;s allowed assessment types.
-          Use the exclude button to remove individual items.
-        </p>
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search assessments..."
-          className="w-full border border-zinc-200 rounded-md pl-9 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-        />
-      </div>
-
-      {/* Auto-included list */}
-      <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-        <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
-            Included ({filtered.length})
-          </h3>
-        </div>
-        {filtered.length === 0 ? (
-          <p className="text-sm text-zinc-400 px-4 py-6 text-center">
-            No assessments match this plan&apos;s rules.
+      {/* Assessments section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+            Assessments ({assessments.length})
           </p>
+          <button
+            onClick={() => setAddSlideOver('ASSESSMENT')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-700 text-white hover:bg-blue-800 transition-colors"
+          >
+            <Plus size={13} />
+            Add Assessment
+          </button>
+        </div>
+
+        {assessments.length === 0 ? (
+          <div className="flex flex-col items-center py-10 gap-2 border border-zinc-200 rounded-md">
+            <FileX size={22} className="text-zinc-300" />
+            <p className="text-sm text-zinc-400">No assessments added to this plan yet.</p>
+          </div>
         ) : (
-          <div className="divide-y divide-zinc-100">
-            {filtered.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between px-4 py-3 group hover:bg-zinc-50 transition-colors"
-              >
-                <div>
-                  <p className="text-sm font-medium text-zinc-900">{a.title}</p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {a.exam_type} · {a.assessment_type}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleExclude(a.id, a.title)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-rose-600 hover:text-rose-700 flex items-center gap-1"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Exclude
-                </button>
-              </div>
-            ))}
+          <div className="border border-zinc-200 rounded-md overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-zinc-50 border-b border-zinc-200">
+                <tr>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 w-1/2">
+                    TITLE
+                  </th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">
+                    CATEGORY
+                  </th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">
+                    TYPE
+                  </th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">
+                    STATUS
+                  </th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {assessments.map((item, idx) => (
+                  <tr
+                    key={item.pcmId}
+                    className={idx < assessments.length - 1 ? 'border-b border-zinc-100' : ''}
+                  >
+                    <td className="px-4 py-3 font-medium text-zinc-900">{item.title}</td>
+                    <td className="px-4 py-3 text-zinc-600">{item.examType}</td>
+                    <td className="px-4 py-3 text-zinc-600">{item.assessmentType}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() =>
+                          setRemoveItem({
+                            pcmId: item.pcmId,
+                            title: item.title,
+                            contentType: 'ASSESSMENT',
+                          })
+                        }
+                        className="text-zinc-300 hover:text-rose-600 transition-colors"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* Excluded items */}
-      {excludedItems.length > 0 && (
-        <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50">
-            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
-              Excluded ({excludedItems.length})
-            </h3>
-          </div>
-          <div className="divide-y divide-zinc-100">
-            {excludedItems.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between px-4 py-3 opacity-50 group hover:opacity-100 transition-opacity"
-              >
-                <div>
-                  <p className="text-sm font-medium text-zinc-900 line-through">
-                    {a.title}
-                  </p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {a.exam_type} · {a.assessment_type}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleReinclude(a.id, a.title)}
-                  className="text-xs text-blue-700 hover:text-blue-800 font-medium"
-                >
-                  Re-include
-                </button>
-              </div>
-            ))}
-          </div>
+      {/* Courses section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+            Courses ({courses.length})
+          </p>
+          <button
+            onClick={() => setAddSlideOver('COURSE')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-700 text-white hover:bg-blue-800 transition-colors"
+          >
+            <Plus size={13} />
+            Add Course
+          </button>
         </div>
+
+        {courses.length === 0 ? (
+          <div className="flex flex-col items-center py-10 gap-2 border border-zinc-200 rounded-md">
+            <BookX size={22} className="text-zinc-300" />
+            <p className="text-sm text-zinc-400">No courses added to this plan yet.</p>
+          </div>
+        ) : (
+          <div className="border border-zinc-200 rounded-md overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-zinc-50 border-b border-zinc-200">
+                <tr>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 w-1/2">
+                    TITLE
+                  </th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">
+                    TYPE
+                  </th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">
+                    STATUS
+                  </th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((item, idx) => (
+                  <tr
+                    key={item.pcmId}
+                    className={idx < courses.length - 1 ? 'border-b border-zinc-100' : ''}
+                  >
+                    <td className="px-4 py-3 font-medium text-zinc-900">{item.title}</td>
+                    <td className="px-4 py-3 text-zinc-600">{item.courseType}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() =>
+                          setRemoveItem({
+                            pcmId: item.pcmId,
+                            title: item.title,
+                            contentType: 'COURSE',
+                          })
+                        }
+                        className="text-zinc-300 hover:text-rose-600 transition-colors"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Add content slide-over */}
+      {addSlideOver && (
+        <AddContentSlideOver
+          planId={plan.id}
+          contentType={addSlideOver}
+          onClose={() => setAddSlideOver(null)}
+          onAdded={() => {
+            fetchContent()
+            setAddSlideOver(null)
+          }}
+        />
       )}
 
+      {/* Remove confirm modal */}
+      {removeItem && (
+        <RemoveFromPlanModal
+          item={removeItem}
+          planId={plan.id}
+          onClose={() => setRemoveItem(null)}
+          onRemoved={() => {
+            fetchContent()
+            setRemoveItem(null)
+          }}
+        />
+      )}
     </div>
   )
 }
