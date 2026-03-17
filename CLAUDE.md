@@ -318,4 +318,240 @@ PRD: https://keyskillset-product-management.atlassian.net/
 1. licensed_categories = metadata only. Access via Plans exclusively.
    Never use it to gate content in any query.
 
-2. Plans contain both assessments AND course
+2. Plans contain both assessments AND courses in V1.
+   plan_content_map uses single table with content_type discriminator
+   (ASSESSMENT | COURSE). Open Decision #9 pending KSS-DB-SA-001.
+
+3. Duplicate Tenant = removed from scope entirely. Never add it back.
+
+4. Client Admin reassignment = separate protected action with its own
+   warning modal. Not part of Edit Details slide-over.
+
+5. Learner removal = two-tier: Archive (operational) vs
+   Hard Delete (GDPR only). Both available to SA and CA.
+
+6. Content tab = plan-scoped only. Empty state is correct state
+   until SA-004 wires plans to tenants.
+
+---
+
+## 17. EXAM ENGINE — LOCKED BEHAVIOURS
+
+NEVER modify without explicit "Override locked behaviour" instruction.
+
+Question status transitions (5 states):
+  not_visited     → answered | marked_for_review | visited_unanswered
+  answered        → answered_and_marked | visited_unanswered (clear)
+  marked_for_review → answered_and_marked | visited_unanswered
+  answered_and_marked → marked_for_review (clear) | answered (save&next)
+
+Navigation rules:
+  Previous: navigates only, no save. Disabled on Q1 Section 1 only.
+  Save & Next last Q non-final section: silently → Q1 next section.
+  Save & Next last Q final section: wrap to Q1 Section 1.
+  Mark for Review: one-directional. Never unmarks.
+    Only unmark path: Save & Next.
+  Timer: never pauses. Auto-submits at 00:00:00.
+
+Question types:
+  MCQ_SINGLE (built) | MCQ_MULTI (FIX-027) |
+  PASSAGE_SINGLE (built) | PASSAGE_MULTI (built) |
+  NUMERIC (FIX-027, keyboard disabled)
+
+---
+
+## 18. KEY FILES
+
+src/app/super-admin/tenants/[id]/page.tsx
+  — Main tenant detail page (7 tabs)
+  — Quick Actions bar inside Overview tab block only
+  — No Duplicate button anywhere in this file
+
+src/components/tenant-detail/EditDetailsSlideOver.tsx
+  — Edit Details slide-over (4 sections)
+  — Exports: EditDetailsSlideOver, TenantRow
+
+src/components/tenant-detail/ContentTab.tsx
+  — Content tab component (plan-scoped, grouped, duplicate badge)
+  — Props: tenantId, onGoToPlans
+
+src/app/assessments/[id]/exam/page.tsx
+  — LinearExamPlayer, ExamHeader, ExamFooter,
+    PaletteSidebar, QuestionArea, ExitConfirmModal, SubmitConfirmModal
+
+src/hooks/useExamEngine.ts
+  — State machine, timer, localStorage
+  — Actions: SELECT_OPTION, SAVE_AND_NEXT, PREVIOUS,
+    MARK_FOR_REVIEW, MARK_AND_NEXT, CLEAR_RESPONSE,
+    JUMP_TO_QUESTION, SWITCH_SECTION, TICK, SUBMIT_EXAM
+
+src/data/exams/clat-full-test-1.ts
+src/data/exams/neet-full-test-1.ts
+src/data/demoUsers.ts
+src/utils/assessmentUtils.ts
+src/data/assessments.ts               — mockAttempts (static, not DB yet)
+src/lib/supabase/client.ts
+src/components/assessment-detail/AttemptsTab.tsx
+src/components/assessment-detail/AnalyticsTab.tsx
+src/components/assessment-detail/OverviewTab.tsx
+src/app/assessments/[id]/page.tsx
+src/app/assessments/[id]/results/page.tsx
+src/app/assessments/[id]/instructions/page.tsx
+
+---
+
+## 19. SIDEBAR NAV — LOCKED v2.0
+
+Section        Item                  Status
+──────────────────────────────────────────────────
+(none)         Dashboard             Coming Soon
+Content        Content Bank          Coming Soon
+Monetisation   Plans & Pricing       🟡 KSS-SA-004 next
+Monetisation   Course Store          Coming Soon
+Master Org     B2C Users             Coming Soon
+Master Org     Content Creators      Coming Soon
+Organisations  Tenants               ✅ KSS-SA-003 built
+Assessment     Sources & Questions   Coming Soon
+Assessment     Question Bank         Coming Soon
+Assessment     Create Assessments    Coming Soon
+Assessment     Bulk Upload           Coming Soon
+Configuration  Marketing Config      Coming Soon
+Configuration  Analytics             Coming Soon
+Configuration  Audit Log             Coming Soon
+
+---
+
+## 20. PERSONA SELECTOR — LOCKED
+
+Admin row (rounded-md avatars):
+  Super Admin    → /super-admin          (blue-700)
+  Akash Inst.    → /client-admin/akash   (violet-700)
+  TechCorp India → /client-admin/techcorp (teal-700)
+
+Divider: "Learner Personas"
+
+Learner row (rounded-full avatars):
+  Free | Basic | Pro | Premium
+
+Client Admin routes → 404 until sprint scoped.
+
+---
+
+## 21. CURRENT BUILD QUEUE
+
+✅ BUG-SA-001      Quick actions bar placement — DONE
+✅ BUG-SA-002      ARR NaN fix — DONE
+✅ BUG-SA-003-EDITLINK  Inline Edit link removed — DONE
+✅ BUG-SA-001-FINAL     Header cleanup, Duplicate removed — DONE
+✅ BUG-SA-002-FINAL     ARR NaN fully resolved — DONE
+✅ FIX-SA-003-OVERVIEW-v2  Overview tab rebuilt — DONE
+✅ FIX-SA-003-CONTENT      Content tab built — DONE
+
+🔴 KSS-DB-SA-001   courses table migration — NEXT (before SA-004)
+               Branch: feat/KSS-DB-SA-001
+               PRD: https://keyskillset-product-management.atlassian.net/
+                    wiki/spaces/EKSS/pages/93093890
+
+🟡 KSS-SA-004   Plans & Pricing
+               PRD: https://keyskillset-product-management.atlassian.net/
+                    wiki/spaces/EKSS/pages/93093890
+
+🟡 KSS-SA-005   Audit Log
+🟡 KSS-SA-006   Analytics
+🟡 KSS-SA-007   Marketing Config
+🟡 KSS-SA-008   Master Organisation
+🟡 KSS-SA-009   Content Bank
+🟡 KSS-SA-010   Dashboard (last)
+
+B2C (pending):
+🔴 KSS-B2C-FIX-023  Back button + ChevronLeft on instructions page
+🔴 KSS-B2C-FIX-024  Previous cross-section NTA navigation
+🔴 KSS-B2C-FIX-025-FINAL  Exam engine state machine (merged)
+🔴 KSS-B2C-FIX-026  Mobile hard block modal (< 768px)
+🔴 KSS-B2C-FIX-027  MCQ_MULTI and NUMERIC renderers
+🔴 KSS-B2C-FIX-028  Draggable on-screen calculator
+
+---
+
+## 22. OPEN BUGS
+
+BUG-001  Analytics tab empty after results redirect
+         Deferred — depends on Analytics page build (KSS-SA-006)
+
+BUG-002  Upgrade banner not showing after free attempt
+         Deferred — depends on DB-003 revisit
+
+---
+
+## 23. OPEN DECISIONS (do not resolve without product owner confirmation)
+
+1.  questions table (B2C) vs content_items (SA) — merge or keep separate
+2.  Supabase vs AWS RDS migration — pending engineering decision
+3.  Client Admin routes build sprint — pending
+4.  Course Store Stripe integration in demo — not decided
+5.  Licensed Categories sync between tenant + contract — update save logic
+6.  Confluence MCP for PRD updates — handled in Claude.ai project chat
+7.  FIX-SA-003-MODAL-PLANS — Section 5 Plans picker (post SA-004)
+8.  courses table schema — pending KSS-DB-SA-001 design
+9.  plan_content_map — single discriminator table (working assumption)
+    vs two tables (plan_assessments + plan_courses)
+10. Sub-PRD 4 Plans & Entitlements — update once SA-004 build starts
+
+---
+
+## 24. PRD CONFLUENCE LINKS
+
+Sub-PRD 2 — Tenant, RBAC & Licensing (v2.1):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93913089
+
+Sub-PRD 4 — Plans & Entitlements (v2.0):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93093890
+
+Super Admin Master PRD:
+  https://keyskillset-product-management.atlassian.net/wiki/x/AQBwBQ
+
+---
+
+## 25. WORKFLOW — HOW CLAUDE.AI AND CLAUDE CODE INTERACT
+
+Claude.ai (project chat):
+  - Reads PRDs via Confluence MCP
+  - Makes product decisions and writes prompts
+  - Updates CLAUDE.md after each session
+  - Generates handoff MD for upload to Project Files
+  - Writes PRD updates to Confluence via MCP
+
+Claude Code (VS Code):
+  - Reads CLAUDE.md automatically on startup
+  - Receives build prompts pasted by the user
+  - Executes against live codebase
+  - NEVER edits CLAUDE.md directly
+  - NEVER writes to Confluence
+
+CLAUDE.md is updated only by Claude.ai at session end.
+Commit CLAUDE.md to repo root after every session update.
+
+---
+
+## 26. SELF-CRITIQUE BEFORE EVERY COMMIT
+
+Run this checklist before presenting any code:
+
+[ ] Tailwind tokens only — no custom hex, no inline styles
+[ ] Correct git branch format (feat/ or fix/)
+[ ] No RLS added to any Super Admin table
+[ ] No schema changes without an authorised KSS-DB-XXX prompt
+[ ] Works for all 4 demo user tiers (Free/Basic/Pro/Premium)
+[ ] Quick Actions bar ONLY inside Overview tab block
+[ ] No Duplicate Tenant action anywhere in any file
+[ ] licensed_categories never used to gate content in any query
+[ ] Locked exam engine behaviours untouched
+[ ] Build passes: npm run build returns ✓ Compiled successfully
+[ ] No unused imports left behind after any removal
+
+---
+
+*CLAUDE.md — keySkillset v2.2 — Updated March 17, 2026*
+*Source of truth: Claude.ai project (keySkillset)*
+*For PRD updates: use Claude.ai with Confluence MCP connector*
+*Never edit this file manually*
