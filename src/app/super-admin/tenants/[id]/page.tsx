@@ -346,16 +346,7 @@ function TabOverview({
       <div className="flex gap-6">
         {/* Tenant Details card */}
         <div className="flex-1 bg-white rounded-md border border-zinc-200 p-5">
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-sm font-semibold text-zinc-900">Tenant Details</p>
-            <button
-              onClick={onEditDetails}
-              className="text-sm font-medium text-blue-700 hover:text-blue-800 flex items-center gap-1"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit
-            </button>
-          </div>
+          <p className="text-sm font-semibold text-zinc-900 mb-4">Tenant Details</p>
           <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 items-start">
             <p className="text-sm text-zinc-500">Tenant Name</p>
             <p className="text-sm text-zinc-900">{tenant.name}</p>
