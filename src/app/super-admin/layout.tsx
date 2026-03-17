@@ -86,7 +86,7 @@ export default function SuperAdminLayout({
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Monetisation
           </p>
-          <NavItem href="/super-admin/plans" icon={CreditCard} label="Plans & Pricing" />
+          <NavItem href="/super-admin/plans-pricing" icon={CreditCard} label="Plans & Pricing" />
           <NavItem href="/super-admin/course-store" icon={ShoppingBag} label="Course Store" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
