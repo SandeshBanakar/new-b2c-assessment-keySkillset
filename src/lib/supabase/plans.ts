@@ -235,3 +235,22 @@ export async function writePlanAuditLog(
 
   if (error) throw new Error(error.message)
 }
+
+// ─── Tenant contract helpers (FIX-SA-003-CONTRACT-PLAN) ──────────────────────
+
+export type PublishedPlanOption = {
+  id: string
+  name: string
+  price: number
+  scope: string
+}
+
+export async function fetchPublishedPlans(): Promise<PublishedPlanOption[]> {
+  const { data, error } = await supabase
+    .from('plans')
+    .select('id, name, price, scope')
+    .eq('status', 'PUBLISHED')
+    .order('price', { ascending: true })
+  if (error) throw new Error(error.message)
+  return data as PublishedPlanOption[]
+}
