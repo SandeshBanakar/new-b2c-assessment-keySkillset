@@ -7,7 +7,9 @@
       "Bash(ls C:/Projects/keyskillset/src/app/assessments/[id]/)",
       "Bash(npx tsc:*)",
       "Bash(grep -n \"seatCount\\\\|arr\\\\|stripeSubscriptionId\\\\|contract\\\\|Contract\\\\|useEffect\\\\|plan_id\\\\|selectedPlan\\\\|publishedPlan\" src/app/super-admin/tenants/[id]/page.tsx)",
-      "Bash(grep -n \"onEditDetails\\\\|SectionLabel\" src/app/super-admin/tenants/[id]/page.tsx src/app/super-admin/layout.tsx)"
+      "Bash(grep -n \"onEditDetails\\\\|SectionLabel\" src/app/super-admin/tenants/[id]/page.tsx src/app/super-admin/layout.tsx)",
+      "mcp__claude_ai_Atlassian__getAccessibleAtlassianResources",
+      "mcp__claude_ai_Atlassian__getConfluencePage"
     ]
   }
 }
