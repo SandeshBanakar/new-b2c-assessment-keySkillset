@@ -1,5 +1,17 @@
 import { supabase } from '@/lib/supabase/client'
 
+export type CreatePlanPayload = {
+  name: string
+  description: string
+  audience_type: string
+  price: number
+  billing_cycle: string
+  status: 'DRAFT' | 'PUBLISHED'
+  max_attempts_per_assessment: number
+  allowed_assessment_types: string[]
+  // stored as JSON array: ['FULL_TEST', 'SUBJECT_TEST', 'CHAPTER_TEST']
+}
+
 export type PlanRow = {
   id: string
   name: string
@@ -50,4 +62,58 @@ export async function fetchPlans(): Promise<PlanRow[]> {
   }))
 
   return normalised as PlanRow[]
+}
+
+export async function createPlan(
+  payload: CreatePlanPayload
+): Promise<string> {
+  // Returns the new plan UUID
+  const { data, error } = await supabase
+    .from('plans')
+    .insert({
+      name:                        payload.name,
+      description:                 payload.description,
+      audience_type:               payload.audience_type,
+      price:                       payload.price,
+      billing_cycle:               payload.billing_cycle,
+      status:                      payload.status,
+      max_attempts_per_assessment: payload.max_attempts_per_assessment,
+    })
+    .select('id')
+    .single()
+
+  if (error) throw new Error(error.message)
+  return (data as { id: string }).id
+}
+
+export async function assignContentToPlan(
+  planId: string,
+  contentItemIds: string[]
+): Promise<void> {
+  if (contentItemIds.length === 0) return
+
+  const rows = contentItemIds.map((contentItemId) => ({
+    plan_id:      planId,
+    content_id:   contentItemId,
+    content_type: 'ASSESSMENT' as const,
+  }))
+
+  const { error } = await supabase
+    .from('plan_content_map')
+    .insert(rows)
+
+  if (error) throw new Error(error.message)
+}
+
+export async function fetchLiveAssessments(): Promise<
+  { id: string; title: string; exam_type: string; assessment_type: string }[]
+> {
+  const { data, error } = await supabase
+    .from('assessments')
+    .select('id, title, exam_type, assessment_type')
+    .eq('status', 'active')
+    .order('title', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return data as { id: string; title: string; exam_type: string; assessment_type: string }[]
 }
