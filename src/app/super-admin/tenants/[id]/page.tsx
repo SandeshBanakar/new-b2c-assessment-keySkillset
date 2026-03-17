@@ -1121,87 +1121,118 @@ function TabContract({
     <div className="bg-white rounded-md border border-zinc-200 p-5">
       <p className="text-sm font-semibold text-zinc-900 mb-4">Contract Details</p>
 
-      {/* Plan selector */}
-      <div className="mb-5">
-        <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-          Linked Plan
-        </label>
-        <select
-          value={selectedPlanId}
-          onChange={(e) => setSelectedPlanId(e.target.value)}
-          className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-        >
-          <option value="">— Select a plan —</option>
-          {publishedPlans.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} · {p.scope === 'PLATFORM_WIDE' ? 'Platform-wide' : 'Category Bundle'} · ₹{p.price}/mo
-            </option>
-          ))}
-        </select>
-        {selectedPlanId && (() => {
-          const plan = publishedPlans.find((p) => p.id === selectedPlanId)
-          if (!plan || !form.seat_count) return null
-          const suggestedArr = plan.price * Number(form.seat_count) * 12
-          return (
-            <p className="text-xs text-zinc-400 mt-1.5">
-              Suggested ARR: ₹{suggestedArr.toLocaleString('en-IN')}
-              &nbsp;({form.seat_count} seats × ₹{plan.price}/mo × 12)
-            </p>
-          )
-        })()}
-      </div>
+      {/* Contract Details form */}
+      <div className="space-y-4">
 
-      {/* Seat Count — existing field */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium text-zinc-700 block mb-1">Seat Count</label>
-          <input
-            type="number"
-            value={form.seat_count}
-            onChange={e => set('seat_count', e.target.value)}
-            className={inputCls}
-          />
+        {/* Row 1 — Linked Plan + Stripe Subscription ID */}
+        <div className="grid grid-cols-2 gap-4">
+
+          {/* Linked Plan */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+              Linked Plan
+            </label>
+            <select
+              value={selectedPlanId}
+              onChange={(e) => setSelectedPlanId(e.target.value)}
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            >
+              <option value="">— Select a plan —</option>
+              {publishedPlans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ·{' '}
+                  {p.scope === 'PLATFORM_WIDE' ? 'Platform-wide' : 'Category Bundle'}{' '}
+                  · ₹{p.price}/mo
+                </option>
+              ))}
+            </select>
+            {selectedPlanId && (() => {
+              const plan = publishedPlans.find((p) => p.id === selectedPlanId)
+              if (!plan || !form.seat_count) return null
+              const suggested = plan.price * Number(form.seat_count) * 12
+              return (
+                <p className="text-xs text-zinc-400 mt-1.5">
+                  Suggested ARR: ₹{suggested.toLocaleString('en-IN')}
+                  &nbsp;({form.seat_count} seats × ₹{plan.price}/mo × 12)
+                </p>
+              )
+            })()}
+          </div>
+
+          {/* Stripe Subscription ID */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+              Stripe Subscription ID
+            </label>
+            <input
+              type="text"
+              value={form.stripe_subscription_id}
+              onChange={e => set('stripe_subscription_id', e.target.value)}
+              className={inputCls}
+            />
+          </div>
+
         </div>
-        <div>
-          <label className="text-sm font-medium text-zinc-700 block mb-1">ARR ($)</label>
-          <input
-            type="text"
-            value={form.arr}
-            onChange={e => { set('arr', e.target.value); setArrError('') }}
-            placeholder="0.00"
-            className={`${inputCls} ${arrError ? 'border-rose-400' : ''}`}
-          />
-          {arrError && <p className="text-xs text-rose-600 mt-1">{arrError}</p>}
+
+        {/* Row 2 — Seat Count + ARR */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+              Seat Count
+            </label>
+            <input
+              type="number"
+              value={form.seat_count}
+              onChange={e => set('seat_count', e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+              ARR ($)
+            </label>
+            <input
+              type="text"
+              value={form.arr}
+              onChange={e => { set('arr', e.target.value); setArrError('') }}
+              placeholder="0.00"
+              className={`${inputCls} ${arrError ? 'border-rose-400' : ''}`}
+            />
+            {arrError && <p className="text-xs text-rose-600 mt-1">{arrError}</p>}
+          </div>
         </div>
-        <div>
-          <label className="text-sm font-medium text-zinc-700 block mb-1">Start Date</label>
-          <input
-            type="date"
-            value={form.start_date}
-            onChange={e => set('start_date', e.target.value)}
-            className={inputCls}
-          />
+
+        {/* Row 3 — Start Date + End Date */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={form.start_date}
+              onChange={e => set('start_date', e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+              End Date
+            </label>
+            <input
+              type="date"
+              value={form.end_date}
+              onChange={e => set('end_date', e.target.value)}
+              className={inputCls}
+            />
+          </div>
         </div>
+
+        {/* Row 4 — Notes full width */}
         <div>
-          <label className="text-sm font-medium text-zinc-700 block mb-1">End Date</label>
-          <input
-            type="date"
-            value={form.end_date}
-            onChange={e => set('end_date', e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-zinc-700 block mb-1">Stripe Subscription ID</label>
-          <input
-            type="text"
-            value={form.stripe_subscription_id}
-            onChange={e => set('stripe_subscription_id', e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        <div className="col-span-2">
-          <label className="text-sm font-medium text-zinc-700 block mb-1">Notes</label>
+          <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+            Notes
+          </label>
           <textarea
             value={form.notes}
             onChange={e => set('notes', e.target.value)}
@@ -1209,6 +1240,7 @@ function TabContract({
             className={`${inputCls} resize-none`}
           />
         </div>
+
       </div>
       <button
         onClick={save}
