@@ -5,21 +5,17 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import {
-  ChevronRight, AlertTriangle, CheckCircle, X, Loader2,
+  ChevronRight, CheckCircle, X, Loader2,
   Lock, UploadCloud, Plus, Users, Download,
   Pencil, Copy, PowerOff, Power, BookOpen,
 } from 'lucide-react'
+import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface TenantDetail {
-  id: string
-  name: string
-  type: string
-  feature_toggle_mode: 'RUN_ONLY' | 'FULL_CREATOR'
+// TenantDetail extends TenantRow with all DB columns
+type TenantDetail = TenantRow & {
   licensed_categories: string[]
-  is_active: boolean
-  created_at: string
 }
 
 interface Contract {
@@ -253,7 +249,7 @@ function InviteUserSlideOver({
   return (
     <>
       <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-[420px] bg-white shadow-xl flex flex-col z-50">
+      <div className="fixed inset-y-0 right-0 w-105 bg-white shadow-xl flex flex-col z-50">
         <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center">
           <p className="text-base font-semibold text-zinc-900">Invite User</p>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
@@ -323,85 +319,148 @@ function TabOverview({
   tenant,
   contract,
   learnerCount,
-  clientAdminEmail,
+  clientAdmin,
+  onEditDetails,
 }: {
   tenant: TenantDetail
   contract: Contract | null
   learnerCount: number
-  clientAdminEmail: string
+  clientAdmin: { name: string; email: string } | null
+  onEditDetails: () => void
 }) {
   const seatCount = contract?.seat_count ?? 0
   const fillPct = seatCount > 0 ? Math.min((learnerCount / seatCount) * 100, 100) : 0
-  const near = seatCount > 0 && learnerCount / seatCount >= 0.9
+  const ratio = seatCount > 0 ? learnerCount / seatCount : 0
+  const barColor = ratio >= 1.0 ? 'bg-rose-600' : ratio >= 0.9 ? 'bg-amber-500' : 'bg-blue-700'
 
-  const fields: [string, React.ReactNode][] = [
-    ['Tenant Name', <span key="name" className="text-sm text-zinc-900">{tenant.name}</span>],
-    ['Type', <span key="type" className="text-xs font-medium bg-blue-50 text-blue-700 rounded-md px-2 py-0.5">{tenant.type}</span>],
-    [
-      'Feature Mode',
-      <span
-        key="mode"
-        className={`text-xs font-medium rounded-md px-2 py-0.5 ${
-          tenant.feature_toggle_mode === 'FULL_CREATOR' ? 'bg-blue-50 text-blue-700' : 'bg-zinc-100 text-zinc-600'
-        }`}
-      >
-        {tenant.feature_toggle_mode === 'FULL_CREATOR' ? 'Full Creator' : 'Run Only'}
-      </span>,
-    ],
-    [
-      'Status',
-      <span
-        key="status"
-        className={`text-xs font-medium rounded-md px-2 py-0.5 ${
-          tenant.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
-        }`}
-      >
-        {tenant.is_active ? 'Active' : 'Inactive'}
-      </span>,
-    ],
-    ['Created', <span key="created" className="text-sm text-zinc-900">{formatDate(tenant.created_at)}</span>],
-    ['Client Admin', <span key="admin" className="text-sm text-zinc-900">{clientAdminEmail || '—'}</span>],
-  ]
+  const val = (v: string | null | undefined) =>
+    v ? (
+      <p className="text-sm text-zinc-900">{v}</p>
+    ) : (
+      <p className="text-sm text-zinc-400">—</p>
+    )
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {/* Details Card */}
-      <div className="bg-white rounded-md border border-zinc-200 p-5">
-        <p className="text-sm font-semibold text-zinc-900 mb-4">Tenant Details</p>
-        <div className="grid grid-cols-2 gap-y-3">
-          {fields.map(([label, value]) => (
-            <>
-              <p key={`lbl-${label}`} className="text-sm text-zinc-500">{label}</p>
-              <div key={`val-${label}`}>{value}</div>
-            </>
-          ))}
-        </div>
-      </div>
+    <div>
+      {/* Row 1: Tenant Details + Seat Usage */}
+      <div className="flex gap-6">
+        {/* Tenant Details card */}
+        <div className="flex-1 bg-white rounded-md border border-zinc-200 p-5">
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-sm font-semibold text-zinc-900">Tenant Details</p>
+            <button
+              onClick={onEditDetails}
+              className="text-sm font-medium text-blue-700 hover:text-blue-800 flex items-center gap-1"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          </div>
+          <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 items-start">
+            <p className="text-sm text-zinc-500">Tenant Name</p>
+            <p className="text-sm text-zinc-900">{tenant.name}</p>
 
-      {/* Seat Usage Card */}
-      <div className="bg-white rounded-md border border-zinc-200 p-5">
-        <p className="text-sm font-semibold text-zinc-900 mb-4">Seat Usage</p>
-        <p className="text-3xl font-semibold text-zinc-900">
-          {learnerCount}
-          <span className="text-lg text-zinc-400"> / {seatCount || '—'}</span>
-        </p>
-        {seatCount > 0 && (
-          <>
-            <div className="w-full h-2 bg-zinc-100 rounded-md overflow-hidden mt-3">
+            <p className="text-sm text-zinc-500">Type</p>
+            <span className="text-xs font-medium bg-blue-50 text-blue-700 rounded-md px-2 py-0.5 w-fit">
+              {tenant.type}
+            </span>
+
+            <p className="text-sm text-zinc-500">Feature Mode</p>
+            <span
+              className={`text-xs font-medium rounded-md px-2 py-0.5 w-fit ${
+                tenant.feature_toggle_mode === 'FULL_CREATOR'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'bg-zinc-100 text-zinc-600'
+              }`}
+            >
+              {tenant.feature_toggle_mode === 'FULL_CREATOR' ? 'Full Creator' : 'Run Only'}
+            </span>
+
+            <p className="text-sm text-zinc-500">Status</p>
+            <span
+              className={`text-xs font-medium rounded-md px-2 py-0.5 w-fit ${
+                tenant.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
+              }`}
+            >
+              {tenant.is_active ? 'Active' : 'Inactive'}
+            </span>
+
+            <p className="text-sm text-zinc-500">Created</p>
+            <p className="text-sm text-zinc-900">{formatDate(tenant.created_at)}</p>
+
+            <p className="text-sm text-zinc-500">Client Admin</p>
+            <div>
+              {clientAdmin ? (
+                <>
+                  <p className="text-sm text-zinc-900">{clientAdmin.name}</p>
+                  <p className="text-sm text-zinc-500">{clientAdmin.email}</p>
+                </>
+              ) : (
+                <p className="text-sm text-zinc-400">Not assigned</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Seat Usage card */}
+        <div className="w-64 flex-none bg-white rounded-md border border-zinc-200 p-5">
+          <p className="text-sm font-semibold text-zinc-900 mb-4">Seat Usage</p>
+          <p className="text-3xl font-semibold text-zinc-900">
+            {learnerCount}
+            <span className="text-lg text-zinc-400"> / {seatCount || '—'}</span>
+          </p>
+          {seatCount > 0 && (
+            <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden mt-3">
               <div
-                className={`h-full rounded-md ${near ? 'bg-amber-500' : 'bg-blue-700'}`}
+                className={`h-full rounded-full ${barColor}`}
                 style={{ width: `${fillPct}%` }}
               />
             </div>
-            {near && (
-              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                Approaching seat limit
-              </p>
-            )}
-          </>
-        )}
-        <p className="text-xs text-zinc-400 mt-1">Active learners</p>
+          )}
+          <p className="text-xs text-zinc-400 mt-2">Active learners</p>
+        </div>
+      </div>
+
+      {/* Row 2: Contact & Address */}
+      <div className="mt-6">
+        <p className="text-sm font-semibold text-zinc-900 mb-3">Contact &amp; Address</p>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+          {/* Left column */}
+          <div className="space-y-3">
+            {(
+              [
+                ['Contact Name', tenant.contact_name],
+                ['Contact Email', tenant.contact_email],
+                ['Contact Phone', tenant.contact_phone],
+                ['Timezone', tenant.timezone],
+                ['Date Format', tenant.date_format],
+              ] as [string, string | null | undefined][]
+            ).map(([label, value]) => (
+              <div key={label} className="flex">
+                <p className="text-sm text-zinc-500 w-36 shrink-0">{label}</p>
+                {val(value)}
+              </div>
+            ))}
+          </div>
+          {/* Right column */}
+          <div className="space-y-3">
+            {(
+              [
+                ['Address Line 1', tenant.address_line1],
+                ['Address Line 2', tenant.address_line2],
+                ['City', tenant.city],
+                ['State', tenant.state],
+                ['Country', tenant.country],
+                ['Zip Code', tenant.zip_code],
+              ] as [string, string | null | undefined][]
+            ).map(([label, value]) => (
+              <div key={label} className="flex">
+                <p className="text-sm text-zinc-500 w-36 shrink-0">{label}</p>
+                {val(value)}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -658,7 +717,7 @@ function AddLearnerSlideOver({
     <>
       <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
       <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl flex flex-col z-50">
-        <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center flex-shrink-0">
+        <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center shrink-0">
           <p className="text-base font-semibold text-zinc-900">Add Learner</p>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
             <X className="w-5 h-5" />
@@ -734,7 +793,7 @@ function AddLearnerSlideOver({
             </select>
           </div>
         </div>
-        <div className="border-t border-zinc-200 px-6 py-4 flex justify-end gap-3 flex-shrink-0">
+        <div className="border-t border-zinc-200 px-6 py-4 flex justify-end gap-3 shrink-0">
           <button onClick={onClose} className="text-sm text-zinc-600 hover:text-zinc-800">
             Cancel
           </button>
@@ -1374,6 +1433,9 @@ export default function TenantDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('Overview')
 
+  // ── Edit Details slide-over
+  const [showEditDetails, setShowEditDetails] = useState(false)
+
   // ── Inline name edit
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
@@ -1498,7 +1560,15 @@ export default function TenantDetailPage() {
     return <p className="p-6 text-sm text-zinc-400">Tenant not found.</p>
   }
 
-  const clientAdmin = adminUsers.find(u => u.role === 'CLIENT_ADMIN' && u.is_active)
+  const clientAdminUser = adminUsers.find(u => u.role === 'CLIENT_ADMIN' && u.is_active)
+  const clientAdmin = clientAdminUser
+    ? { name: clientAdminUser.name, email: clientAdminUser.email }
+    : null
+
+  const handleEditDetailsSave = (updated: Partial<TenantRow>) => {
+    setTenant(prev => prev ? { ...prev, ...updated } as TenantDetail : prev)
+    setPageToast({ msg: 'Tenant details updated', variant: 'success' })
+  }
 
   return (
     <div className="p-6">
@@ -1600,7 +1670,8 @@ export default function TenantDetailPage() {
           tenant={tenant}
           contract={contract}
           learnerCount={learnerCount}
-          clientAdminEmail={clientAdmin?.email ?? ''}
+          clientAdmin={clientAdmin}
+          onEditDetails={() => setShowEditDetails(true)}
         />
       )}
       {activeTab === 'Plans' && <TabPlans />}
@@ -1632,6 +1703,13 @@ export default function TenantDetailPage() {
           tenantName={tenant.name}
         />
       )}
+
+      <EditDetailsSlideOver
+        isOpen={showEditDetails}
+        onClose={() => setShowEditDetails(false)}
+        tenant={tenant}
+        onSave={handleEditDetailsSave}
+      />
 
       {pageToast && (
         <Toast
