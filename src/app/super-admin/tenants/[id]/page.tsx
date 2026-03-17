@@ -1163,7 +1163,7 @@ function TabContract({
 }) {
   const [form, setForm] = useState<Omit<Contract, 'tenant_id' | 'id' | 'updated_at'>>({
     seat_count: contract?.seat_count ?? 0,
-    arr: contract ? contract.arr / 100 : 0,
+    arr: Math.max(0, Number(contract?.arr) || 0) / 100,
     start_date: contract?.start_date?.split('T')[0] ?? '',
     end_date: contract?.end_date?.split('T')[0] ?? '',
     stripe_subscription_id: contract?.stripe_subscription_id ?? '',
@@ -1171,11 +1171,18 @@ function TabContract({
   })
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(false)
+  const [arrError, setArrError] = useState('')
 
   const set = (key: keyof typeof form, val: string | number) =>
     setForm(prev => ({ ...prev, [key]: val }))
 
   const save = async () => {
+    const arrValue = parseFloat(String(form.arr))
+    if (isNaN(arrValue) || arrValue < 0) {
+      setArrError('ARR must be a valid positive number.')
+      return
+    }
+    setArrError('')
     setSaving(true)
     try {
       const payload = {
@@ -1229,10 +1236,11 @@ function TabContract({
           <input
             type="text"
             value={form.arr}
-            onChange={e => set('arr', e.target.value)}
+            onChange={e => { set('arr', e.target.value); setArrError('') }}
             placeholder="0.00"
-            className={inputCls}
+            className={`${inputCls} ${arrError ? 'border-rose-400' : ''}`}
           />
+          {arrError && <p className="text-xs text-rose-600 mt-1">{arrError}</p>}
         </div>
         <div>
           <label className="text-sm font-medium text-zinc-700 block mb-1">Start Date</label>
