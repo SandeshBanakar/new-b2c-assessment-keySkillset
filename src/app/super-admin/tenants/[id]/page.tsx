@@ -7,9 +7,10 @@ import { supabase } from '@/lib/supabase/client'
 import {
   ChevronRight, CheckCircle, X, Loader2,
   Lock, UploadCloud, Plus, Users, Download,
-  Pencil, Copy, PowerOff, Power, BookOpen,
+  Pencil, PowerOff, Power,
 } from 'lucide-react'
 import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
+import ContentTab from '@/components/tenant-detail/ContentTab'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,20 +74,6 @@ interface Department {
 interface Team {
   id: string
   name: string
-}
-
-type RawContentItem = {
-  id: string
-  title: string
-  exam_category_id: string | null
-  test_type: string | null
-  source: string
-  status: string
-  tenant_scope_id: string | null
-  created_by: string | null
-  created_at: string
-  exam_categories: { name: string } | null
-  admin_users: { name: string } | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1045,111 +1032,6 @@ function TabLearners({
 
 // ─── Tab: Content ─────────────────────────────────────────────────────────────
 
-function getContentStatusBadge(status: string): string {
-  if (status === 'LIVE') return 'bg-green-50 text-green-700'
-  if (status === 'DRAFT') return 'bg-amber-50 text-amber-700'
-  return 'bg-zinc-100 text-zinc-500'
-}
-
-function TabContent({ tenantId: _tenantId }: { tenantId: string }) {
-  const [platformItems, setPlatformItems] = useState<RawContentItem[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    supabase
-      .from('content_items')
-      .select('*, exam_categories(name)')
-      .eq('source', 'PLATFORM')
-      .eq('status', 'LIVE')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setPlatformItems((data ?? []) as RawContentItem[])
-        setLoading(false)
-      })
-  }, [])
-
-  const skeletonRows = (
-    <tbody>
-      {[0, 1].map(i => (
-        <tr key={i}>
-          <td colSpan={4} className="px-4 py-3">
-            <div className="h-8 animate-pulse bg-zinc-100 rounded-md" />
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  )
-
-  return (
-    <div>
-      <p className="font-semibold text-zinc-900 mb-1">Content</p>
-      <p className="text-sm text-zinc-500 mb-6">
-        Platform content available globally + content created by this tenant.
-      </p>
-
-      {/* Section A: Platform Assessments */}
-      <p className="text-sm font-semibold text-zinc-700 mb-1">Platform Assessments</p>
-      <p className="text-sm text-zinc-500 mb-3">
-        Live assessments available to all tenants via the global content bank.
-      </p>
-      <div className="bg-white rounded-md border border-zinc-200 overflow-hidden mb-2">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-zinc-50 border-b border-zinc-200">
-              {['Title', 'Category', 'Type', 'Status'].map(col => (
-                <th
-                  key={col}
-                  className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide"
-                >
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          {loading ? (
-            skeletonRows
-          ) : platformItems.length === 0 ? (
-            <tbody>
-              <tr>
-                <td colSpan={4} className="px-4 py-4 text-sm text-zinc-400">
-                  No live platform content available.
-                </td>
-              </tr>
-            </tbody>
-          ) : (
-            <tbody>
-              {platformItems.map(item => (
-                <tr key={item.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-zinc-900">{item.title}</td>
-                  <td className="px-4 py-3 text-sm text-zinc-500">{item.exam_categories?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-sm text-zinc-500">{item.test_type ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium rounded-md px-2 py-0.5 ${getContentStatusBadge(item.status)}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          )}
-        </table>
-      </div>
-
-      <div className="border-t border-zinc-200 my-6" />
-
-      {/* Section B: Platform Courses */}
-      <p className="text-sm font-semibold text-zinc-700 mb-1">Platform Courses</p>
-      <p className="text-xs text-zinc-400 mb-3">
-        Courses will appear here once the Courses module is configured.
-      </p>
-      <div className="py-8 flex flex-col items-center justify-center border border-dashed border-zinc-200 rounded-md">
-        <BookOpen className="w-6 h-6 text-zinc-300 mb-2" />
-        <p className="text-sm text-zinc-400">Courses module coming soon</p>
-      </div>
-    </div>
-  )
-}
-
 // ─── Tab: Contract ────────────────────────────────────────────────────────────
 
 function TabContract({
@@ -1623,13 +1505,6 @@ export default function TenantDetailPage() {
             Edit Name
           </button>
           <button
-            onClick={() => console.log('Duplicate — available in future prompt')}
-            className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 flex items-center"
-          >
-            <Copy className="w-4 h-4 mr-1.5" />
-            Duplicate
-          </button>
-          <button
             onClick={toggleActive}
             className={`border rounded-md px-3 py-1.5 text-sm font-medium flex items-center ${
               tenant.is_active
@@ -1688,7 +1563,12 @@ export default function TenantDetailPage() {
           onRefresh={load}
         />
       )}
-      {activeTab === 'Content' && <TabContent tenantId={id} />}
+      {activeTab === 'Content' && (
+        <ContentTab
+          tenantId={id}
+          onGoToPlans={() => setActiveTab('Plans')}
+        />
+      )}
       {activeTab === 'Contract' && (
         <TabContract
           tenantId={id}
