@@ -12,11 +12,12 @@ import {
 interface Props {
   planId: string
   contentType: 'ASSESSMENT' | 'COURSE'
+  planAudience?: 'B2C' | 'B2B'
   onClose: () => void
   onAdded: () => void
 }
 
-export function AddContentSlideOver({ planId, contentType, onClose, onAdded }: Props) {
+export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C', onClose, onAdded }: Props) {
   const isAssessment = contentType === 'ASSESSMENT'
   const label = isAssessment ? 'Assessment' : 'Course'
 
@@ -34,7 +35,7 @@ export function AddContentSlideOver({ planId, contentType, onClose, onAdded }: P
       setLoading(true)
       try {
         if (isAssessment) {
-          const data = await fetchAvailableAssessmentsForPlan(planId)
+          const data = await fetchAvailableAssessmentsForPlan(planId, planAudience)
           setItems(
             data.map((a) => ({
               id: a.id,

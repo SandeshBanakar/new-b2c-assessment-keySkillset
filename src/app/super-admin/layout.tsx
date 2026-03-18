@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Library,
-  ShoppingBag,
   Users,
   PenTool,
   Building2,
@@ -13,11 +12,6 @@ import {
   BookMarked,
   FileEdit,
   Upload,
-  MousePointerClick,
-  Terminal,
-  Keyboard,
-  Play,
-  Layers,
   CreditCard,
   Megaphone,
   BarChart2,
@@ -72,15 +66,10 @@ export default function SuperAdminLayout({
           <NavItem href="/super-admin/dashboard" icon={LayoutDashboard} label="Dashboard" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
-            Content
+            Content Management
           </p>
           <NavItem href="/super-admin/content-bank" icon={Library} label="Content Bank" />
-
-          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
-            Monetisation
-          </p>
           <NavItem href="/super-admin/plans-pricing" icon={CreditCard} label="Plans & Pricing" />
-          <NavItem href="/super-admin/course-store" icon={ShoppingBag} label="Course Store" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Master Organisation
@@ -100,15 +89,6 @@ export default function SuperAdminLayout({
           <NavItem href="/super-admin/question-bank" icon={BookMarked} label="Question Bank" />
           <NavItem href="/super-admin/create-assessments" icon={FileEdit} label="Create Assessments" />
           <NavItem href="/super-admin/bulk-upload" icon={Upload} label="Bulk Upload" />
-
-          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
-            Course Creation
-          </p>
-          <NavItem href="/super-admin/click-based-course" icon={MousePointerClick} label="Click-based Course" />
-          <NavItem href="/super-admin/coding-sandbox-course" icon={Terminal} label="Coding Sandbox" />
-          <NavItem href="/super-admin/keyboard-trainer-course" icon={Keyboard} label="Keyboard Trainer" />
-          <NavItem href="/super-admin/video-based-course" icon={Play} label="Video-based Course" />
-          <NavItem href="/super-admin/combination-course" icon={Layers} label="Combination Course" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Configuration

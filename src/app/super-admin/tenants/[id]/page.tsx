@@ -6,11 +6,11 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import {
   ChevronRight, CheckCircle, X, Loader2,
-  Lock, UploadCloud, Plus, Users, Download,
+  UploadCloud, Plus, Users, Download,
   Pencil, PowerOff, Power,
 } from 'lucide-react'
 import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
-import ContentTab from '@/components/tenant-detail/ContentTab'
+import PlansTab from '@/components/tenant-detail/PlansTab'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ interface AdminUser {
   tenant_id: string
   name: string
   email: string
-  role: 'CLIENT_ADMIN' | 'TEAM_MANAGER'
+  role: 'CLIENT_ADMIN' | 'CONTENT_CREATOR' | 'SUPER_ADMIN'
   is_active: boolean
 }
 
@@ -199,7 +199,7 @@ function InviteUserSlideOver({
 }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'CLIENT_ADMIN' | 'TEAM_MANAGER'>('TEAM_MANAGER')
+  const [role, setRole] = useState<'CLIENT_ADMIN' | 'CONTENT_CREATOR'>('CLIENT_ADMIN')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -275,8 +275,8 @@ function InviteUserSlideOver({
               onChange={e => setRole(e.target.value as typeof role)}
               className="text-sm border border-zinc-200 rounded-md px-3 py-1.5 w-full focus:ring-1 focus:ring-blue-700 outline-none"
             >
-              <option value="TEAM_MANAGER">Team Manager</option>
               <option value="CLIENT_ADMIN">Client Admin</option>
+              <option value="CONTENT_CREATOR">Content Creator</option>
             </select>
           </div>
         </div>
@@ -308,11 +308,15 @@ function TabOverview({
   contract,
   learnerCount,
   clientAdmin,
+  onEditDetails,
+  onToggleActive,
 }: {
   tenant: TenantDetail
   contract: Contract | null
   learnerCount: number
   clientAdmin: { name: string; email: string } | null
+  onEditDetails: () => void
+  onToggleActive: () => void
 }) {
   const seatCount = contract?.seat_count ?? 0
   const fillPct = seatCount > 0 ? Math.min((learnerCount / seatCount) * 100, 100) : 0
@@ -328,6 +332,34 @@ function TabOverview({
 
   return (
     <div>
+      {/* Quick Actions bar — OVERVIEW TAB ONLY */}
+      <div className="flex items-center gap-2 mb-6">
+        <button
+          onClick={onEditDetails}
+          className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 flex items-center"
+        >
+          <Pencil className="w-4 h-4 mr-1.5" />
+          Edit Details
+        </button>
+        {tenant.is_active ? (
+          <button
+            onClick={onToggleActive}
+            className="border border-rose-200 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 flex items-center"
+          >
+            <PowerOff className="w-4 h-4 mr-1.5" />
+            Deactivate
+          </button>
+        ) : (
+          <button
+            onClick={onToggleActive}
+            className="bg-blue-700 hover:bg-blue-800 text-white rounded-md px-3 py-1.5 text-sm font-medium flex items-center"
+          >
+            <Power className="w-4 h-4 mr-1.5" />
+            Reactivate
+          </button>
+        )}
+      </div>
+
       {/* Row 1: Tenant Details + Seat Usage */}
       <div className="flex gap-6">
         {/* Tenant Details card */}
@@ -443,23 +475,7 @@ function TabOverview({
   )
 }
 
-// ─── Tab: Plans ───────────────────────────────────────────────────────────────
-
-function TabPlans() {
-  return (
-    <div className="mt-8 flex flex-col items-center justify-center py-16 px-6 text-center">
-      <Lock className="w-10 h-10 text-zinc-300 mb-4" />
-      <p className="text-base font-semibold text-zinc-900 mb-2">Plans &amp; Assignments</p>
-      <p className="text-sm text-zinc-500 max-w-sm">
-        Assign plans to this tenant once the Plans catalogue is ready. Plans control which
-        assessments and courses this tenant&apos;s learners can access.
-      </p>
-      <span className="inline-flex items-center gap-1.5 bg-zinc-100 text-zinc-500 text-xs font-medium px-2.5 py-1 rounded-md mt-4">
-        Available after Plans &amp; Pricing is configured
-      </span>
-    </div>
-  )
-}
+// TabPlans is rendered via PlansTab component (see import above)
 
 // ─── Tab: Users & Roles ───────────────────────────────────────────────────────
 
@@ -539,10 +555,12 @@ function TabUsersRoles({
                       className={`text-xs font-medium rounded-md px-2 py-0.5 ${
                         u.role === 'CLIENT_ADMIN'
                           ? 'bg-blue-50 text-blue-700'
+                          : u.role === 'SUPER_ADMIN'
+                          ? 'bg-zinc-100 text-zinc-600'
                           : 'bg-violet-50 text-violet-700'
                       }`}
                     >
-                      {u.role === 'CLIENT_ADMIN' ? 'Client Admin' : 'Team Manager'}
+                      {u.role === 'CLIENT_ADMIN' ? 'Client Admin' : u.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Content Creator'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -1198,6 +1216,63 @@ function TabContract({
       {contract?.updated_at && (
         <p className="text-xs text-zinc-400 mt-2">Last updated {formatDate(contract.updated_at)}</p>
       )}
+
+      {/* Section 2 — Payment Overview */}
+      {form.stripe_subscription_id ? (
+        <div className="mt-6 pt-6 border-t border-zinc-100">
+          <p className="text-sm font-semibold text-zinc-900 mb-4">Payment Overview</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            {[
+              ['Stripe Customer ID', 'cus_demo_placeholder'],
+              ['Subscription Status', 'Active'],
+              ['Latest Invoice Status', 'Paid'],
+              ['Latest Invoice Amount', '$4,200.00'],
+              ['Renewal Date', '01-01-2027'],
+              ['MRR', form.arr ? `$${(Number(form.arr) / 12).toFixed(2)}` : '—'],
+            ].map(([label, value]) => (
+              <div key={label} className="flex">
+                <p className="text-xs text-zinc-500 w-44 shrink-0">{label}</p>
+                <p className="text-xs font-medium text-zinc-900">{value}</p>
+              </div>
+            ))}
+          </div>
+          <a
+            href="#"
+            className="inline-block mt-3 text-xs font-medium text-blue-700 hover:underline"
+          >
+            View in Stripe Dashboard →
+          </a>
+        </div>
+      ) : (
+        <div className="mt-6 pt-6 border-t border-zinc-100">
+          <div className="rounded-md bg-zinc-50 border border-zinc-200 px-4 py-3">
+            <p className="text-sm text-zinc-500">
+              No Stripe subscription linked. Add a Stripe Subscription ID in the Contract Details section above to enable payment tracking.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Section 3 — Storage & Hosting (SA only) */}
+      <div className="mt-6 pt-6 border-t border-zinc-100">
+        <p className="text-sm font-semibold text-zinc-900 mb-1">Storage &amp; Hosting</p>
+        <p className="text-xs text-zinc-400 mb-4">Daily snapshot · Super Admin only</p>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+            <p className="text-xs text-zinc-500 mb-1">Total Storage Used</p>
+            <p className="text-sm font-semibold text-zinc-900">12.4 GB</p>
+          </div>
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+            <p className="text-xs text-zinc-500 mb-1">Est. Hosting Cost</p>
+            <p className="text-sm font-semibold text-zinc-900">$18.60 / mo</p>
+          </div>
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+            <p className="text-xs text-zinc-500 mb-1">Last Snapshot</p>
+            <p className="text-sm font-semibold text-zinc-900">Mar 18, 2026</p>
+          </div>
+        </div>
+      </div>
+
       {toast && <Toast message="Contract saved" onDismiss={() => setToast(false)} />}
     </div>
   )
@@ -1322,7 +1397,6 @@ const TABS = [
   'Plans',
   'Users & Roles',
   'Learners',
-  'Content',
   'Contract',
   'Audit History',
 ] as const
@@ -1342,13 +1416,6 @@ export default function TenantDetailPage() {
 
   // ── Edit Details slide-over
   const [showEditDetails, setShowEditDetails] = useState(false)
-
-  // ── Inline name edit
-  const [editingName, setEditingName] = useState(false)
-  const [nameValue, setNameValue] = useState('')
-  const [nameSaving, setNameSaving] = useState(false)
-  const [nameError, setNameError] = useState('')
-  const nameInputRef = useRef<HTMLInputElement>(null)
 
   // ── Page-level toast (header actions)
   const [pageToast, setPageToast] = useState<{ msg: string; variant: 'success' | 'error' } | null>(null)
@@ -1385,50 +1452,6 @@ export default function TenantDetailPage() {
     const { data } = await supabase.from('admin_users').select('*').eq('tenant_id', id)
     setAdminUsers((data || []) as AdminUser[])
   }, [id])
-
-  useEffect(() => {
-    if (editingName) nameInputRef.current?.focus()
-  }, [editingName])
-
-  const saveName = async () => {
-    if (!tenant) return
-    const trimmed = nameValue.trim()
-    if (!trimmed || trimmed === tenant.name) {
-      setEditingName(false)
-      setNameError('')
-      return
-    }
-    setNameSaving(true)
-    const oldName = tenant.name
-    const { error } = await supabase
-      .from('tenants')
-      .update({ name: trimmed })
-      .eq('id', id)
-    if (error) {
-      if (error.code === '23505') {
-        setNameError('A tenant with this name already exists.')
-      } else {
-        setPageToast({ msg: 'Failed to update name.', variant: 'error' })
-        setEditingName(false)
-        setNameError('')
-      }
-      setNameSaving(false)
-      return
-    }
-    await supabase.from('audit_logs').insert({
-      action: 'TENANT_UPDATED',
-      entity_type: 'tenant',
-      entity_id: id,
-      actor_name: 'Super Admin',
-      before_state: { name: oldName },
-      after_state: { name: trimmed },
-    })
-    setTenant(prev => prev ? { ...prev, name: trimmed } : prev)
-    setEditingName(false)
-    setNameError('')
-    setNameSaving(false)
-    setPageToast({ msg: 'Tenant name updated.', variant: 'success' })
-  }
 
   const toggleActive = async () => {
     if (!tenant) return
@@ -1489,62 +1512,16 @@ export default function TenantDetailPage() {
       </div>
 
       {/* Header */}
-      <div className="flex justify-between items-start mb-6">
-        {/* Left: name + badges */}
-        <div className="flex items-center gap-3">
-          {editingName ? (
-            <div>
-              <input
-                ref={nameInputRef}
-                value={nameValue}
-                onChange={e => { setNameValue(e.target.value); setNameError('') }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') saveName()
-                  if (e.key === 'Escape') { setEditingName(false); setNameError('') }
-                }}
-                onBlur={saveName}
-                disabled={nameSaving}
-                className="text-xl font-semibold text-zinc-900 border-b-2 border-blue-700 bg-transparent outline-none min-w-48 disabled:opacity-60"
-              />
-              {nameError && <p className="text-sm text-rose-600 mt-1">{nameError}</p>}
-            </div>
-          ) : (
-            <h1 className="text-xl font-semibold text-zinc-900">{tenant.name}</h1>
-          )}
-          <span className="text-xs font-medium bg-blue-50 text-blue-700 rounded-md px-2 py-0.5">B2B</span>
-          <span
-            className={`text-xs font-medium rounded-md px-2 py-0.5 ${
-              tenant.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
-            }`}
-          >
-            {tenant.is_active ? 'Active' : 'Inactive'}
-          </span>
-        </div>
-
-        {/* Right: quick actions */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setNameValue(tenant.name); setEditingName(true); setNameError('') }}
-            className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 flex items-center"
-          >
-            <Pencil className="w-4 h-4 mr-1.5" />
-            Edit Name
-          </button>
-          <button
-            onClick={toggleActive}
-            className={`border rounded-md px-3 py-1.5 text-sm font-medium flex items-center ${
-              tenant.is_active
-                ? 'border-rose-200 text-rose-600 hover:bg-rose-50'
-                : 'border-green-200 text-green-600 hover:bg-green-50'
-            }`}
-          >
-            {tenant.is_active ? (
-              <><PowerOff className="w-4 h-4 mr-1.5" />Deactivate</>
-            ) : (
-              <><Power className="w-4 h-4 mr-1.5" />Reactivate</>
-            )}
-          </button>
-        </div>
+      <div className="flex items-center gap-3 mb-6">
+        <h1 className="text-xl font-semibold text-zinc-900">{tenant.name}</h1>
+        <span className="text-xs font-medium bg-blue-50 text-blue-700 rounded-md px-2 py-0.5">B2B</span>
+        <span
+          className={`text-xs font-medium rounded-md px-2 py-0.5 ${
+            tenant.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
+          }`}
+        >
+          {tenant.is_active ? 'Active' : 'Inactive'}
+        </span>
       </div>
 
       {/* Tab Nav */}
@@ -1571,9 +1548,13 @@ export default function TenantDetailPage() {
           contract={contract}
           learnerCount={learnerCount}
           clientAdmin={clientAdmin}
+          onEditDetails={() => setShowEditDetails(true)}
+          onToggleActive={toggleActive}
         />
       )}
-      {activeTab === 'Plans' && <TabPlans />}
+      {activeTab === 'Plans' && (
+        <PlansTab tenantId={id} />
+      )}
       {activeTab === 'Users & Roles' && (
         <TabUsersRoles
           tenantId={id}
@@ -1587,9 +1568,6 @@ export default function TenantDetailPage() {
           tenantName={tenant.name}
           onRefresh={load}
         />
-      )}
-      {activeTab === 'Content' && (
-        <ContentTab tenantId={id} onGoToPlans={() => setActiveTab('Plans')} />
       )}
       {activeTab === 'Contract' && (
         <TabContract

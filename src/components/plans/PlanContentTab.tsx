@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Trash2, FileX, BookX } from 'lucide-react'
+import { Plus, Trash2, FileX, BookX, Building2 } from 'lucide-react'
 import {
   fetchPlanAssignedAssessments,
   fetchPlanAssignedCourses,
+  fetchTenantCountForPlan,
 } from '@/lib/supabase/plans'
 import type { PlanDetail, PlanAssignedAssessment, PlanAssignedCourse } from '@/lib/supabase/plans'
 import { AddContentSlideOver } from './AddContentSlideOver'
@@ -16,6 +17,7 @@ export function PlanContentTab({ plan }: Props) {
   const [assessments, setAssessments] = useState<PlanAssignedAssessment[]>([])
   const [courses, setCourses] = useState<PlanAssignedCourse[]>([])
   const [loading, setLoading] = useState(true)
+  const [tenantCount, setTenantCount] = useState(0)
 
   const [addSlideOver, setAddSlideOver] = useState<'ASSESSMENT' | 'COURSE' | null>(null)
   const [removeItem, setRemoveItem] = useState<{
@@ -27,12 +29,14 @@ export function PlanContentTab({ plan }: Props) {
   const fetchContent = useCallback(async () => {
     setLoading(true)
     try {
-      const [a, c] = await Promise.all([
+      const [a, c, tc] = await Promise.all([
         fetchPlanAssignedAssessments(plan.id),
         fetchPlanAssignedCourses(plan.id),
+        fetchTenantCountForPlan(plan.id),
       ])
       setAssessments(a)
       setCourses(c)
+      setTenantCount(tc)
     } finally {
       setLoading(false)
     }
@@ -57,8 +61,38 @@ export function PlanContentTab({ plan }: Props) {
     )
   }
 
+  const planAudience = (plan as PlanDetail & { plan_audience?: 'B2C' | 'B2B' }).plan_audience ?? 'B2C'
+
   return (
     <div className="space-y-8">
+
+      {/* Multi-tenant callout — shown for B2B plans assigned to 1+ tenants */}
+      {planAudience === 'B2B' && tenantCount > 0 && (
+        <div className="flex items-center gap-2.5 rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
+          <Building2 className="w-4 h-4 text-blue-700 shrink-0" />
+          <p className="text-sm text-blue-700">
+            This plan is assigned to <span className="font-semibold">{tenantCount} tenant{tenantCount !== 1 ? 's' : ''}</span>.
+            Content changes here apply to all assigned tenants immediately.
+          </p>
+        </div>
+      )}
+
+      {/* Plan audience indicator */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-zinc-500">Plan audience:</span>
+        <span
+          className={`text-xs font-medium rounded-md px-2 py-0.5 ${
+            planAudience === 'B2B'
+              ? 'bg-violet-50 text-violet-700'
+              : 'bg-blue-50 text-blue-700'
+          }`}
+        >
+          {planAudience}
+        </span>
+        <span className="text-xs text-zinc-400">
+          · Only {planAudience === 'B2C' ? 'B2C_ONLY and BOTH' : 'B2B_ONLY and BOTH'} content can be added
+        </span>
+      </div>
 
       {/* Assessments section */}
       <div>
@@ -213,6 +247,7 @@ export function PlanContentTab({ plan }: Props) {
         <AddContentSlideOver
           planId={plan.id}
           contentType={addSlideOver}
+          planAudience={planAudience}
           onClose={() => setAddSlideOver(null)}
           onAdded={() => {
             fetchContent()
