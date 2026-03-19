@@ -238,7 +238,7 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
         <EditPlanSlideOver
           plan={plan}
           onClose={() => setShowEdit(false)}
-          onSuccess={onRefresh}
+          onSaved={onRefresh}
         />
       )}
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Loader2, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,6 +41,135 @@ interface FormState {
   zip_code: string
   timezone: string
   date_format: string
+}
+
+// ─── Static data ──────────────────────────────────────────────────────────────
+
+const DATE_FORMATS = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY']
+
+// IANA timezone list from browser Intl API (Node 16+, all modern browsers)
+const TIMEZONES: string[] = (() => {
+  try {
+    return Intl.supportedValuesOf('timeZone')
+  } catch {
+    // Fallback for environments that don't support supportedValuesOf
+    return [
+      'Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Asia/Tokyo',
+      'Asia/Shanghai', 'Asia/Seoul', 'Asia/Bangkok', 'Asia/Karachi',
+      'Asia/Dhaka', 'Asia/Colombo', 'Asia/Kathmandu',
+      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
+      'America/New_York', 'America/Chicago', 'America/Denver',
+      'America/Los_Angeles', 'America/Toronto', 'America/Sao_Paulo',
+      'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos',
+      'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland',
+      'UTC',
+    ]
+  }
+})()
+
+const COUNTRIES = [
+  'India', 'United States', 'United Kingdom', 'Canada', 'Australia',
+  'Afghanistan', 'Albania', 'Algeria', 'Angola', 'Argentina', 'Armenia',
+  'Austria', 'Azerbaijan', 'Bahrain', 'Bangladesh', 'Belarus', 'Belgium',
+  'Bolivia', 'Bosnia and Herzegovina', 'Brazil', 'Bulgaria', 'Cambodia',
+  'Cameroon', 'Chile', 'China', 'Colombia', 'Croatia', 'Czech Republic',
+  'Denmark', 'Ecuador', 'Egypt', 'Ethiopia', 'Finland', 'France',
+  'Georgia', 'Germany', 'Ghana', 'Greece', 'Guatemala', 'Hong Kong',
+  'Hungary', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+  'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kuwait', 'Kyrgyzstan',
+  'Lebanon', 'Libya', 'Malaysia', 'Mexico', 'Morocco', 'Myanmar',
+  'Nepal', 'Netherlands', 'New Zealand', 'Nigeria', 'Norway', 'Oman',
+  'Pakistan', 'Palestine', 'Peru', 'Philippines', 'Poland', 'Portugal',
+  'Qatar', 'Romania', 'Russia', 'Saudi Arabia', 'Serbia', 'Singapore',
+  'Slovakia', 'South Africa', 'South Korea', 'Spain', 'Sri Lanka',
+  'Sudan', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan',
+  'Tanzania', 'Thailand', 'Tunisia', 'Turkey', 'Turkmenistan', 'Uganda',
+  'Ukraine', 'United Arab Emirates', 'Uruguay', 'Uzbekistan', 'Venezuela',
+  'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
+]
+
+// ─── SearchableSelect component ───────────────────────────────────────────────
+
+function SearchableSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  inputCls,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: string[]
+  placeholder?: string
+  inputCls: string
+}) {
+  const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const filtered = options.filter((o) =>
+    o.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const handleFocus = () => {
+    setSearch('')
+    setOpen(true)
+  }
+
+  const handleBlur = (e: React.FocusEvent) => {
+    if (containerRef.current?.contains(e.relatedTarget as Node)) return
+    setOpen(false)
+    setSearch('')
+  }
+
+  const handleSelect = (option: string) => {
+    onChange(option)
+    setOpen(false)
+    setSearch('')
+  }
+
+  return (
+    <div ref={containerRef} className="relative" onBlur={handleBlur}>
+      <div className="relative">
+        <Search
+          size={13}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
+        />
+        <input
+          type="text"
+          value={open ? search : value}
+          onFocus={handleFocus}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={open ? `Search…` : (placeholder ?? '')}
+          className={`${inputCls} pl-8`}
+          autoComplete="off"
+        />
+      </div>
+      {open && (
+        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-zinc-400">No results</p>
+          ) : (
+            filtered.slice(0, 80).map((option) => (
+              <button
+                key={option}
+                type="button"
+                tabIndex={0}
+                onMouseDown={() => handleSelect(option)}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                  value === option
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'text-zinc-700 hover:bg-zinc-50'
+                }`}
+              >
+                {option}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -102,16 +231,13 @@ export function EditDetailsSlideOver({
   if (!isOpen) return null
 
   const set = (key: keyof FormState, val: string) => {
-    setForm(prev => ({ ...prev, [key]: val }))
+    setForm((prev) => ({ ...prev, [key]: val }))
     setDirty(true)
   }
 
   const handleClose = () => {
-    if (dirty) {
-      setConfirmDiscard(true)
-    } else {
-      onClose()
-    }
+    if (dirty) setConfirmDiscard(true)
+    else onClose()
   }
 
   const handleDiscard = () => {
@@ -140,8 +266,8 @@ export function EditDetailsSlideOver({
         state: form.state.trim() || null,
         country: form.country.trim() || null,
         zip_code: form.zip_code.trim() || null,
-        timezone: form.timezone.trim() || 'Asia/Kolkata',
-        date_format: form.date_format.trim() || 'DD/MM/YYYY',
+        timezone: form.timezone || 'Asia/Kolkata',
+        date_format: form.date_format || 'DD/MM/YYYY',
       }
 
       const { error } = await supabase
@@ -215,6 +341,7 @@ export function EditDetailsSlideOver({
 
         {/* Form */}
         <div className="flex-1 overflow-y-auto px-6 pb-6">
+
           {/* Section 1 — Platform Setup */}
           <p className={sectionHeaderCls}>Platform Setup</p>
 
@@ -225,7 +352,7 @@ export function EditDetailsSlideOver({
             <input
               type="text"
               value={form.name}
-              onChange={e => set('name', e.target.value)}
+              onChange={(e) => set('name', e.target.value)}
               className={`${inputCls} ${nameErr ? 'border-rose-400' : ''}`}
             />
             {nameErr && <p className="text-sm text-rose-600 mt-1">{nameErr}</p>}
@@ -235,7 +362,7 @@ export function EditDetailsSlideOver({
             <label className={labelCls}>Feature Toggle Mode</label>
             <select
               value={form.feature_toggle_mode}
-              onChange={e => set('feature_toggle_mode', e.target.value)}
+              onChange={(e) => set('feature_toggle_mode', e.target.value)}
               className={inputCls}
             >
               <option value="RUN_ONLY">Run Only</option>
@@ -252,7 +379,7 @@ export function EditDetailsSlideOver({
               <input
                 type="text"
                 value={form.contact_name}
-                onChange={e => set('contact_name', e.target.value)}
+                onChange={(e) => set('contact_name', e.target.value)}
                 className={inputCls}
               />
             </div>
@@ -261,7 +388,7 @@ export function EditDetailsSlideOver({
               <input
                 type="email"
                 value={form.contact_email}
-                onChange={e => set('contact_email', e.target.value)}
+                onChange={(e) => set('contact_email', e.target.value)}
                 className={inputCls}
               />
             </div>
@@ -270,7 +397,7 @@ export function EditDetailsSlideOver({
               <input
                 type="text"
                 value={form.contact_phone}
-                onChange={e => set('contact_phone', e.target.value)}
+                onChange={(e) => set('contact_phone', e.target.value)}
                 className={inputCls}
               />
             </div>
@@ -285,7 +412,7 @@ export function EditDetailsSlideOver({
               <input
                 type="text"
                 value={form.address_line1}
-                onChange={e => set('address_line1', e.target.value)}
+                onChange={(e) => set('address_line1', e.target.value)}
                 className={inputCls}
               />
             </div>
@@ -294,45 +421,50 @@ export function EditDetailsSlideOver({
               <input
                 type="text"
                 value={form.address_line2}
-                onChange={e => set('address_line2', e.target.value)}
+                onChange={(e) => set('address_line2', e.target.value)}
                 className={inputCls}
               />
             </div>
-            <div>
-              <label className={labelCls}>City</label>
-              <input
-                type="text"
-                value={form.city}
-                onChange={e => set('city', e.target.value)}
-                className={inputCls}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>City</label>
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={(e) => set('city', e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>State</label>
+                <input
+                  type="text"
+                  value={form.state}
+                  onChange={(e) => set('state', e.target.value)}
+                  className={inputCls}
+                />
+              </div>
             </div>
-            <div>
-              <label className={labelCls}>State</label>
-              <input
-                type="text"
-                value={form.state}
-                onChange={e => set('state', e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Country</label>
-              <input
-                type="text"
-                value={form.country}
-                onChange={e => set('country', e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Zip Code</label>
-              <input
-                type="text"
-                value={form.zip_code}
-                onChange={e => set('zip_code', e.target.value)}
-                className={inputCls}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Zip Code</label>
+                <input
+                  type="text"
+                  value={form.zip_code}
+                  onChange={(e) => set('zip_code', e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Country</label>
+                <SearchableSelect
+                  value={form.country}
+                  onChange={(v) => set('country', v)}
+                  options={COUNTRIES}
+                  placeholder="Search country…"
+                  inputCls={inputCls}
+                />
+              </div>
             </div>
           </div>
 
@@ -342,23 +474,28 @@ export function EditDetailsSlideOver({
           <div className="space-y-4">
             <div>
               <label className={labelCls}>Timezone</label>
-              <input
-                type="text"
+              <SearchableSelect
                 value={form.timezone}
-                onChange={e => set('timezone', e.target.value)}
-                className={inputCls}
+                onChange={(v) => set('timezone', v)}
+                options={TIMEZONES}
+                placeholder="Search timezone…"
+                inputCls={inputCls}
               />
             </div>
             <div>
               <label className={labelCls}>Date Format</label>
-              <input
-                type="text"
+              <select
                 value={form.date_format}
-                onChange={e => set('date_format', e.target.value)}
+                onChange={(e) => set('date_format', e.target.value)}
                 className={inputCls}
-              />
+              >
+                {DATE_FORMATS.map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
             </div>
           </div>
+
         </div>
 
         {/* Footer */}

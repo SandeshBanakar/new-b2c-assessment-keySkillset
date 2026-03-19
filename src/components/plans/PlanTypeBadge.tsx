@@ -3,8 +3,8 @@ import { type PlanType } from '@/lib/supabase/plans'
 type Props = { type: PlanType }
 
 const config: Record<PlanType, { label: string; classes: string }> = {
-  WHOLE_PLATFORM: {
-    label: 'Whole Platform',
+  PLATFORM_WIDE: {
+    label: 'Platform-wide',
     classes: 'bg-blue-50 text-blue-700 border border-blue-200',
   },
   CATEGORY_BUNDLE: {
@@ -14,7 +14,7 @@ const config: Record<PlanType, { label: string; classes: string }> = {
 }
 
 export function PlanTypeBadge({ type }: Props) {
-  const c = config[type]
+  const c = config[type] ?? config.CATEGORY_BUNDLE
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${c.classes}`}>
       {c.label}

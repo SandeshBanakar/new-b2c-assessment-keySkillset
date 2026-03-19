@@ -22,7 +22,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
   const label = isAssessment ? 'Assessment' : 'Course'
 
   const [items, setItems] = useState<
-    { id: string; title: string; sub: string }[]
+    { id: string; title: string; sub: string; disabled?: boolean }[]
   >([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -50,6 +50,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
               id: c.id,
               title: c.title,
               sub: c.courseType,
+              disabled: c.isIndividuallyPurchasable,
             }))
           )
         }
@@ -65,6 +66,8 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
   )
 
   const toggleSelect = (id: string) => {
+    const item = items.find((i) => i.id === id)
+    if (item?.disabled) return
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -141,21 +144,24 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
           ) : (
             <div className="space-y-1">
               {filtered.map((item) => (
-                <label
+                <div
                   key={item.id}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-50 cursor-pointer"
+                  title={item.disabled ? 'This course is sold individually and cannot be added to a plan' : undefined}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-md ${item.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-zinc-50 cursor-pointer'}`}
+                  onClick={() => !item.disabled && toggleSelect(item.id)}
                 >
                   <input
                     type="checkbox"
                     checked={selected.has(item.id)}
-                    onChange={() => toggleSelect(item.id)}
-                    className="accent-blue-700"
+                    onChange={() => !item.disabled && toggleSelect(item.id)}
+                    disabled={item.disabled}
+                    className="accent-blue-700 disabled:cursor-not-allowed"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-900 truncate">{item.title}</p>
                     <p className="text-xs text-zinc-400">{item.sub}</p>
                   </div>
-                </label>
+                </div>
               ))}
             </div>
           )}

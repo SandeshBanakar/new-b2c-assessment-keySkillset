@@ -16,6 +16,7 @@ import {
   Megaphone,
   BarChart2,
   Shield,
+  PlaySquare,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -81,6 +82,11 @@ export default function SuperAdminLayout({
             Organisations
           </p>
           <NavItem href="/super-admin/tenants" icon={Building2} label="Tenants" />
+
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Course Creation
+          </p>
+          <NavItem href="/super-admin/create-course" icon={PlaySquare} label="Create Course" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Assessment Creation

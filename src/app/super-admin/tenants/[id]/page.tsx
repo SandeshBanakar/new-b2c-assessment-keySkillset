@@ -1055,10 +1055,12 @@ function TabContract({
   tenantId,
   contract,
   onSaved,
+  featureToggleMode,
 }: {
   tenantId: string
   contract: Contract | null
   onSaved: (c: Contract) => void
+  featureToggleMode: string
 }) {
   const [form, setForm] = useState<Omit<Contract, 'tenant_id' | 'id' | 'updated_at'>>({
     seat_count: contract?.seat_count ?? 0,
@@ -1256,21 +1258,27 @@ function TabContract({
       {/* Section 3 — Storage & Hosting (SA only) */}
       <div className="mt-6 pt-6 border-t border-zinc-100">
         <p className="text-sm font-semibold text-zinc-900 mb-1">Storage &amp; Hosting</p>
-        <p className="text-xs text-zinc-400 mb-4">Daily snapshot · Super Admin only</p>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-            <p className="text-xs text-zinc-500 mb-1">Total Storage Used</p>
-            <p className="text-sm font-semibold text-zinc-900">12.4 GB</p>
-          </div>
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-            <p className="text-xs text-zinc-500 mb-1">Est. Hosting Cost</p>
-            <p className="text-sm font-semibold text-zinc-900">$18.60 / mo</p>
-          </div>
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-            <p className="text-xs text-zinc-500 mb-1">Last Snapshot</p>
-            <p className="text-sm font-semibold text-zinc-900">Mar 18, 2026</p>
-          </div>
-        </div>
+        {featureToggleMode === 'RUN_ONLY' ? (
+          <p className="text-sm text-zinc-400">Storage &amp; Hosting is not tracked for Run-Only tenants.</p>
+        ) : (
+          <>
+            <p className="text-xs text-zinc-400 mb-4">Daily snapshot · Super Admin only</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+                <p className="text-xs text-zinc-500 mb-1">Total Storage Used</p>
+                <p className="text-sm font-semibold text-zinc-900">12.4 GB</p>
+              </div>
+              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+                <p className="text-xs text-zinc-500 mb-1">Est. Hosting Cost</p>
+                <p className="text-sm font-semibold text-zinc-900">$18.60 / mo</p>
+              </div>
+              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+                <p className="text-xs text-zinc-500 mb-1">Last Snapshot</p>
+                <p className="text-sm font-semibold text-zinc-900">Mar 18, 2026</p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {toast && <Toast message="Contract saved" onDismiss={() => setToast(false)} />}
@@ -1574,6 +1582,7 @@ export default function TenantDetailPage() {
           tenantId={id}
           contract={contract}
           onSaved={c => setContract(c)}
+          featureToggleMode={tenant.feature_toggle_mode ?? ''}
         />
       )}
       {activeTab === 'Audit History' && (

@@ -3,11 +3,23 @@ import { supabase } from '@/lib/supabase/client'
 export type PlanRow = {
   id: string
   name: string
+  display_name: string | null
+  description: string | null
   price: number
   billing_cycle: string
   audience_type: string
   plan_audience: 'B2C' | 'B2B'
   status: string
+  scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
+  tier: 'BASIC' | 'PRO' | 'PREMIUM' | 'ENTERPRISE' | null
+  feature_bullets: string[]
+  category: string | null
+  max_attempts_per_assessment: number
+  tagline: string | null
+  footnote: string | null
+  is_popular: boolean
+  cta_label: string | null
+  allowed_assessment_types: string[]
   created_at: string
   plan_subscribers: {
     subscriber_count: number
@@ -15,10 +27,12 @@ export type PlanRow = {
   } | null
 }
 
-export type PlanType = 'WHOLE_PLATFORM' | 'CATEGORY_BUNDLE'
+// Matches DB scope column values exactly — PLATFORM_WIDE not WHOLE_PLATFORM
+export type PlanType = 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
 
-export function derivePlanType(name: string): PlanType {
-  return name.startsWith('All Exams') ? 'WHOLE_PLATFORM' : 'CATEGORY_BUNDLE'
+// Uses actual DB scope column — never name heuristics
+export function derivePlanType(scope: string): PlanType {
+  return scope === 'PLATFORM_WIDE' ? 'PLATFORM_WIDE' : 'CATEGORY_BUNDLE'
 }
 
 export async function fetchPlans(): Promise<PlanRow[]> {
@@ -27,11 +41,23 @@ export async function fetchPlans(): Promise<PlanRow[]> {
     .select(`
       id,
       name,
+      display_name,
+      description,
       price,
       billing_cycle,
       audience_type,
       plan_audience,
       status,
+      scope,
+      tier,
+      feature_bullets,
+      category,
+      max_attempts_per_assessment,
+      tagline,
+      footnote,
+      is_popular,
+      cta_label,
+      allowed_assessment_types,
       created_at,
       plan_subscribers (
         subscriber_count,
@@ -58,7 +84,11 @@ export async function fetchPlans(): Promise<PlanRow[]> {
 
 export type CreatePlanPayload = {
   name: string
-  description: string
+  display_name: string | null
+  description: string | null
+  tagline: string | null
+  is_popular: boolean
+  cta_label: string | null
   price: number
   billing_cycle: string
   status: 'DRAFT' | 'PUBLISHED'
@@ -66,7 +96,9 @@ export type CreatePlanPayload = {
   allowed_assessment_types: string[]
   scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
   category: string | null
-  // null when scope = PLATFORM_WIDE
+  feature_bullets: string[]
+  footnote: string | null
+  plan_audience: 'B2C' | 'B2B'
 }
 
 export async function createPlan(
@@ -77,15 +109,22 @@ export async function createPlan(
     .from('plans')
     .insert({
       name:                          payload.name,
+      display_name:                  payload.display_name,
       description:                   payload.description,
-      audience_type:                 'B2C',
-      // hardcoded — B2B plans via Contracts in V2
+      tagline:                       payload.tagline,
+      is_popular:                    payload.is_popular,
+      cta_label:                     payload.cta_label,
+      audience_type:                 'B2C', // legacy column — keep default
+      plan_audience:                 payload.plan_audience,
       price:                         payload.price,
       billing_cycle:                 payload.billing_cycle,
       status:                        payload.status,
       max_attempts_per_assessment:   payload.max_attempts_per_assessment,
+      allowed_assessment_types:      payload.allowed_assessment_types,
       scope:                         payload.scope,
       category:                      payload.category,
+      feature_bullets:               payload.feature_bullets,
+      footnote:                      payload.footnote,
     })
     .select('id')
     .single()
@@ -129,11 +168,12 @@ export async function fetchLiveAssessments(): Promise<
 // ─── Detail page types + helpers (KSS-SA-004-C) ──────────────────────────────
 
 export type PlanDetail = PlanRow & {
-  scope: string
-  category: string | null
-  max_attempts_per_assessment: number
   description: string
-  plan_audience: 'B2C' | 'B2B'
+  tagline: string | null
+  footnote: string | null
+  is_popular: boolean
+  cta_label: string | null
+  allowed_assessment_types: string[]
 }
 
 export type PlanAuditEntry = {
@@ -158,9 +198,11 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
   const { data, error } = await supabase
     .from('plans')
     .select(`
-      id, name, description, price, billing_cycle,
-      audience_type, plan_audience, status, scope, category,
-      max_attempts_per_assessment, created_at,
+      id, name, display_name, description, price, billing_cycle,
+      audience_type, plan_audience, status, scope, tier, category,
+      max_attempts_per_assessment, feature_bullets,
+      tagline, footnote, is_popular, cta_label,
+      allowed_assessment_types, created_at,
       plan_subscribers (subscriber_count, mock_mrr)
     `)
     .eq('id', id)
@@ -491,7 +533,7 @@ export async function fetchAvailableAssessmentsForPlan(
 
 export async function fetchAvailableCoursesForPlan(
   planId: string
-): Promise<{ id: string; title: string; courseType: string }[]> {
+): Promise<{ id: string; title: string; courseType: string; isIndividuallyPurchasable: boolean }[]> {
   const { data: existing } = await supabase
     .from('plan_content_map')
     .select('content_id')
@@ -502,7 +544,7 @@ export async function fetchAvailableCoursesForPlan(
 
   let query = supabase
     .from('courses')
-    .select('id, title, course_type')
+    .select('id, title, course_type, is_individually_purchasable')
     .eq('status', 'LIVE')
 
   if (assignedIds.length > 0) {
@@ -512,8 +554,8 @@ export async function fetchAvailableCoursesForPlan(
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
-  return (data as { id: string; title: string; course_type: string }[]).map(
-    (c) => ({ id: c.id, title: c.title, courseType: c.course_type })
+  return (data as { id: string; title: string; course_type: string; is_individually_purchasable: boolean }[]).map(
+    (c) => ({ id: c.id, title: c.title, courseType: c.course_type, isIndividuallyPurchasable: c.is_individually_purchasable })
   )
 }
 
@@ -690,4 +732,134 @@ export async function fetchTenantCountForPlan(planId: string): Promise<number> {
     .eq('plan_id', planId)
   if (error) return 0
   return count ?? 0
+}
+
+// ─── B2B plan create helper (KSS-SA-004) ─────────────────────────────────────
+
+export type CreateB2BPlanPayload = {
+  name: string
+  description: string
+  max_attempts_per_assessment: number
+  status: 'DRAFT' | 'PUBLISHED'
+}
+
+export async function createB2BPlan(payload: CreateB2BPlanPayload): Promise<string> {
+  const { data, error } = await supabase
+    .from('plans')
+    .insert({
+      name:                        payload.name,
+      description:                 payload.description,
+      price:                       0,
+      plan_audience:               'B2B',
+      audience_type:               'B2C', // legacy column — keep default
+      scope:                       'PLATFORM_WIDE',
+      status:                      payload.status,
+      max_attempts_per_assessment: payload.max_attempts_per_assessment,
+      feature_bullets:             [],
+    })
+    .select('id')
+    .single()
+  if (error) throw new Error(error.message)
+  return (data as { id: string }).id
+}
+
+// ─── Tab 2: Course Pricing helpers (KSS-SA-004) ───────────────────────────────
+
+export type CoursePricingRow = {
+  id: string
+  title: string
+  course_type: string
+  status: string
+  audience_type: string | null
+  price: number | null
+  price_usd_cents: number | null
+  is_individually_purchasable: boolean
+  stripe_price_id: string | null
+}
+
+export async function fetchB2CCoursesForPricing(): Promise<CoursePricingRow[]> {
+  // Tab 2: LIVE courses with B2C_ONLY or BOTH audience_type only
+  const { data, error } = await supabase
+    .from('courses')
+    .select('id, title, course_type, status, audience_type, price, price_usd_cents, is_individually_purchasable, stripe_price_id')
+    .eq('status', 'LIVE')
+    .or('audience_type.eq.B2C_ONLY,audience_type.eq.BOTH')
+    .order('title', { ascending: true })
+  if (error) throw new Error(error.message)
+  return data as CoursePricingRow[]
+}
+
+export type UpdateCoursePricingPayload = {
+  price: number | null
+  price_usd_cents: number | null
+  is_individually_purchasable: boolean
+  stripe_price_id: string | null
+}
+
+export async function updateCoursePricing(
+  courseId: string,
+  payload: UpdateCoursePricingPayload
+): Promise<void> {
+  const { error } = await supabase
+    .from('courses')
+    .update({
+      price:                       payload.price,
+      price_usd_cents:             payload.price_usd_cents,
+      is_individually_purchasable: payload.is_individually_purchasable,
+      stripe_price_id:             payload.stripe_price_id,
+    })
+    .eq('id', courseId)
+  if (error) throw new Error(error.message)
+}
+
+// ─── B2B card grid helper (KSS-SA-004) ───────────────────────────────────────
+
+export type B2BPlanCard = {
+  id: string
+  name: string
+  status: string
+  tenant_count: number
+  content_count: number
+}
+
+export async function fetchB2BPlansForGrid(): Promise<B2BPlanCard[]> {
+  const { data: plans, error } = await supabase
+    .from('plans')
+    .select('id, name, status')
+    .eq('plan_audience', 'B2B')
+    .order('name', { ascending: true })
+  if (error) throw new Error(error.message)
+
+  const planList = (plans ?? []) as { id: string; name: string; status: string }[]
+  if (planList.length === 0) return []
+
+  const planIds = planList.map((p) => p.id)
+
+  // Tenant counts
+  const { data: tpmRows } = await supabase
+    .from('tenant_plan_map')
+    .select('plan_id')
+    .in('plan_id', planIds)
+  const tenantCountMap: Record<string, number> = {}
+  ;(tpmRows ?? []).forEach((r: { plan_id: string }) => {
+    tenantCountMap[r.plan_id] = (tenantCountMap[r.plan_id] ?? 0) + 1
+  })
+
+  // Content counts
+  const { data: pcmRows } = await supabase
+    .from('plan_content_map')
+    .select('plan_id')
+    .in('plan_id', planIds)
+  const contentCountMap: Record<string, number> = {}
+  ;(pcmRows ?? []).forEach((r: { plan_id: string }) => {
+    contentCountMap[r.plan_id] = (contentCountMap[r.plan_id] ?? 0) + 1
+  })
+
+  return planList.map((p) => ({
+    id:            p.id,
+    name:          p.name,
+    status:        p.status,
+    tenant_count:  tenantCountMap[p.id] ?? 0,
+    content_count: contentCountMap[p.id] ?? 0,
+  }))
 }

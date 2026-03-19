@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 3.0 | Updated: March 18, 2026
+# Version: 4.1 | Updated: March 19, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -22,6 +22,10 @@ Deployment:  Vercel (auto-deploy on main push)
 Database:    Supabase — project ID: ugweguyeaqkbxgtpkhez
 Repo:        github.com/SandeshBanakar/new-b2c-assessment-keySkillset
 Editor:      Claude Code (VS Code)
+Docs ref:    Context7 — https://context7.com/
+             Use Context7 to look up accurate, up-to-date library documentation
+             (Next.js, Supabase, Tailwind, Lucide, etc.) before implementing
+             any library-specific feature. Prefer Context7 over memory/guesswork.
 
 ---
 
@@ -80,11 +84,25 @@ Basic:   a0c16137-7fd5-44f5-96e6-60e4617d9230
 Pro:     e150d59c-13c1-4db3-b6d7-4f30c29178e9
 Premium: 191c894d-b532-4fa8-b1fe-746e5cdcdcc8
 
-### courses table — confirmed columns (March 17, 2026 — KSS-DB-SA-001 complete)
+### tenants table — feature_toggle_mode values (locked)
+FULL_CREATOR → tenant has Content Creator access + own database usage
+RUN_ONLY     → tenant has Client Admin access only; no own DB; relies on SA
+               for content. Storage & Hosting section HIDDEN for RUN_ONLY.
+               Condition: feature_toggle_mode === 'RUN_ONLY'
+
+### courses table — confirmed columns (KSS-DB-SA-001 + KSS-DB-SA-003)
 id (uuid), title (text), description (text), course_type (text),
 status (text — LIVE/INACTIVE/DRAFT/ARCHIVED), source (text),
 tenant_id (uuid nullable), created_by (uuid nullable),
-created_at (timestamptz), updated_at (timestamptz)
+created_at (timestamptz), updated_at (timestamptz),
+audience_type (text — B2C_ONLY/B2B_ONLY/BOTH, nullable),
+price (numeric, nullable — null = not priced individually),
+currency (text DEFAULT 'INR'),
+is_individually_purchasable (boolean DEFAULT false),
+stripe_price_id (text, nullable)
+
+MIGRATION KSS-DB-SA-003 (authorised March 19, 2026):
+  See Section 27 for full SQL.
 
 ### content_items table — columns including KSS-DB-SA-002 additions
 id (uuid), title (text), description (text),
@@ -113,16 +131,45 @@ Plan content uses content_items table (NOT assessments table).
 plan_content_map.content_id → content_items.id for ASSESSMENT rows.
 plan_content_map.content_id → courses.id for COURSE rows.
 
-### plans table — plan_audience field (KSS-DB-SA-002)
-plan_audience text DEFAULT 'B2C'
-Values: 'B2C' (Plans & Pricing page) | 'B2B' (B2B tenants only)
-B2B plans are global shared plans — assignable to multiple tenants.
+### plans table — full field list (KSS-DB-SA-002 + KSS-DB-SA-003)
+plan_type text NOT NULL            — 'WHOLE_PLATFORM' | 'CATEGORY_BUNDLE'
+tier text NOT NULL                 — CHECK: 'BASIC'|'PRO'|'PREMIUM'|'ENTERPRISE'
+                                   B2C plans use BASIC/PRO/PREMIUM
+                                   B2B plans use ENTERPRISE (constraint extended KSS-DB-SA-003)
+audience_type text DEFAULT 'B2C'   — legacy column (pre KSS-DB-SA-002), keep as 'B2C'
+price_usd_cents integer DEFAULT 0  — price in USD cents. NOT legacy. Live field.
+                                   Label in UI: "Price (USD)". Source of truth for
+                                   Stripe checkout and B2C pricing page display.
+price integer DEFAULT 0            — price in INR. Label in UI: "Price (₹)".
+                                   Source of truth for INR Stripe checkout and
+                                   B2C pricing page display.
+plan_audience text DEFAULT 'B2C'   — 'B2C' | 'B2B'
+display_name text (nullable)       — customer-facing name (separate from internal name)
+tagline text (nullable)            — 1-sentence pricing card subtitle
+feature_bullets jsonb DEFAULT '[]' — ordered array of strings, max 7, 80 chars each
+footnote text (nullable)           — small print below CTA on pricing card
+is_popular boolean DEFAULT false   — drives "Most Popular" badge
+cta_label text (nullable)          — button label override (default: "Get Started")
+status text                        — 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' (plans only)
+scope text                         — 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
 
-### Super Admin Tables (row counts for reference)
+B2B plans are ALWAYS platform-wide (scope='PLATFORM_WIDE'). Locked permanently.
+B2B plan price = 0 always. Billing via tenant contracts. Never show price in UI.
+B2B plans assignable to multiple tenants simultaneously.
+
+### Super Admin Tables (row counts for reference — post KSS-DB-SA-003)
 exam_categories(6), tenants(3), admin_users(4), content_items(12),
-plans(6), plan_content_map(23+), contracts(2), departments(6),
-teams(18), learners(25), audit_logs(5), courses(5),
-tenant_plan_map(seeded — all plans × B2B tenants)
+plans(9 — 6 B2C + 3 B2B), plan_content_map(23+), contracts(2),
+departments(6), teams(18), learners(25), audit_logs(5),
+courses(9 — 4 B2B LIVE + 4 B2C LIVE + 1 INACTIVE),
+tenant_plan_map(3 — Akash Standard→Akash, TechCorp Premium→TechCorp,
+                    Enterprise Pro→both tenants)
+
+### B2B Plans (seeded — KSS-DB-SA-003)
+Akash Standard  — Akash Institute Delhi only, plan_audience='B2B', price=0
+TechCorp Premium — TechCorp India only, plan_audience='B2B', price=0
+Enterprise Pro  — both tenants, plan_audience='B2B', price=0
+All B2B plans: scope='PLATFORM_WIDE', status='PUBLISHED'
 
 ---
 
@@ -244,8 +291,12 @@ Pattern: right-side panel, 480px wide, fixed overlay bg-black/30
 4 sections (single scroll, no wizard):
   Section 1 — Platform Setup: Tenant Name*, Feature Toggle Mode
   Section 2 — Contact: Contact Name, Contact Email, Contact Phone
-  Section 3 — Address: Line 1, Line 2, City, State, Country, Zip Code
-  Section 4 — Locale: Timezone, Date Format
+  Section 3 — Address: Line 1, Line 2, City, State, Zip Code,
+               Country (searchable combobox dropdown — full country list)
+  Section 4 — Locale:
+    Timezone — IANA dropdown (Intl.supportedValuesOf('timeZone'))
+               Display format: "Asia/Kolkata" (IANA key only, not offset label)
+    Date Format — dropdown: DD/MM/YYYY | MM/DD/YYYY | YYYY-MM-DD | DD-MM-YYYY
 
 NOT editable here: Contract fields (Seat Count, ARR, dates)
   → those are edited in Contract tab only
@@ -361,11 +412,14 @@ Section 2 — Payment Overview (static mock in demo):
   MRR: ARR / 12
   Stripe Dashboard Link: # (placeholder)
 
-Section 3 — Storage & Hosting (SA only — hidden from Client Admin):
-  Total Storage Used: [N] GB (daily snapshot)
-  Estimated Hosting Cost: $[X]/month
-  Last Snapshot: [date]
-  Static mock values in demo. SA only — check role before rendering.
+Section 3 — Storage & Hosting (SA only):
+  CONDITION: shown ONLY when tenant.feature_toggle_mode !== 'RUN_ONLY'
+  When RUN_ONLY: render a quiet note instead —
+    "Storage & Hosting is not tracked for Run-Only tenants."
+  When FULL_CREATOR: show static mock values:
+    Total Storage Used: 12.4 GB (daily snapshot)
+    Estimated Hosting Cost: $18.60/month
+    Last Snapshot: Mar 18, 2026
 
 Empty state if no Stripe ID:
   "No Stripe subscription linked. Add a Stripe Subscription ID
@@ -421,6 +475,69 @@ Client Admin: can view Sections 1 and 2 (read-only). Cannot see Section 3.
 
 12. Reclassification auto-removes from incompatible plans on confirm.
     Inline preview shows impact before confirm. SA cannot skip the preview.
+
+13. All B2B plans are ALWAYS platform-wide (scope='PLATFORM_WIDE'). LOCKED.
+    Never create a B2B CATEGORY_BUNDLE plan. Never show price for B2B plans.
+    B2B billing = tenant contract (ARR in Contract tab). Price column hidden.
+
+14. Individual course pricing lives on the course record (NOT plan records).
+    See decision 15 for full locked spec. Permission guard: price fields are
+    SA-editable only, not Content Creators.
+
+15. Course à la carte pricing (locked — March 19, 2026):
+    Fields on course record: price (INR), price_usd_cents (USD),
+    is_individually_purchasable (boolean), stripe_price_id (text).
+    SA manages from Plans & Pricing → Tab 2 (Course Pricing). Both INR and USD
+    prices are editable by SA in Tab 2.
+    stripe_price_id for courses = recurring ANNUAL Stripe Price ID (Stripe-managed).
+    GATE: is_individually_purchasable = true → course EXCLUDED from all B2C
+    subscription plan content assignment. Mutually exclusive. Enforce in UI + query.
+    If already in a plan: warn SA → confirm → auto-remove from plans → set purchasable.
+    Option X (single-course subscription plan) = REJECTED AND LOCKED. Never build.
+    Tab 2 (Course Pricing) is the ONLY surface for course à la carte pricing.
+
+16. B2C subscription tiers: free (default) | basic | professional | premium.
+    Stored as subscription_tier on the user/demoUsers record.
+    Free = default unsubscribed state. NOT a plan record. Users get:
+      - 1 free attempt per assessment (per assessment, all tiers)
+      - Access to courses where is_individually_purchasable=false AND price=null
+    Plans & Pricing swimlane shows "Free (Default)" as a read-only reference
+    column alongside the 3 paid tiers.
+
+17. Plans & Pricing page has 3 tabs: Assessment Plans | Course Pricing | B2B Plans.
+    Full spec in Section 28. Tab-scoped Create buttons only — no global Create button.
+    "Create B2C Plan" (Tab 1) | "Create B2B Plan" (Tab 3) | No button on Tab 2.
+    Page subtitle: "Manage B2C and B2B subscription plans and content entitlements"
+
+18. Feature bullets for plans: JSONB array (feature_bullets column).
+    B2C plans ONLY — not shown on B2B create/edit form.
+    UI: dynamic add/remove list, start with 3 fields, max 7, 80 chars/bullet.
+    GripVertical drag handle per row (V1: icon only, drag in V2).
+    Display name (display_name column) is customer-facing; name is internal.
+    B2B plans have NO display_name, tagline, feature_bullets, is_popular, cta_label.
+
+19. Make Live modal (for both content_items and courses):
+    Enhanced single-step: metadata summary + audience radio + plan impact preview.
+    For assessments: preview queries existing plans where item becomes eligible
+    (matching plan_audience + allowed_assessment_types).
+    For courses: shows "This course will become individually purchasable."
+    No multi-step wizard. No eligibility check beyond the preview.
+
+20. Edit Details slide-over locale fields use dropdowns (not text inputs):
+    Timezone: IANA dropdown (Intl.supportedValuesOf('timeZone')).
+    Date Format: enum dropdown (DD/MM/YYYY | MM/DD/YYYY | YYYY-MM-DD | DD-MM-YYYY).
+    Country: searchable combobox with full country list.
+
+21. Storage & Hosting section (Contract tab) is hidden for RUN_ONLY tenants.
+    Condition: tenant.feature_toggle_mode === 'RUN_ONLY'.
+    Show note: "Storage & Hosting is not tracked for Run-Only tenants."
+
+22. B2B plan create/edit form fields (locked — March 19, 2026):
+    name (internal)* | description | max_attempts (default 10, range 1–99)
+    Scope: read-only badge "Platform-Wide" — never a selector on B2B form.
+    Pricing: read-only callout "Pricing managed via tenant contract."
+    B2B plans grant ALL assessment types — no allowed_assessment_types field.
+    max_attempts editable both in Create form and plan detail Overview tab.
 
 ---
 
@@ -518,16 +635,21 @@ Content Management   Plans & Pricing       🟡 KSS-SA-004 next
 Master Org           B2C Users             Coming Soon
 Master Org           Content Creators      Coming Soon
 Organisations        Tenants               ✅ KSS-SA-003 built
-Assessment           Sources & Questions   Coming Soon
-Assessment           Question Bank         Coming Soon
-Assessment           Create Assessments    Coming Soon
-Assessment           Bulk Upload           Coming Soon
+Course Creation      Create Course         🟡 pending (route: /super-admin/create-course)
+Assessment Creation  Sources & Questions   Coming Soon
+Assessment Creation  Question Bank         Coming Soon
+Assessment Creation  Create Assessments    Coming Soon
+Assessment Creation  Bulk Upload           Coming Soon
 Configuration        Marketing Config      Coming Soon
 Configuration        Analytics             Coming Soon
 Configuration        Audit Log             Coming Soon
 
+Nav group order: Content Management → Master Organisation → Organisations →
+  Course Creation → Assessment Creation → Configuration
+
 REMOVED PERMANENTLY: "Course Store" — not in nav, not in code, not in scope.
 RENAMED: "Content" + "Monetisation" groups → "Content Management" group.
+ADDED: "Course Creation" group above "Assessment Creation".
 
 ---
 
@@ -563,26 +685,44 @@ No Team Manager persona selector — role removed from V1.
 ✅ KSS-SA-004-CONTENT     Plan Content tab rebuilt — manual add/remove,
                            Assessments + Courses sections, no auto-include — DONE
 
-🟡 KSS-SA-004-ARCH  Content architecture changes (March 18, 2026 session):
+✅ KSS-SA-004-ARCH  Content architecture changes — DONE (March 18, 2026):
     - DB: KSS-DB-SA-002 — audience_type on content_items, plan_audience on plans
     - Sidebar nav: Content Management group, Course Store removed
     - Tenant detail: 6 tabs (Content tab removed, Plans tab active)
-    - Build PlansTab.tsx (Docebo accordion — assign + content preview)
-    - Build AssignPlanSlideOver.tsx
-    - Update PlanContentTab.tsx (audience gate + multi-tenant callout)
-    - Update AddContentSlideOver.tsx (audience_type filter)
+    - Built PlansTab.tsx + AssignPlanSlideOver.tsx
+    - Updated PlanContentTab.tsx (audience gate + multi-tenant callout)
+    - Updated AddContentSlideOver.tsx (audience_type filter)
     - Contract tab: Storage & Hosting section (SA only)
 
-🟡 KSS-SA-004   Plans & Pricing — full feature (B2C pricing page config,
-               plan lifecycle, swimlane layout, B2B plan management)
+🟡 KSS-DB-SA-003  Courses + plans schema + B2B seeding (March 19, 2026):
+    - courses: +audience_type, +price, +currency, +is_individually_purchasable,
+               +stripe_price_id
+    - plans: +display_name, +tagline, +feature_bullets (jsonb), +footnote,
+             +is_popular, +cta_label
+    - Update 4 LIVE courses → audience_type='B2B_ONLY'
+    - Insert 4 new B2C LIVE courses (HIPAA, Call Etiquettes, PF Basics, Employee Policy)
+    - Insert 3 B2B plans (Akash Standard, TechCorp Premium, Enterprise Pro)
+    - Seed tenant_plan_map
+
+🟡 FIX-SA-005   Tenant detail flags (March 19, 2026):
+    - Flag 1: EditDetailsSlideOver locale fields → IANA timezone dropdown,
+              date format dropdown, country searchable combobox
+    - Flag 2: Contract tab Storage & Hosting hidden for RUN_ONLY tenants
+    - Flag 3: B2B plans seeded (via KSS-DB-SA-003) — Plans tab now populated
+    - Sidebar: Course Creation group + Create Course item
+
+🟡 KSS-SA-009   Content Bank (unified assessments + courses table, Make Live workflow)
+🟡 KSS-SA-004   Plans & Pricing — 3-tab page (decisions finalised March 19, 2026):
+               Tab 1: B2C swimlane (Free/Basic/Pro/Premium) + category plans
+               Tab 2: Course Pricing à la carte (INR + USD, annual Stripe recurring)
+               Tab 3: B2B card grid (no price shown)
+               Create B2C Plan + Create B2B Plan — tab-scoped entry points
                PRD: https://keyskillset-product-management.atlassian.net/
                     wiki/spaces/EKSS/pages/93093890
-
 🟡 KSS-SA-005   Audit Log
 🟡 KSS-SA-006   Analytics
 🟡 KSS-SA-007   Marketing Config
 🟡 KSS-SA-008   Master Organisation
-🟡 KSS-SA-009   Content Bank
 🟡 KSS-SA-010   Dashboard (last)
 
 B2C (pending):
@@ -619,6 +759,14 @@ BUG-002  Upgrade banner not showing after free attempt
 10. ~~Sub-PRD 4~~ — CLOSED: updated to v2.2 March 18, 2026
 11. CA self-serve plan assignment (V2 deferred — SA-curated model in V1)
 12. B2B Stripe integration (V2 — billing via contract in V1)
+13. V2 DEFERRED: Assessments and courses in one plan — a single B2C/B2B plan
+    will contain both assessment content AND course content together.
+    Currently: assessments and courses are managed separately within plans.
+    Do not build. Do not reference in V1 code.
+14. Course à la carte + plan subscription coexistence — if a course is
+    is_individually_purchasable = true, can a subscriber who has it in their
+    plan retain access after unsubscribing? Not resolved for V1.
+    Gate is: purchasable courses cannot be IN plans (mutually exclusive in V1).
 
 ---
 
@@ -652,9 +800,13 @@ Commit CLAUDE.md to repo root after every session update.
 
 ---
 
-## 25. SELF-CRITIQUE BEFORE EVERY COMMIT
+## 25. SELF-CRITIQUE — AT EVERY ITERATION AND BEFORE EVERY COMMIT
 
-Run this checklist before presenting any code:
+IMPORTANT: Self-critique is not only for commits. Run it at every design
+decision, every component choice, every data model change. Ask: "Is there
+a simpler/more correct approach?" before writing any code.
+
+Run this full checklist before presenting any code:
 
 [ ] Tailwind tokens only — no custom hex, no inline styles
 [ ] Correct git branch format (feat/ or fix/)
@@ -672,11 +824,299 @@ Run this checklist before presenting any code:
 [ ] No Course Store anywhere in nav or code
 [ ] audience_type gate enforced in plan content pickers
 [ ] plan_audience used to determine B2C vs B2B plan identity
-[ ] Storage & Hosting section in Contract tab is SA-only (role check)
+[ ] Storage & Hosting hidden for RUN_ONLY (feature_toggle_mode check)
+[ ] All B2B plans are PLATFORM_WIDE — never CATEGORY_BUNDLE
+[ ] B2B plan price never shown in UI (always "Via tenant contract")
+[ ] Feature bullets stored as JSONB, max 7, 80 chars each
+[ ] display_name used for customer-facing plan names
+[ ] Course pricing fields are SA-editable only (not content creators)
+[ ] Free tier is NOT a plan record — default unsubscribed state only
+[ ] Create B2C Plan form creates assessment subscription plans ONLY — no course plans
+[ ] Create B2B Plan form: name + description + max_attempts (default 10) ONLY
+    No display_name, tagline, feature_bullets, is_popular, cta_label on B2B form
+[ ] B2B plans grant ALL assessment types — no allowed_assessment_types filter
+[ ] B2B max_attempts default = 10, editable in form and plan detail Overview tab
+[ ] is_individually_purchasable courses EXCLUDED from B2C plan content pickers
+[ ] Course à la carte: stripe_price_id = annual recurring Stripe Price ID
+[ ] Tab 2 Course Pricing shows LIVE courses with audience_type B2C_ONLY or BOTH
+[ ] Plans & Pricing page subtitle: "Manage B2C and B2B subscription plans and content entitlements"
+[ ] No global Create Plan button in page header — tab-scoped buttons only
+[ ] derivePlanType() must use actual scope column from DB, not name heuristics
+[ ] price_usd_cents labeled "Price (USD)" everywhere — never "legacy USD" in UI or code
+[ ] Tab 2 (Course Pricing) shows LIVE courses only — audience_type B2C_ONLY or BOTH
+[ ] Purchasable courses greyed out in AddContentSlideOver with tooltip
+[ ] MRR strip inside Tab 1 only — not in page header, not in Tab 2 or Tab 3
 
 ---
 
-*CLAUDE.md — keySkillset v3.0 — Updated March 18, 2026*
+## 26. DEVELOPMENT WORKFLOW PROCEDURES
+
+### A. Starting Any New Feature or Fix
+1. Read CLAUDE.md fully before touching any code.
+2. Read all relevant files before proposing changes.
+3. Branch: git checkout -b feat/KSS-[TRACK]-[NNN] or fix/KSS-[TRACK]-[NNN]
+4. If schema change needed: write SQL, present for approval, wait. Never auto-run.
+
+### B. UX Research (run before any new UI component)
+1. Launch Explore or general-purpose agent with specific research questions.
+2. Research: industry patterns, 2-3 comparable platforms, UX tradeoffs.
+3. Present findings + recommendation with rationale.
+4. Get user decision before writing any code.
+
+### C. Self-Critique (at every design/code decision)
+1. After drafting any solution, ask: Is there a simpler approach?
+2. Check all locked decisions in CLAUDE.md Sections 15 + 25.
+3. Check design system compliance (Section 3).
+4. Run the full Section 25 checklist before any commit.
+
+### D. Schema Migration
+1. Write SQL migration with IF NOT EXISTS guards.
+2. Show full SQL to user — label it KSS-DB-SA-NNN.
+3. Wait for explicit approval. Never run without it.
+4. After user confirms run: update TypeScript types in src/lib/supabase/.
+5. Update CLAUDE.md Section 4 schema docs.
+6. Run npm run build to verify no type errors.
+
+### E. Code Editing
+1. Read file before editing. Never edit blind.
+2. Make minimal targeted changes — no scope creep.
+3. No unused imports. No commented-out code.
+4. After changes: npm run build must pass before committing.
+
+### F. Git Commit
+1. git status + git diff to confirm scope.
+2. Stage specific files (not git add -A).
+3. Commit message: imperative mood, references prompt ID.
+4. Co-authored-by: Claude Sonnet 4.6.
+5. Never commit directly to main.
+
+### G. PRD Update (Confluence)
+1. Use MCP Atlassian tools (updateConfluencePage).
+2. Update after ALL code for a feature is committed and build passes.
+3. Update: version number, date, changed sections only.
+4. Sections to always check: Data Model, API, UI Spec, Status.
+
+---
+
+## 27. CONTENT BANK SPEC (KSS-SA-009)
+
+Unified table showing both content_items (assessments) AND courses.
+
+### Columns
+Title | Type (Assessment/Course) | Category | Status badge |
+Audience badge | Created By | Created Date | Plan Count (N plans)
+
+### Default view
+Filter: Status = INACTIVE (primary SA review queue)
+Sort: Created Date descending (newest first)
+
+### Filters (filter bar above table)
+Status (multi-select: INACTIVE/LIVE/DRAFT/ARCHIVED) |
+Content Type (Assessment / Course) |
+Audience (B2C_ONLY/B2B_ONLY/BOTH/Unset) |
+Category (multi-select from exam_categories) |
+Source (Internal/External)
+
+### Row actions
+INACTIVE items: "Make Live" button (blue-700) + "Archive" (zinc)
+LIVE items: "Reclassify" + "Archive"
+ARCHIVED items: read-only
+
+### Make Live modal (enhanced single-step)
+1. Metadata summary (read-only): title, type, category/course_type
+2. Audience radio: B2C_ONLY | B2B_ONLY | BOTH
+   Each option shows a one-line description.
+3. Plan impact preview (computed on radio change):
+   - Assessments: "Eligible for: [plan names matching audience + allowed types]"
+   - Courses: "This course will become individually purchasable."
+4. Confirm button: "Make Live"
+No multi-step wizard. No blocking validation (content is pre-reviewed at INACTIVE).
+
+### Bulk Make Live
+Only permitted when all selected items share the same audience classification.
+Otherwise: require individual promotion.
+
+---
+
+## 28. PLANS & PRICING PAGE SPEC (KSS-SA-004)
+
+Route: /super-admin/plans-pricing (existing route, 3-tab structure)
+Page subtitle: "Manage B2C and B2B subscription plans and content entitlements"
+MRR strip: Total Platform MRR shown at top (global, covers all B2C plans)
+Header: NO global "+ Create Plan" button. Create buttons live inside each tab.
+
+### Tab 1 — Assessment Plans (B2C)
+MRR strip: shown INSIDE Tab 1 only (not above the tabs — removed from page header area).
+  Shows B2C plans MRR only. B2B plans excluded (price=0, billing via contract).
+
+Layout: Swimlane comparison table
+Columns: Free (Default) [read-only] | Basic | Professional | Premium
+  Column headers = tier display labels (hardcoded). Maps to plans.tier:
+    Basic → tier='BASIC', plan_audience='B2C'
+    Professional → tier='PRO', plan_audience='B2C'
+    Premium → tier='PREMIUM', plan_audience='B2C'
+Below swimlane: category-specific plans in a separate section
+  (SAT Pro, NEET Pro, JEE Premium — shown as table rows with same columns)
+
+Swimlane row attributes (rows of the comparison table):
+  Price (₹/month) | Subscriber Count | MRR | Status badge |
+  Scope | Allowed Types | Max Attempts | Feature Bullets count
+  Scope values display as: "Platform-wide" | "Category Bundle"
+
+Actions: Edit button per plan → opens EditPlanSlideOver (480px right panel)
+  Edit slide-over sections:
+    Plan Identity: name (internal), display_name, tagline, is_popular, cta_label
+    Scope: PLATFORM_WIDE / CATEGORY_BUNDLE (segmented control)
+    Pricing: price (INR/month), billing cycle
+    Access Rules: allowed_assessment_types checkboxes, max_attempts
+    Feature Bullets + Footnote
+
+Create: "Create B2C Plan" button (blue-700, top-right of Tab 1)
+  → /super-admin/plans-pricing/new?audience=B2C
+  Creates assessment subscription plans ONLY. No course plans. (Option Z — locked)
+
+### Tab 2 — Course Pricing (B2C à la carte)
+Layout: Table of LIVE B2C courses (audience_type = B2C_ONLY or BOTH only — no NULL/INACTIVE)
+Columns: Course Title | Course Type | Status | Price (₹) | Price (USD) | Purchasable | Actions
+SA edits per course row (inline or slide-over):
+  price (INR) | price_usd_cents — shown as "Price (USD)", LIVE field, source of truth
+  for Stripe checkout AND B2C pricing page display | is_individually_purchasable | stripe_price_id
+stripe_price_id = recurring ANNUAL Stripe Price ID (managed by Stripe, not the platform)
+price_usd_cents: NOT a legacy field. Rename everywhere as "Price (USD)". Live field.
+  price (INR) + price_usd_cents (USD) = source of truth for Stripe checkout and
+  end-user B2C pricing page display.
+Empty state: "No courses available for pricing. Promote courses to Live in the Content Bank first."
+
+GATE (locked): A course with is_individually_purchasable = true cannot be assigned
+  to any B2C subscription plan.
+  In AddContentSlideOver (course picker): show purchasable courses greyed out with
+  tooltip: "This course is sold individually and cannot be added to a plan."
+  If a course already in a plan is marked purchasable from Tab 2:
+    → Show warning modal: "This will remove the course from [plan names]. Confirm?"
+    → On confirm: remove from plans, set is_individually_purchasable = true
+    → On cancel: revert the toggle
+
+No "Create" button on Tab 2. SA enables à la carte from existing course rows only.
+
+### Tab 3 — B2B Plans
+Layout: Card grid
+Each card: Plan Name | Assigned Tenants count | Content Items count | Status badge
+No price shown anywhere on B2B cards.
+Note at section top: "B2B plan pricing is managed per-tenant via the Contract tab."
+Actions per card: "View" → plan detail page (/super-admin/plans-pricing/[id])
+
+Create: "Create B2B Plan" button (blue-700, top-right of Tab 3)
+  → /super-admin/plans-pricing/new?audience=B2B
+
+### Create B2C Plan form (/new?audience=B2C)
+Assessment subscription plans only. Sections:
+  1. Plan Identity: name (internal)*, display_name (customer-facing),
+     tagline, is_popular toggle, cta_label
+  2. Scope: segmented control — Platform-Wide / Category Bundle
+     (if Category Bundle: show category selector)
+  3. Pricing: price (₹/month)*, billing cycle (Monthly — Annual V2)
+  4. Access Rules: allowed_assessment_types* (checkboxes), max_attempts*
+  5. Feature Bullets (dynamic list, max 7, 80 chars each) + Footnote
+  Save as Draft | Publish Plan
+
+### Create B2B Plan form (/new?audience=B2B)
+B2B enterprise plans. Sections:
+  1. Plan Identity: name (internal)*, description
+  2. Max Attempts: number input, default 10, range 1–99
+     (note: "Free attempt always included — 1 per assessment, all tiers")
+  3. Scope: read-only badge — "Platform-Wide"
+     caption: "B2B plans are always platform-wide."
+  4. Pricing: read-only callout — "Pricing is managed per tenant via the
+     Contract tab. No price is set on B2B plans."
+  No display_name | No tagline | No feature_bullets | No is_popular | No cta_label
+  All assessment types granted — no allowed_assessment_types restriction
+  Save as Draft | Publish Plan
+
+### Feature Bullets input component (B2C plans only — EditPlanSlideOver + Create B2C form)
+Pattern: Dynamic add/remove list
+- Start with 3 empty text inputs (placeholder: e.g. "Full-length Tests included")
+- Each row: GripVertical icon | text input (80 char max, live counter) | Trash icon
+- Add Bullet button (disabled at 7 items, shows "N of 7 max")
+- Trash icon disabled on last remaining item
+- State: JSONB array stored in plans.feature_bullets
+
+---
+
+## 29. KSS-DB-SA-003 MIGRATION SQL (authorised March 19, 2026)
+
+Run in Supabase Dashboard → SQL Editor. RLS: OFF (Super Admin tables).
+
+-- 1. courses table additions
+ALTER TABLE courses
+  ADD COLUMN IF NOT EXISTS audience_type text
+    CHECK (audience_type IN ('B2C_ONLY', 'B2B_ONLY', 'BOTH')),
+  ADD COLUMN IF NOT EXISTS price numeric,
+  ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'INR',
+  ADD COLUMN IF NOT EXISTS is_individually_purchasable boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS stripe_price_id text;
+
+-- 2. plans table additions
+ALTER TABLE plans
+  ADD COLUMN IF NOT EXISTS display_name text,
+  ADD COLUMN IF NOT EXISTS tagline text,
+  ADD COLUMN IF NOT EXISTS feature_bullets jsonb NOT NULL DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS footnote text,
+  ADD COLUMN IF NOT EXISTS is_popular boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS cta_label text;
+
+-- 3. Update 4 existing LIVE courses → B2B_ONLY
+UPDATE courses SET audience_type = 'B2B_ONLY' WHERE status = 'LIVE';
+
+-- 4. Insert 4 new B2C LIVE courses
+INSERT INTO courses
+  (id, title, description, course_type, status, source, audience_type, currency)
+VALUES
+  (gen_random_uuid(), 'HIPAA Compliance Training',
+   'Essential HIPAA compliance training covering PHI handling, breach protocols, and privacy rules.',
+   'VIDEO', 'LIVE', 'PLATFORM', 'B2C_ONLY', 'INR'),
+  (gen_random_uuid(), 'Call Centre Etiquettes',
+   'Professional communication skills and call handling best practices for customer-facing roles.',
+   'VIDEO', 'LIVE', 'PLATFORM', 'B2C_ONLY', 'INR'),
+  (gen_random_uuid(), 'Provident Fund Basics',
+   'Complete guide to EPF, VPF contributions, withdrawal rules, and employer compliance.',
+   'VIDEO', 'LIVE', 'PLATFORM', 'B2C_ONLY', 'INR'),
+  (gen_random_uuid(), 'Employee Policy Handbook',
+   'Understanding workplace policies, code of conduct, leave entitlements, and HR procedures.',
+   'VIDEO', 'LIVE', 'PLATFORM', 'B2C_ONLY', 'INR');
+
+-- 5. Insert 3 B2B plans (all platform-wide, price=0)
+INSERT INTO plans
+  (id, name, display_name, description, price, billing_cycle, status,
+   max_attempts_per_assessment, scope, category, plan_audience)
+VALUES
+  (gen_random_uuid(), 'Akash Standard', 'Akash Standard',
+   'Platform-wide assessment and course access for Akash Institute Delhi learners.',
+   0, 'MONTHLY', 'PUBLISHED', 99, 'PLATFORM_WIDE', NULL, 'B2B'),
+  (gen_random_uuid(), 'TechCorp Premium', 'TechCorp Premium',
+   'Premium platform-wide access for TechCorp India employees.',
+   0, 'MONTHLY', 'PUBLISHED', 99, 'PLATFORM_WIDE', NULL, 'B2B'),
+  (gen_random_uuid(), 'Enterprise Pro', 'Enterprise Pro',
+   'Shared enterprise platform-wide plan for multi-tenant access.',
+   0, 'MONTHLY', 'PUBLISHED', 99, 'PLATFORM_WIDE', NULL, 'B2B');
+
+-- 6. Assign B2B plans to tenants
+-- Akash Standard → Akash Institute Delhi
+INSERT INTO tenant_plan_map (tenant_id, plan_id)
+SELECT 'ec1bc005-e76d-4208-ab0f-abe0d316e260', id FROM plans WHERE name = 'Akash Standard';
+
+-- TechCorp Premium → TechCorp India
+INSERT INTO tenant_plan_map (tenant_id, plan_id)
+SELECT '7caa0566-e31a-41b6-962d-30fb3d6cb011', id FROM plans WHERE name = 'TechCorp Premium';
+
+-- Enterprise Pro → both tenants
+INSERT INTO tenant_plan_map (tenant_id, plan_id)
+SELECT 'ec1bc005-e76d-4208-ab0f-abe0d316e260', id FROM plans WHERE name = 'Enterprise Pro';
+INSERT INTO tenant_plan_map (tenant_id, plan_id)
+SELECT '7caa0566-e31a-41b6-962d-30fb3d6cb011', id FROM plans WHERE name = 'Enterprise Pro';
+
+---
+
+*CLAUDE.md — keySkillset v4.0 — Updated March 19, 2026*
 *Source of truth for Claude Code sessions*
 *PRD updates: use Confluence MCP tools in Claude Code or Claude.ai*
 *Do not edit this file manually*
