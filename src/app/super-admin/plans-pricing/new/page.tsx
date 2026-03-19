@@ -122,7 +122,6 @@ function B2CForm() {
         price:                       price as number,
         billing_cycle:               'MONTHLY',
         status,
-        allowed_assessment_types:    allowedTypes,
         max_attempts_per_assessment: maxAttempts,
         feature_bullets:             bullets.filter((b) => b.trim()),
         footnote:                    footnote.trim() || null,

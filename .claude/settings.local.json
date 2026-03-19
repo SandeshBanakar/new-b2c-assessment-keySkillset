@@ -22,7 +22,11 @@
       "Bash(git rev-parse --short HEAD)",
       "Bash(npx tsc --noEmit*)",
       "Bash(curl -s -H*ugweguyeaqkbxgtpkhez*)",
-      "Bash(curl -s -H*uqweguyeaqkbxgtpkhez*)"
+      "Bash(curl -s -H*uqweguyeaqkbxgtpkhez*)",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/plan_content_map?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/assessments?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/courses?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/plans?limit=1&plan_audience=eq.B2B\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")"
     ]
   }
 }

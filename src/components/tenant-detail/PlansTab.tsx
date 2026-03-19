@@ -221,14 +221,18 @@ function PlanAccordionRow({
 export default function PlansTab({ tenantId }: Props) {
   const [plans, setPlans] = useState<TenantAssignedPlan[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showAssign, setShowAssign] = useState(false)
   const [filterPlanId, setFilterPlanId] = useState('')
 
   const fetchPlans = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const data = await fetchTenantAssignedPlansWithContent(tenantId)
       setPlans(data)
+    } catch (e: unknown) {
+      setLoadError(e instanceof Error ? e.message : 'Failed to load plans.')
     } finally {
       setLoading(false)
     }
@@ -244,6 +248,20 @@ export default function PlansTab({ tenantId }: Props) {
         {[0, 1].map((i) => (
           <div key={i} className="h-14 animate-pulse bg-zinc-100 rounded-md" />
         ))}
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex items-start gap-3 bg-rose-50 border border-rose-200 rounded-md px-4 py-3">
+        <p className="text-sm text-rose-600">{loadError}</p>
+        <button
+          onClick={fetchPlans}
+          className="ml-auto text-xs font-medium text-rose-600 underline shrink-0"
+        >
+          Retry
+        </button>
       </div>
     )
   }

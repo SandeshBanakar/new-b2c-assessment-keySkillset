@@ -57,7 +57,6 @@ export async function fetchPlans(): Promise<PlanRow[]> {
       footnote,
       is_popular,
       cta_label,
-      allowed_assessment_types,
       created_at,
       plan_subscribers (
         subscriber_count,
@@ -70,8 +69,10 @@ export async function fetchPlans(): Promise<PlanRow[]> {
 
   // Supabase returns plan_subscribers as an array (one-to-one relation).
   // Normalise to a single object or null before returning.
+  // allowed_assessment_types is not a DB column — default to [] client-side.
   const normalised = (data ?? []).map((row) => ({
     ...row,
+    allowed_assessment_types: [],
     plan_subscribers: Array.isArray(row.plan_subscribers)
       ? (row.plan_subscribers[0] ?? null)
       : row.plan_subscribers,
@@ -93,7 +94,7 @@ export type CreatePlanPayload = {
   billing_cycle: string
   status: 'DRAFT' | 'PUBLISHED'
   max_attempts_per_assessment: number
-  allowed_assessment_types: string[]
+  // allowed_assessment_types is not a DB column — UI-only, not persisted
   scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
   category: string | null
   feature_bullets: string[]
@@ -120,7 +121,6 @@ export async function createPlan(
       billing_cycle:                 payload.billing_cycle,
       status:                        payload.status,
       max_attempts_per_assessment:   payload.max_attempts_per_assessment,
-      allowed_assessment_types:      payload.allowed_assessment_types,
       scope:                         payload.scope,
       category:                      payload.category,
       feature_bullets:               payload.feature_bullets,
@@ -140,9 +140,9 @@ export async function assignContentToPlan(
   if (contentItemIds.length === 0) return
 
   const rows = contentItemIds.map((contentItemId) => ({
-    plan_id:      planId,
-    content_id:   contentItemId,
-    content_type: 'ASSESSMENT' as const,
+    plan_id:          planId,
+    content_item_id:  contentItemId,
+    content_type:     'ASSESSMENT' as const,
   }))
 
   const { error } = await supabase
@@ -202,7 +202,7 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
       audience_type, plan_audience, status, scope, tier, category,
       max_attempts_per_assessment, feature_bullets,
       tagline, footnote, is_popular, cta_label,
-      allowed_assessment_types, created_at,
+      created_at,
       plan_subscribers (subscriber_count, mock_mrr)
     `)
     .eq('id', id)
@@ -219,6 +219,8 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
 
   return {
     ...row,
+    // allowed_assessment_types is not a DB column — default to [] client-side
+    allowed_assessment_types: [],
     plan_subscribers: Array.isArray(row.plan_subscribers)
       ? (row.plan_subscribers[0] ?? null)
       : row.plan_subscribers,
@@ -346,51 +348,51 @@ export async function fetchTenantPlansWithContent(
   // Step 3: assessment rows from plan_content_map
   const { data: pcmRows, error: pcmError } = await supabase
     .from('plan_content_map')
-    .select('id, plan_id, content_id')
+    .select('id, plan_id, content_item_id')
     .in('plan_id', planIds)
     .eq('content_type', 'ASSESSMENT')
 
   if (pcmError) throw new Error(pcmError.message)
 
-  const contentIds = (pcmRows as { content_id: string }[]).map((r) => r.content_id)
+  const contentIds = (pcmRows as { content_item_id: string }[]).map((r) => r.content_item_id)
 
-  // Step 4: content_items details
-  let contentMap: Record<string, { title: string; exam_type: string; assessment_type: string; status: string }> = {}
+  // Step 4: content_items details (DB columns: test_type, exam_category_id — no exam_type/assessment_type)
+  let contentMap: Record<string, { title: string; test_type: string; status: string }> = {}
   if (contentIds.length > 0) {
     const { data: ciRows, error: ciError } = await supabase
       .from('content_items')
-      .select('id, title, exam_type, assessment_type, status')
+      .select('id, title, test_type, status')
       .in('id', contentIds)
 
     if (ciError) throw new Error(ciError.message)
 
     contentMap = Object.fromEntries(
-      (ciRows as { id: string; title: string; exam_type: string; assessment_type: string; status: string }[])
+      (ciRows as { id: string; title: string; test_type: string; status: string }[])
         .map((c) => [c.id, c])
     )
   }
 
   // Step 5: build sections — detect duplicates across plans
   const contentIdToPlanCount: Record<string, number> = {}
-  ;(pcmRows as { content_id: string }[]).forEach((r) => {
-    contentIdToPlanCount[r.content_id] = (contentIdToPlanCount[r.content_id] ?? 0) + 1
+  ;(pcmRows as { content_item_id: string }[]).forEach((r) => {
+    contentIdToPlanCount[r.content_item_id] = (contentIdToPlanCount[r.content_item_id] ?? 0) + 1
   })
 
   return planIds.map((planId) => {
     const planAssessments: TenantPlanAssessment[] = (
-      pcmRows as { id: string; plan_id: string; content_id: string }[]
+      pcmRows as { id: string; plan_id: string; content_item_id: string }[]
     )
       .filter((r) => r.plan_id === planId)
       .map((r) => {
-        const ci = contentMap[r.content_id]
+        const ci = contentMap[r.content_item_id]
         return {
           pcmId: r.id,
-          contentId: r.content_id,
+          contentId: r.content_item_id,
           title: ci?.title ?? '—',
-          examType: ci?.exam_type ?? '—',
-          assessmentType: ci?.assessment_type ?? '—',
+          examType: '—',
+          assessmentType: ci?.test_type ?? '—',
           status: ci?.status ?? '—',
-          inPlanCount: contentIdToPlanCount[r.content_id] ?? 1,
+          inPlanCount: contentIdToPlanCount[r.content_item_id] ?? 1,
         }
       })
 
@@ -426,35 +428,36 @@ export async function fetchPlanAssignedAssessments(
 ): Promise<PlanAssignedAssessment[]> {
   const { data: pcmRows, error: pcmError } = await supabase
     .from('plan_content_map')
-    .select('id, content_id')
+    .select('id, content_item_id')
     .eq('plan_id', planId)
     .eq('content_type', 'ASSESSMENT')
 
   if (pcmError) throw new Error(pcmError.message)
   if (!pcmRows || pcmRows.length === 0) return []
 
-  const contentIds = (pcmRows as { content_id: string }[]).map((r) => r.content_id)
+  const contentIds = (pcmRows as { content_item_id: string }[]).map((r) => r.content_item_id)
 
+  // DB columns: test_type (not assessment_type), exam_category_id UUID FK (not exam_type string)
   const { data: ciRows, error: ciError } = await supabase
     .from('content_items')
-    .select('id, title, exam_type, assessment_type, status')
+    .select('id, title, test_type, status')
     .in('id', contentIds)
 
   if (ciError) throw new Error(ciError.message)
 
   const ciMap = Object.fromEntries(
-    (ciRows as { id: string; title: string; exam_type: string; assessment_type: string; status: string }[])
+    (ciRows as { id: string; title: string; test_type: string; status: string }[])
       .map((c) => [c.id, c])
   )
 
-  return (pcmRows as { id: string; content_id: string }[]).map((r) => {
-    const ci = ciMap[r.content_id]
+  return (pcmRows as { id: string; content_item_id: string }[]).map((r) => {
+    const ci = ciMap[r.content_item_id]
     return {
       pcmId: r.id,
-      contentId: r.content_id,
+      contentId: r.content_item_id,
       title: ci?.title ?? '—',
-      examType: ci?.exam_type ?? '—',
-      assessmentType: ci?.assessment_type ?? '—',
+      examType: '—',
+      assessmentType: ci?.test_type ?? '—',
       status: ci?.status ?? '—',
     }
   })
@@ -465,14 +468,14 @@ export async function fetchPlanAssignedCourses(
 ): Promise<PlanAssignedCourse[]> {
   const { data: pcmRows, error: pcmError } = await supabase
     .from('plan_content_map')
-    .select('id, content_id')
+    .select('id, content_item_id')
     .eq('plan_id', planId)
     .eq('content_type', 'COURSE')
 
   if (pcmError) throw new Error(pcmError.message)
   if (!pcmRows || pcmRows.length === 0) return []
 
-  const contentIds = (pcmRows as { content_id: string }[]).map((r) => r.content_id)
+  const contentIds = (pcmRows as { content_item_id: string }[]).map((r) => r.content_item_id)
 
   const { data: coRows, error: coError } = await supabase
     .from('courses')
@@ -486,11 +489,11 @@ export async function fetchPlanAssignedCourses(
       .map((c) => [c.id, c])
   )
 
-  return (pcmRows as { id: string; content_id: string }[]).map((r) => {
-    const co = coMap[r.content_id]
+  return (pcmRows as { id: string; content_item_id: string }[]).map((r) => {
+    const co = coMap[r.content_item_id]
     return {
       pcmId: r.id,
-      contentId: r.content_id,
+      contentId: r.content_item_id,
       title: co?.title ?? '—',
       courseType: co?.course_type ?? '—',
       status: co?.status ?? '—',
@@ -504,18 +507,19 @@ export async function fetchAvailableAssessmentsForPlan(
 ): Promise<{ id: string; title: string; examType: string; assessmentType: string; audienceType: string | null }[]> {
   const { data: existing } = await supabase
     .from('plan_content_map')
-    .select('content_id')
+    .select('content_item_id')
     .eq('plan_id', planId)
     .eq('content_type', 'ASSESSMENT')
 
-  const assignedIds = (existing as { content_id: string }[] | null ?? []).map((r) => r.content_id)
+  const assignedIds = (existing as { content_item_id: string }[] | null ?? []).map((r) => r.content_item_id)
 
   // Audience gate: B2C plans show B2C_ONLY and BOTH content; B2B plans show B2B_ONLY and BOTH content
   const compatibleType = planAudience === 'B2C' ? 'B2C_ONLY' : 'B2B_ONLY'
 
+  // DB columns: test_type (not assessment_type) — exam_category_id is UUID FK, not returned as string
   let query = supabase
     .from('content_items')
-    .select('id, title, exam_type, assessment_type, audience_type')
+    .select('id, title, test_type, audience_type')
     .eq('status', 'LIVE')
     .or(`audience_type.eq.${compatibleType},audience_type.eq.BOTH,audience_type.is.null`)
 
@@ -526,8 +530,8 @@ export async function fetchAvailableAssessmentsForPlan(
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
-  return (data as { id: string; title: string; exam_type: string; assessment_type: string; audience_type: string | null }[]).map(
-    (a) => ({ id: a.id, title: a.title, examType: a.exam_type, assessmentType: a.assessment_type, audienceType: a.audience_type })
+  return (data as { id: string; title: string; test_type: string; audience_type: string | null }[]).map(
+    (a) => ({ id: a.id, title: a.title, examType: '—', assessmentType: a.test_type, audienceType: a.audience_type })
   )
 }
 
@@ -536,11 +540,11 @@ export async function fetchAvailableCoursesForPlan(
 ): Promise<{ id: string; title: string; courseType: string; isIndividuallyPurchasable: boolean }[]> {
   const { data: existing } = await supabase
     .from('plan_content_map')
-    .select('content_id')
+    .select('content_item_id')
     .eq('plan_id', planId)
     .eq('content_type', 'COURSE')
 
-  const assignedIds = (existing as { content_id: string }[] | null ?? []).map((r) => r.content_id)
+  const assignedIds = (existing as { content_item_id: string }[] | null ?? []).map((r) => r.content_item_id)
 
   let query = supabase
     .from('courses')
@@ -566,7 +570,7 @@ export async function addContentToPlan(
 ): Promise<void> {
   const { error } = await supabase
     .from('plan_content_map')
-    .insert({ plan_id: planId, content_id: contentId, content_type: contentType })
+    .insert({ plan_id: planId, content_item_id: contentId, content_type: contentType })
   if (error) throw new Error(error.message)
 }
 
@@ -616,27 +620,27 @@ export async function fetchTenantAssignedPlansWithContent(
   // Step 3: assessment content map rows
   const { data: pcmRows, error: pcmError } = await supabase
     .from('plan_content_map')
-    .select('id, plan_id, content_id')
+    .select('id, plan_id, content_item_id')
     .in('plan_id', planIds)
     .eq('content_type', 'ASSESSMENT')
 
   if (pcmError) throw new Error(pcmError.message)
 
-  const typedPcm = (pcmRows ?? []) as { id: string; plan_id: string; content_id: string }[]
-  const contentIds = typedPcm.map((r) => r.content_id)
+  const typedPcm = (pcmRows ?? []) as { id: string; plan_id: string; content_item_id: string }[]
+  const contentIds = typedPcm.map((r) => r.content_item_id)
 
-  // Step 4: content_items details
-  let contentMap: Record<string, { title: string; exam_type: string; assessment_type: string; status: string }> = {}
+  // Step 4: content_items details (DB columns: test_type, exam_category_id UUID FK)
+  let contentMap: Record<string, { title: string; test_type: string; status: string }> = {}
   if (contentIds.length > 0) {
     const { data: ciRows, error: ciError } = await supabase
       .from('content_items')
-      .select('id, title, exam_type, assessment_type, status')
+      .select('id, title, test_type, status')
       .in('id', contentIds)
 
     if (ciError) throw new Error(ciError.message)
 
     contentMap = Object.fromEntries(
-      (ciRows as { id: string; title: string; exam_type: string; assessment_type: string; status: string }[])
+      (ciRows as { id: string; title: string; test_type: string; status: string }[])
         .map((c) => [c.id, c])
     )
   }
@@ -644,7 +648,7 @@ export async function fetchTenantAssignedPlansWithContent(
   // Step 5: detect duplicates (same content in multiple plans for this tenant)
   const contentIdToPlanCount: Record<string, number> = {}
   typedPcm.forEach((r) => {
-    contentIdToPlanCount[r.content_id] = (contentIdToPlanCount[r.content_id] ?? 0) + 1
+    contentIdToPlanCount[r.content_item_id] = (contentIdToPlanCount[r.content_item_id] ?? 0) + 1
   })
 
   return planIds.map((planId) => {
@@ -652,15 +656,15 @@ export async function fetchTenantAssignedPlansWithContent(
     const assessments = typedPcm
       .filter((r) => r.plan_id === planId)
       .map((r) => {
-        const ci = contentMap[r.content_id]
+        const ci = contentMap[r.content_item_id]
         return {
           pcmId: r.id,
-          contentId: r.content_id,
+          contentId: r.content_item_id,
           title: ci?.title ?? '—',
-          examType: ci?.exam_type ?? '—',
-          assessmentType: ci?.assessment_type ?? '—',
+          examType: '—',
+          assessmentType: ci?.test_type ?? '—',
           status: ci?.status ?? '—',
-          inPlanCount: contentIdToPlanCount[r.content_id] ?? 1,
+          inPlanCount: contentIdToPlanCount[r.content_item_id] ?? 1,
         }
       })
 

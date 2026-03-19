@@ -112,7 +112,6 @@ export function EditPlanSlideOver({ plan, onClose, onSaved }: Props) {
         category:                    scope === 'CATEGORY_BUNDLE' ? category : null,
         price,
         max_attempts_per_assessment: maxAttempts,
-        allowed_assessment_types:    allowedTypes,
         feature_bullets:             cleanBullets,
         footnote:                    footnote.trim() || null,
       })
