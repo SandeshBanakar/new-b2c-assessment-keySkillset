@@ -1,0 +1,105 @@
+#!/bin/bash
+# keySkillset SA Pre-Commit Hook
+# Invokes the SA Test Agent via Claude CLI before every commit.
+# Holds the commit if issues are found. Owner must type 'approve' to override.
+#
+# Install: run scripts/install-hooks.sh once after cloning.
+
+set -e
+
+REPORT_PATH=".claude/reports/sa-test-report.md"
+AGENT_NAME="keySkillset SA Test Agent"
+
+echo ""
+echo "┌─────────────────────────────────────────────┐"
+echo "│  keySkillset SA Test Agent — Pre-Commit Run │"
+echo "└─────────────────────────────────────────────┘"
+echo ""
+
+# Check if claude CLI is available
+if ! command -v claude &> /dev/null; then
+  echo "⚠️  claude CLI not found. Skipping SA test agent."
+  echo "   Install Claude Code CLI to enable pre-commit checks."
+  echo "   Proceeding with commit (unguarded)."
+  exit 0
+fi
+
+# Check if any SA files are staged
+STAGED_SA_FILES=$(git diff --staged --name-only | grep -E "^src/app/super-admin/|^src/components/tenant-detail/|^src/components/plans/" || true)
+
+if [ -z "$STAGED_SA_FILES" ]; then
+  echo "ℹ️  No Super Admin files staged. Skipping SA checks."
+  echo "✅ Commit allowed."
+  exit 0
+fi
+
+echo "📁 Staged SA files:"
+echo "$STAGED_SA_FILES" | sed 's/^/   /'
+echo ""
+echo "🔍 Running SA Test Agent. This may take 30-90 seconds..."
+echo ""
+
+# Run the SA test agent via Claude CLI in print mode
+# The agent writes the full report to .claude/reports/sa-test-report.md
+AGENT_OUTPUT=$(claude -p "Run the sa-test-agent on the currently staged files. Check all categories: TYPE ERROR, LOCKED DECISION VIOLATION, SCHEMA MISMATCH, DESIGN SYSTEM, DEAD IMPORT, BUSINESS LOGIC. Write the full report to ${REPORT_PATH}. Output only the summary counts and HOLD or PASS verdict to stdout." 2>&1)
+
+EXIT_CODE=$?
+
+echo "$AGENT_OUTPUT"
+echo ""
+
+# Check if the report was written
+if [ ! -f "$REPORT_PATH" ]; then
+  echo "⚠️  Report file not written by agent. Check Claude CLI output above."
+  echo "   Proceeding with commit (agent error — not a code issue)."
+  exit 0
+fi
+
+# Check verdict in the report
+VERDICT=$(grep "HOLD\|PASS" "$REPORT_PATH" | tail -1 || true)
+
+if echo "$VERDICT" | grep -q "PASS"; then
+  echo "✅ SA TEST AGENT: All checks passed. Commit allowed."
+  echo "   Report: ${REPORT_PATH}"
+  exit 0
+fi
+
+if echo "$VERDICT" | grep -q "HOLD"; then
+  echo "⛔ SA TEST AGENT: Issues found. Commit held pending owner review."
+  echo ""
+  echo "   Full report: ${REPORT_PATH}"
+  echo ""
+  echo "   Open the report, review each flagged issue, then return here."
+  echo ""
+
+  # Interactive prompt — must run in terminal context
+  if [ -t 0 ]; then
+    read -r -p "   Type 'approve' to override and commit anyway, or press Enter to abort: " OWNER_RESPONSE
+    echo ""
+
+    if [ "$OWNER_RESPONSE" = "approve" ]; then
+      TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      BRANCH=$(git branch --show-current)
+      # Append owner decision to report
+      printf "\n---\n## Owner Decision\nInput: approve (manual override)\nBranch: %s\nDecided at: %s\n" \
+        "$BRANCH" "$TIMESTAMP" >> "$REPORT_PATH"
+      echo "✅ Override accepted. Proceeding with commit."
+      echo "   Override recorded in: ${REPORT_PATH}"
+      exit 0
+    else
+      printf "\n---\n## Owner Decision\nInput: abort\nDecided at: %s\n" \
+        "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$REPORT_PATH"
+      echo "❌ Commit aborted. Fix the issues and recommit."
+      exit 1
+    fi
+  else
+    # Non-interactive context (CI or piped input) — block by default
+    echo "   Non-interactive context detected. Blocking commit."
+    exit 1
+  fi
+fi
+
+# Fallback: if verdict line not found, allow with warning
+echo "⚠️  Could not determine verdict from report. Allowing commit with warning."
+echo "   Review ${REPORT_PATH} manually."
+exit 0

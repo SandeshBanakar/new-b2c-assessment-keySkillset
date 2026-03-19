@@ -13,7 +13,16 @@
       "Bash(grep -n \"courses\\\\|tenant_plan_map\" src/app/super-admin/tenants/[id]/page.tsx)",
       "Bash(grep -n \"AssignContentSlideOver\\\\|RemoveContentModal\\\\|onGoToPlans\" src/app/super-admin/tenants/[id]/page.tsx)",
       "Bash(grep -n \"ContentTab\\\\|activeTab\\\\|setActiveTab\\\\|onGoToPlans\" src/app/super-admin/tenants/[id]/page.tsx)",
-      "mcp__claude_ai_Atlassian__updateConfluencePage"
+      "mcp__claude_ai_Atlassian__updateConfluencePage",
+      "mcp__claude_ai_Atlassian__createConfluencePage",
+      "mcp__claude_ai_Atlassian__searchConfluenceUsingCql",
+      "Bash(git diff --staged --name-only)",
+      "Bash(git diff --staged --name-only | grep*)",
+      "Bash(git branch --show-current)",
+      "Bash(git rev-parse --short HEAD)",
+      "Bash(npx tsc --noEmit*)",
+      "Bash(curl -s -H*ugweguyeaqkbxgtpkhez*)",
+      "Bash(curl -s -H*uqweguyeaqkbxgtpkhez*)"
     ]
   }
 }
