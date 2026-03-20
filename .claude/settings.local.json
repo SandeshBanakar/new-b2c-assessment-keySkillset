@@ -31,7 +31,13 @@
       "Bash(grep -n \"from\\(''admin_users''\\)\" /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)",
       "Bash(grep -n \"from\\(''learners''\\)\" /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)",
       "Bash(sed -n '670,680p' /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)",
-      "Bash(grep -n \"created_at\\\\|updated_at\\\\|phone\\\\|status\" /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)"
+      "Bash(grep -n \"created_at\\\\|updated_at\\\\|phone\\\\|status\" /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/exam_categories?select=id,name\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/content_items?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/learners?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/departments?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/teams?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/tenants?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")"
     ]
   }
 }
