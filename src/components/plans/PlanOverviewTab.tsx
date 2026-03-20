@@ -71,7 +71,12 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
       <div className="flex items-center justify-between bg-white border border-zinc-200 rounded-md px-5 py-4">
         <div className="flex items-center gap-3">
           <PlanStatusBadge status={plan.status} />
-          <PlanTypeBadge type={derivePlanType(plan.name)} />
+          <PlanTypeBadge type={derivePlanType(plan.scope)} />
+          {plan.plan_category === 'COURSE_BUNDLE' && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200">
+              Course Bundle
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -109,32 +114,23 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
         </div>
       </div>
 
-      {/* MRR summary strip */}
+      {/* Summary strip */}
       <div className="grid grid-cols-3 gap-4">
-        {[
-          {
-            label: 'Subscribers',
-            value: plan.plan_subscribers?.subscriber_count ?? 0,
-          },
-          {
-            label: 'MRR',
-            value: `₹${(
-              plan.plan_subscribers?.mock_mrr ?? 0
-            ).toLocaleString('en-IN')}`,
-          },
-          {
-            label: 'Price',
-            value: plan.price === 0 ? 'Free' : `₹${plan.price}/mo`,
-          },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className="bg-white border border-zinc-200 rounded-md px-4 py-3"
-          >
+        {(plan.plan_category === 'COURSE_BUNDLE'
+          ? [
+              { label: 'Subscribers',    value: plan.plan_subscribers?.subscriber_count ?? 0 },
+              { label: 'Annual Revenue', value: `₹${((plan.plan_subscribers?.subscriber_count ?? 0) * plan.price).toLocaleString('en-IN')}` },
+              { label: 'Price (₹/year)', value: plan.price === 0 ? 'Free' : `₹${plan.price.toLocaleString('en-IN')}` },
+            ]
+          : [
+              { label: 'Subscribers', value: plan.plan_subscribers?.subscriber_count ?? 0 },
+              { label: 'MRR',         value: `₹${(plan.plan_subscribers?.mock_mrr ?? 0).toLocaleString('en-IN')}` },
+              { label: 'Price',       value: plan.price === 0 ? 'Free' : `₹${plan.price}/mo` },
+            ]
+        ).map((item) => (
+          <div key={item.label} className="bg-white border border-zinc-200 rounded-md px-4 py-3">
             <p className="text-xs text-zinc-400">{item.label}</p>
-            <p className="text-lg font-semibold text-zinc-900 mt-0.5">
-              {item.value}
-            </p>
+            <p className="text-lg font-semibold text-zinc-900 mt-0.5">{item.value}</p>
           </div>
         ))}
       </div>
@@ -148,41 +144,33 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
           <Field label="Plan name" value={plan.name} />
           <Field
             label="Scope"
-            value={
-              plan.scope === 'PLATFORM_WIDE'
-                ? 'Platform-wide'
-                : `Category Bundle — ${plan.category ?? '—'}`
-            }
+            value={plan.scope === 'PLATFORM_WIDE' ? 'Platform-wide' : `Category Bundle — ${plan.category ?? '—'}`}
           />
+          {plan.display_name && <Field label="Display name" value={plan.display_name} />}
+          <Field label="Description" value={plan.description || '—'} />
+          {plan.tagline && <Field label="Tagline" value={plan.tagline} />}
           <Field
-            label="Description"
-            value={plan.description || '—'}
+            label="Billing cycle"
+            value={plan.billing_cycle === 'ANNUAL' ? 'Annual' : 'Monthly'}
           />
-          <Field label="Billing cycle" value="Monthly" />
-          <Field
-            label="Audience"
-            value={plan.audience_type ?? 'B2C'}
-          />
-          <Field
-            label="Max paid attempts"
-            value={`${plan.max_attempts_per_assessment} per assessment`}
-          />
+          {plan.plan_category !== 'COURSE_BUNDLE' && (
+            <Field
+              label="Max paid attempts"
+              value={`${plan.max_attempts_per_assessment} per assessment`}
+            />
+          )}
           <Field
             label="Created"
             value={new Date(plan.created_at).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
+              day: 'numeric', month: 'short', year: 'numeric',
             })}
           />
           <Field
-            label="Stripe Product ID"
+            label={plan.plan_category === 'COURSE_BUNDLE' ? 'Stripe Price ID' : 'Stripe Product ID'}
             value={
               stripeId ? (
                 <span className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-zinc-600">
-                    {stripeId}
-                  </span>
+                  <span className="font-mono text-xs text-zinc-600">{stripeId}</span>
                   <button
                     onClick={() => navigator.clipboard.writeText(stripeId)}
                     className="text-zinc-400 hover:text-zinc-600 transition-colors"

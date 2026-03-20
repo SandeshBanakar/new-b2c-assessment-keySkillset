@@ -537,9 +537,201 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
   )
 }
 
-// ─── Public export: routes to B2B or B2C form by plan_audience ─────────────────
+// ─── Course Bundle Edit form ──────────────────────────────────────────────────
+function CourseBundleEditForm({ plan, onClose, onSaved }: Props) {
+  const [name, setName]               = useState(plan.name)
+  const [displayName, setDisplayName] = useState(plan.display_name ?? '')
+  const [tagline, setTagline]         = useState(plan.tagline ?? '')
+  const [price, setPrice]             = useState(plan.price)
+  const [billingCycle, setBillingCycle] = useState<'ANNUAL' | 'MONTHLY'>(
+    (plan.billing_cycle as 'ANNUAL' | 'MONTHLY') ?? 'ANNUAL'
+  )
+  const initialBullets = Array.isArray(plan.feature_bullets) && plan.feature_bullets.length > 0
+    ? plan.feature_bullets
+    : ['', '', '']
+  const [bullets, setBullets]     = useState<string[]>(initialBullets)
+  const [footnote, setFootnote]   = useState(plan.footnote ?? '')
+  const [saving, setSaving]       = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+
+  function addBullet() { if (bullets.length < 7) setBullets((p) => [...p, '']) }
+  function removeBullet(i: number) { if (bullets.length > 1) setBullets((p) => p.filter((_, idx) => idx !== i)) }
+  function updateBullet(i: number, v: string) { setBullets((p) => p.map((b, idx) => idx === i ? v.slice(0, 80) : b)) }
+
+  async function handleSave() {
+    if (!name.trim()) { setError('Plan name is required.'); return }
+    setSaving(true)
+    setError(null)
+    try {
+      await updatePlan(plan.id, {
+        name:            name.trim(),
+        display_name:    displayName.trim() || null,
+        tagline:         tagline.trim() || null,
+        price,
+        billing_cycle:   billingCycle,
+        feature_bullets: bullets.filter((b) => b.trim()),
+        footnote:        footnote.trim() || null,
+      } as Parameters<typeof updatePlan>[1])
+      await writePlanAuditLog(plan.id, 'PLAN_UPDATED', { updated_by: 'super_admin' })
+      onSaved()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Save failed.')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-120 bg-white border-l border-zinc-200 z-50 flex flex-col shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">Edit Course Bundle Plan</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">{plan.name}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+          {/* Section 1 — Identity */}
+          <div>
+            <SectionHeading number="1" title="Plan Identity" />
+            <div className="space-y-4">
+              <div>
+                <FieldLabel label="Plan name (internal)" required />
+                <input
+                  value={name} onChange={(e) => setName(e.target.value)}
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <FieldLabel label="Display name (customer-facing)" />
+                <input
+                  value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Shown on pricing page"
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <FieldLabel label="Tagline" />
+                <input
+                  value={tagline} onChange={(e) => setTagline(e.target.value)}
+                  placeholder="One-line subtitle for the pricing card"
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2 — Pricing */}
+          <div>
+            <SectionHeading number="2" title="Pricing" />
+            <div className="space-y-4">
+              <div>
+                <FieldLabel label="Price (₹/year)" required />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
+                  <input
+                    type="number" min={0} value={price}
+                    onChange={(e) => setPrice(Number(e.target.value))}
+                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div>
+                <FieldLabel label="Billing cycle" />
+                <div className="grid grid-cols-2 gap-2">
+                  {(['ANNUAL', 'MONTHLY'] as const).map((cycle) => (
+                    <button
+                      key={cycle} type="button" onClick={() => setBillingCycle(cycle)}
+                      className={`px-3 py-2 rounded-md border text-sm font-medium transition-colors ${
+                        billingCycle === cycle
+                          ? 'border-blue-600 bg-blue-50 text-blue-900'
+                          : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {cycle === 'ANNUAL' ? 'Annual' : 'Monthly'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3 — Feature Bullets */}
+          <div>
+            <SectionHeading number="3" title="Feature Bullets & Footnote" subtitle="Max 7 bullets, 80 chars each." />
+            <div className="space-y-4">
+              <div>
+                <FieldLabel label="Feature bullets" />
+                <div className="space-y-2">
+                  {bullets.map((bullet, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <GripVertical className="w-4 h-4 text-zinc-300 shrink-0" />
+                      <div className="relative flex-1">
+                        <input
+                          type="text" value={bullet} onChange={(e) => updateBullet(idx, e.target.value)}
+                          placeholder={`Feature ${idx + 1}`} maxLength={80}
+                          className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent pr-12"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-300">{bullet.length}/80</span>
+                      </div>
+                      <button
+                        type="button" onClick={() => removeBullet(idx)} disabled={bullets.length <= 1}
+                        className="p-1.5 rounded-md text-zinc-400 hover:text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button" onClick={addBullet} disabled={bullets.length >= 7}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Bullet <span className="text-zinc-400 ml-0.5">({bullets.length} of 7 max)</span>
+                </button>
+              </div>
+              <div>
+                <FieldLabel label="Footnote" />
+                <input
+                  value={footnote} onChange={(e) => setFootnote(e.target.value)}
+                  placeholder="e.g. Annual subscription. Renews automatically."
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-200 shrink-0">
+          {error && <p className="text-sm text-rose-600 mb-3">{error}</p>}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave} disabled={saving}
+              className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── Public export: routes by plan_audience + plan_category ─────────────────
 export function EditPlanSlideOver(props: Props) {
-  return props.plan.plan_audience === 'B2B'
-    ? <B2BEditForm {...props} />
-    : <B2CEditForm {...props} />
+  if (props.plan.plan_audience === 'B2B') return <B2BEditForm {...props} />
+  if (props.plan.plan_category === 'COURSE_BUNDLE') return <CourseBundleEditForm {...props} />
+  return <B2CEditForm {...props} />
 }

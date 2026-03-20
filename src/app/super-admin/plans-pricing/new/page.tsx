@@ -6,9 +6,12 @@ import { ChevronLeft, GripVertical, Info, Plus, Trash2, Search } from 'lucide-re
 import {
   createPlan,
   createB2BPlan,
+  createCourseBundlePlan,
   addContentToPlan,
   fetchAllLiveB2BAssessments,
   fetchAllLiveB2BCourses,
+  fetchAllLiveB2CCoursesForBundle,
+  type B2CCourseBundlePickerItem,
 } from '@/lib/supabase/plans'
 
 type AssessmentType = 'FULL_TEST' | 'SUBJECT_TEST' | 'CHAPTER_TEST'
@@ -781,12 +784,333 @@ function B2BForm() {
   )
 }
 
+// ─── Course Bundle Form ────────────────────────────────────────────────────────
+
+function CourseBundleForm() {
+  const router = useRouter()
+
+  // Section 1 — Identity
+  const [name, setName]               = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [description, setDescription] = useState('')
+  const [tagline, setTagline]         = useState('')
+
+  // Section 2 — Pricing
+  const [price, setPrice]               = useState<number | ''>('')
+  const [billingCycle, setBillingCycle] = useState<'ANNUAL' | 'MONTHLY'>('ANNUAL')
+  const [stripePriceId, setStripePriceId] = useState('')
+
+  // Section 3 — Feature Bullets
+  const [bullets, setBullets]   = useState<string[]>(['', '', ''])
+  const [footnote, setFootnote] = useState('')
+
+  // Section 4 — Courses
+  const [courseItems, setCourseItems]         = useState<B2CCourseBundlePickerItem[]>([])
+  const [contentLoading, setContentLoading]   = useState(true)
+  const [selectedCourses, setSelectedCourses] = useState<Set<string>>(new Set())
+  const [courseSearch, setCourseSearch]       = useState('')
+
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError]           = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchAllLiveB2CCoursesForBundle()
+      .then(setCourseItems)
+      .finally(() => setContentLoading(false))
+  }, [])
+
+  function addBullet() { if (bullets.length < 7) setBullets((p) => [...p, '']) }
+  function removeBullet(i: number) { if (bullets.length > 1) setBullets((p) => p.filter((_, idx) => idx !== i)) }
+  function updateBullet(i: number, v: string) { setBullets((p) => p.map((b, idx) => idx === i ? v.slice(0, 80) : b)) }
+
+  function toggleCourse(id: string) {
+    setSelectedCourses((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+
+  const filteredCourses = courseItems.filter((c) =>
+    c.title.toLowerCase().includes(courseSearch.toLowerCase())
+  )
+
+  function validate(): string | null {
+    if (!name.trim()) return 'Plan name is required.'
+    if (price === '' || price < 0) return 'Price must be 0 or a positive number.'
+    return null
+  }
+
+  async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
+    const err = validate()
+    if (err) { setError(err); return }
+    setError(null)
+    setSubmitting(true)
+    try {
+      const planId = await createCourseBundlePlan({
+        name:            name.trim(),
+        display_name:    displayName.trim() || null,
+        description:     description.trim() || null,
+        tagline:         tagline.trim() || null,
+        price:           price as number,
+        billing_cycle:   billingCycle,
+        feature_bullets: bullets.filter((b) => b.trim()),
+        stripe_price_id: stripePriceId.trim() || null,
+        status,
+      })
+      await Promise.all(
+        Array.from(selectedCourses).map((id) => addContentToPlan(planId, id, 'COURSE'))
+      )
+      router.push(`/super-admin/plans-pricing/${planId}`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'An unexpected error occurred.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* SECTION 1 — Plan Identity */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading number="1" title="Plan Identity" subtitle="Internal name, customer-facing name, and marketing copy." />
+        <div className="space-y-4">
+          <div>
+            <FieldLabel label="Plan name (internal)" required />
+            <input
+              type="text" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Healthcare Learning Bundle"
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <FieldLabel label="Display name (customer-facing)" />
+            <input
+              type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="e.g. Healthcare Bundle"
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+            <p className="text-xs text-zinc-400 mt-1">Shown on pricing page. Defaults to plan name if blank.</p>
+          </div>
+          <div>
+            <FieldLabel label="Description" />
+            <textarea
+              value={description} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Briefly describe what this bundle includes..."
+              rows={2}
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none"
+            />
+          </div>
+          <div>
+            <FieldLabel label="Tagline" />
+            <input
+              type="text" value={tagline} onChange={(e) => setTagline(e.target.value)}
+              placeholder="e.g. Master compliance in one go"
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 2 — Pricing */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading number="2" title="Pricing" subtitle="Annual subscription price. Stripe Price ID is the recurring annual price." />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <FieldLabel label="Price (₹/year)" required />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
+              <input
+                type="number" min={0} value={price}
+                onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="4999"
+                className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <div>
+            <FieldLabel label="Billing cycle" />
+            <div className="grid grid-cols-2 gap-2">
+              {(['ANNUAL', 'MONTHLY'] as const).map((cycle) => (
+                <button
+                  key={cycle} type="button" onClick={() => setBillingCycle(cycle)}
+                  className={`px-3 py-2 rounded-md border text-sm font-medium transition-colors ${
+                    billingCycle === cycle
+                      ? 'border-blue-600 bg-blue-50 text-blue-900'
+                      : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  {cycle === 'ANNUAL' ? 'Annual' : 'Monthly'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4">
+          <FieldLabel label="Stripe Price ID" />
+          <input
+            type="text" value={stripePriceId} onChange={(e) => setStripePriceId(e.target.value)}
+            placeholder="price_annual_..."
+            className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+          />
+          <p className="text-xs text-zinc-400 mt-1">Recurring annual Stripe Price ID for checkout.</p>
+        </div>
+      </div>
+
+      {/* SECTION 3 — Feature Bullets */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading number="3" title="Feature Bullets & Footnote" subtitle="Marketing copy for the pricing card. Max 7 bullets, 80 chars each." />
+        <div className="space-y-4">
+          <div>
+            <FieldLabel label="Feature bullets" />
+            <div className="space-y-2">
+              {bullets.map((bullet, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <GripVertical className="w-4 h-4 text-zinc-300 shrink-0" />
+                  <div className="relative flex-1">
+                    <input
+                      type="text" value={bullet} onChange={(e) => updateBullet(idx, e.target.value)}
+                      placeholder={`Feature ${idx + 1}`} maxLength={80}
+                      className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent pr-12"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-300">{bullet.length}/80</span>
+                  </div>
+                  <button
+                    type="button" onClick={() => removeBullet(idx)} disabled={bullets.length <= 1}
+                    className="p-1.5 rounded-md text-zinc-400 hover:text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button" onClick={addBullet} disabled={bullets.length >= 7}
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Bullet <span className="text-zinc-400 ml-0.5">({bullets.length} of 7 max)</span>
+            </button>
+          </div>
+          <div>
+            <FieldLabel label="Footnote" />
+            <input
+              type="text" value={footnote} onChange={(e) => setFootnote(e.target.value)}
+              placeholder="e.g. Annual subscription. Renews automatically."
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 4 — Courses */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading
+          number="4"
+          title="Courses"
+          subtitle="Select LIVE B2C courses to include in this bundle. You can add more from the plan detail page."
+        />
+        <div className="border border-zinc-200 rounded-md overflow-hidden">
+          <div className="relative border-b border-zinc-200">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+            <input
+              type="text" placeholder="Search courses..."
+              value={courseSearch} onChange={(e) => setCourseSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {contentLoading ? (
+              <div className="p-3 space-y-2">
+                {[0, 1, 2].map((i) => <div key={i} className="h-10 rounded bg-zinc-100 animate-pulse" />)}
+              </div>
+            ) : filteredCourses.length === 0 ? (
+              <p className="text-xs text-zinc-400 text-center py-6">
+                {courseItems.length === 0 ? 'No live B2C courses available.' : 'No matches.'}
+              </p>
+            ) : (
+              <div className="divide-y divide-zinc-100">
+                {filteredCourses.map((course) => (
+                  <label key={course.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 cursor-pointer">
+                    <input
+                      type="checkbox" checked={selectedCourses.has(course.id)}
+                      onChange={() => toggleCourse(course.id)} className="accent-blue-700"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-zinc-900 truncate">{course.title}</p>
+                      <p className="text-xs text-zinc-400">
+                        {course.courseType}
+                        {course.isIndividuallyPurchasable && (
+                          <span className="ml-2 text-amber-600">· Also sold individually</span>
+                        )}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedCourses.size > 0 && (
+            <div className="border-t border-zinc-100 bg-zinc-50 px-3 py-2">
+              <p className="text-xs text-blue-700 font-medium">
+                {selectedCourses.size} course{selectedCourses.size !== 1 ? 's' : ''} selected
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded-md px-4 py-3">
+          <p className="text-sm text-rose-600">{error}</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2">
+        <button
+          type="button"
+          onClick={() => router.push('/super-admin/plans-pricing')}
+          className="text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
+        >
+          Cancel
+        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button" disabled={submitting} onClick={() => handleSubmit('DRAFT')}
+            className="px-4 py-2 text-sm font-medium text-zinc-700 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Save as Draft
+          </button>
+          <button
+            type="button" disabled={submitting} onClick={() => handleSubmit('PUBLISHED')}
+            className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Publishing...' : 'Publish Plan'}
+          </button>
+        </div>
+      </div>
+
+    </div>
+  )
+}
+
 // ─── Inner component (uses useSearchParams — must be wrapped in Suspense) ─────
 
 function NewPlanInner() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const audience     = searchParams.get('audience') === 'B2B' ? 'B2B' : 'B2C'
+  const category     = searchParams.get('category')
+  const isCourseBundlePlan = audience === 'B2C' && category === 'COURSE_BUNDLE'
+
+  const pageTitle = audience === 'B2B'
+    ? 'Create B2B Plan'
+    : isCourseBundlePlan
+      ? 'Create Course Plan'
+      : 'Create Assessment Plan'
+
+  const pageSubtitle = audience === 'B2B'
+    ? 'Define a platform-wide B2B plan. Assign it to tenants from their Plans tab.'
+    : isCourseBundlePlan
+      ? 'Define a B2C course bundle plan with annual subscription pricing.'
+      : 'Define the plan identity, scope, pricing, and access rules.'
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -800,17 +1124,11 @@ function NewPlanInner() {
           <ChevronLeft className="w-4 h-4" />
           Back to Plans
         </button>
-        <h1 className="text-xl font-semibold text-zinc-900">
-          {audience === 'B2B' ? 'Create B2B Plan' : 'Create B2C Plan'}
-        </h1>
-        <p className="text-sm text-zinc-500 mt-0.5">
-          {audience === 'B2B'
-            ? 'Define a platform-wide B2B plan. Assign it to tenants from their Plans tab.'
-            : 'Define the plan identity, scope, pricing, and access rules.'}
-        </p>
+        <h1 className="text-xl font-semibold text-zinc-900">{pageTitle}</h1>
+        <p className="text-sm text-zinc-500 mt-0.5">{pageSubtitle}</p>
       </div>
 
-      {audience === 'B2B' ? <B2BForm /> : <B2CForm />}
+      {audience === 'B2B' ? <B2BForm /> : isCourseBundlePlan ? <CourseBundleForm /> : <B2CForm />}
 
     </div>
   )
