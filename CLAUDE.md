@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 4.1 | Updated: March 19, 2026
+# Version: 5.0 | Updated: March 20, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -110,6 +110,10 @@ exam_category_id (uuid FK → exam_categories),
 test_type (text), source (text),
 status (text — DRAFT/INACTIVE/LIVE/ARCHIVED),
 audience_type (text — B2C_ONLY/B2B_ONLY/BOTH, nullable until LIVE),
+visibility_scope (text DEFAULT 'GLOBAL' — 'GLOBAL'|'TENANT_PRIVATE'|'PENDING_PROMOTION'),
+  tenant_id IS NULL  → always 'GLOBAL' (SA-authored)
+  tenant_id NOT NULL → 'TENANT_PRIVATE' (tenant-authored, FULL_CREATOR only)
+  'PENDING_PROMOTION' → V2 (push to SA global bank — NOT BUILT IN V1)
 tenant_id (uuid nullable), created_by (uuid nullable),
 created_at (timestamptz), updated_at (timestamptz)
 
@@ -165,6 +169,30 @@ courses(9 — 4 B2B LIVE + 4 B2C LIVE + 1 INACTIVE),
 tenant_plan_map(3 — Akash Standard→Akash, TechCorp Premium→TechCorp,
                     Enterprise Pro→both tenants)
 
+### learners table — confirmed columns (March 20, 2026)
+id (uuid), tenant_id (uuid), full_name (text), email (text),
+phone (text nullable), department_id (uuid nullable FK → departments),
+team_id (uuid nullable FK → teams), status (text — ACTIVE|INACTIVE),
+created_at (timestamptz)
+NOTE: department_id and team_id exist in live schema but were undocumented. Now confirmed.
+
+### Client Admin Tables (V1 — KSS-DB-CA-001, authorised March 20, 2026)
+learner_profiles   — B2B extension per learner: employee_roll_number, notes
+                     learner_id (FK → learners), tenant_id (FK → tenants)
+content_assignments — CA assigns content to DEPARTMENT|TEAM|INDIVIDUAL
+                     Dynamic membership: future learners in target auto-inherit access
+                     content_type discriminator: ASSESSMENT | COURSE
+learner_content_access — Materialized access records derived from content_assignments
+                     source_assignment_id (FK → content_assignments) for traceability
+                     revoked_at NULL = active; overlapping assignments handled by multiple rows
+certificates        — Course completion certs (V1: courses only)
+                     learner_name, content_title, tenant_name denormalised for permanence
+                     certificate_number format: KSS-{tenant_short}-{YYYYMMDD}-{seq}
+client_audit_log    — Immutable CA-scoped audit trail
+                     actor_role: CLIENT_ADMIN | CONTENT_CREATOR
+                     before_state + after_state: JSONB
+                     RLS: OFF (consistent with all admin tables)
+
 ### B2B Plans (seeded — KSS-DB-SA-003)
 Akash Standard  — Akash Institute Delhi only, plan_audience='B2B', price=0
 TechCorp Premium — TechCorp India only, plan_audience='B2B', price=0
@@ -204,12 +232,23 @@ Language: "Stays in" / "Removed from" (NOT "compatible/incompatible")
 ## 6. PLATFORM HIERARCHY (locked — V1)
 
 Super Admin (internal keySkillset)
-  └── Content Creator (Master Org only)
-Client Admin (B2B org, multi-tenant)
+  └── Content Creator (Master Org only — role=CONTENT_CREATOR, tenant_id=NULL)
+Client Admin (B2B org — one per tenant)
+  └── Content Creator (FULL_CREATOR tenants only — role=CONTENT_CREATOR, tenant_id=B2B tenant)
+        Interface: /content-creator/[tenant]/ — FUTURE SCOPE, NOT BUILT YET
+        Mirrors Master Org Content Creator capabilities when built.
   └── B2B Learner
 B2C Student / Professional (direct)
 
 Team Manager: DEFERRED TO V2. Not in code, not in UI, not in any role selector.
+
+Content Creator for FULL_CREATOR tenants (locked decisions — March 20, 2026):
+  - Assigned by: SA (via Tenant → Users & Roles tab) OR CA (via CA → Users & Roles section)
+  - Both SA and CA surfaces show CC management for FULL_CREATOR tenants only
+  - SA Users & Roles tab: shows CLIENT_ADMIN + CONTENT_CREATOR (FULL_CREATOR) or CLIENT_ADMIN only (RUN_ONLY)
+  - Content created by tenant CC lives in content_items with tenant_id = B2B tenant, visibility_scope = TENANT_PRIVATE
+  - /content-creator/[tenant]/ route is locked but NOT BUILT. Persona: Coming Soon placeholder.
+  - Sprint tracking: KSS-CA-FUTURE-001 (not scoped for current build)
 
 ---
 
@@ -656,17 +695,23 @@ ADDED: "Course Creation" group above "Assessment Creation".
 ## 19. PERSONA SELECTOR — LOCKED
 
 Admin row (rounded-md avatars):
-  Super Admin    → /super-admin          (blue-700)
-  Akash Inst.    → /client-admin/akash   (violet-700)
-  TechCorp India → /client-admin/techcorp (teal-700)
+  Super Admin    → /super-admin               (blue-700)
+  Akash Inst.    → /client-admin/akash        (violet-700)
+  TechCorp India → /client-admin/techcorp     (teal-700)
+
+Content Creator row (rounded-md avatars, labelled "Content Creator Personas"):
+  Akash Content Creator → /content-creator/akash   (amber-700, "Coming Soon" badge)
+  Note: TechCorp is RUN_ONLY — no Content Creator persona. Akash only.
+  Note: /content-creator/[tenant]/ is FUTURE SCOPE. Clicking shows Coming Soon.
 
 Divider: "Learner Personas"
 
 Learner row (rounded-full avatars):
   Free | Basic | Pro | Premium
 
-Client Admin routes → 404 until sprint scoped.
-No Team Manager persona selector — role removed from V1.
+Client Admin routes: KSS-CA sprint — built March 20, 2026.
+Content Creator routes: FUTURE SCOPE — Coming Soon placeholder only.
+No Team Manager persona selector — role permanently removed from V1.
 
 ---
 
@@ -724,6 +769,16 @@ No Team Manager persona selector — role removed from V1.
 🟡 KSS-SA-007   Marketing Config
 🟡 KSS-SA-008   Master Organisation
 🟡 KSS-SA-010   Dashboard (last)
+
+Client Admin (pending — KSS-CA sprint, March 20, 2026):
+🟡 KSS-DB-CA-001  CA schema migration (visibility_scope on content_items + 5 new tables + Akash seed)
+🟡 KSS-CA-001     CA Layout + Navigation (sidebar, persona routing, feature_toggle_mode guards)
+🟡 KSS-CA-002     Organisation (Departments + Teams CRUD + learner assignment to dept/team)
+🟡 KSS-CA-003     Learner Management (list, manual add, CSV upload, profile, deactivate/reactivate, password reset)
+🟡 KSS-CA-004     Catalog (browse + assign to Dept/Team/Individual, dynamic membership model)
+🟡 KSS-CA-005     Content Bank (FULL_CREATOR only — INACTIVE → CA makes LIVE, archive)
+🟡 KSS-CA-006     Reports (R3: Per-Learner Score, R5: Content Performance, R6: Certificates, R7: Activity Log)
+🔵 KSS-CA-FUTURE-001  Content Creator interface /content-creator/[tenant]/ — FUTURE SCOPE (not scoped)
 
 B2C (pending):
 🔴 KSS-B2C-FIX-023  Back button + ChevronLeft on instructions page
@@ -1116,7 +1171,222 @@ SELECT '7caa0566-e31a-41b6-962d-30fb3d6cb011', id FROM plans WHERE name = 'Enter
 
 ---
 
-*CLAUDE.md — keySkillset v4.0 — Updated March 19, 2026*
+---
+
+## 30. CLIENT ADMIN PLATFORM — ARCHITECTURE (V1, locked March 20, 2026)
+
+### Routes (locked)
+/client-admin/[tenant]/             — CA dashboard landing
+/client-admin/[tenant]/org          — Departments + Teams
+/client-admin/[tenant]/learners     — Learner management
+/client-admin/[tenant]/catalog      — Content catalog + assignment
+/client-admin/[tenant]/content-bank — Content Bank (FULL_CREATOR only)
+/client-admin/[tenant]/reports      — Reports (R3, R5, R6, R7)
+/content-creator/[tenant]/          — FUTURE SCOPE — NOT BUILT IN V1
+
+### Tenant Slug → Tenant ID Map (locked)
+akash    → ec1bc005-e76d-4208-ab0f-abe0d316e260  (Akash Institute Delhi, FULL_CREATOR)
+techcorp → 7caa0566-e31a-41b6-962d-30fb3d6cb011  (TechCorp India, RUN_ONLY)
+
+### Auth Pattern (demo)
+Persona-selector based — same as SA. No JWT. tenant_id injected from URL slug.
+All Supabase queries include .eq('tenant_id', tenantId) from slug resolution.
+
+### Feature Mode Guards
+FULL_CREATOR (Akash):  Content Bank page visible. Content Creator management available.
+RUN_ONLY (TechCorp):   Content Bank hidden. Content Creator management hidden.
+Guard: tenant.feature_toggle_mode === 'FULL_CREATOR' | 'RUN_ONLY'
+
+### What is PERMANENTLY EXCLUDED from V1 (never add to CA code)
+- Team Manager role — V2. No TEAM_MANAGER in admin_users for CA. All functions = CLIENT_ADMIN only.
+- Groups — V2. No groups, learner_group_membership tables.
+- Learning Paths — V2. No learning_paths, steps, enrollments, step_progress tables.
+- Group as content assignment target — V2.
+- Assessment completion certificates — V2 (V1: course completion only).
+- R1 (Tenant Overview Dashboard) — V2 (needs learning path data for full value).
+- R2 (Department Completion Rates) — V2 (needs learning path enrollments).
+- R4 (Overdue Learners) — V2 (needs learning path deadlines).
+- Push TENANT_PRIVATE content to SA global bank — V2.
+- Learner-facing certificate download — V2 (learner-facing side out of scope V1).
+- Content Creator interface /content-creator/[tenant]/ — FUTURE SCOPE.
+
+### Content Model (locked — March 20, 2026)
+content_items.tenant_id:
+  NULL         → SA-authored content (GLOBAL — available to all tenants via plans)
+  [tenant_id]  → Tenant-authored content (TENANT_PRIVATE — visible within owning tenant only)
+
+content_items.visibility_scope:
+  GLOBAL            → SA content. Appears in plan content pickers. Visible via B2B plan assignment.
+  TENANT_PRIVATE    → Tenant content. Visible in that tenant's CA Catalog + CA Content Bank only.
+  PENDING_PROMOTION → V2 (push to SA global bank workflow — NOT BUILT IN V1)
+
+CA Catalog query rules:
+  FULL_CREATOR tenant:
+    GLOBAL content from plans assigned to this tenant (LIVE, B2B_ONLY or BOTH, via tenant_plan_map)
+    + TENANT_PRIVATE LIVE content WHERE tenant_id = :this_tenant
+  RUN_ONLY tenant:
+    GLOBAL content from plans assigned to this tenant (LIVE, B2B_ONLY or BOTH) ONLY
+
+SA Content Bank (KSS-SA-009) filter:
+  Shows content WHERE visibility_scope = 'GLOBAL' (SA content only)
+  Never shows TENANT_PRIVATE content in SA Content Bank
+
+### CA Content Bank Page (FULL_CREATOR only — locked)
+Source: content_items WHERE tenant_id = :tenant_id AND status IN ('INACTIVE', 'LIVE', 'ARCHIVED')
+Default filter: status = 'INACTIVE' (CA review queue)
+Make Live: sets status = 'LIVE'. visibility_scope stays TENANT_PRIVATE. No audience_type needed (not B2C).
+Archive: sets status = 'ARCHIVED'.
+Push to SA bank: V2 (PENDING_PROMOTION state — not built).
+
+### Content Assignment Model (locked — V1)
+Targets: DEPARTMENT | TEAM | INDIVIDUAL (all three in V1)
+Groups as target: V2
+Dynamic membership: YES
+  ON assignment to DEPARTMENT/TEAM: all current members get learner_content_access records
+  ON new learner added to that DEPARTMENT/TEAM: system creates learner_content_access for them
+  ON learner removed from target: learner_content_access.revoked_at = NOW()
+  Overlapping assignments: multiple learner_content_access rows; must revoke ALL to lose access
+Content types: ASSESSMENT (from content_items) | COURSE (from courses table)
+
+### Certificates V1 (locked)
+Trigger: course completion (100% screens viewed). Assessment certificates = V2.
+Contents: learner_name, content_title, tenant_name, completion_date, certificate_number
+Format:   KSS-{tenant_short}-{YYYYMMDD}-{seq}   e.g. KSS-AKS-20260320-001
+Learner download: in-app (learner-facing side V2 — not built)
+CA visibility: Reports → R6 Certificates Issued Log (CA sees all certs for their tenant)
+
+### Reports V1 (locked scope)
+R3 — Per-Learner Score & Attempts     ✅ V1 (from content_assignments + attempts data)
+R5 — Content Item Performance          ✅ V1 (avg score, pass rate, total attempts)
+R6 — Certificates Issued Log           ✅ V1 (certificates table)
+R7 — Learner Activity Log              ✅ V1 (last login, days since active)
+R1 — Tenant Overview Dashboard         ❌ V2
+R2 — Department Completion Rates       ❌ V2 (needs learning paths)
+R4 — Overdue Learners                  ❌ V2 (needs learning path deadlines)
+
+### CA Sidebar Navigation (locked V1)
+Group          Item                 Visibility
+────────────────────────────────────────────────
+(none)         Dashboard            All CA
+Organisation   Departments          All CA
+Organisation   Teams (within dept)  All CA
+Learners       Learners             All CA
+Catalog        Catalog              All CA
+Content Bank   Content Bank         FULL_CREATOR only (hidden for RUN_ONLY)
+Reports        Reports              All CA (R3, R5, R6, R7)
+Settings       Users & Roles        All CA
+Settings       Audit Log            All CA (placeholder V1)
+
+---
+
+## 31. KSS-DB-CA-001 MIGRATION SQL (authorised March 20, 2026)
+
+Run in Supabase Dashboard → SQL Editor. RLS: OFF (consistent with all admin tables).
+
+-- 1. Add visibility_scope to content_items
+ALTER TABLE content_items
+  ADD COLUMN IF NOT EXISTS visibility_scope text NOT NULL DEFAULT 'GLOBAL'
+    CHECK (visibility_scope IN ('GLOBAL', 'TENANT_PRIVATE', 'PENDING_PROMOTION'));
+
+-- All existing rows are SA-authored (tenant_id IS NULL) → GLOBAL is correct default.
+-- No UPDATE needed for existing rows.
+
+-- 2. learner_profiles table
+CREATE TABLE IF NOT EXISTS learner_profiles (
+  id                   uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  learner_id           uuid NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+  tenant_id            uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  employee_roll_number text,
+  notes                text,
+  created_at           timestamptz DEFAULT now(),
+  updated_at           timestamptz DEFAULT now(),
+  UNIQUE (learner_id, tenant_id)
+);
+
+-- 3. content_assignments table
+CREATE TABLE IF NOT EXISTS content_assignments (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  content_id   uuid NOT NULL,
+  content_type text NOT NULL CHECK (content_type IN ('ASSESSMENT', 'COURSE')),
+  target_type  text NOT NULL CHECK (target_type IN ('DEPARTMENT', 'TEAM', 'INDIVIDUAL')),
+  target_id    uuid NOT NULL,
+  assigned_by  uuid NOT NULL REFERENCES admin_users(id),
+  assigned_at  timestamptz DEFAULT now(),
+  removed_at   timestamptz
+);
+
+-- 4. learner_content_access table
+CREATE TABLE IF NOT EXISTS learner_content_access (
+  id                   uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  learner_id           uuid NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+  content_id           uuid NOT NULL,
+  content_type         text NOT NULL CHECK (content_type IN ('ASSESSMENT', 'COURSE')),
+  tenant_id            uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  source_assignment_id uuid REFERENCES content_assignments(id),
+  granted_at           timestamptz DEFAULT now(),
+  revoked_at           timestamptz
+);
+
+-- 5. certificates table
+CREATE TABLE IF NOT EXISTS certificates (
+  id                 uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  learner_id         uuid NOT NULL REFERENCES learners(id),
+  content_id         uuid NOT NULL,
+  content_type       text NOT NULL DEFAULT 'COURSE'
+    CHECK (content_type IN ('COURSE')),
+  tenant_id          uuid NOT NULL REFERENCES tenants(id),
+  learner_name       text NOT NULL,
+  content_title      text NOT NULL,
+  tenant_name        text NOT NULL,
+  certificate_number text NOT NULL UNIQUE,
+  issued_at          timestamptz DEFAULT now()
+);
+
+-- 6. client_audit_log table
+CREATE TABLE IF NOT EXISTS client_audit_log (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  actor_id     uuid NOT NULL REFERENCES admin_users(id),
+  actor_name   text NOT NULL,
+  actor_role   text NOT NULL CHECK (actor_role IN ('CLIENT_ADMIN', 'CONTENT_CREATOR')),
+  action       text NOT NULL,
+  entity_type  text NOT NULL,
+  entity_id    uuid,
+  before_state jsonb,
+  after_state  jsonb,
+  ip_address   text,
+  created_at   timestamptz DEFAULT now()
+);
+
+-- 7. Seed INACTIVE tenant content for Akash Institute Delhi (FULL_CREATOR demo)
+-- Akash tenant_id: ec1bc005-e76d-4208-ab0f-abe0d316e260
+-- NOTE: Replace <VALID_EXAM_CATEGORY_ID> with an actual id from exam_categories table.
+-- Run: SELECT id, name FROM exam_categories; to get valid IDs before running this block.
+
+INSERT INTO content_items
+  (id, title, description, exam_category_id, test_type, source,
+   status, tenant_id, visibility_scope, audience_type, created_at, updated_at)
+VALUES
+  (gen_random_uuid(),
+   'Akash Institute — NEET Foundation Batch Notes',
+   'Comprehensive chapter-wise notes for NEET Foundation batch 2026, created by Akash Institute content team.',
+   '<VALID_EXAM_CATEGORY_ID>', 'CHAPTER_TEST', 'TENANT',
+   'INACTIVE', 'ec1bc005-e76d-4208-ab0f-abe0d316e260', 'TENANT_PRIVATE', NULL, now(), now()),
+  (gen_random_uuid(),
+   'Akash Institute — Physics Mechanics Practice Set',
+   'Custom practice set covering Newton''s Laws and Kinematics for Akash Foundation Batch.',
+   '<VALID_EXAM_CATEGORY_ID>', 'SUBJECT_TEST', 'TENANT',
+   'INACTIVE', 'ec1bc005-e76d-4208-ab0f-abe0d316e260', 'TENANT_PRIVATE', NULL, now(), now()),
+  (gen_random_uuid(),
+   'Akash Institute — NEET Internal Mock Test Series 1',
+   'Internal mock test exclusively for Akash Institute registered students. Not for external distribution.',
+   '<VALID_EXAM_CATEGORY_ID>', 'FULL_TEST', 'TENANT',
+   'INACTIVE', 'ec1bc005-e76d-4208-ab0f-abe0d316e260', 'TENANT_PRIVATE', NULL, now(), now());
+
+---
+
+*CLAUDE.md — keySkillset v5.0 — Updated March 20, 2026*
 *Source of truth for Claude Code sessions*
 *PRD updates: use Confluence MCP tools in Claude Code or Claude.ai*
 *Do not edit this file manually*

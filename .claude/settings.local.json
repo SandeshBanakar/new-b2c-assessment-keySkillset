@@ -26,7 +26,12 @@
       "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/plan_content_map?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
       "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/assessments?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
       "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/courses?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
-      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/plans?limit=1&plan_audience=eq.B2B\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")"
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/plans?limit=1&plan_audience=eq.B2B\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(xargs grep:*)",
+      "Bash(grep -n \"from\\(''admin_users''\\)\" /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)",
+      "Bash(grep -n \"from\\(''learners''\\)\" /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)",
+      "Bash(sed -n '670,680p' /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)",
+      "Bash(grep -n \"created_at\\\\|updated_at\\\\|phone\\\\|status\" /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/tenants/[id]/page.tsx)"
     ]
   }
 }

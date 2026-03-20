@@ -42,36 +42,169 @@ type Props = {
   onSaved: () => void
 }
 
-export function EditPlanSlideOver({ plan, onClose, onSaved }: Props) {
-  // Section 1 — Identity
+// ─── B2B Edit form — name, description, max_attempts only ─────────────────────
+function B2BEditForm({
+  plan,
+  onClose,
+  onSaved,
+}: Props) {
+  const [name, setName]           = useState(plan.name)
+  const [description, setDesc]    = useState(plan.description ?? '')
+  const [maxAttempts, setMaxAttempts] = useState(plan.max_attempts_per_assessment ?? 10)
+  const [saving, setSaving]       = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+
+  async function handleSave() {
+    if (!name.trim()) { setError('Plan name is required.'); return }
+    setSaving(true)
+    setError(null)
+    try {
+      await updatePlan(plan.id, {
+        name:                        name.trim(),
+        description:                 description.trim() || null,
+        max_attempts_per_assessment: maxAttempts,
+      })
+      await writePlanAuditLog(plan.id, 'PLAN_UPDATED', { updated_by: 'super_admin' })
+      onSaved()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Save failed.')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-120 bg-white border-l border-zinc-200 z-50 flex flex-col shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">Edit B2B Plan</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">{plan.name}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+          {/* Section 1 — Identity */}
+          <div>
+            <SectionHeading number="1" title="Plan Identity" />
+            <div className="space-y-4">
+              <div>
+                <FieldLabel label="Plan name (internal)" required />
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <FieldLabel label="Description" />
+                <textarea
+                  value={description}
+                  onChange={(e) => setDesc(e.target.value)}
+                  rows={3}
+                  placeholder="Plan description for internal reference"
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2 — Scope (read-only) */}
+          <div>
+            <SectionHeading number="2" title="Scope" />
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-md">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                Platform-Wide
+              </span>
+              <span className="text-xs text-zinc-400">B2B plans are always platform-wide.</span>
+            </div>
+          </div>
+
+          {/* Section 3 — Pricing (read-only) */}
+          <div>
+            <SectionHeading number="3" title="Pricing" />
+            <div className="px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-md">
+              <p className="text-sm text-zinc-600">Pricing is managed per tenant via the Contract tab.</p>
+              <p className="text-xs text-zinc-400 mt-1">No price is set on B2B plans.</p>
+            </div>
+          </div>
+
+          {/* Section 4 — Max Attempts */}
+          <div>
+            <SectionHeading number="4" title="Access Rules" />
+            <div className="space-y-4">
+              <div className="px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-md">
+                <p className="text-xs font-medium text-zinc-600 mb-1">Assessment types</p>
+                <p className="text-xs text-zinc-400">B2B plans grant access to all assessment types.</p>
+              </div>
+              <div>
+                <FieldLabel label="Max paid attempts per assessment" />
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={maxAttempts}
+                    onChange={(e) => setMaxAttempts(Number(e.target.value))}
+                    className="w-20 border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                  <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    <Info className="w-3.5 h-3.5" />
+                    Free attempt always included — 1 per assessment, all tiers
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-200 shrink-0">
+          {error && <p className="text-sm text-rose-600 mb-3">{error}</p>}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── B2C Edit form — full 5-section form ──────────────────────────────────────
+function B2CEditForm({ plan, onClose, onSaved }: Props) {
   const [name, setName]               = useState(plan.name)
   const [displayName, setDisplayName] = useState(plan.display_name ?? '')
   const [tagline, setTagline]         = useState(plan.tagline ?? '')
   const [isPopular, setIsPopular]     = useState(plan.is_popular)
   const [ctaLabel, setCtaLabel]       = useState(plan.cta_label ?? '')
-
-  // Section 2 — Scope
-  const [scope, setScope]       = useState<'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'>(plan.scope)
-  const [category, setCategory] = useState<string | null>(plan.category)
-
-  // Section 3 — Pricing
-  const [price, setPrice] = useState(plan.price)
-
-  // Section 4 — Access Rules
+  const [scope, setScope]             = useState<'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'>(plan.scope)
+  const [category, setCategory]       = useState<string | null>(plan.category)
+  const [price, setPrice]             = useState(plan.price)
   const [allowedTypes, setAllowedTypes] = useState<AssessmentType[]>(
     (plan.allowed_assessment_types ?? []) as AssessmentType[]
   )
   const [maxAttempts, setMaxAttempts] = useState(plan.max_attempts_per_assessment ?? 5)
-
-  // Section 5 — Feature Bullets + Footnote
   const initialBullets = Array.isArray(plan.feature_bullets) && plan.feature_bullets.length > 0
     ? plan.feature_bullets
     : ['', '', '']
-  const [bullets, setBullets] = useState<string[]>(initialBullets)
-  const [footnote, setFootnote] = useState(plan.footnote ?? '')
-
-  const [saving, setSaving] = useState(false)
-  const [error, setError]   = useState<string | null>(null)
+  const [bullets, setBullets]     = useState<string[]>(initialBullets)
+  const [footnote, setFootnote]   = useState(plan.footnote ?? '')
+  const [saving, setSaving]       = useState(false)
+  const [error, setError]         = useState<string | null>(null)
 
   function toggleType(type: AssessmentType) {
     setAllowedTypes((prev) =>
@@ -126,7 +259,7 @@ export function EditPlanSlideOver({ plan, onClose, onSaved }: Props) {
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[480px] bg-white border-l border-zinc-200 z-50 flex flex-col shadow-xl">
+      <div className="fixed right-0 top-0 h-full w-120 bg-white border-l border-zinc-200 z-50 flex flex-col shadow-xl">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
@@ -402,4 +535,11 @@ export function EditPlanSlideOver({ plan, onClose, onSaved }: Props) {
       </div>
     </>
   )
+}
+
+// ─── Public export: routes to B2B or B2C form by plan_audience ─────────────────
+export function EditPlanSlideOver(props: Props) {
+  return props.plan.plan_audience === 'B2B'
+    ? <B2BEditForm {...props} />
+    : <B2CEditForm {...props} />
 }

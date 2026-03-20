@@ -309,7 +309,7 @@ export function EditDetailsSlideOver({
       <div className="fixed inset-0 bg-black/30 z-40" onClick={handleClose} />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 h-full w-[480px] bg-white shadow-xl z-50 flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-120 bg-white shadow-xl z-50 flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center shrink-0">
           <p className="text-base font-semibold text-zinc-900">Edit Details</p>

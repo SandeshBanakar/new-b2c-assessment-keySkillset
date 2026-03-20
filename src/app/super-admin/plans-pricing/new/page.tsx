@@ -1,9 +1,15 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft, GripVertical, Info, Plus, Trash2 } from 'lucide-react'
-import { createPlan, createB2BPlan } from '@/lib/supabase/plans'
+import { ChevronLeft, GripVertical, Info, Plus, Trash2, Search } from 'lucide-react'
+import {
+  createPlan,
+  createB2BPlan,
+  addContentToPlan,
+  fetchAllLiveB2BAssessments,
+  fetchAllLiveB2BCourses,
+} from '@/lib/supabase/plans'
 
 type AssessmentType = 'FULL_TEST' | 'SUBJECT_TEST' | 'CHAPTER_TEST'
 
@@ -471,6 +477,78 @@ function B2CForm() {
 
 // ─── B2B Form ─────────────────────────────────────────────────────────────────
 
+// ─── Inline content picker (used inside B2BForm Section 5) ──────────────────
+function ContentPicker({
+  label,
+  items,
+  loading,
+  selected,
+  onToggle,
+}: {
+  label: string
+  items: { id: string; title: string; sub: string }[]
+  loading: boolean
+  selected: Set<string>
+  onToggle: (id: string) => void
+}) {
+  const [search, setSearch] = useState('')
+  const filtered = items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">{label}</p>
+        {selected.size > 0 && (
+          <span className="text-xs font-medium text-blue-700">{selected.size} selected</span>
+        )}
+      </div>
+      <div className="border border-zinc-200 rounded-md overflow-hidden">
+        <div className="relative border-b border-zinc-200">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+          <input
+            type="text"
+            placeholder={`Search ${label.toLowerCase()}...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none"
+          />
+        </div>
+        <div className="max-h-48 overflow-y-auto">
+          {loading ? (
+            <div className="p-3 space-y-2">
+              {[0, 1, 2].map((i) => <div key={i} className="h-8 rounded bg-zinc-100 animate-pulse" />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-xs text-zinc-400 text-center py-6">
+              {items.length === 0 ? `No live B2B ${label.toLowerCase()} available.` : 'No matches.'}
+            </p>
+          ) : (
+            <div className="divide-y divide-zinc-100">
+              {filtered.map((item) => (
+                <label
+                  key={item.id}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(item.id)}
+                    onChange={() => onToggle(item.id)}
+                    className="accent-blue-700"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-zinc-900 truncate">{item.title}</p>
+                    <p className="text-xs text-zinc-400">{item.sub}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function B2BForm() {
   const router = useRouter()
 
@@ -479,6 +557,30 @@ function B2BForm() {
   const [maxAttempts, setMaxAttempts] = useState<number>(10)
   const [submitting, setSubmitting]   = useState(false)
   const [error, setError]             = useState<string | null>(null)
+
+  // Section 5 — Content
+  const [assessments, setAssessments] = useState<{ id: string; title: string; sub: string }[]>([])
+  const [courses, setCourses]         = useState<{ id: string; title: string; sub: string }[]>([])
+  const [contentLoading, setContentLoading] = useState(true)
+  const [selectedAssessments, setSelectedAssessments] = useState<Set<string>>(new Set())
+  const [selectedCourses, setSelectedCourses]         = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    Promise.all([fetchAllLiveB2BAssessments(), fetchAllLiveB2BCourses()])
+      .then(([a, c]) => {
+        setAssessments(a.map((x) => ({ id: x.id, title: x.title, sub: x.assessmentType })))
+        setCourses(c.map((x) => ({ id: x.id, title: x.title, sub: x.courseType })))
+      })
+      .finally(() => setContentLoading(false))
+  }, [])
+
+  function toggleAssessment(id: string) {
+    setSelectedAssessments((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+
+  function toggleCourse(id: string) {
+    setSelectedCourses((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
 
   function validate(): string | null {
     if (!name.trim()) return 'Plan name is required.'
@@ -492,13 +594,18 @@ function B2BForm() {
     setError(null)
     setSubmitting(true)
     try {
-      await createB2BPlan({
+      const planId = await createB2BPlan({
         name:                        name.trim(),
         description:                 description.trim(),
         max_attempts_per_assessment: maxAttempts,
         status,
       })
-      router.push('/super-admin/plans-pricing')
+      // Add selected content after plan creation
+      await Promise.all([
+        ...Array.from(selectedAssessments).map((id) => addContentToPlan(planId, id, 'ASSESSMENT')),
+        ...Array.from(selectedCourses).map((id) => addContentToPlan(planId, id, 'COURSE')),
+      ])
+      router.push(`/super-admin/plans-pricing/${planId}`)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'An unexpected error occurred.')
     } finally {
@@ -608,6 +715,31 @@ function B2BForm() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* SECTION 5 — Content */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading
+          number="5"
+          title="Content"
+          subtitle="Optionally add assessments and courses now. You can always add more from the plan detail page."
+        />
+        <div className="space-y-5">
+          <ContentPicker
+            label="Assessments"
+            items={assessments}
+            loading={contentLoading}
+            selected={selectedAssessments}
+            onToggle={toggleAssessment}
+          />
+          <ContentPicker
+            label="Courses"
+            items={courses}
+            loading={contentLoading}
+            selected={selectedCourses}
+            onToggle={toggleCourse}
+          />
         </div>
       </div>
 

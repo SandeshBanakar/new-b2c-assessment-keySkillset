@@ -25,6 +25,7 @@ export function AssignPlanSlideOver({ tenantId, onClose, onAssigned }: Props) {
   useEffect(() => {
     fetchAvailableB2BPlansForTenant(tenantId)
       .then(setPlans)
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [tenantId])
 
@@ -54,7 +55,7 @@ export function AssignPlanSlideOver({ tenantId, onClose, onAssigned }: Props) {
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-[480px] bg-white shadow-xl flex flex-col z-50">
+      <div className="fixed inset-y-0 right-0 w-120 bg-white shadow-xl flex flex-col z-50">
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center shrink-0">
           <p className="text-base font-semibold text-zinc-900">Assign Plan</p>

@@ -25,6 +25,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
     { id: string; title: string; sub: string; disabled?: boolean }[]
   >([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -33,6 +34,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
   useEffect(() => {
     async function load() {
       setLoading(true)
+      setLoadError(null)
       try {
         if (isAssessment) {
           const data = await fetchAvailableAssessmentsForPlan(planId, planAudience)
@@ -44,7 +46,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
             }))
           )
         } else {
-          const data = await fetchAvailableCoursesForPlan(planId)
+          const data = await fetchAvailableCoursesForPlan(planId, planAudience)
           setItems(
             data.map((c) => ({
               id: c.id,
@@ -54,12 +56,14 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
             }))
           )
         }
+      } catch (e: unknown) {
+        setLoadError(e instanceof Error ? e.message : 'Failed to load content.')
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [planId, isAssessment])
+  }, [planId, planAudience, isAssessment])
 
   const filtered = items.filter((item) =>
     item.title.toLowerCase().includes(search.toLowerCase())
@@ -101,7 +105,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
       <div className="flex-1 bg-black/30" onClick={onClose} />
 
       {/* Panel */}
-      <div className="w-[480px] bg-white shadow-xl flex flex-col">
+      <div className="w-120 bg-white shadow-xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
           <h2 className="text-base font-semibold text-zinc-900">Add {label}</h2>
@@ -129,7 +133,9 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
 
         {/* List */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {loading ? (
+          {loadError ? (
+            <p className="text-sm text-rose-600 text-center py-8">{loadError}</p>
+          ) : loading ? (
             <div className="space-y-2">
               {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="h-10 rounded bg-zinc-100 animate-pulse" />

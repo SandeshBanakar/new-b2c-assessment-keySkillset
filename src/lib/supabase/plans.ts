@@ -536,7 +536,8 @@ export async function fetchAvailableAssessmentsForPlan(
 }
 
 export async function fetchAvailableCoursesForPlan(
-  planId: string
+  planId: string,
+  planAudience: 'B2C' | 'B2B' = 'B2C'
 ): Promise<{ id: string; title: string; courseType: string; isIndividuallyPurchasable: boolean }[]> {
   const { data: existing } = await supabase
     .from('plan_content_map')
@@ -546,10 +547,16 @@ export async function fetchAvailableCoursesForPlan(
 
   const assignedIds = (existing as { content_item_id: string }[] | null ?? []).map((r) => r.content_item_id)
 
+  // Audience gate: B2C plans show B2C_ONLY and BOTH; B2B plans show B2B_ONLY and BOTH
+  const audienceFilter = planAudience === 'B2B'
+    ? 'audience_type.eq.B2B_ONLY,audience_type.eq.BOTH'
+    : 'audience_type.eq.B2C_ONLY,audience_type.eq.BOTH'
+
   let query = supabase
     .from('courses')
     .select('id, title, course_type, is_individually_purchasable')
     .eq('status', 'LIVE')
+    .or(audienceFilter)
 
   if (assignedIds.length > 0) {
     query = query.not('id', 'in', `(${assignedIds.join(',')})`)
@@ -560,6 +567,39 @@ export async function fetchAvailableCoursesForPlan(
 
   return (data as { id: string; title: string; course_type: string; is_individually_purchasable: boolean }[]).map(
     (c) => ({ id: c.id, title: c.title, courseType: c.course_type, isIndividuallyPurchasable: c.is_individually_purchasable })
+  )
+}
+
+// ─── Helpers for pre-creation content selection (plan ID doesn't exist yet) ───
+
+export async function fetchAllLiveB2BAssessments(): Promise<
+  { id: string; title: string; assessmentType: string }[]
+> {
+  const { data, error } = await supabase
+    .from('content_items')
+    .select('id, title, test_type')
+    .eq('status', 'LIVE')
+    .or('audience_type.eq.B2B_ONLY,audience_type.eq.BOTH')
+    .order('title', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data as { id: string; title: string; test_type: string }[]).map(
+    (a) => ({ id: a.id, title: a.title, assessmentType: a.test_type })
+  )
+}
+
+export async function fetchAllLiveB2BCourses(): Promise<
+  { id: string; title: string; courseType: string }[]
+> {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('id, title, course_type')
+    .eq('status', 'LIVE')
+    .eq('is_individually_purchasable', false)
+    .or('audience_type.eq.B2B_ONLY,audience_type.eq.BOTH')
+    .order('title', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data as { id: string; title: string; course_type: string }[]).map(
+    (c) => ({ id: c.id, title: c.title, courseType: c.course_type })
   )
 }
 
@@ -685,26 +725,26 @@ export type AvailableB2BPlan = {
 export async function fetchAvailableB2BPlansForTenant(
   tenantId: string
 ): Promise<AvailableB2BPlan[]> {
-  // Get plan IDs already assigned to this tenant
+  // Fetch all B2B plans
+  const { data: allPlans, error: plansError } = await supabase
+    .from('plans')
+    .select('id, name')
+    .eq('plan_audience', 'B2B')
+    .order('name', { ascending: true })
+  if (plansError) throw new Error(plansError.message)
+
+  // Fetch plan IDs already assigned to this tenant
   const { data: assigned } = await supabase
     .from('tenant_plan_map')
     .select('plan_id')
     .eq('tenant_id', tenantId)
 
-  const assignedIds = (assigned as { plan_id: string }[] | null ?? []).map((r) => r.plan_id)
+  const assignedIds = new Set(
+    (assigned as { plan_id: string }[] | null ?? []).map((r) => r.plan_id)
+  )
 
-  let query = supabase
-    .from('plans')
-    .select('id, name')
-    .eq('plan_audience', 'B2B')
-
-  if (assignedIds.length > 0) {
-    query = query.not('id', 'in', `(${assignedIds.join(',')})`)
-  }
-
-  const { data, error } = await query.order('name', { ascending: true })
-  if (error) throw new Error(error.message)
-  return data as AvailableB2BPlan[]
+  // Filter in JS — avoids PostgREST NOT IN syntax issues with UUIDs
+  return (allPlans as AvailableB2BPlan[]).filter((p) => !assignedIds.has(p.id))
 }
 
 export async function assignPlanToTenant(
@@ -759,7 +799,6 @@ export async function createB2BPlan(payload: CreateB2BPlanPayload): Promise<stri
       scope:                       'PLATFORM_WIDE',
       status:                      payload.status,
       max_attempts_per_assessment: payload.max_attempts_per_assessment,
-      feature_bullets:             [],
     })
     .select('id')
     .single()
@@ -776,7 +815,6 @@ export type CoursePricingRow = {
   status: string
   audience_type: string | null
   price: number | null
-  price_usd_cents: number | null
   is_individually_purchasable: boolean
   stripe_price_id: string | null
 }
@@ -785,7 +823,7 @@ export async function fetchB2CCoursesForPricing(): Promise<CoursePricingRow[]> {
   // Tab 2: LIVE courses with B2C_ONLY or BOTH audience_type only
   const { data, error } = await supabase
     .from('courses')
-    .select('id, title, course_type, status, audience_type, price, price_usd_cents, is_individually_purchasable, stripe_price_id')
+    .select('id, title, course_type, status, audience_type, price, is_individually_purchasable, stripe_price_id')
     .eq('status', 'LIVE')
     .or('audience_type.eq.B2C_ONLY,audience_type.eq.BOTH')
     .order('title', { ascending: true })
@@ -795,7 +833,6 @@ export async function fetchB2CCoursesForPricing(): Promise<CoursePricingRow[]> {
 
 export type UpdateCoursePricingPayload = {
   price: number | null
-  price_usd_cents: number | null
   is_individually_purchasable: boolean
   stripe_price_id: string | null
 }
@@ -808,7 +845,6 @@ export async function updateCoursePricing(
     .from('courses')
     .update({
       price:                       payload.price,
-      price_usd_cents:             payload.price_usd_cents,
       is_individually_purchasable: payload.is_individually_purchasable,
       stripe_price_id:             payload.stripe_price_id,
     })

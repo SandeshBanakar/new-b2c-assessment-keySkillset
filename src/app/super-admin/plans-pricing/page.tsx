@@ -34,21 +34,21 @@ function formatINR(value: number): string {
 function FreeTierColumn() {
   return (
     <div className="flex flex-col">
-      <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-200 text-center">
+      <div className="px-4 h-15 bg-zinc-50 border-b border-zinc-200 flex flex-col items-center justify-center">
         <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Free</p>
         <p className="text-xs text-zinc-400 mt-0.5">Default</p>
       </div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-500">₹0</div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-400">—</div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-400">—</div>
-      <div className="px-4 py-3 flex justify-center">
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-500">₹0</div>
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">—</div>
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">—</div>
+      <div className="px-4 h-11 flex items-center justify-center">
         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
           Read-only
         </span>
       </div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-400">—</div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-400">1 attempt</div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-400">—</div>
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">—</div>
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">1 attempt</div>
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">—</div>
     </div>
   )
 }
@@ -66,12 +66,12 @@ function PlanColumn({
   if (!plan) {
     return (
       <div className="flex flex-col">
-        <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-200 text-center">
+        <div className="px-4 h-15 bg-zinc-50 border-b border-zinc-200 flex flex-col items-center justify-center">
           <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">{label}</p>
           <p className="text-xs text-zinc-300 mt-0.5">Not configured</p>
         </div>
         {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="px-4 py-3 text-center text-sm text-zinc-300">—</div>
+          <div key={i} className="px-4 h-11 flex items-center justify-center text-sm text-zinc-300">—</div>
         ))}
       </div>
     )
@@ -82,7 +82,7 @@ function PlanColumn({
 
   return (
     <div className="flex flex-col group">
-      <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-200 text-center">
+      <div className="px-4 h-15 bg-zinc-50 border-b border-zinc-200 flex flex-col items-center justify-center">
         <p className="text-xs font-semibold text-zinc-700 uppercase tracking-wide">{label}</p>
         <button
           onClick={() => onEdit(plan)}
@@ -91,25 +91,25 @@ function PlanColumn({
           <Pencil className="w-3 h-3" /> Edit
         </button>
       </div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-700 font-medium">
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-700 font-medium">
         {plan.price === 0 ? 'Free' : `${formatINR(plan.price)}/mo`}
       </div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-600">
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
         {sub?.subscriber_count ?? 0}
       </div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-600">
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
         {formatINR(sub?.mock_mrr ?? 0)}
       </div>
-      <div className="px-4 py-3 flex justify-center">
+      <div className="px-4 h-11 flex items-center justify-center">
         <PlanStatusBadge status={plan.status} />
       </div>
-      <div className="px-4 py-3 flex justify-center">
+      <div className="px-4 h-11 flex items-center justify-center">
         <PlanTypeBadge type={derivePlanType(plan.scope)} />
       </div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-600">
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
         {plan.max_attempts_per_assessment ?? '—'}
       </div>
-      <div className="px-4 py-3 text-center text-sm text-zinc-600">
+      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
         {bulletCount > 0 ? `${bulletCount} bullet${bulletCount !== 1 ? 's' : ''}` : '—'}
       </div>
     </div>
@@ -167,7 +167,7 @@ function AssessmentPlansTab({
           className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Create B2C Plan
+          Create Assess Plan
         </button>
       </div>
 
@@ -176,11 +176,11 @@ function AssessmentPlansTab({
         <div className="grid grid-cols-[140px_1fr_1fr_1fr_1fr] min-w-175 divide-x divide-zinc-200">
           {/* Row label column */}
           <div className="flex flex-col">
-            <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-200">
+            <div className="px-4 py-3 h-15 bg-zinc-50 border-b border-zinc-200 flex items-center">
               <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Plan</p>
             </div>
             {SWIMLANE_ROW_LABELS.map((row) => (
-              <div key={row} className="px-4 py-3 text-xs font-medium text-zinc-500">
+              <div key={row} className="px-4 h-11 flex items-center text-xs font-medium text-zinc-500">
                 {row}
               </div>
             ))}
@@ -273,7 +273,6 @@ function CoursePricingTab() {
     setEditingId(course.id)
     setEditDraft({
       price:                       course.price,
-      price_usd_cents:             course.price_usd_cents,
       is_individually_purchasable: course.is_individually_purchasable,
       stripe_price_id:             course.stripe_price_id,
     })
@@ -289,7 +288,6 @@ function CoursePricingTab() {
     try {
       await updateCoursePricing(courseId, {
         price:                       editDraft.price ?? null,
-        price_usd_cents:             editDraft.price_usd_cents ?? null,
         is_individually_purchasable: editDraft.is_individually_purchasable ?? false,
         stripe_price_id:             editDraft.stripe_price_id ?? null,
       })
@@ -332,7 +330,6 @@ function CoursePricingTab() {
             <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course</th>
             <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Type</th>
             <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹)</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (USD)</th>
             <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Purchasable</th>
             <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Stripe Price ID</th>
             <th className="px-4 py-3" />
@@ -358,18 +355,6 @@ function CoursePricingTab() {
                         }
                         className="w-24 border border-zinc-200 rounded-md px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-600"
                         placeholder="0"
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <input
-                        type="number"
-                        min={0}
-                        value={editDraft.price_usd_cents ?? ''}
-                        onChange={(e) =>
-                          setEditDraft((d) => ({ ...d, price_usd_cents: e.target.value === '' ? null : Number(e.target.value) }))
-                        }
-                        className="w-28 border border-zinc-200 rounded-md px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        placeholder="cents (e.g. 1999)"
                       />
                     </td>
                     <td className="px-4 py-2 text-center">
@@ -413,11 +398,6 @@ function CoursePricingTab() {
                     <td className="px-4 py-3 text-right text-zinc-700">
                       {course.price != null ? formatINR(course.price) : <span className="text-zinc-400">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-right text-zinc-700">
-                      {course.price_usd_cents != null
-                        ? `$${(course.price_usd_cents / 100).toFixed(2)}`
-                        : <span className="text-zinc-400">—</span>}
-                    </td>
                     <td className="px-4 py-3 text-center">
                       {course.is_individually_purchasable ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -449,7 +429,7 @@ function CoursePricingTab() {
       </table>
       <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-3">
         <p className="text-xs text-zinc-400">
-          Stripe Price ID must be a recurring annual price ID. Price (₹) and Price (USD) are source of truth for Stripe checkout and B2C pricing page display.
+          Stripe Price ID must be a recurring annual price ID. Price (₹) is the source of truth for Stripe checkout and B2C pricing page display.
         </p>
       </div>
     </div>
