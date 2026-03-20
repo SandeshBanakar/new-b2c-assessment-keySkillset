@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 5.1 | Updated: March 20, 2026
+# Version: 5.2 | Updated: March 20, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -140,7 +140,7 @@ Plan content uses content_items table (NOT assessments table).
 plan_content_map.content_id → content_items.id for ASSESSMENT rows.
 plan_content_map.content_id → courses.id for COURSE rows.
 
-### plans table — full field list (KSS-DB-SA-002 + KSS-DB-SA-003)
+### plans table — full field list (KSS-DB-SA-002 + KSS-DB-SA-003 + KSS-DB-SA-004)
 plan_type text NOT NULL            — 'WHOLE_PLATFORM' | 'CATEGORY_BUNDLE'
 tier text NOT NULL                 — CHECK: 'BASIC'|'PRO'|'PREMIUM'|'ENTERPRISE'
                                    B2C plans use BASIC/PRO/PREMIUM
@@ -153,6 +153,10 @@ price integer DEFAULT 0            — price in INR. Label in UI: "Price (₹)".
                                    Source of truth for INR Stripe checkout and
                                    B2C pricing page display.
 plan_audience text DEFAULT 'B2C'   — 'B2C' | 'B2B'
+plan_category text DEFAULT 'ASSESSMENT'
+                                   — 'ASSESSMENT' | 'COURSE_BUNDLE' (added KSS-DB-SA-004)
+                                   ASSESSMENT = assessment subscription plan (B2C or B2B)
+                                   COURSE_BUNDLE = B2C annual course bundle plan
 display_name text (nullable)       — customer-facing name (separate from internal name)
 tagline text (nullable)            — 1-sentence pricing card subtitle
 feature_bullets jsonb DEFAULT '[]' — ordered array of strings, max 7, 80 chars each
@@ -535,6 +539,15 @@ Client Admin: can view Sections 1 and 2 (read-only). Cannot see Section 3.
     Never create a B2B CATEGORY_BUNDLE plan. Never show price for B2B plans.
     B2B billing = tenant contract (ARR in Contract tab). Price column hidden.
 
+23. Course Bundle Plans (locked — March 20, 2026):
+    plan_category = 'COURSE_BUNDLE' distinguishes from assessment plans (plan_category = 'ASSESSMENT').
+    B2C only. Annual subscription. Always platform-wide. No tier system — named bundles.
+    No is_popular / cta_label (marketing handled via marketing tab banners).
+    Purchasable courses CAN be in bundles simultaneously (CP-Q1e=B confirmed).
+    EditPlanSlideOver routes by plan_category: CourseBundleEditForm for COURSE_BUNDLE.
+    PlanOverviewTab shows "Course Bundle" badge + Price (₹/year) + Annual Revenue strip.
+    derivePlanType() uses plan.scope, NOT plan.name (bug fixed March 20, 2026).
+
 14. Individual course pricing lives on the course record (NOT plan records).
     See decision 15 for full locked spec. Permission guard: price fields are
     SA-editable only, not Content Creators.
@@ -755,6 +768,12 @@ No Team Manager persona selector — role permanently removed from V1.
     - Updated AddContentSlideOver.tsx (audience_type filter)
     - Contract tab: Storage & Hosting section (SA only)
 
+✅ KSS-DB-SA-004  plan_category column (March 20, 2026):
+    SQL: ALTER TABLE plans ADD COLUMN IF NOT EXISTS plan_category text
+         NOT NULL DEFAULT 'ASSESSMENT'
+         CHECK (plan_category IN ('ASSESSMENT', 'COURSE_BUNDLE'));
+    Run manually in Supabase Dashboard → SQL Editor (MCP lacks DDL perms).
+
 🟡 KSS-DB-SA-003  Courses + plans schema + B2B seeding (March 19, 2026):
     - courses: +audience_type, +price, +currency, +is_individually_purchasable,
                +stripe_price_id
@@ -922,6 +941,12 @@ Run this full checklist before presenting any code:
 [ ] Tab 2 (Course Pricing) shows LIVE courses only — audience_type B2C_ONLY or BOTH
 [ ] Purchasable courses greyed out in AddContentSlideOver with tooltip
 [ ] MRR strip inside Tab 1 only — not in page header, not in Tab 2 or Tab 3
+[ ] Tab 2 label = "Course Plans" (not "Course Pricing")
+[ ] plan_category = 'COURSE_BUNDLE' for course bundle plans (not 'ASSESSMENT')
+[ ] Course bundle plans: B2C only, platform-wide, annual, no tier, no is_popular/cta_label
+[ ] derivePlanType() uses plan.scope — never plan.name
+[ ] CourseBundleEditForm shown for plan_category === 'COURSE_BUNDLE' in EditPlanSlideOver
+[ ] Purchasable courses allowed in course bundles (CP-Q1e=B) — no gate for bundles
 
 ---
 
@@ -1060,28 +1085,51 @@ Create: "Create B2C Plan" button (blue-700, top-right of Tab 1)
   → /super-admin/plans-pricing/new?audience=B2C
   Creates assessment subscription plans ONLY. No course plans. (Option Z — locked)
 
-### Tab 2 — Course Pricing (B2C à la carte)
+### Tab 2 — Course Plans (renamed from "Course Pricing" — March 20, 2026)
+Tab name: "Course Plans". Two sections inside:
+
+#### Section A — Individual Course Pricing (top)
 Layout: Table of LIVE B2C courses (audience_type = B2C_ONLY or BOTH only — no NULL/INACTIVE)
-Columns: Course Title | Course Type | Status | Price (₹) | Price (USD) | Purchasable | Actions
-SA edits per course row (inline or slide-over):
-  price (INR) | price_usd_cents — shown as "Price (USD)", LIVE field, source of truth
-  for Stripe checkout AND B2C pricing page display | is_individually_purchasable | stripe_price_id
+Columns: Course | Type | Price (₹) | Purchasable | Stripe Price ID | Actions
+SA edits per course row inline:
+  price (INR) | is_individually_purchasable | stripe_price_id
 stripe_price_id = recurring ANNUAL Stripe Price ID (managed by Stripe, not the platform)
-price_usd_cents: NOT a legacy field. Rename everywhere as "Price (USD)". Live field.
-  price (INR) + price_usd_cents (USD) = source of truth for Stripe checkout and
-  end-user B2C pricing page display.
 Empty state: "No courses available for pricing. Promote courses to Live in the Content Bank first."
 
 GATE (locked): A course with is_individually_purchasable = true cannot be assigned
   to any B2C subscription plan.
   In AddContentSlideOver (course picker): show purchasable courses greyed out with
   tooltip: "This course is sold individually and cannot be added to a plan."
-  If a course already in a plan is marked purchasable from Tab 2:
-    → Show warning modal: "This will remove the course from [plan names]. Confirm?"
-    → On confirm: remove from plans, set is_individually_purchasable = true
-    → On cancel: revert the toggle
 
-No "Create" button on Tab 2. SA enables à la carte from existing course rows only.
+#### Section B — Course Bundle Plans (bottom)
+Layout: Table rows
+Columns: Plan Name | Display Name | Price (₹/year) | Courses | Status | Actions (View)
+"Create Course Plan" button at top-right of entire Tab 2.
+Empty state in section B: shows Create Course Plan button inline.
+
+#### Create Course Plan form (/new?audience=B2C&category=COURSE_BUNDLE)
+plan_category = 'COURSE_BUNDLE', plan_audience = 'B2C', scope = 'PLATFORM_WIDE' (always)
+Sections:
+  1. Plan Identity: name*, display_name, description, tagline
+  2. Pricing: price (₹/year)*, billing_cycle (Annual/Monthly selector), stripe_price_id
+  3. Feature Bullets & Footnote (max 7, 80 chars each)
+  4. Courses: picker of LIVE B2C courses (B2C_ONLY or BOTH)
+     — purchasable courses show "Also sold individually" note (not blocked)
+     — CP-Q1e confirmed: courses can be in bundle AND individually purchasable simultaneously
+  On submit: create plan → bulk-insert selected courses → route to plan detail page
+
+#### Course Bundle Plan rules (locked — March 20, 2026)
+- B2C only (plan_audience = 'B2C', plan_category = 'COURSE_BUNDLE')
+- Annual subscription (billing_cycle default = 'ANNUAL')
+- Always platform-wide (scope = 'PLATFORM_WIDE') — no category restriction
+- No tier system — named bundles only (no BASIC/PRO/PREMIUM)
+- No is_popular / cta_label fields (marketing handled via marketing tab / banners)
+- Purchasable courses CAN be in bundles (bundle overrides mutual exclusivity gate)
+- Plan detail page: same /plans-pricing/[id] route, detects plan_category
+  Overview tab: Name, Display Name, Tagline, Scope, Price (₹/year), Billing Cycle
+  Content tab: courses only (add/remove same mechanism as assessment plans)
+
+No "Create" button on Tab 2 for individual course pricing rows (SA edits inline only).
 
 ### Tab 3 — B2B Plans
 Layout: Card grid

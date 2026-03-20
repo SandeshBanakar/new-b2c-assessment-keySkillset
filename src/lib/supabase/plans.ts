@@ -9,6 +9,7 @@ export type PlanRow = {
   billing_cycle: string
   audience_type: string
   plan_audience: 'B2C' | 'B2B'
+  plan_category: 'ASSESSMENT' | 'COURSE_BUNDLE'
   status: string
   scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
   tier: 'BASIC' | 'PRO' | 'PREMIUM' | 'ENTERPRISE' | null
@@ -58,6 +59,7 @@ export async function fetchPlans(): Promise<PlanRow[]> {
       is_popular,
       cta_label,
       created_at,
+      plan_category,
       plan_subscribers (
         subscriber_count,
         mock_mrr
@@ -72,6 +74,7 @@ export async function fetchPlans(): Promise<PlanRow[]> {
   // allowed_assessment_types is not a DB column — default to [] client-side.
   const normalised = (data ?? []).map((row) => ({
     ...row,
+    plan_category: (row.plan_category ?? 'ASSESSMENT') as 'ASSESSMENT' | 'COURSE_BUNDLE',
     allowed_assessment_types: [],
     plan_subscribers: Array.isArray(row.plan_subscribers)
       ? (row.plan_subscribers[0] ?? null)
@@ -199,7 +202,7 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
     .from('plans')
     .select(`
       id, name, display_name, description, price, billing_cycle,
-      audience_type, plan_audience, status, scope, tier, category,
+      audience_type, plan_audience, plan_category, status, scope, tier, category,
       max_attempts_per_assessment, feature_bullets,
       tagline, footnote, is_popular, cta_label,
       created_at,
@@ -219,6 +222,7 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
 
   return {
     ...row,
+    plan_category: (row.plan_category ?? 'ASSESSMENT') as 'ASSESSMENT' | 'COURSE_BUNDLE',
     // allowed_assessment_types is not a DB column — default to [] client-side
     allowed_assessment_types: [],
     plan_subscribers: Array.isArray(row.plan_subscribers)
@@ -902,4 +906,111 @@ export async function fetchB2BPlansForGrid(): Promise<B2BPlanCard[]> {
     tenant_count:  tenantCountMap[p.id] ?? 0,
     content_count: contentCountMap[p.id] ?? 0,
   }))
+}
+
+// ─── Course Bundle Plans (KSS-DB-SA-004) ─────────────────────────────────────
+
+export type CourseBundlePlanRow = {
+  id: string
+  name: string
+  display_name: string | null
+  price: number
+  status: string
+  course_count: number
+}
+
+export async function fetchCourseBundlePlans(): Promise<CourseBundlePlanRow[]> {
+  const { data: plans, error } = await supabase
+    .from('plans')
+    .select('id, name, display_name, price, status')
+    .eq('plan_audience', 'B2C')
+    .eq('plan_category', 'COURSE_BUNDLE')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+
+  const planList = (plans ?? []) as { id: string; name: string; display_name: string | null; price: number; status: string }[]
+  if (planList.length === 0) return []
+
+  const planIds = planList.map((p) => p.id)
+  const { data: pcmRows } = await supabase
+    .from('plan_content_map')
+    .select('plan_id')
+    .in('plan_id', planIds)
+  const countMap: Record<string, number> = {}
+  ;(pcmRows ?? []).forEach((r: { plan_id: string }) => {
+    countMap[r.plan_id] = (countMap[r.plan_id] ?? 0) + 1
+  })
+
+  return planList.map((p) => ({
+    id:           p.id,
+    name:         p.name,
+    display_name: p.display_name,
+    price:        p.price,
+    status:       p.status,
+    course_count: countMap[p.id] ?? 0,
+  }))
+}
+
+export type CreateCourseBundlePlanPayload = {
+  name: string
+  display_name: string | null
+  description: string | null
+  tagline: string | null
+  price: number
+  billing_cycle: 'ANNUAL' | 'MONTHLY'
+  feature_bullets: string[]
+  stripe_price_id: string | null
+  status: 'DRAFT' | 'PUBLISHED'
+}
+
+export async function createCourseBundlePlan(
+  payload: CreateCourseBundlePlanPayload
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('plans')
+    .insert({
+      name:            payload.name,
+      display_name:    payload.display_name,
+      description:     payload.description,
+      tagline:         payload.tagline,
+      price:           payload.price,
+      billing_cycle:   payload.billing_cycle,
+      feature_bullets: payload.feature_bullets,
+      plan_audience:   'B2C',
+      audience_type:   'B2C', // legacy column — keep default
+      plan_category:   'COURSE_BUNDLE',
+      scope:           'PLATFORM_WIDE',
+      status:          payload.status,
+    })
+    .select('id')
+    .single()
+  if (error) throw new Error(error.message)
+  return (data as { id: string }).id
+}
+
+// B2C course picker for course bundle plan creation
+// Returns LIVE B2C courses (B2C_ONLY or BOTH) with purchasable flag
+export type B2CCourseBundlePickerItem = {
+  id: string
+  title: string
+  courseType: string
+  isIndividuallyPurchasable: boolean
+}
+
+export async function fetchAllLiveB2CCoursesForBundle(): Promise<B2CCourseBundlePickerItem[]> {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('id, title, course_type, is_individually_purchasable')
+    .eq('status', 'LIVE')
+    .or('audience_type.eq.B2C_ONLY,audience_type.eq.BOTH')
+    .order('title', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data as { id: string; title: string; course_type: string; is_individually_purchasable: boolean }[]).map(
+    (c) => ({
+      id:                        c.id,
+      title:                     c.title,
+      courseType:                c.course_type,
+      isIndividuallyPurchasable: c.is_individually_purchasable,
+    })
+  )
 }

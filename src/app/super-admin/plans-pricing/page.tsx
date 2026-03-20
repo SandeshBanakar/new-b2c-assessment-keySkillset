@@ -9,15 +9,17 @@ import {
   fetchB2BPlansForGrid,
   fetchB2CCoursesForPricing,
   updateCoursePricing,
+  fetchCourseBundlePlans,
   type PlanRow,
   type B2BPlanCard,
   type CoursePricingRow,
+  type CourseBundlePlanRow,
 } from '@/lib/supabase/plans'
 import { PlanStatusBadge } from '@/components/plans/PlanStatusBadge'
 import { PlanTypeBadge } from '@/components/plans/PlanTypeBadge'
 import { EditPlanSlideOver } from '@/components/plans/EditPlanSlideOver'
 
-type Tab = 'assessment-plans' | 'course-pricing' | 'b2b-plans'
+type Tab = 'assessment-plans' | 'course-plans' | 'b2b-plans'
 
 // Tier column order for the B2C swimlane — maps tier DB value to display label
 const B2C_TIERS = [
@@ -253,8 +255,9 @@ function AssessmentPlansTab({
   )
 }
 
-// ─── Tab 2: Course Pricing ────────────────────────────────────────────────────
-function CoursePricingTab() {
+// ─── Tab 2: Course Plans ──────────────────────────────────────────────────────
+
+function IndividualCoursePricingSection() {
   const [courses, setCourses] = useState<CoursePricingRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -278,10 +281,7 @@ function CoursePricingTab() {
     })
   }
 
-  function cancelEdit() {
-    setEditingId(null)
-    setEditDraft({})
-  }
+  function cancelEdit() { setEditingId(null); setEditDraft({}) }
 
   async function saveEdit(courseId: string) {
     setSaving(true)
@@ -292,9 +292,7 @@ function CoursePricingTab() {
         stripe_price_id:             editDraft.stripe_price_id ?? null,
       })
       setCourses((prev) =>
-        prev.map((c) =>
-          c.id === courseId ? { ...c, ...editDraft } as CoursePricingRow : c
-        )
+        prev.map((c) => c.id === courseId ? { ...c, ...editDraft } as CoursePricingRow : c)
       )
       cancelEdit()
     } catch (e: unknown) {
@@ -304,19 +302,11 @@ function CoursePricingTab() {
     }
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-40">
-      <p className="text-sm text-zinc-400">Loading courses...</p>
-    </div>
-  )
-  if (error) return (
-    <div className="flex items-center justify-center h-40">
-      <p className="text-sm text-rose-600">{error}</p>
-    </div>
-  )
+  if (loading) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
+  if (error) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
   if (courses.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-40 gap-2">
-      <BookOpen className="w-8 h-8 text-zinc-300" />
+    <div className="flex flex-col items-center justify-center h-28 gap-1">
+      <BookOpen className="w-6 h-6 text-zinc-300" />
       <p className="text-sm text-zinc-500">No courses available for pricing.</p>
       <p className="text-xs text-zinc-400">Promote courses to Live in the Content Bank first.</p>
     </div>
@@ -342,50 +332,36 @@ function CoursePricingTab() {
               <tr key={course.id} className={`transition-colors ${isEditing ? 'bg-blue-50/30' : 'hover:bg-zinc-50'}`}>
                 <td className="px-4 py-3 font-medium text-zinc-900">{course.title}</td>
                 <td className="px-4 py-3 text-xs text-zinc-500">{course.course_type}</td>
-
                 {isEditing ? (
                   <>
                     <td className="px-4 py-2 text-right">
                       <input
-                        type="number"
-                        min={0}
-                        value={editDraft.price ?? ''}
-                        onChange={(e) =>
-                          setEditDraft((d) => ({ ...d, price: e.target.value === '' ? null : Number(e.target.value) }))
-                        }
+                        type="number" min={0} value={editDraft.price ?? ''}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, price: e.target.value === '' ? null : Number(e.target.value) }))}
                         className="w-24 border border-zinc-200 rounded-md px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-600"
                         placeholder="0"
                       />
                     </td>
                     <td className="px-4 py-2 text-center">
                       <input
-                        type="checkbox"
-                        checked={editDraft.is_individually_purchasable ?? false}
-                        onChange={(e) =>
-                          setEditDraft((d) => ({ ...d, is_individually_purchasable: e.target.checked }))
-                        }
+                        type="checkbox" checked={editDraft.is_individually_purchasable ?? false}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, is_individually_purchasable: e.target.checked }))}
                         className="accent-blue-700 w-4 h-4"
                       />
                     </td>
                     <td className="px-4 py-2">
                       <input
-                        type="text"
-                        value={editDraft.stripe_price_id ?? ''}
-                        onChange={(e) =>
-                          setEditDraft((d) => ({ ...d, stripe_price_id: e.target.value || null }))
-                        }
+                        type="text" value={editDraft.stripe_price_id ?? ''}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, stripe_price_id: e.target.value || null }))}
                         className="w-full border border-zinc-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
                         placeholder="price_annual_..."
                       />
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={cancelEdit} className="text-xs text-zinc-500 hover:text-zinc-800">
-                          Cancel
-                        </button>
+                        <button onClick={cancelEdit} className="text-xs text-zinc-500 hover:text-zinc-800">Cancel</button>
                         <button
-                          onClick={() => saveEdit(course.id)}
-                          disabled={saving}
+                          onClick={() => saveEdit(course.id)} disabled={saving}
                           className="text-xs font-medium bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded-md disabled:opacity-50"
                         >
                           {saving ? 'Saving…' : 'Save'}
@@ -400,25 +376,14 @@ function CoursePricingTab() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       {course.is_individually_purchasable ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Yes
-                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Yes</span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
-                          No
-                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">No</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-zinc-400 text-xs font-mono truncate max-w-45">
-                      {course.stripe_price_id ?? '—'}
-                    </td>
+                    <td className="px-4 py-3 text-zinc-400 text-xs font-mono truncate max-w-45">{course.stripe_price_id ?? '—'}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => startEdit(course)}
-                        className="text-xs text-blue-700 hover:text-blue-800 font-medium"
-                      >
-                        Edit
-                      </button>
+                      <button onClick={() => startEdit(course)} className="text-xs text-blue-700 hover:text-blue-800 font-medium">Edit</button>
                     </td>
                   </>
                 )}
@@ -431,6 +396,101 @@ function CoursePricingTab() {
         <p className="text-xs text-zinc-400">
           Stripe Price ID must be a recurring annual price ID. Price (₹) is the source of truth for Stripe checkout and B2C pricing page display.
         </p>
+      </div>
+    </div>
+  )
+}
+
+function CourseBundlePlansSection({ onCreateCoursePlan }: { onCreateCoursePlan: () => void }) {
+  const router = useRouter()
+  const [bundles, setBundles] = useState<CourseBundlePlanRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchCourseBundlePlans()
+      .then(setBundles)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
+  if (error) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
+  if (bundles.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-28 gap-2">
+      <LayoutGrid className="w-6 h-6 text-zinc-300" />
+      <p className="text-sm text-zinc-500">No course bundle plans yet.</p>
+      <button
+        onClick={onCreateCoursePlan}
+        className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-medium px-3 py-1.5 rounded-md transition-colors mt-1"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        Create Course Plan
+      </button>
+    </div>
+  )
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 bg-zinc-50">
+            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Display Name</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹/year)</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Courses</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
+            <th className="px-4 py-3" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-100">
+          {bundles.map((bundle) => (
+            <tr key={bundle.id} className="hover:bg-zinc-50 transition-colors">
+              <td className="px-4 py-3 font-medium text-zinc-900">{bundle.name}</td>
+              <td className="px-4 py-3 text-zinc-600">{bundle.display_name ?? <span className="text-zinc-400">—</span>}</td>
+              <td className="px-4 py-3 text-right text-zinc-700 font-medium">{formatINR(bundle.price)}</td>
+              <td className="px-4 py-3 text-center text-zinc-600">{bundle.course_count}</td>
+              <td className="px-4 py-3 text-center">
+                <PlanStatusBadge status={bundle.status} />
+              </td>
+              <td className="px-4 py-3 text-right">
+                <button
+                  onClick={() => router.push(`/super-admin/plans-pricing/${bundle.id}`)}
+                  className="text-xs text-blue-700 hover:text-blue-800 font-medium"
+                >
+                  View
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function CoursePlansTab({ onCreateCoursePlan }: { onCreateCoursePlan: () => void }) {
+  return (
+    <div className="space-y-8">
+      {/* Individual Course Pricing section */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-zinc-700">Individual Course Pricing</h2>
+          <button
+            onClick={onCreateCoursePlan}
+            className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Create Course Plan
+          </button>
+        </div>
+        <IndividualCoursePricingSection />
+      </div>
+
+      {/* Course Bundle Plans section */}
+      <div>
+        <h2 className="text-sm font-semibold text-zinc-700 mb-4">Course Bundle Plans</h2>
+        <CourseBundlePlansSection onCreateCoursePlan={onCreateCoursePlan} />
       </div>
     </div>
   )
@@ -537,7 +597,7 @@ export default function PlansPage() {
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'assessment-plans', label: 'Assessment Plans' },
-    { id: 'course-pricing',   label: 'Course Pricing' },
+    { id: 'course-plans',     label: 'Course Plans' },
     { id: 'b2b-plans',        label: 'B2B Plans' },
   ]
 
@@ -586,7 +646,11 @@ export default function PlansPage() {
           onCreateB2C={() => router.push('/super-admin/plans-pricing/new?audience=B2C')}
         />
       )}
-      {activeTab === 'course-pricing' && <CoursePricingTab />}
+      {activeTab === 'course-plans' && (
+        <CoursePlansTab
+          onCreateCoursePlan={() => router.push('/super-admin/plans-pricing/new?audience=B2C&category=COURSE_BUNDLE')}
+        />
+      )}
       {activeTab === 'b2b-plans' && (
         <B2BPlansTab
           onCreateB2B={() => router.push('/super-admin/plans-pricing/new?audience=B2B')}
