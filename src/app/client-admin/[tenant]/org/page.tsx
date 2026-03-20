@@ -262,7 +262,7 @@ function ConfirmModal({
       <div className="bg-white rounded-md border border-zinc-200 w-full max-w-sm mx-4 shadow-lg">
         <div className="px-6 py-5">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <div className="mt-0.5 w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center shrink-0">
               <AlertTriangle className="w-4 h-4 text-amber-600" />
             </div>
             <div>
@@ -377,7 +377,7 @@ export default function OrgPage() {
   // ── Fetch departments ──────────────────────────────────────────────────────
 
   const fetchDepartments = useCallback(async () => {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return }
     setLoading(true)
 
     const { data: depts } = await supabase
@@ -455,10 +455,14 @@ export default function OrgPage() {
     setTeams(rawTeams.map((t) => ({ ...t, learnerCount: teamLearnerMap[t.id] ?? 0 })))
   }, [])
 
-  useEffect(() => { fetchDepartments() }, [fetchDepartments])
   useEffect(() => {
-    if (selectedDept) fetchTeams(selectedDept.id)
-    else setTeams([])
+    void (async () => { await fetchDepartments() })()
+  }, [fetchDepartments])
+  useEffect(() => {
+    void (async () => {
+      if (selectedDept) await fetchTeams(selectedDept.id)
+      else setTeams([])
+    })()
   }, [selectedDept, fetchTeams])
 
   // ── Department actions ─────────────────────────────────────────────────────
@@ -545,9 +549,9 @@ export default function OrgPage() {
       </div>
 
       {/* Split pane */}
-      <div className="flex gap-4 min-h-[520px]">
+      <div className="flex gap-4 min-h-130">
         {/* Left — Departments */}
-        <div className="w-80 flex-shrink-0 bg-white border border-zinc-200 rounded-md overflow-hidden flex flex-col">
+        <div className="w-80 shrink-0 bg-white border border-zinc-200 rounded-md overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-zinc-100">
             <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
               Departments{' '}
@@ -598,7 +602,7 @@ export default function OrgPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-1 shrink-0">
                       <KebabMenu
                         isActive={dept.status === 'ACTIVE'}
                         onEdit={() => setDeptModal({ open: true, editing: dept })}
@@ -647,7 +651,7 @@ export default function OrgPage() {
 
               {selectedDept.status === 'INACTIVE' && (
                 <div className="mx-5 mt-4 px-4 py-3 rounded-md bg-amber-50 border border-amber-200 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-800">
                     This department is inactive. Reactivate it to create new teams or assign learners.
                   </p>

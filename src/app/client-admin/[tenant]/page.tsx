@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 
-export default function ClientAdminRoot({
+export default async function ClientAdminRoot({
   params,
 }: {
-  params: { tenant: string }
+  params: Promise<{ tenant: string }>
 }) {
-  redirect(`/client-admin/${params.tenant}/dashboard`)
+  const { tenant } = await params
+  redirect(`/client-admin/${tenant}/dashboard`)
 }
