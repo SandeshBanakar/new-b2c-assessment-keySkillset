@@ -39,7 +39,27 @@
       "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/teams?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
       "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/tenants?limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/content_items?select=id,title,tenant_scope_id,visibility_scope,status&status=eq.INACTIVE&limit=5\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/content_items?select=id,title,tenant_scope_id,visibility_scope,status&tenant_scope_id=eq.ec1bc005-e76d-4208-ab0f-abe0d316e260\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/learners?select=id,tenant_id,full_name,email,phone,department_id,team_id,status,employee_roll_number,notes,created_at&limit=5\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/learners?select=count&tenant_id=eq.ec1bc005-e76d-4208-ab0f-abe0d316e260\" -H 'apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj' -H 'Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj' -H 'Prefer: count=exact' -I)",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/departments?select=id,name,status&tenant_id=eq.ec1bc005-e76d-4208-ab0f-abe0d316e260&order=name\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/departments?select=id,name,tenant_id,status&limit=20\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/learners?select=id,tenant_id,full_name,status&limit=5\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/tenants?select=id,name,feature_toggle_mode\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/certificates?select=count&tenant_id=eq.ec1bc005-e76d-4208-ab0f-abe0d316e260\" -H 'apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj' -H 'Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj' -H 'Prefer: count=exact' -I)",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/teams?select=id,name,tenant_id&limit=5\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/learner_profiles?select=id&limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/content_assignments?select=id&limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "Bash(curl -s \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/client_audit_log?select=id&limit=1\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\")",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__claude_ai_Vercel__list_projects",
+      "mcp__claude_ai_Vercel__get_project",
+      "mcp__claude_ai_Vercel__get_runtime_logs",
+      "mcp__claude_ai_Vercel__get_deployment",
+      "mcp__claude_ai_Vercel__web_fetch_vercel_url",
+      "Bash(curl -s -X PATCH \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/tenants?id=eq.7caa0566-e31a-41b6-962d-30fb3d6cb011\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Content-Type: application/json\" -H \"Prefer: return=representation\" -d '{\"\"feature_toggle_mode\"\": \"\"RUN_ONLY\"\"}')"
     ]
   }
 }
