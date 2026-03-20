@@ -41,7 +41,7 @@ function NavItem({
       href={href}
       className={
         isActive
-          ? 'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm font-medium transition-colors bg-violet-50 text-violet-700 border-l-2 border-violet-700 pl-[6px]'
+          ? 'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm font-medium transition-colors bg-violet-50 text-violet-700 border-l-2 border-violet-700 pl-1.5'
           : 'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm font-medium text-zinc-600 cursor-pointer hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
       }
     >
@@ -88,7 +88,7 @@ export default function ClientAdminLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-50">
-      <aside className="w-60 flex-shrink-0 flex flex-col bg-white border-r border-zinc-200 h-screen fixed left-0 top-0 overflow-y-auto">
+      <aside className="w-60 shrink-0 flex flex-col bg-white border-r border-zinc-200 h-screen fixed left-0 top-0 overflow-y-auto">
         <div className="px-4 py-4 border-b border-zinc-200">
           <p className="text-sm font-semibold text-zinc-900">
             {tenant?.name ?? 'Loading…'}

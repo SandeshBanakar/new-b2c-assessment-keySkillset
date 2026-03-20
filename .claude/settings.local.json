@@ -59,7 +59,10 @@
       "mcp__claude_ai_Vercel__get_runtime_logs",
       "mcp__claude_ai_Vercel__get_deployment",
       "mcp__claude_ai_Vercel__web_fetch_vercel_url",
-      "Bash(curl -s -X PATCH \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/tenants?id=eq.7caa0566-e31a-41b6-962d-30fb3d6cb011\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Content-Type: application/json\" -H \"Prefer: return=representation\" -d '{\"\"feature_toggle_mode\"\": \"\"RUN_ONLY\"\"}')"
+      "Bash(curl -s -X PATCH \"https://uqweguyeaqkbxgtpkhez.supabase.co/rest/v1/tenants?id=eq.7caa0566-e31a-41b6-962d-30fb3d6cb011\" -H \"apikey: sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Authorization: Bearer sb_publishable_AX2KDXMKhQp53MeCLkVWsQ_6mTbGCTj\" -H \"Content-Type: application/json\" -H \"Prefer: return=representation\" -d '{\"\"feature_toggle_mode\"\": \"\"RUN_ONLY\"\"}')",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(ls c:/Projects/new-b2c-assessment-keySkillset/src/app/client-admin/[tenant]/)",
+      "mcp__claude_ai_Supabase__apply_migration"
     ]
   }
 }
