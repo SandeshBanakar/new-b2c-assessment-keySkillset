@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 5.0 | Updated: March 20, 2026
+# Version: 5.1 | Updated: March 20, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -19,7 +19,10 @@ Precision is mandatory. Move fast — but never guess at locked decisions.
 
 Framework:   Next.js 16.1.6 (Turbopack), TypeScript, Tailwind CSS
 Deployment:  Vercel (auto-deploy on main push)
-Database:    Supabase — project ID: ugweguyeaqkbxgtpkhez
+Database:    Supabase — project ID: uqweguyeaqkbxgtpkhez
+             MCP URL:   https://mcp.supabase.com/mcp?project_ref=uqweguyeaqkbxgtpkhez
+             MCP tool:  mcp__claude_ai_Supabase__execute_sql (project_id: uqweguyeaqkbxgtpkhez)
+             ALL schema changes run via Supabase MCP execute_sql — never apply_migration
 Repo:        github.com/SandeshBanakar/new-b2c-assessment-keySkillset
 Editor:      Claude Code (VS Code)
 Docs ref:    Context7 — https://context7.com/
@@ -783,11 +786,16 @@ No Team Manager persona selector — role permanently removed from V1.
 🟡 KSS-SA-008   Master Organisation
 🟡 KSS-SA-010   Dashboard (last)
 
-Client Admin (pending — KSS-CA sprint, March 20, 2026):
-🟡 KSS-DB-CA-001  CA schema migration (visibility_scope on content_items + 5 new tables + Akash seed)
-🟡 KSS-CA-001     CA Layout + Navigation (sidebar, persona routing, feature_toggle_mode guards)
-🟡 KSS-CA-002     Organisation (Departments + Teams CRUD + learner assignment to dept/team)
-🟡 KSS-CA-003     Learner Management (list, manual add, CSV upload, profile, deactivate/reactivate, password reset)
+Client Admin (KSS-CA sprint, March 20, 2026):
+✅ KSS-DB-CA-001  CA schema migration — DONE (March 20, 2026)
+    - visibility_scope on content_items (GLOBAL/TENANT_PRIVATE/PENDING_PROMOTION)
+    - 5 new tables: learner_profiles, content_assignments, learner_content_access,
+      certificates, client_audit_log
+    - 3 TENANT_PRIVATE INACTIVE seed items for Akash Institute Delhi
+    - Data fix: tenant_scope_id set + visibility_scope=GLOBAL → corrected to TENANT_PRIVATE
+✅ KSS-CA-001     CA Layout + Navigation — DONE (sidebar, persona routing, feature_toggle_mode guards)
+✅ KSS-CA-002     Organisation — DONE (Departments + Teams CRUD, learner counts, deactivate/reactivate)
+✅ KSS-CA-003     Learner Management — DONE (list, add, edit, profile slide-over, deactivate/reactivate)
 🟡 KSS-CA-004     Catalog (browse + assign to Dept/Team/Individual, dynamic membership model)
 🟡 KSS-CA-005     Content Bank (FULL_CREATOR only — INACTIVE → CA makes LIVE, archive)
 🟡 KSS-CA-006     Reports (R3: Per-Learner Score, R5: Content Performance, R6: Certificates, R7: Activity Log)
@@ -937,13 +945,22 @@ Run this full checklist before presenting any code:
 3. Check design system compliance (Section 3).
 4. Run the full Section 25 checklist before any commit.
 
-### D. Schema Migration
+### D. Schema Migration (LOCKED PROCEDURE — March 20, 2026)
+ALL database changes are executed manually via Supabase MCP. Never use apply_migration.
+
 1. Write SQL migration with IF NOT EXISTS guards.
-2. Show full SQL to user — label it KSS-DB-SA-NNN.
-3. Wait for explicit approval. Never run without it.
-4. After user confirms run: update TypeScript types in src/lib/supabase/.
-5. Update CLAUDE.md Section 4 schema docs.
-6. Run npm run build to verify no type errors.
+2. Label it KSS-DB-[TRACK]-NNN. Show full SQL to user — wait for explicit approval.
+3. On approval: run via mcp__claude_ai_Supabase__execute_sql
+   project_id: uqweguyeaqkbxgtpkhez
+   Never paste SQL into a shell. Never use apply_migration. Never auto-run.
+4. Verify the change ran correctly with a SELECT or column check query.
+5. Update TypeScript types in src/lib/supabase/ if needed.
+6. Update CLAUDE.md Section 4 schema docs.
+7. Run npm run build to verify no type errors.
+
+Supabase data fixes (non-schema, e.g. seed corrections, visibility_scope fixes):
+  Run directly via execute_sql after confirming intent with the user.
+  No approval gate needed for data-only corrections to existing tables.
 
 ### E. Code Editing
 1. Read file before editing. Never edit blind.
