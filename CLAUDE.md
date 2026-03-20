@@ -104,18 +104,20 @@ stripe_price_id (text, nullable)
 MIGRATION KSS-DB-SA-003 (authorised March 19, 2026):
   See Section 27 for full SQL.
 
-### content_items table — columns including KSS-DB-SA-002 additions
-id (uuid), title (text), description (text),
+### content_items table — confirmed live columns (verified March 20, 2026 via REST API)
+id (uuid), title (text),
 exam_category_id (uuid FK → exam_categories),
 test_type (text), source (text),
 status (text — DRAFT/INACTIVE/LIVE/ARCHIVED),
 audience_type (text — B2C_ONLY/B2B_ONLY/BOTH, nullable until LIVE),
 visibility_scope (text DEFAULT 'GLOBAL' — 'GLOBAL'|'TENANT_PRIVATE'|'PENDING_PROMOTION'),
-  tenant_id IS NULL  → always 'GLOBAL' (SA-authored)
-  tenant_id NOT NULL → 'TENANT_PRIVATE' (tenant-authored, FULL_CREATOR only)
+  tenant_scope_id IS NULL  → always 'GLOBAL' (SA-authored)
+  tenant_scope_id NOT NULL → 'TENANT_PRIVATE' (tenant-authored, FULL_CREATOR only)
   'PENDING_PROMOTION' → V2 (push to SA global bank — NOT BUILT IN V1)
-tenant_id (uuid nullable), created_by (uuid nullable),
+tenant_scope_id (uuid nullable),  ← IMPORTANT: column is tenant_scope_id NOT tenant_id
+created_by (uuid nullable),
 created_at (timestamptz), updated_at (timestamptz)
+COLUMNS THAT DO NOT EXIST: description (no such column in live schema)
 
 MIGRATION KSS-DB-SA-002 (authorised March 18, 2026):
   ALTER TABLE content_items ADD COLUMN audience_type text;
@@ -169,12 +171,23 @@ courses(9 — 4 B2B LIVE + 4 B2C LIVE + 1 INACTIVE),
 tenant_plan_map(3 — Akash Standard→Akash, TechCorp Premium→TechCorp,
                     Enterprise Pro→both tenants)
 
-### learners table — confirmed columns (March 20, 2026)
+### learners table — confirmed live columns (verified March 20, 2026 via REST API)
 id (uuid), tenant_id (uuid), full_name (text), email (text),
 phone (text nullable), department_id (uuid nullable FK → departments),
 team_id (uuid nullable FK → teams), status (text — ACTIVE|INACTIVE),
-created_at (timestamptz)
-NOTE: department_id and team_id exist in live schema but were undocumented. Now confirmed.
+employee_roll_number (text nullable), notes (text nullable),
+created_by (uuid nullable), created_at (timestamptz)
+NOTE: employee_roll_number + notes + created_by already exist directly on learners.
+learner_profiles table was also created by KSS-DB-CA-001 — use learner_profiles for
+any additional B2B-specific fields; but employee_roll_number/notes live on learners.
+
+### departments table — confirmed live columns (verified March 20, 2026 via REST API)
+id (uuid), tenant_id (uuid), name (text), description (text nullable),
+team_manager_id (uuid nullable), status (text — ACTIVE|INACTIVE), created_at (timestamptz)
+
+### teams table — confirmed live columns (verified March 20, 2026 via REST API)
+id (uuid), department_id (uuid FK → departments), tenant_id (uuid),
+name (text), status (text — ACTIVE|INACTIVE), created_at (timestamptz)
 
 ### Client Admin Tables (V1 — KSS-DB-CA-001, authorised March 20, 2026)
 learner_profiles   — B2B extension per learner: employee_roll_number, notes
@@ -1361,27 +1374,24 @@ CREATE TABLE IF NOT EXISTS client_audit_log (
 
 -- 7. Seed INACTIVE tenant content for Akash Institute Delhi (FULL_CREATOR demo)
 -- Akash tenant_id: ec1bc005-e76d-4208-ab0f-abe0d316e260
--- NOTE: Replace <VALID_EXAM_CATEGORY_ID> with an actual id from exam_categories table.
--- Run: SELECT id, name FROM exam_categories; to get valid IDs before running this block.
+-- NEET exam_category_id: 23d482e7-81c3-4a10-bd60-52fd458595d6
+-- FIXED March 20, 2026: removed description (no such column); tenant_scope_id NOT tenant_id
 
 INSERT INTO content_items
-  (id, title, description, exam_category_id, test_type, source,
-   status, tenant_id, visibility_scope, audience_type, created_at, updated_at)
+  (id, title, exam_category_id, test_type, source,
+   status, tenant_scope_id, visibility_scope, audience_type, created_at, updated_at)
 VALUES
   (gen_random_uuid(),
    'Akash Institute — NEET Foundation Batch Notes',
-   'Comprehensive chapter-wise notes for NEET Foundation batch 2026, created by Akash Institute content team.',
-   '<VALID_EXAM_CATEGORY_ID>', 'CHAPTER_TEST', 'TENANT',
+   '23d482e7-81c3-4a10-bd60-52fd458595d6', 'CHAPTER_TEST', 'TENANT',
    'INACTIVE', 'ec1bc005-e76d-4208-ab0f-abe0d316e260', 'TENANT_PRIVATE', NULL, now(), now()),
   (gen_random_uuid(),
    'Akash Institute — Physics Mechanics Practice Set',
-   'Custom practice set covering Newton''s Laws and Kinematics for Akash Foundation Batch.',
-   '<VALID_EXAM_CATEGORY_ID>', 'SUBJECT_TEST', 'TENANT',
+   '23d482e7-81c3-4a10-bd60-52fd458595d6', 'SUBJECT_TEST', 'TENANT',
    'INACTIVE', 'ec1bc005-e76d-4208-ab0f-abe0d316e260', 'TENANT_PRIVATE', NULL, now(), now()),
   (gen_random_uuid(),
    'Akash Institute — NEET Internal Mock Test Series 1',
-   'Internal mock test exclusively for Akash Institute registered students. Not for external distribution.',
-   '<VALID_EXAM_CATEGORY_ID>', 'FULL_TEST', 'TENANT',
+   '23d482e7-81c3-4a10-bd60-52fd458595d6', 'FULL_TEST', 'TENANT',
    'INACTIVE', 'ec1bc005-e76d-4208-ab0f-abe0d316e260', 'TENANT_PRIVATE', NULL, now(), now());
 
 ---
