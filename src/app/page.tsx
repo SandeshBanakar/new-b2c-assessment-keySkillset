@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase } from 'lucide-react';
+import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool } from 'lucide-react';
 import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
 import type { DemoUser } from '@/data/demoUsers';
@@ -103,6 +103,26 @@ function PersonaSelector() {
           </span>
           <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-teal-900 text-teal-300">
             CLIENT_ADMIN
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 w-full max-w-lg mx-auto">
+        <div className="flex-1 h-px bg-zinc-800" />
+        <p className="text-xs text-zinc-600 whitespace-nowrap">Content Creator Personas</p>
+        <div className="flex-1 h-px bg-zinc-800" />
+      </div>
+
+      <div className="flex items-center justify-center gap-6">
+        <div className="flex flex-col items-center gap-3 opacity-60 cursor-not-allowed select-none">
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent bg-amber-700">
+            <PenTool className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 text-center">
+            Akash Content Creator
+          </span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-amber-900 text-amber-300">
+            Coming Soon
           </span>
         </div>
       </div>
