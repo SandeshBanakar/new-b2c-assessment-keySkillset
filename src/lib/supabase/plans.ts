@@ -628,11 +628,20 @@ export async function removeContentFromPlan(pcmId: string): Promise<void> {
 
 // ─── Tenant Plans tab helpers (KSS-SA-004-ARCH) ───────────────────────────────
 
+export type TenantAssignedCourse = {
+  pcmId: string
+  contentId: string
+  title: string
+  courseType: string
+  status: string
+}
+
 export type TenantAssignedPlan = {
   planId: string
   planName: string
   planAudience: 'B2C' | 'B2B'
   assessments: (TenantPlanAssessment & { inPlanCount: number })[]
+  courses: TenantAssignedCourse[]
 }
 
 export async function fetchTenantAssignedPlansWithContent(
@@ -695,8 +704,37 @@ export async function fetchTenantAssignedPlansWithContent(
     contentIdToPlanCount[r.content_item_id] = (contentIdToPlanCount[r.content_item_id] ?? 0) + 1
   })
 
+  // Step 6: course content map rows
+  const { data: coursePcmRows, error: coursePcmError } = await supabase
+    .from('plan_content_map')
+    .select('id, plan_id, content_item_id')
+    .in('plan_id', planIds)
+    .eq('content_type', 'COURSE')
+
+  if (coursePcmError) throw new Error(coursePcmError.message)
+
+  const typedCoursePcm = (coursePcmRows ?? []) as { id: string; plan_id: string; content_item_id: string }[]
+  const courseContentIds = typedCoursePcm.map((r) => r.content_item_id)
+
+  // Step 7: courses table details
+  let courseMap: Record<string, { title: string; course_type: string; status: string }> = {}
+  if (courseContentIds.length > 0) {
+    const { data: coRows, error: coError } = await supabase
+      .from('courses')
+      .select('id, title, course_type, status')
+      .in('id', courseContentIds)
+
+    if (coError) throw new Error(coError.message)
+
+    courseMap = Object.fromEntries(
+      (coRows as { id: string; title: string; course_type: string; status: string }[])
+        .map((c) => [c.id, c])
+    )
+  }
+
   return planIds.map((planId) => {
     const plan = planMap[planId]
+
     const assessments = typedPcm
       .filter((r) => r.plan_id === planId)
       .map((r) => {
@@ -712,11 +750,25 @@ export async function fetchTenantAssignedPlansWithContent(
         }
       })
 
+    const courses = typedCoursePcm
+      .filter((r) => r.plan_id === planId)
+      .map((r) => {
+        const co = courseMap[r.content_item_id]
+        return {
+          pcmId: r.id,
+          contentId: r.content_item_id,
+          title: co?.title ?? '—',
+          courseType: co?.course_type ?? '—',
+          status: co?.status ?? '—',
+        }
+      })
+
     return {
       planId,
       planName: plan?.name ?? 'Unknown Plan',
       planAudience: (plan?.plan_audience ?? 'B2B') as 'B2C' | 'B2B',
       assessments,
+      courses,
     }
   })
 }

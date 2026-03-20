@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, BookOpen, LayoutGrid, AlertTriangle, Loader2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, BookOpen, LayoutGrid, AlertTriangle, Loader2 } from 'lucide-react'
 import {
   fetchTenantAssignedPlansWithContent,
   unassignPlanFromTenant,
@@ -80,7 +80,7 @@ function PlanAccordionRow({
   const [confirmUnassign, setConfirmUnassign] = useState(false)
   const [unassigning, setUnassigning] = useState(false)
 
-  const totalItems = plan.assessments.length
+  const totalItems = plan.assessments.length + plan.courses.length
 
   const handleUnassign = async () => {
     setUnassigning(true)
@@ -192,13 +192,46 @@ function PlanAccordionRow({
               )}
             </div>
 
-            {/* Courses sub-section — placeholder */}
+            {/* Courses sub-section */}
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Courses</p>
-              <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <BookOpen className="w-4 h-4 text-zinc-300 shrink-0" />
-                <p className="text-sm text-zinc-400">Courses module coming soon</p>
-              </div>
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
+                Courses ({plan.courses.length})
+              </p>
+
+              {plan.courses.length === 0 ? (
+                <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+                  <BookOpen className="w-4 h-4 text-zinc-300 shrink-0" />
+                  <p className="text-sm text-zinc-400">No courses in this plan.</p>
+                </div>
+              ) : (
+                <div className="border border-zinc-200 rounded-md overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-zinc-50 border-b border-zinc-200">
+                      <tr>
+                        <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 w-1/2">TITLE</th>
+                        <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">TYPE</th>
+                        <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plan.courses.map((course, idx) => (
+                        <tr
+                          key={course.pcmId}
+                          className={idx < plan.courses.length - 1 ? 'border-b border-zinc-100' : ''}
+                        >
+                          <td className="px-4 py-3 font-medium text-zinc-900">{course.title}</td>
+                          <td className="px-4 py-3 text-zinc-600">{course.courseType}</td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                              {course.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
