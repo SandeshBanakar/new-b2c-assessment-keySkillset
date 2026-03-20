@@ -417,6 +417,7 @@ export type PlanAssignedAssessment = {
   examType: string
   assessmentType: string
   status: string
+  planCount: number   // how many plans platform-wide contain this item
 }
 
 export type PlanAssignedCourse = {
@@ -454,6 +455,18 @@ export async function fetchPlanAssignedAssessments(
       .map((c) => [c.id, c])
   )
 
+  // Platform-wide plan count per content item (for duplicate badge)
+  const { data: countRows } = await supabase
+    .from('plan_content_map')
+    .select('content_item_id')
+    .in('content_item_id', contentIds)
+    .eq('content_type', 'ASSESSMENT')
+
+  const planCountMap: Record<string, number> = {}
+  ;(countRows as { content_item_id: string }[] ?? []).forEach((r) => {
+    planCountMap[r.content_item_id] = (planCountMap[r.content_item_id] ?? 0) + 1
+  })
+
   return (pcmRows as { id: string; content_item_id: string }[]).map((r) => {
     const ci = ciMap[r.content_item_id]
     return {
@@ -463,6 +476,7 @@ export async function fetchPlanAssignedAssessments(
       examType: '—',
       assessmentType: ci?.test_type ?? '—',
       status: ci?.status ?? '—',
+      planCount: planCountMap[r.content_item_id] ?? 1,
     }
   })
 }
@@ -1065,4 +1079,73 @@ export async function fetchAllLiveB2CCoursesForBundle(): Promise<B2CCourseBundle
       isIndividuallyPurchasable: c.is_individually_purchasable,
     })
   )
+}
+
+// ─── Content plan usage modal (duplicate badge) ────────────────────────────────
+
+export type PlanUsageItem = {
+  pcmId: string
+  planId: string
+  planName: string
+  planAudience: 'B2C' | 'B2B'
+  planStatus: string
+}
+
+export async function fetchPlansContainingContent(
+  contentId: string,
+  tenantId?: string
+): Promise<PlanUsageItem[]> {
+  // Step 1: all plan_content_map rows for this content item
+  const { data: pcmRows, error: pcmError } = await supabase
+    .from('plan_content_map')
+    .select('id, plan_id')
+    .eq('content_item_id', contentId)
+    .eq('content_type', 'ASSESSMENT')
+
+  if (pcmError) throw new Error(pcmError.message)
+  if (!pcmRows || pcmRows.length === 0) return []
+
+  const typed = (pcmRows as { id: string; plan_id: string }[])
+  let planIds = typed.map((r) => r.plan_id)
+
+  // Step 2: if tenantId provided, scope to that tenant's plans only
+  if (tenantId) {
+    const { data: tpmRows } = await supabase
+      .from('tenant_plan_map')
+      .select('plan_id')
+      .eq('tenant_id', tenantId)
+
+    const tenantPlanSet = new Set(
+      (tpmRows as { plan_id: string }[] ?? []).map((r) => r.plan_id)
+    )
+    planIds = planIds.filter((id) => tenantPlanSet.has(id))
+  }
+
+  if (planIds.length === 0) return []
+
+  // Step 3: plan details
+  const { data: planRows, error: planError } = await supabase
+    .from('plans')
+    .select('id, name, plan_audience, status')
+    .in('id', planIds)
+
+  if (planError) throw new Error(planError.message)
+
+  const planMap = Object.fromEntries(
+    (planRows as { id: string; name: string; plan_audience: string; status: string }[])
+      .map((p) => [p.id, p])
+  )
+
+  return typed
+    .filter((r) => planIds.includes(r.plan_id))
+    .map((r) => {
+      const plan = planMap[r.plan_id]
+      return {
+        pcmId: r.id,
+        planId: r.plan_id,
+        planName: plan?.name ?? 'Unknown Plan',
+        planAudience: (plan?.plan_audience ?? 'B2B') as 'B2C' | 'B2B',
+        planStatus: plan?.status ?? '—',
+      }
+    })
 }

@@ -9,6 +9,7 @@ import {
 } from '@/lib/supabase/plans'
 import { supabase } from '@/lib/supabase/client'
 import { AssignPlanSlideOver } from './AssignPlanSlideOver'
+import { ContentPlanUsageModal } from '@/components/plans/ContentPlanUsageModal'
 
 interface Props {
   tenantId: string
@@ -71,14 +72,17 @@ function PlanAccordionRow({
   plan,
   tenantId,
   onUnassigned,
+  onContentChanged,
 }: {
   plan: TenantAssignedPlan
   tenantId: string
   onUnassigned: () => void
+  onContentChanged: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [confirmUnassign, setConfirmUnassign] = useState(false)
   const [unassigning, setUnassigning] = useState(false)
+  const [usageModal, setUsageModal] = useState<{ contentId: string; contentTitle: string } | null>(null)
 
   const totalItems = plan.assessments.length + plan.courses.length
 
@@ -171,10 +175,13 @@ function PlanAccordionRow({
                           <td className="px-4 py-3 font-medium text-zinc-900">
                             <span>{item.title}</span>
                             {item.inPlanCount > 1 && (
-                              <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                              <button
+                                onClick={() => setUsageModal({ contentId: item.contentId, contentTitle: item.title })}
+                                className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 transition-colors"
+                              >
                                 <AlertTriangle className="w-3 h-3" />
                                 In {item.inPlanCount} plans
-                              </span>
+                              </button>
                             )}
                           </td>
                           <td className="px-4 py-3 text-zinc-600">{item.examType}</td>
@@ -243,6 +250,16 @@ function PlanAccordionRow({
           onCancel={() => setConfirmUnassign(false)}
           onConfirm={handleUnassign}
           loading={unassigning}
+        />
+      )}
+
+      {usageModal && (
+        <ContentPlanUsageModal
+          contentId={usageModal.contentId}
+          contentTitle={usageModal.contentTitle}
+          tenantId={tenantId}
+          onClose={() => setUsageModal(null)}
+          onRemoved={() => { setUsageModal(null); onContentChanged() }}
         />
       )}
     </>
@@ -361,6 +378,7 @@ export default function PlansTab({ tenantId }: Props) {
             plan={plan}
             tenantId={tenantId}
             onUnassigned={fetchPlans}
+            onContentChanged={fetchPlans}
           />
         ))}
       </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Trash2, FileX, BookX, Building2 } from 'lucide-react'
+import { Plus, Trash2, FileX, BookX, Building2, AlertTriangle } from 'lucide-react'
 import {
   fetchPlanAssignedAssessments,
   fetchPlanAssignedCourses,
@@ -10,6 +10,7 @@ import {
 import type { PlanDetail, PlanAssignedAssessment, PlanAssignedCourse } from '@/lib/supabase/plans'
 import { AddContentSlideOver } from './AddContentSlideOver'
 import { RemoveFromPlanModal } from './RemoveFromPlanModal'
+import { ContentPlanUsageModal } from './ContentPlanUsageModal'
 
 type Props = { plan: PlanDetail }
 
@@ -25,6 +26,7 @@ export function PlanContentTab({ plan }: Props) {
     title: string
     contentType: 'ASSESSMENT' | 'COURSE'
   } | null>(null)
+  const [usageModal, setUsageModal] = useState<{ contentId: string; contentTitle: string } | null>(null)
 
   const fetchContent = useCallback(async () => {
     setLoading(true)
@@ -140,7 +142,18 @@ export function PlanContentTab({ plan }: Props) {
                     key={item.pcmId}
                     className={idx < assessments.length - 1 ? 'border-b border-zinc-100' : ''}
                   >
-                    <td className="px-4 py-3 font-medium text-zinc-900">{item.title}</td>
+                    <td className="px-4 py-3 font-medium text-zinc-900">
+                      <span>{item.title}</span>
+                      {item.planCount > 1 && (
+                        <button
+                          onClick={() => setUsageModal({ contentId: item.contentId, contentTitle: item.title })}
+                          className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 transition-colors"
+                        >
+                          <AlertTriangle className="w-3 h-3" />
+                          In {item.planCount} plans
+                        </button>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-zinc-600">{item.examType}</td>
                     <td className="px-4 py-3 text-zinc-600">{item.assessmentType}</td>
                     <td className="px-4 py-3">
@@ -266,6 +279,16 @@ export function PlanContentTab({ plan }: Props) {
             fetchContent()
             setRemoveItem(null)
           }}
+        />
+      )}
+
+      {/* Plan usage modal — platform-wide (no tenantId) */}
+      {usageModal && (
+        <ContentPlanUsageModal
+          contentId={usageModal.contentId}
+          contentTitle={usageModal.contentTitle}
+          onClose={() => setUsageModal(null)}
+          onRemoved={() => { setUsageModal(null); fetchContent() }}
         />
       )}
     </div>
