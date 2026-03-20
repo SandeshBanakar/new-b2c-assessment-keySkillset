@@ -12,7 +12,9 @@ const MOCK_SUBSCRIBERS = [
 
 export function PlanSubscribersTab({ plan }: Props) {
   const count = plan.plan_subscribers?.subscriber_count ?? 0
-  const mrr   = plan.plan_subscribers?.mock_mrr ?? 0
+  // Active = subscribers with last login within 30 days (mock: 4 of 5 sample rows = 80%)
+  const activeCount = Math.round(count * 0.8)
+  const activePct   = count > 0 ? Math.round((activeCount / count) * 100) : 0
 
   return (
     <div className="space-y-5">
@@ -26,10 +28,12 @@ export function PlanSubscribersTab({ plan }: Props) {
           </p>
         </div>
         <div className="bg-white border border-zinc-200 rounded-md px-4 py-3">
-          <p className="text-xs text-zinc-400">MRR</p>
+          <p className="text-xs text-zinc-400">Total active</p>
           <p className="text-lg font-semibold text-zinc-900 mt-0.5">
-            ₹{mrr.toLocaleString('en-IN')}
+            {activeCount.toLocaleString('en-IN')} of {count.toLocaleString('en-IN')}{' '}
+            <span className="text-sm font-medium text-zinc-500">({activePct}%)</span>
           </p>
+          <p className="text-xs text-zinc-400 mt-0.5">last 30 days</p>
         </div>
       </div>
 

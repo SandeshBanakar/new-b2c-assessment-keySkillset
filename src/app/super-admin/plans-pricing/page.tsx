@@ -472,22 +472,24 @@ function CourseBundlePlansSection({ onCreateCoursePlan }: { onCreateCoursePlan: 
 function CoursePlansTab({ onCreateCoursePlan }: { onCreateCoursePlan: () => void }) {
   return (
     <div className="space-y-8">
-      {/* Individual Course Pricing section */}
+      {/* Tab-level controls — Create Course Plan at top-right of entire Tab 2 */}
+      <div className="flex justify-end">
+        <button
+          onClick={onCreateCoursePlan}
+          className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Create Course Plan
+        </button>
+      </div>
+
+      {/* Section A — Individual Course Pricing (no Create button here) */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-zinc-700">Individual Course Pricing</h2>
-          <button
-            onClick={onCreateCoursePlan}
-            className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Create Course Plan
-          </button>
-        </div>
+        <h2 className="text-sm font-semibold text-zinc-700 mb-4">Individual Course Pricing</h2>
         <IndividualCoursePricingSection />
       </div>
 
-      {/* Course Bundle Plans section */}
+      {/* Section B — Course Bundle Plans */}
       <div>
         <h2 className="text-sm font-semibold text-zinc-700 mb-4">Course Bundle Plans</h2>
         <CourseBundlePlansSection onCreateCoursePlan={onCreateCoursePlan} />
