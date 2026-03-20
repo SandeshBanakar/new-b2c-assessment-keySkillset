@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 5.2 | Updated: March 20, 2026
+# Version: 5.3 | Updated: March 20, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -699,7 +699,7 @@ Section              Item                  Status
 ────────────────────────────────────────────────────────
 (none)               Dashboard             Coming Soon
 Content Management   Content Bank          🟡 KSS-SA-009 pending
-Content Management   Plans & Pricing       🟡 KSS-SA-004 next
+Content Management   Plans & Pricing       ✅ KSS-SA-004 built
 Master Org           B2C Users             Coming Soon
 Master Org           Content Creators      Coming Soon
 Organisations        Tenants               ✅ KSS-SA-003 built
@@ -774,7 +774,7 @@ No Team Manager persona selector — role permanently removed from V1.
          CHECK (plan_category IN ('ASSESSMENT', 'COURSE_BUNDLE'));
     Run manually in Supabase Dashboard → SQL Editor (MCP lacks DDL perms).
 
-🟡 KSS-DB-SA-003  Courses + plans schema + B2B seeding (March 19, 2026):
+✅ KSS-DB-SA-003  Courses + plans schema + B2B seeding — DONE (March 20, 2026):
     - courses: +audience_type, +price, +currency, +is_individually_purchasable,
                +stripe_price_id
     - plans: +display_name, +tagline, +feature_bullets (jsonb), +footnote,
@@ -784,21 +784,24 @@ No Team Manager persona selector — role permanently removed from V1.
     - Insert 3 B2B plans (Akash Standard, TechCorp Premium, Enterprise Pro)
     - Seed tenant_plan_map
 
-🟡 FIX-SA-005   Tenant detail flags (March 19, 2026):
+✅ FIX-SA-005   Tenant detail flags — DONE (March 20, 2026):
     - Flag 1: EditDetailsSlideOver locale fields → IANA timezone dropdown,
               date format dropdown, country searchable combobox
     - Flag 2: Contract tab Storage & Hosting hidden for RUN_ONLY tenants
     - Flag 3: B2B plans seeded (via KSS-DB-SA-003) — Plans tab now populated
     - Sidebar: Course Creation group + Create Course item
 
-🟡 KSS-SA-009   Content Bank (unified assessments + courses table, Make Live workflow)
-🟡 KSS-SA-004   Plans & Pricing — 3-tab page (decisions finalised March 19, 2026):
+✅ KSS-SA-004   Plans & Pricing — DONE (March 20, 2026):
                Tab 1: B2C swimlane (Free/Basic/Pro/Premium) + category plans
-               Tab 2: Course Pricing à la carte (INR + USD, annual Stripe recurring)
+               Tab 2: Course Plans — Individual Course Pricing + Course Bundle Plans
                Tab 3: B2B card grid (no price shown)
-               Create B2C Plan + Create B2B Plan — tab-scoped entry points
+               Create Assessment Plan + Create Course Plan + Create B2B Plan — tab-scoped
+               Course Bundle Plans: plan_category='COURSE_BUNDLE', annual subscription,
+               platform-wide, purchasable courses allowed in bundles (Q1e=B locked)
                PRD: https://keyskillset-product-management.atlassian.net/
-                    wiki/spaces/EKSS/pages/93093890
+                    wiki/spaces/EKSS/pages/93093890 (updated to v3.1)
+
+🟡 KSS-SA-009   Content Bank (unified assessments + courses table, Make Live workflow)
 🟡 KSS-SA-005   Audit Log
 🟡 KSS-SA-006   Analytics
 🟡 KSS-SA-007   Marketing Config
