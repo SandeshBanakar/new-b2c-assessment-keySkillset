@@ -847,8 +847,8 @@ Client Admin (KSS-CA sprint, March 20, 2026):
                    - AssignSlideOver: Dept/Team/Individual targets, inserts content_assignments +
                      learner_content_access. Duplicate guard. Learner count preview.
                    - RUN_ONLY info banner: "All content provided by keySkillset..." + mailto
-                   - Source badges: "Platform Content" (GLOBAL) + "Your Organisation" (TENANT_PRIVATE)
-                     CC2 LOCKED: "Platform Content" badge shown on EVERY GLOBAL row in the table,
+                   - Source badges: "keySkillset Content" (GLOBAL) + "Your Organisation" (TENANT_PRIVATE)
+                     CC2 LOCKED: "keySkillset Content" badge shown on EVERY GLOBAL row in the table,
                      regardless of whether tenant has TENANT_PRIVATE items. Always visible.
                    - Assigned column: shows count only. On hover → tooltip shows target names
                      (locked March 22, 2026): format = "Dept / Team / User" label + name per row.
@@ -1399,7 +1399,7 @@ content_items.visibility_scope:
   PENDING_PROMOTION → V2 (push to SA global bank workflow — NOT BUILT IN V1)
 
 CA Catalog source badge rules (CC2 — locked March 22, 2026):
-  "Platform Content" badge (zinc) shown on EVERY GLOBAL row — always visible.
+  "keySkillset Content" badge (zinc) shown on EVERY GLOBAL row — always visible.
   "Your Organisation" badge (amber) shown on TENANT_PRIVATE rows.
   Rule applies regardless of whether tenant has any TENANT_PRIVATE items.
   Purpose: always clear to CA where each item originates.
@@ -1464,7 +1464,7 @@ Group          Item                 Visibility
 Organisation   Departments          All CA
 Organisation   Teams (within dept)  All CA
 Learners       Learners             All CA
-Catalog        Catalog              All CA
+Catalog        Global Catalog       All CA
 Content Bank   Content Bank         FULL_CREATOR only (hidden for RUN_ONLY)
 Reports        Reports              All CA (R3, R5, R6, R7)
 Settings       Users & Roles        All CA

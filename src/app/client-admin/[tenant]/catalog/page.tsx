@@ -83,7 +83,7 @@ function SourceBadge({ source }: { source: 'GLOBAL' | 'TENANT_PRIVATE' }) {
     </span>
   ) : (
     <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
-      Platform Content
+      keySkillset Content
     </span>
   )
 }
@@ -764,7 +764,7 @@ export default function CatalogPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-900">Content Catalog</h1>
+          <h1 className="text-xl font-semibold text-zinc-900">Global Catalog</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
             {loading ? 'Loading…' : `${items.length} items available · ${assessmentCount} assessments · ${courseCount} courses`}
           </p>
@@ -815,6 +815,22 @@ export default function CatalogPage() {
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-zinc-200 rounded-md bg-white text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
+      </div>
+
+      {/* Source badge legend */}
+      <div className="flex items-center gap-4 mb-3 text-xs text-zinc-500">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-flex items-center rounded-md px-2 py-0.5 font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
+            keySkillset Content
+          </span>
+          — added by keySkillset
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-flex items-center rounded-md px-2 py-0.5 font-medium bg-amber-50 text-amber-700 border border-amber-200">
+            Your Organisation
+          </span>
+          — added by your organisation&rsquo;s content creators
+        </span>
       </div>
 
       {/* Table */}

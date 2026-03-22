@@ -147,7 +147,7 @@ export default function ClientAdminLayout({
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Content
           </p>
-          <NavItem href={`${base}/catalog`} icon={BookOpen} label="Catalog" />
+          <NavItem href={`${base}/catalog`} icon={BookOpen} label="Global Catalog" />
           {isFullCreator && (
             <NavItem href={`${base}/content-bank`} icon={Library} label="Content Bank" />
           )}
