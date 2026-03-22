@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 5.3 | Updated: March 20, 2026
+# Version: 5.5 | Updated: March 22, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -815,12 +815,92 @@ Client Admin (KSS-CA sprint, March 20, 2026):
       certificates, client_audit_log
     - 3 TENANT_PRIVATE INACTIVE seed items for Akash Institute Delhi
     - Data fix: tenant_scope_id set + visibility_scope=GLOBAL → corrected to TENANT_PRIVATE
-✅ KSS-CA-001     CA Layout + Navigation — DONE (sidebar, persona routing, feature_toggle_mode guards)
-✅ KSS-CA-002     Organisation — DONE (Departments + Teams CRUD, learner counts, deactivate/reactivate)
-✅ KSS-CA-003     Learner Management — DONE (list, add, edit, profile slide-over, deactivate/reactivate)
-🟡 KSS-CA-004     Catalog (browse + assign to Dept/Team/Individual, dynamic membership model)
-🟡 KSS-CA-005     Content Bank (FULL_CREATOR only — INACTIVE → CA makes LIVE, archive)
+✅ KSS-CA-001     CA Layout + Navigation — DONE
+                   - Sidebar, persona routing, feature_toggle_mode guards
+                   - Bottom nav: admin user name/email from admin_users + 3-dot logout (→ /)
+                   - March 22: bottom nav fixed (was showing tenant name, now shows CA user)
+✅ KSS-CA-002     Organisation — DONE (March 20 + March 22, 2026)
+                   - Departments + Teams CRUD
+                   - Actions column (replaced kebab): Edit + Deactivate/Reactivate for depts
+                   - Teams: Add Learners + Edit + Deactivate/Reactivate in Actions column
+                   - Add Learners to Team modal: 2-step (picker → warning), unassigned learners only
+                   - Seed data: 15 Akash + 10 TechCorp learners distributed across teams
+✅ KSS-CA-003     Learner Management — DONE (March 20 + March 22, 2026)
+                   - Learner list with filter tabs + search
+                   - Add/Edit learner slide-over, profile slide-over
+                   - Actions column (replaced kebab): View Profile + Deactivate/Reactivate
+                   - Row click removed (C2 decision March 22)
+
+  ⚠️  KSS-CA-002/003 KNOWN SPEC GAPS (pending clarification — March 22, 2026):
+     1. Archive vs Deactivate: CA Sub-PRD 1 specifies ARCHIVED (permanent) status for
+        depts/teams. DB has ACTIVE|INACTIVE. We built Deactivate/Reactivate (reversible).
+        OPEN: confirm whether to rename to Archive (permanent) or keep Deactivate (reversible).
+     2. Phone required: CA Sub-PRD 2 says phone is REQUIRED for learner creation.
+        Current form has phone as optional. Pending confirmation.
+     3. Password at creation: PRD requires password + confirm at learner creation.
+        Current form does not have this. Pending confirmation for demo scope.
+     4. Learner profile: PRD says redirect to full profile PAGE after add.
+        Current UI uses slide-over. Full page at /learners/[id] not yet built.
+
+✅ KSS-CA-004     Catalog — DONE (March 22, 2026)
+                   - Browse licensed catalog (GLOBAL + TENANT_PRIVATE for FULL_CREATOR)
+                   - AssignSlideOver: Dept/Team/Individual targets, inserts content_assignments +
+                     learner_content_access. Duplicate guard. Learner count preview.
+                   - RUN_ONLY info banner: "All content provided by keySkillset..." + mailto
+                   - Source badges: "Platform Content" (GLOBAL) + "Your Organisation" (TENANT_PRIVATE)
+                     CC2 LOCKED: "Platform Content" badge shown on EVERY GLOBAL row in the table,
+                     regardless of whether tenant has TENANT_PRIVATE items. Always visible.
+                   - Assigned column: shows count only. On hover → tooltip shows target names
+                     (locked March 22, 2026): format = "Dept / Team / User" label + name per row.
+                     Capped at 5 items with "+N more". Interaction: hover tooltip (not click popover).
+
+✅ KSS-CA-004-EXT  Org page Team "View More" slide-over + Learner Profile — DONE (March 22, 2026)
+                   - View More button on each team row (teams only — Q8a=B)
+                   - TeamDetailSlideOver: two sections (Q8b=two sections)
+                     Section 1 — Learners: name (→ profile), status, joined date, "Remove from Team"
+                     Section 2 — Assigned Content: read-only, direct + inherited (dept), "via dept" tag
+                     Unassign stays on Catalog page (C7) — slide-over is read-only for content
+                   - Learner name clickable → /client-admin/[tenant]/learners/[id] (Q8d=yes)
+                   - Learner profile page built: /client-admin/[tenant]/learners/[id]/page.tsx
+                     Shows: contact/identity card, organisation card, assigned content table
+                     Actions: Deactivate / Reactivate from profile header
+                   - "View Profile" on learners list now navigates to full profile page (not slide-over)
+
+✅ KSS-CA-005     Content Bank — DONE (March 23, 2026)
+                   - FULL_CREATOR only: RUN_ONLY tenants redirected to Catalog
+                   - Source: content_items WHERE tenant_scope_id = tenantId, status IN (INACTIVE/LIVE/ARCHIVED)
+                   - Default filter: Pending Review (INACTIVE)
+                   - Filter tabs: Pending Review | Live | Archived | All
+                   - Row actions: INACTIVE → Make Live (blue-707) + Archive; LIVE → Archive; ARCHIVED → read-only
+                   - Make Live: sets status=LIVE, visibility_scope stays TENANT_PRIVATE, no audience_type
+                   - Archive: sets status=ARCHIVED
+                   - Search by title
+                   - Info callout: private content explanation (violet-50)
 🟡 KSS-CA-006     Reports (R3: Per-Learner Score, R5: Content Performance, R6: Certificates, R7: Activity Log)
+                   Prerequisite: seed mock attempts/completions data first (Q7=B decision)
+                   Sub-navigation: Learner Performance | Content Performance | Certificates | Learner Activity
+🟡 KSS-CA-007     CA Dashboard — PENDING
+                   Widgets: active learner count + seat bar, dept/team counts,
+                   catalog item count, quick links to Learners/Catalog
+✅ KSS-CA-008     Users & Roles — DONE (March 23, 2026)
+                   Single scrollable page, two sections:
+                   Section 1 — My Profile: avatar, name (editable inline), email (read-only),
+                     role badge CLIENT_ADMIN (read-only). Name edit: inline pencil → check/cancel.
+                     Email: "Contact your Super Admin" note. Role: "assigned by SA" note.
+                   Section 2 — Content Creators (FULL_CREATOR only):
+                     Table: Name (amber avatar), Email, Status badge, Interface "Coming Soon" badge,
+                     Actions: Deactivate / Reactivate with confirm modal
+                     Add Content Creator button → slide-over: Name* + Email* + Password* + Confirm*
+                     Duplicate email guard. Password UI only (no column on admin_users in V1).
+                     RUN_ONLY note: shown when not FULL_CREATOR. No CC section rendered.
+                   Locked decisions (March 23):
+                     CC actions = Deactivate/Reactivate (CQ1=A)
+                     Add CC form = Name + Email + Password + Confirm (CQ2=B)
+                     CA profile edit = Name only (CQ3=A)
+                     CC rows show "Coming Soon" badge (CQ4=A)
+                     Layout = single page, two sections (CQ5=A)
+🟡 KSS-CA-009     Audit Log — LAST (real client_audit_log data, builds as other pages write entries)
+                   Currently: placeholder page. Build after all other CA pages log events.
 🔵 KSS-CA-FUTURE-001  Content Creator interface /content-creator/[tenant]/ — FUTURE SCOPE (not scoped)
 
 B2C (pending):
@@ -870,17 +950,34 @@ BUG-002  Upgrade banner not showing after free attempt
 
 ## 23. PRD CONFLUENCE LINKS
 
-Sub-PRD 2 — Content Bank & Taxonomy (v3.0):
-  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93421571
-
-Sub-PRD 3 — Tenant, RBAC & Licensing (v2.3):
-  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93913089
-
-Sub-PRD 4 — Plans & Entitlements (v2.2):
-  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93093890
-
+### Super Admin PRDs
 Super Admin Master PRD (v2.0):
   https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/91226113
+
+SA Sub-PRD 2 — Content Bank & Taxonomy (v3.0):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93421571
+
+SA Sub-PRD 3 — Tenant, RBAC & Licensing (v2.3):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93913089
+
+SA Sub-PRD 4 — Plans & Entitlements (v2.2):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93093890
+
+### Client Admin PRDs (added March 22, 2026)
+Client Admin Master PRD (v2.0):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93552656
+
+CA Sub-PRD 1 — Org Hierarchy & RBAC:
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/95420418
+
+CA Sub-PRD 2 — Learner Management:
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/96272385
+
+CA Sub-PRD 3 — Content Assignment & Learning Paths:
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/96862209
+
+CA Sub-PRD 4 — Reporting & Analytics:
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/97452044
 
 ---
 
@@ -1301,6 +1398,12 @@ content_items.visibility_scope:
   TENANT_PRIVATE    → Tenant content. Visible in that tenant's CA Catalog + CA Content Bank only.
   PENDING_PROMOTION → V2 (push to SA global bank workflow — NOT BUILT IN V1)
 
+CA Catalog source badge rules (CC2 — locked March 22, 2026):
+  "Platform Content" badge (zinc) shown on EVERY GLOBAL row — always visible.
+  "Your Organisation" badge (amber) shown on TENANT_PRIVATE rows.
+  Rule applies regardless of whether tenant has any TENANT_PRIVATE items.
+  Purpose: always clear to CA where each item originates.
+
 CA Catalog query rules:
   FULL_CREATOR tenant:
     GLOBAL content from plans assigned to this tenant (LIVE, B2B_ONLY or BOTH, via tenant_plan_map)
@@ -1318,6 +1421,15 @@ Default filter: status = 'INACTIVE' (CA review queue)
 Make Live: sets status = 'LIVE'. visibility_scope stays TENANT_PRIVATE. No audience_type needed (not B2C).
 Archive: sets status = 'ARCHIVED'.
 Push to SA bank: V2 (PENDING_PROMOTION state — not built).
+
+### Department deactivation cascade (C6 — locked March 22, 2026)
+On dept deactivate:
+  1. Show warning modal with impact counts (N active teams, N learners affected)
+  2. On confirm: teams.status=INACTIVE for all child teams, learners.department_id=NULL +
+     learners.team_id=NULL for all learners in that dept.
+  3. Learners remain in platform — CA reassigns via Learners page.
+  Warning text format: "This will also: N active teams will be deactivated and N learners will
+    be unassigned. Learners remain in the platform — reassign them via the Learners page."
 
 ### Content Assignment Model (locked — V1)
 Targets: DEPARTMENT | TEAM | INDIVIDUAL (all three in V1)

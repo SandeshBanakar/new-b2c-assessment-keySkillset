@@ -12,11 +12,17 @@ import {
   X,
   ChevronDown,
   CheckCircle,
+  Info,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId, CA_ADMIN_USER_MAP } from '@/lib/client-admin/tenants'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface AssignmentTarget {
+  type: 'DEPARTMENT' | 'TEAM' | 'INDIVIDUAL'
+  name: string
+}
 
 interface CatalogItem {
   id: string
@@ -27,6 +33,7 @@ interface CatalogItem {
   audience_type: string | null
   source: 'GLOBAL' | 'TENANT_PRIVATE'
   assignment_count: number
+  assignment_targets: AssignmentTarget[]
 }
 
 interface Department {
@@ -72,9 +79,13 @@ function TypeBadge({ type }: { type: 'ASSESSMENT' | 'COURSE' }) {
 function SourceBadge({ source }: { source: 'GLOBAL' | 'TENANT_PRIVATE' }) {
   return source === 'TENANT_PRIVATE' ? (
     <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-      Own
+      Your Organisation
     </span>
-  ) : null
+  ) : (
+    <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
+      Platform Content
+    </span>
+  )
 }
 
 // ─── Assign slide-over ────────────────────────────────────────────────────────
@@ -505,6 +516,45 @@ function AssignSlideOver({
   )
 }
 
+// ─── Assignment tooltip ───────────────────────────────────────────────────────
+
+const TYPE_LABEL: Record<string, string> = {
+  DEPARTMENT: 'Dept',
+  TEAM: 'Team',
+  INDIVIDUAL: 'User',
+}
+
+function AssignmentTooltip({ count, targets }: { count: number; targets: AssignmentTarget[] }) {
+  const MAX_SHOWN = 5
+  const shown = targets.slice(0, MAX_SHOWN)
+  const overflow = targets.length - MAX_SHOWN
+
+  return (
+    <div className="relative inline-block group">
+      <span className="text-xs font-medium text-zinc-700 underline decoration-dotted cursor-default">
+        {count}
+      </span>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 bg-zinc-800 text-white text-xs rounded-md px-3 py-2 shadow-lg pointer-events-none min-w-[160px]">
+        {shown.map((t, i) => (
+          <div key={i} className="flex items-center gap-2 py-0.5">
+            <span className="text-zinc-400 text-[10px] uppercase tracking-wide w-10 shrink-0">
+              {TYPE_LABEL[t.type]}
+            </span>
+            <span className="truncate">{t.name}</span>
+          </div>
+        ))}
+        {overflow > 0 && (
+          <div className="text-zinc-400 pt-1 mt-1 border-t border-zinc-600">
+            +{overflow} more
+          </div>
+        )}
+        {/* Caret */}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-800" />
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CatalogPage() {
@@ -518,6 +568,19 @@ export default function CatalogPage() {
   const [filterType, setFilterType] = useState<FilterType>('ALL')
   const [search, setSearch] = useState('')
   const [assignItem, setAssignItem] = useState<CatalogItem | null>(null)
+  const [tenantMode, setTenantMode] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!tenantId) return
+    supabase
+      .from('tenants')
+      .select('feature_toggle_mode')
+      .eq('id', tenantId)
+      .single()
+      .then(({ data }) => {
+        if (data) setTenantMode(data.feature_toggle_mode)
+      })
+  }, [tenantId])
 
   const fetchCatalog = useCallback(async () => {
     if (!tenantId) { setLoading(false); return }
@@ -561,6 +624,7 @@ export default function CatalogPage() {
             audience_type: ci.audience_type,
             source: 'GLOBAL',
             assignment_count: 0,
+            assignment_targets: [],
           })
         }
       }
@@ -585,6 +649,7 @@ export default function CatalogPage() {
         audience_type: ci.audience_type,
         source: 'TENANT_PRIVATE',
         assignment_count: 0,
+        assignment_targets: [],
       })
     }
 
@@ -608,6 +673,7 @@ export default function CatalogPage() {
           audience_type: c.audience_type,
           source: 'GLOBAL',
           assignment_count: 0,
+          assignment_targets: [],
         })
       }
     }
@@ -622,20 +688,46 @@ export default function CatalogPage() {
       }
     }
 
-    // 6. Fetch assignment counts
-    const { data: assignmentCounts } = await supabase
+    // 6. Fetch assignment targets (with names for tooltip)
+    const { data: assignmentRows } = await supabase
       .from('content_assignments')
-      .select('content_id, content_type')
+      .select('content_id, target_type, target_id')
       .eq('tenant_id', tenantId)
       .is('removed_at', null)
       .in('content_id', merged.map((i) => i.id))
 
-    const countMap: Record<string, number> = {}
-    for (const a of assignmentCounts ?? []) {
-      countMap[a.content_id] = (countMap[a.content_id] ?? 0) + 1
+    const rows = assignmentRows ?? []
+    const deptIds = [...new Set(rows.filter((a) => a.target_type === 'DEPARTMENT').map((a) => a.target_id))]
+    const teamIds = [...new Set(rows.filter((a) => a.target_type === 'TEAM').map((a) => a.target_id))]
+    const learnerIds = [...new Set(rows.filter((a) => a.target_type === 'INDIVIDUAL').map((a) => a.target_id))]
+
+    const [deptRes, teamRes, learnerRes] = await Promise.all([
+      deptIds.length > 0
+        ? supabase.from('departments').select('id, name').in('id', deptIds)
+        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      teamIds.length > 0
+        ? supabase.from('teams').select('id, name').in('id', teamIds)
+        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      learnerIds.length > 0
+        ? supabase.from('learners').select('id, full_name').in('id', learnerIds)
+        : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    ])
+
+    const nameMap: Record<string, { name: string; type: 'DEPARTMENT' | 'TEAM' | 'INDIVIDUAL' }> = {}
+    for (const d of deptRes.data ?? []) nameMap[d.id] = { name: d.name, type: 'DEPARTMENT' }
+    for (const t of teamRes.data ?? []) nameMap[t.id] = { name: t.name, type: 'TEAM' }
+    for (const l of learnerRes.data ?? []) nameMap[l.id] = { name: l.full_name, type: 'INDIVIDUAL' }
+
+    const targetsByItem: Record<string, AssignmentTarget[]> = {}
+    for (const a of rows) {
+      if (!targetsByItem[a.content_id]) targetsByItem[a.content_id] = []
+      const entry = nameMap[a.target_id]
+      if (entry) targetsByItem[a.content_id].push({ type: entry.type, name: entry.name })
     }
+
     for (const item of merged) {
-      item.assignment_count = countMap[item.id] ?? 0
+      item.assignment_targets = targetsByItem[item.id] ?? []
+      item.assignment_count = item.assignment_targets.length
     }
 
     setItems(merged)
@@ -678,6 +770,23 @@ export default function CatalogPage() {
           </p>
         </div>
       </div>
+
+      {/* RUN_ONLY info banner */}
+      {tenantMode === 'RUN_ONLY' && (
+        <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-md px-4 py-3 mb-4">
+          <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-blue-700">
+            All content in this catalog is provided by keySkillset.{' '}
+            <a
+              href="mailto:contact@keyskillset.com"
+              className="font-medium underline hover:text-blue-800"
+            >
+              Contact us
+            </a>{' '}
+            to request additional content.
+          </p>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="flex items-center gap-3 mb-4">
@@ -760,9 +869,10 @@ export default function CatalogPage() {
                   </td>
                   <td className="px-5 py-3">
                     {item.assignment_count > 0 ? (
-                      <span className="text-xs font-medium text-zinc-600 bg-zinc-100 rounded-md px-2 py-0.5">
-                        {item.assignment_count} target{item.assignment_count !== 1 ? 's' : ''}
-                      </span>
+                      <AssignmentTooltip
+                        count={item.assignment_count}
+                        targets={item.assignment_targets}
+                      />
                     ) : (
                       <span className="text-xs text-zinc-400">—</span>
                     )}

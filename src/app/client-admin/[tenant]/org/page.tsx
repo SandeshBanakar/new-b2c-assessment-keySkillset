@@ -1,15 +1,21 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Building2,
   Users,
-  MoreHorizontal,
   Plus,
   ChevronRight,
   X,
   AlertTriangle,
+  Search,
+  UserPlus,
+  FileText,
+  BookOpen,
+  Layers,
+  ArrowUpRight,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId } from '@/lib/client-admin/tenants'
@@ -33,6 +39,14 @@ interface Team {
   status: 'ACTIVE' | 'INACTIVE'
   created_at: string
   learnerCount: number
+}
+
+interface CandidateLearner {
+  id: string
+  full_name: string
+  email: string
+  department_id: string | null
+  departmentName?: string
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -295,58 +309,624 @@ function ConfirmModal({
   )
 }
 
-// ─── Kebab menu ───────────────────────────────────────────────────────────────
+// ─── Add Learners modal ───────────────────────────────────────────────────────
 
-function KebabMenu({
-  onEdit,
-  onDeactivate,
-  onReactivate,
-  isActive,
+function AddLearnersModal({
+  team,
+  dept,
+  tenantId,
+  allDepts,
+  onClose,
+  onAdded,
 }: {
-  onEdit: () => void
-  onDeactivate: () => void
-  onReactivate: () => void
-  isActive: boolean
+  team: Team
+  dept: Department
+  tenantId: string
+  allDepts: Department[]
+  onClose: () => void
+  onAdded: (count: number) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState<'pick' | 'confirm'>('pick')
+  const [candidates, setCandidates] = useState<CandidateLearner[]>([])
+  const [loadingCandidates, setLoadingCandidates] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
 
-  return (
-    <div className="relative">
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
-        className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
-      >
-        <MoreHorizontal className="w-4 h-4" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-zinc-200 rounded-md shadow-lg z-20 py-1">
-            <button
-              onClick={() => { setOpen(false); onEdit() }}
-              className="w-full text-left px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
-            >
-              Edit
+  // Fetch unassigned active learners for this tenant
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from('learners')
+        .select('id, full_name, email, department_id')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'ACTIVE')
+        .is('team_id', null)
+        .order('full_name')
+      if (data) {
+        const deptMap: Record<string, string> = {}
+        allDepts.forEach((d) => { deptMap[d.id] = d.name })
+        setCandidates(data.map((l) => ({
+          ...l,
+          departmentName: l.department_id ? deptMap[l.department_id] : undefined,
+        })))
+      }
+      setLoadingCandidates(false)
+    }
+    void load()
+  }, [tenantId, allDepts])
+
+  const filtered = candidates.filter((c) => {
+    const q = search.toLowerCase()
+    return !q || c.full_name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+  })
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (selected.size === filtered.length && filtered.length > 0) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map((c) => c.id)))
+    }
+  }
+
+  const selectedLearners = candidates.filter((c) => selected.has(c.id))
+
+  async function handleConfirm() {
+    setSaving(true)
+    const ids = [...selected]
+    await supabase
+      .from('learners')
+      .update({ team_id: team.id, department_id: dept.id })
+      .in('id', ids)
+    setSaving(false)
+    onAdded(ids.length)
+  }
+
+  // ── Step 1: Picker ──────────────────────────────────────────────────────────
+  if (step === 'pick') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+        <div className="bg-white rounded-md border border-zinc-200 w-full max-w-lg mx-4 shadow-lg flex flex-col max-h-[80vh]">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-900">Add Learners</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Adding to <span className="font-medium text-zinc-700">{team.name}</span>
+              </p>
+            </div>
+            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+              <X className="w-4 h-4" />
             </button>
-            {isActive ? (
-              <button
-                onClick={() => { setOpen(false); onDeactivate() }}
-                className="w-full text-left px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
-              >
-                Deactivate
-              </button>
+          </div>
+
+          {/* Search */}
+          <div className="px-4 py-3 border-b border-zinc-100">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search learners…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-zinc-200 rounded-md bg-white text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto">
+            {loadingCandidates ? (
+              <div className="px-6 py-12 text-center text-sm text-zinc-400">Loading…</div>
+            ) : filtered.length === 0 ? (
+              <div className="px-6 py-12 flex flex-col items-center justify-center text-center">
+                <Users className="w-8 h-8 text-zinc-300 mb-3" />
+                <p className="text-sm font-medium text-zinc-500">
+                  {search ? 'No learners match your search.' : 'No unassigned learners available.'}
+                </p>
+                <p className="text-xs text-zinc-400 mt-1">
+                  {!search && 'All active learners are already assigned to a team.'}
+                </p>
+              </div>
             ) : (
-              <button
-                onClick={() => { setOpen(false); onReactivate() }}
-                className="w-full text-left px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
-              >
-                Reactivate
-              </button>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-100">
+                    <th className="px-4 py-2 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selected.size === filtered.length && filtered.length > 0}
+                        onChange={toggleAll}
+                        className="rounded border-zinc-300 accent-violet-600"
+                      />
+                    </th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                      Name
+                    </th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                      Current Dept
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {filtered.map((c) => (
+                    <tr
+                      key={c.id}
+                      onClick={() => toggleSelect(c.id)}
+                      className="cursor-pointer hover:bg-zinc-50 transition-colors"
+                    >
+                      <td className="px-4 py-2.5 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(c.id)}
+                          onChange={() => toggleSelect(c.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border-zinc-300 accent-violet-600"
+                        />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <p className="font-medium text-zinc-900">{c.full_name}</p>
+                        <p className="text-xs text-zinc-400">{c.email}</p>
+                      </td>
+                      <td className="px-4 py-2.5 text-zinc-500 text-xs">
+                        {c.departmentName ?? <span className="text-zinc-300">Unassigned</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
-        </>
-      )}
+
+          <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-100">
+            <p className="text-xs text-zinc-400">
+              {selected.size > 0 ? `${selected.size} selected` : 'Select learners to add'}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onClose}
+                className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setStep('confirm')}
+                disabled={selected.size === 0}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-violet-700 rounded-md hover:bg-violet-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Continue →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Step 2: Warning + confirm ───────────────────────────────────────────────
+  const deptChanges = selectedLearners.filter(
+    (l) => l.department_id && l.department_id !== dept.id
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-md border border-zinc-200 w-full max-w-lg mx-4 shadow-lg flex flex-col max-h-[80vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">Confirm Assignment</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              {selectedLearners.length} learner{selectedLearners.length !== 1 ? 's' : ''} → {team.name}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {deptChanges.length > 0 && (
+            <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800">
+                {deptChanges.length} learner{deptChanges.length !== 1 ? 's' : ''} will be moved
+                to <span className="font-semibold">{dept.name}</span>. Any content previously
+                assigned via their old department will be revoked.
+              </p>
+            </div>
+          )}
+
+          <table className="w-full text-sm border border-zinc-100 rounded-md overflow-hidden">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50">
+                <th className="text-left px-3 py-2 text-xs font-medium text-zinc-500">Name</th>
+                <th className="text-left px-3 py-2 text-xs font-medium text-zinc-500">Dept change</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {selectedLearners.map((l) => {
+                const deptChange = l.department_id && l.department_id !== dept.id
+                const oldDeptName = allDepts.find((d) => d.id === l.department_id)?.name
+                return (
+                  <tr key={l.id}>
+                    <td className="px-3 py-2">
+                      <p className="font-medium text-zinc-900">{l.full_name}</p>
+                      <p className="text-xs text-zinc-400">{l.email}</p>
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {deptChange ? (
+                        <span className="text-amber-700">
+                          {oldDeptName} → {dept.name}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-100">
+          <button
+            onClick={() => setStep('pick')}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+          >
+            ← Back
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-violet-700 rounded-md hover:bg-violet-800 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Adding…' : `Add ${selectedLearners.length} Learner${selectedLearners.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
     </div>
+  )
+}
+
+// ─── Team detail slide-over ───────────────────────────────────────────────────
+
+interface TeamLearner {
+  id: string
+  full_name: string
+  status: 'ACTIVE' | 'INACTIVE'
+  created_at: string
+}
+
+interface TeamContent {
+  id: string
+  title: string
+  content_type: 'ASSESSMENT' | 'COURSE'
+  assigned_at: string
+  inherited: boolean
+}
+
+function TeamDetailSlideOver({
+  team,
+  dept,
+  tenantId,
+  tenantSlug,
+  onClose,
+  onLearnerRemoved,
+}: {
+  team: Team
+  dept: Department
+  tenantId: string
+  tenantSlug: string
+  onClose: () => void
+  onLearnerRemoved: () => void
+}) {
+  const [learners, setLearners] = useState<TeamLearner[]>([])
+  const [content, setContent] = useState<TeamContent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState<TeamLearner | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+
+      // Team learners
+      const { data: rawLearners } = await supabase
+        .from('learners')
+        .select('id, full_name, status, created_at')
+        .eq('team_id', team.id)
+        .eq('tenant_id', tenantId)
+        .order('full_name')
+
+      setLearners((rawLearners ?? []) as TeamLearner[])
+
+      // Content assignments — team-direct + dept-inherited
+      const { data: teamAssignments } = await supabase
+        .from('content_assignments')
+        .select('content_id, content_type, assigned_at')
+        .eq('tenant_id', tenantId)
+        .eq('target_type', 'TEAM')
+        .eq('target_id', team.id)
+        .is('removed_at', null)
+
+      const { data: deptAssignments } = await supabase
+        .from('content_assignments')
+        .select('content_id, content_type, assigned_at')
+        .eq('tenant_id', tenantId)
+        .eq('target_type', 'DEPARTMENT')
+        .eq('target_id', dept.id)
+        .is('removed_at', null)
+
+      const allAssignments = [
+        ...((teamAssignments ?? []).map((a) => ({ ...a, inherited: false }))),
+        ...((deptAssignments ?? []).map((a) => ({ ...a, inherited: true }))),
+      ]
+
+      if (allAssignments.length === 0) {
+        setContent([])
+        setLoading(false)
+        return
+      }
+
+      const assessmentIds = allAssignments
+        .filter((a) => a.content_type === 'ASSESSMENT')
+        .map((a) => a.content_id)
+      const courseIds = allAssignments
+        .filter((a) => a.content_type === 'COURSE')
+        .map((a) => a.content_id)
+
+      const [{ data: ciRows }, { data: courseRows }] = await Promise.all([
+        assessmentIds.length > 0
+          ? supabase.from('content_items').select('id, title').in('id', assessmentIds)
+          : Promise.resolve({ data: [] }),
+        courseIds.length > 0
+          ? supabase.from('courses').select('id, title').in('id', courseIds)
+          : Promise.resolve({ data: [] }),
+      ])
+
+      const titleMap: Record<string, string> = {}
+      for (const ci of ciRows ?? []) titleMap[ci.id] = ci.title
+      for (const c of courseRows ?? []) titleMap[c.id] = c.title
+
+      // Deduplicate by content_id, prefer direct over inherited
+      const seen = new Set<string>()
+      const merged: TeamContent[] = []
+      // Direct first
+      for (const a of allAssignments.filter((x) => !x.inherited)) {
+        if (!seen.has(a.content_id) && titleMap[a.content_id]) {
+          seen.add(a.content_id)
+          merged.push({
+            id: a.content_id,
+            title: titleMap[a.content_id],
+            content_type: a.content_type as 'ASSESSMENT' | 'COURSE',
+            assigned_at: a.assigned_at,
+            inherited: false,
+          })
+        }
+      }
+      // Inherited
+      for (const a of allAssignments.filter((x) => x.inherited)) {
+        if (!seen.has(a.content_id) && titleMap[a.content_id]) {
+          seen.add(a.content_id)
+          merged.push({
+            id: a.content_id,
+            title: titleMap[a.content_id],
+            content_type: a.content_type as 'ASSESSMENT' | 'COURSE',
+            assigned_at: a.assigned_at,
+            inherited: true,
+          })
+        }
+      }
+
+      setContent(merged)
+      setLoading(false)
+    }
+    void load()
+  }, [team.id, dept.id, tenantId])
+
+  async function handleRemoveLearner(learner: TeamLearner) {
+    setRemovingId(learner.id)
+    await supabase
+      .from('learners')
+      .update({ team_id: null })
+      .eq('id', learner.id)
+    setLearners((prev) => prev.filter((l) => l.id !== learner.id))
+    setRemovingId(null)
+    setConfirmRemove(null)
+    onLearnerRemoved()
+  }
+
+  function formatDate(iso: string) {
+    return new Date(iso).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    })
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-[480px] z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-4 border-b border-zinc-200">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">{team.name}</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">{dept.name}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 mt-0.5">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center text-sm text-zinc-400">
+            Loading…
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            {/* Section 1 — Learners */}
+            <div className="px-6 py-4 border-b border-zinc-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-zinc-400" />
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                  Learners ({learners.length})
+                </p>
+              </div>
+
+              {learners.length === 0 ? (
+                <p className="text-sm text-zinc-400 text-center py-6">
+                  No learners in this team yet.
+                </p>
+              ) : (
+                <div className="space-y-px">
+                  {learners.map((l) => (
+                    <div
+                      key={l.id}
+                      className="flex items-center justify-between py-2 px-1 rounded-md hover:bg-zinc-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div>
+                          <Link
+                            href={`/client-admin/${tenantSlug}/learners/${l.id}`}
+                            className="flex items-center gap-1 text-sm font-medium text-violet-700 hover:text-violet-800 hover:underline"
+                          >
+                            {l.full_name}
+                            <ArrowUpRight className="w-3 h-3 shrink-0" />
+                          </Link>
+                          <p className="text-xs text-zinc-400 mt-0.5">
+                            Joined {formatDate(l.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
+                          l.status === 'ACTIVE'
+                            ? 'bg-green-50 text-green-700 border border-green-200'
+                            : 'bg-zinc-100 text-zinc-500 border border-zinc-200'
+                        }`}>
+                          {l.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                        </span>
+                        <button
+                          onClick={() => setConfirmRemove(l)}
+                          disabled={removingId === l.id}
+                          className="px-2 py-1 text-xs font-medium text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Section 2 — Assigned Content (read-only) */}
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Layers className="w-4 h-4 text-zinc-400" />
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                  Assigned Content ({content.length})
+                </p>
+              </div>
+
+              {content.length === 0 ? (
+                <p className="text-sm text-zinc-400 text-center py-6">
+                  No content assigned to this team.
+                </p>
+              ) : (
+                <div className="space-y-px">
+                  {content.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex items-start justify-between py-2 px-1 rounded-md hover:bg-zinc-50 transition-colors"
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <div className="mt-0.5 shrink-0">
+                          {c.content_type === 'ASSESSMENT' ? (
+                            <FileText className="w-4 h-4 text-blue-500" />
+                          ) : (
+                            <BookOpen className="w-4 h-4 text-violet-500" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-zinc-900 truncate">{c.title}</p>
+                          <p className="text-xs text-zinc-400 mt-0.5">
+                            {c.content_type === 'ASSESSMENT' ? 'Assessment' : 'Course'} ·{' '}
+                            {formatDate(c.assigned_at)}
+                            {c.inherited && (
+                              <span className="ml-1.5 text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
+                                via dept
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-zinc-400 mt-4 pt-4 border-t border-zinc-100">
+                To unassign content, go to the{' '}
+                <Link
+                  href={`/client-admin/${tenantSlug}/catalog`}
+                  className="text-violet-700 hover:underline"
+                >
+                  Catalog page
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Remove from team confirm */}
+      {confirmRemove && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-md border border-zinc-200 w-full max-w-sm mx-4 shadow-lg">
+            <div className="px-6 py-5">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900">Remove from team?</p>
+                  <p className="text-sm text-zinc-500 mt-1">
+                    <span className="font-medium">{confirmRemove.full_name}</span> will be removed
+                    from <span className="font-medium">{team.name}</span>. They will remain in{' '}
+                    {dept.name} and keep individually-assigned content.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRemoveLearner(confirmRemove)}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-rose-600 rounded-md hover:bg-rose-700 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -362,9 +942,10 @@ export default function OrgPage() {
   const [selectedDept, setSelectedDept] = useState<Department | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Modal state
   const [deptModal, setDeptModal] = useState<{ open: boolean; editing: Department | null }>({ open: false, editing: null })
   const [teamModal, setTeamModal] = useState<{ open: boolean; editing: Team | null }>({ open: false, editing: null })
+  const [addLearnersTeam, setAddLearnersTeam] = useState<Team | null>(null)
+  const [viewMoreTeam, setViewMoreTeam] = useState<Team | null>(null)
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean
     title: string
@@ -388,14 +969,12 @@ export default function OrgPage() {
 
     if (!depts) { setLoading(false); return }
 
-    // Fetch team counts per dept
     const { data: teamCounts } = await supabase
       .from('teams')
       .select('department_id')
       .eq('tenant_id', tenantId)
       .eq('status', 'ACTIVE')
 
-    // Fetch learner counts per dept
     const { data: learnerCounts } = await supabase
       .from('learners')
       .select('department_id')
@@ -419,13 +998,10 @@ export default function OrgPage() {
     }))
 
     setDepartments(enriched)
-
-    // Sync selected dept if it exists
     setSelectedDept((prev) => {
       if (!prev) return null
       return enriched.find((d) => d.id === prev.id) ?? null
     })
-
     setLoading(false)
   }, [tenantId])
 
@@ -440,7 +1016,6 @@ export default function OrgPage() {
 
     if (!rawTeams) { setTeams([]); return }
 
-    // Learner counts per team
     const { data: learnerCounts } = await supabase
       .from('learners')
       .select('team_id')
@@ -458,6 +1033,7 @@ export default function OrgPage() {
   useEffect(() => {
     void (async () => { await fetchDepartments() })()
   }, [fetchDepartments])
+
   useEffect(() => {
     void (async () => {
       if (selectedDept) await fetchTeams(selectedDept.id)
@@ -467,16 +1043,56 @@ export default function OrgPage() {
 
   // ── Department actions ─────────────────────────────────────────────────────
 
-  function handleDeactivateDept(dept: Department) {
+  async function handleDeactivateDept(dept: Department) {
+    // Fetch cascade impact before showing modal
+    const [{ data: affectedTeams }, { data: affectedLearners }] = await Promise.all([
+      supabase
+        .from('teams')
+        .select('id')
+        .eq('department_id', dept.id)
+        .eq('status', 'ACTIVE'),
+      supabase
+        .from('learners')
+        .select('id')
+        .eq('department_id', dept.id)
+        .eq('status', 'ACTIVE'),
+    ])
+
+    const teamCount = affectedTeams?.length ?? 0
+    const learnerCount = affectedLearners?.length ?? 0
+
+    const parts: string[] = []
+    if (teamCount > 0) parts.push(`${teamCount} active team${teamCount !== 1 ? 's' : ''} will be deactivated`)
+    if (learnerCount > 0) parts.push(`${learnerCount} learner${learnerCount !== 1 ? 's' : ''} will be unassigned from this department`)
+
+    const cascadeNote = parts.length > 0
+      ? `This will also: ${parts.join(' and ')}. Learners remain in the platform — reassign them via the Learners page.`
+      : `The department will no longer appear in active assignments.`
+
     setConfirmModal({
       open: true,
       title: 'Deactivate Department',
-      message: `Deactivating "${dept.name}" will not remove learners. The department will no longer appear in active assignments.`,
+      message: `Deactivate "${dept.name}"? ${cascadeNote}`,
       confirmLabel: 'Deactivate',
       destructive: true,
       onConfirm: async () => {
-        await supabase.from('departments').update({ status: 'INACTIVE' }).eq('id', dept.id)
+        const teamIds = (affectedTeams ?? []).map((t) => t.id)
+        await Promise.all([
+          // Cascade: deactivate all child teams
+          teamIds.length > 0
+            ? supabase.from('teams').update({ status: 'INACTIVE' }).in('id', teamIds)
+            : Promise.resolve(),
+          // Cascade: unassign learners from dept + team
+          supabase
+            .from('learners')
+            .update({ department_id: null, team_id: null })
+            .eq('department_id', dept.id)
+            .eq('tenant_id', tenantId ?? ''),
+          // Deactivate dept
+          supabase.from('departments').update({ status: 'INACTIVE' }).eq('id', dept.id),
+        ])
         setConfirmModal(null)
+        if (selectedDept?.id === dept.id) setSelectedDept(null)
         await fetchDepartments()
       },
     })
@@ -602,13 +1218,28 @@ export default function OrgPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <KebabMenu
-                        isActive={dept.status === 'ACTIVE'}
-                        onEdit={() => setDeptModal({ open: true, editing: dept })}
-                        onDeactivate={() => handleDeactivateDept(dept)}
-                        onReactivate={() => handleReactivateDept(dept)}
-                      />
+                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setDeptModal({ open: true, editing: dept })}
+                        className="px-2 py-1 text-xs font-medium text-zinc-600 border border-zinc-200 rounded hover:bg-zinc-50 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      {dept.status === 'ACTIVE' ? (
+                        <button
+                          onClick={() => handleDeactivateDept(dept)}
+                          className="px-2 py-1 text-xs font-medium text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors"
+                        >
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReactivateDept(dept)}
+                          className="px-2 py-1 text-xs font-medium text-violet-700 border border-violet-200 rounded hover:bg-violet-50 transition-colors"
+                        >
+                          Reactivate
+                        </button>
+                      )}
                       <ChevronRight className={`w-4 h-4 transition-colors ${
                         selectedDept?.id === dept.id ? 'text-violet-500' : 'text-zinc-300'
                       }`} />
@@ -680,7 +1311,9 @@ export default function OrgPage() {
                         <th className="text-left px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                           Status
                         </th>
-                        <th className="px-5 py-3" />
+                        <th className="text-right px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -696,13 +1329,45 @@ export default function OrgPage() {
                           <td className="px-5 py-3">
                             <StatusBadge status={team.status} />
                           </td>
-                          <td className="px-5 py-3 text-right">
-                            <KebabMenu
-                              isActive={team.status === 'ACTIVE'}
-                              onEdit={() => setTeamModal({ open: true, editing: team })}
-                              onDeactivate={() => handleDeactivateTeam(team)}
-                              onReactivate={() => handleReactivateTeam(team)}
-                            />
+                          <td className="px-5 py-3">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => setViewMoreTeam(team)}
+                                className="px-2 py-1 text-xs font-medium text-zinc-600 border border-zinc-200 rounded hover:bg-zinc-50 transition-colors"
+                              >
+                                View More
+                              </button>
+                              {team.status === 'ACTIVE' && (
+                                <button
+                                  onClick={() => setAddLearnersTeam(team)}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-violet-700 border border-violet-200 rounded hover:bg-violet-50 transition-colors"
+                                >
+                                  <UserPlus className="w-3 h-3" />
+                                  Add Learners
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setTeamModal({ open: true, editing: team })}
+                                className="px-2 py-1 text-xs font-medium text-zinc-600 border border-zinc-200 rounded hover:bg-zinc-50 transition-colors"
+                              >
+                                Edit
+                              </button>
+                              {team.status === 'ACTIVE' ? (
+                                <button
+                                  onClick={() => handleDeactivateTeam(team)}
+                                  className="px-2 py-1 text-xs font-medium text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors"
+                                >
+                                  Deactivate
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleReactivateTeam(team)}
+                                  className="px-2 py-1 text-xs font-medium text-violet-700 border border-violet-200 rounded hover:bg-violet-50 transition-colors"
+                                >
+                                  Reactivate
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -742,6 +1407,29 @@ export default function OrgPage() {
         />
       )}
 
+      {addLearnersTeam && selectedDept && tenantId && (
+        <AddLearnersModal
+          team={addLearnersTeam}
+          dept={selectedDept}
+          tenantId={tenantId}
+          allDepts={departments}
+          onClose={() => setAddLearnersTeam(null)}
+          onAdded={async (count) => {
+            setAddLearnersTeam(null)
+            // Optimistic update on team count, then re-fetch for accuracy
+            setTeams((prev) =>
+              prev.map((t) =>
+                t.id === addLearnersTeam.id
+                  ? { ...t, learnerCount: t.learnerCount + count }
+                  : t
+              )
+            )
+            await fetchTeams(selectedDept.id)
+            await fetchDepartments()
+          }}
+        />
+      )}
+
       {confirmModal?.open && (
         <ConfirmModal
           title={confirmModal.title}
@@ -750,6 +1438,20 @@ export default function OrgPage() {
           destructive={confirmModal.destructive}
           onConfirm={confirmModal.onConfirm}
           onClose={() => setConfirmModal(null)}
+        />
+      )}
+
+      {viewMoreTeam && selectedDept && tenantId && (
+        <TeamDetailSlideOver
+          team={viewMoreTeam}
+          dept={selectedDept}
+          tenantId={tenantId}
+          tenantSlug={tenantSlug}
+          onClose={() => setViewMoreTeam(null)}
+          onLearnerRemoved={async () => {
+            if (selectedDept) await fetchTeams(selectedDept.id)
+            await fetchDepartments()
+          }}
         />
       )}
     </div>

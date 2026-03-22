@@ -1,12 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import {
   Users,
   Plus,
   Search,
-  MoreHorizontal,
   X,
   AlertTriangle,
   ChevronDown,
@@ -62,9 +61,9 @@ function StatusBadge({ status }: { status: 'ACTIVE' | 'INACTIVE' }) {
   )
 }
 
-// ─── Kebab menu ───────────────────────────────────────────────────────────────
+// ─── Row actions ──────────────────────────────────────────────────────────────
 
-function KebabMenu({
+function RowActions({
   learner,
   onView,
   onDeactivate,
@@ -75,43 +74,28 @@ function KebabMenu({
   onDeactivate: () => void
   onReactivate: () => void
 }) {
-  const [open, setOpen] = useState(false)
-
   return (
-    <div className="relative">
+    <div className="flex items-center justify-end gap-1.5">
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
-        className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
+        onClick={onView}
+        className="px-2 py-1 text-xs font-medium text-zinc-600 border border-zinc-200 rounded hover:bg-zinc-50 transition-colors"
       >
-        <MoreHorizontal className="w-4 h-4" />
+        View Profile
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-zinc-200 rounded-md shadow-lg z-20 py-1">
-            <button
-              onClick={() => { setOpen(false); onView() }}
-              className="w-full text-left px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
-            >
-              View Profile
-            </button>
-            {learner.status === 'ACTIVE' ? (
-              <button
-                onClick={() => { setOpen(false); onDeactivate() }}
-                className="w-full text-left px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
-              >
-                Deactivate
-              </button>
-            ) : (
-              <button
-                onClick={() => { setOpen(false); onReactivate() }}
-                className="w-full text-left px-3 py-1.5 text-sm text-violet-700 hover:bg-violet-50 transition-colors"
-              >
-                Reactivate
-              </button>
-            )}
-          </div>
-        </>
+      {learner.status === 'ACTIVE' ? (
+        <button
+          onClick={onDeactivate}
+          className="px-2 py-1 text-xs font-medium text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors"
+        >
+          Deactivate
+        </button>
+      ) : (
+        <button
+          onClick={onReactivate}
+          className="px-2 py-1 text-xs font-medium text-violet-700 border border-violet-200 rounded hover:bg-violet-50 transition-colors"
+        >
+          Reactivate
+        </button>
       )}
     </div>
   )
@@ -443,125 +427,12 @@ function LearnerSlideOver({
   )
 }
 
-// ─── Profile slide-over (read-only + edit button) ─────────────────────────────
-
-function ProfileSlideOver({
-  learner,
-  departments,
-  allTeams,
-  onClose,
-  onEdit,
-}: {
-  learner: Learner
-  departments: Department[]
-  allTeams: Team[]
-  onClose: () => void
-  onEdit: () => void
-}) {
-  const dept = departments.find((d) => d.id === learner.department_id)
-  const team = allTeams.find((t) => t.id === learner.team_id)
-
-  function Row({ label, value }: { label: string; value: string | null | undefined }) {
-    return (
-      <div>
-        <p className="text-xs font-medium text-zinc-500">{label}</p>
-        <p className="text-sm text-zinc-900 mt-0.5">
-          {value ?? <span className="text-zinc-400">—</span>}
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-120 z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
-          <h2 className="text-sm font-semibold text-zinc-900">Learner Profile</h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onEdit}
-              className="px-3 py-1.5 text-sm font-medium text-violet-700 border border-violet-200 rounded-md hover:bg-violet-50 transition-colors"
-            >
-              Edit
-            </button>
-            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-          {/* Avatar + status */}
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center text-sm font-semibold text-violet-700">
-              {learner.full_name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
-            </div>
-            <div>
-              <p className="text-base font-semibold text-zinc-900">{learner.full_name}</p>
-              <div className="mt-1">
-                <StatusBadge status={learner.status} />
-              </div>
-            </div>
-          </div>
-
-          {/* Personal */}
-          <div>
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-              Contact
-            </p>
-            <div className="space-y-3">
-              <Row label="Email" value={learner.email} />
-              <Row label="Phone" value={learner.phone} />
-            </div>
-          </div>
-
-          {/* Organisation */}
-          <div>
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-              Organisation
-            </p>
-            <div className="space-y-3">
-              <Row label="Department" value={dept?.name} />
-              <Row label="Team" value={team?.name} />
-            </div>
-          </div>
-
-          {/* Internal */}
-          <div>
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-              Internal Fields
-            </p>
-            <div className="space-y-3">
-              <Row label="Employee Roll Number" value={learner.employee_roll_number} />
-              <Row label="Notes" value={learner.notes} />
-            </div>
-          </div>
-
-          {/* Meta */}
-          <div>
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-              Meta
-            </p>
-            <Row
-              label="Joined"
-              value={new Date(learner.created_at).toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-              })}
-            />
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function LearnersPage() {
   const params = useParams()
+  const router = useRouter()
   const tenantSlug = params.tenant as string
   const tenantId = getTenantId(tenantSlug)
 
@@ -576,7 +447,6 @@ export default function LearnersPage() {
   // Panel state
   const [addSlideOver, setAddSlideOver] = useState(false)
   const [editLearner, setEditLearner] = useState<Learner | null>(null)
-  const [profileLearner, setProfileLearner] = useState<Learner | null>(null)
   const [confirmModal, setConfirmModal] = useState<{
     title: string
     message: string
@@ -771,16 +641,14 @@ export default function LearnersPage() {
                 <th className="text-left px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                   Status
                 </th>
-                <th className="px-5 py-3" />
+                <th className="text-right px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {filtered.map((learner) => (
-                <tr
-                  key={learner.id}
-                  onClick={() => setProfileLearner(learner)}
-                  className="hover:bg-zinc-50 transition-colors cursor-pointer"
-                >
+                <tr key={learner.id} className="hover:bg-zinc-50 transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-xs font-semibold text-violet-700 shrink-0">
@@ -799,10 +667,10 @@ export default function LearnersPage() {
                   <td className="px-5 py-3">
                     <StatusBadge status={learner.status} />
                   </td>
-                  <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <KebabMenu
+                  <td className="px-5 py-3">
+                    <RowActions
                       learner={learner}
-                      onView={() => setProfileLearner(learner)}
+                      onView={() => router.push(`/client-admin/${tenantSlug}/learners/${learner.id}`)}
                       onDeactivate={() => handleDeactivate(learner)}
                       onReactivate={() => handleReactivate(learner)}
                     />
@@ -835,21 +703,6 @@ export default function LearnersPage() {
           allTeams={allTeams}
           onClose={() => setEditLearner(null)}
           onSaved={() => { setEditLearner(null); fetchData() }}
-        />
-      )}
-
-      {/* Profile slide-over */}
-      {profileLearner && !editLearner && (
-        <ProfileSlideOver
-          learner={profileLearner}
-          departments={departments}
-          allTeams={allTeams}
-          onClose={() => setProfileLearner(null)}
-          onEdit={() => {
-            const current = learners.find((l) => l.id === profileLearner.id) ?? profileLearner
-            setProfileLearner(null)
-            setEditLearner(current)
-          }}
         />
       )}
 
