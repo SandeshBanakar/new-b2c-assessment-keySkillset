@@ -842,7 +842,7 @@ Client Admin (KSS-CA sprint, March 20, 2026):
      4. Learner profile: PRD says redirect to full profile PAGE after add.
         Current UI uses slide-over. Full page at /learners/[id] not yet built.
 
-✅ KSS-CA-004     Catalog — DONE (March 22, 2026)
+✅ KSS-CA-004     Global Catalog — DONE (March 22, 2026; renamed March 23, 2026)
                    - Browse licensed catalog (GLOBAL + TENANT_PRIVATE for FULL_CREATOR)
                    - AssignSlideOver: Dept/Team/Individual targets, inserts content_assignments +
                      learner_content_access. Duplicate guard. Learner count preview.
@@ -859,7 +859,7 @@ Client Admin (KSS-CA sprint, March 20, 2026):
                    - TeamDetailSlideOver: two sections (Q8b=two sections)
                      Section 1 — Learners: name (→ profile), status, joined date, "Remove from Team"
                      Section 2 — Assigned Content: read-only, direct + inherited (dept), "via dept" tag
-                     Unassign stays on Catalog page (C7) — slide-over is read-only for content
+                     Unassign stays on Global Catalog page (C7) — slide-over is read-only for content
                    - Learner name clickable → /client-admin/[tenant]/learners/[id] (Q8d=yes)
                    - Learner profile page built: /client-admin/[tenant]/learners/[id]/page.tsx
                      Shows: contact/identity card, organisation card, assigned content table
@@ -867,7 +867,7 @@ Client Admin (KSS-CA sprint, March 20, 2026):
                    - "View Profile" on learners list now navigates to full profile page (not slide-over)
 
 ✅ KSS-CA-005     Content Bank — DONE (March 23, 2026)
-                   - FULL_CREATOR only: RUN_ONLY tenants redirected to Catalog
+                   - FULL_CREATOR only: RUN_ONLY tenants redirected to Global Catalog
                    - Source: content_items WHERE tenant_scope_id = tenantId, status IN (INACTIVE/LIVE/ARCHIVED)
                    - Default filter: Pending Review (INACTIVE)
                    - Filter tabs: Pending Review | Live | Archived | All
@@ -881,7 +881,7 @@ Client Admin (KSS-CA sprint, March 20, 2026):
                    Sub-navigation: Learner Performance | Content Performance | Certificates | Learner Activity
 🟡 KSS-CA-007     CA Dashboard — PENDING
                    Widgets: active learner count + seat bar, dept/team counts,
-                   catalog item count, quick links to Learners/Catalog
+                   catalog item count, quick links to Learners/Global Catalog
 ✅ KSS-CA-008     Users & Roles — DONE (March 23, 2026)
                    Single scrollable page, two sections:
                    Section 1 — My Profile: avatar, name (editable inline), email (read-only),
@@ -1395,16 +1395,19 @@ content_items.tenant_id:
 
 content_items.visibility_scope:
   GLOBAL            → SA content. Appears in plan content pickers. Visible via B2B plan assignment.
-  TENANT_PRIVATE    → Tenant content. Visible in that tenant's CA Catalog + CA Content Bank only.
+  TENANT_PRIVATE    → Tenant content. Visible in that tenant's CA Global Catalog + CA Content Bank only.
   PENDING_PROMOTION → V2 (push to SA global bank workflow — NOT BUILT IN V1)
 
-CA Catalog source badge rules (CC2 — locked March 22, 2026):
+CA Global Catalog source badge rules (CC2 — locked March 22, 2026; names updated March 23, 2026):
   "keySkillset Content" badge (zinc) shown on EVERY GLOBAL row — always visible.
+    (renamed from "Platform Content" — March 23, 2026)
   "Your Organisation" badge (amber) shown on TENANT_PRIVATE rows.
   Rule applies regardless of whether tenant has any TENANT_PRIVATE items.
+  Inline legend above table: "keySkillset Content — added by keySkillset |
+    Your Organisation — added by your organisation's content creators"
   Purpose: always clear to CA where each item originates.
 
-CA Catalog query rules:
+CA Global Catalog query rules:
   FULL_CREATOR tenant:
     GLOBAL content from plans assigned to this tenant (LIVE, B2B_ONLY or BOTH, via tenant_plan_map)
     + TENANT_PRIVATE LIVE content WHERE tenant_id = :this_tenant
