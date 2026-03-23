@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 6.0 | Updated: March 23, 2026
+# Version: 6.1 | Updated: March 23, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -733,7 +733,7 @@ src/app/assessments/[id]/instructions/page.tsx
 Section              Item                  Status
 ────────────────────────────────────────────────────────
 (none)               Dashboard             Coming Soon
-Content Management   Content Bank          🟡 KSS-SA-009 pending
+Content Management   Content Bank          ✅ KSS-SA-009 built
 Content Management   Plans & Pricing       ✅ KSS-SA-004 built
 Master Org           B2C Users             Coming Soon
 Master Org           Content Creators      Coming Soon
@@ -848,7 +848,17 @@ No Team Manager persona selector — role permanently removed from V1.
                - Inline confirm per-row removal (no nested modals)
                - fetchPlansContainingContent() added to plans.ts
 
-🟡 KSS-SA-009   Content Bank (unified assessments + courses table, Make Live workflow)
+✅ KSS-SA-009   Content Bank (unified assessments + courses table, Make Live workflow) — DONE (March 23, 2026):
+               - Unified table: content_items + courses in one surface
+               - Default filter: INACTIVE (SA review queue); sort by created_at desc
+               - Status tab bar with per-status counts
+               - Inline filters: type, audience, category, search
+               - Row actions: INACTIVE → Make Live + Archive; LIVE → Reclassify + Archive
+               - MakeLiveModal: metadata summary + audience radio + eligible plan preview
+               - ReclassifyModal: stays-in / removed-from preview; auto-removes incompatible pcm rows
+               - ArchiveModal: removes from all plans + sets ARCHIVED
+               - src/lib/supabase/content-bank.ts: data layer
+               - src/components/content-bank/: MakeLiveModal + ReclassifyModal
 🟡 KSS-SA-005   Audit Log
 🟡 KSS-SA-006   Analytics
 🟡 KSS-SA-007   Marketing Config
