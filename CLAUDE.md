@@ -183,7 +183,8 @@ id (uuid), tenant_id (uuid), full_name (text), email (text),
 phone (text nullable), department_id (uuid nullable FK → departments),
 team_id (uuid nullable FK → teams), status (text — ACTIVE|INACTIVE),
 employee_roll_number (text nullable), notes (text nullable),
-created_by (uuid nullable), created_at (timestamptz)
+created_by (uuid nullable), created_at (timestamptz),
+last_active_at (timestamptz nullable — added KSS-DB-CA-002, March 23, 2026)
 NOTE: employee_roll_number + notes + created_by already exist directly on learners.
 learner_profiles table was also created by KSS-DB-CA-001 — use learner_profiles for
 any additional B2B-specific fields; but employee_roll_number/notes live on learners.
@@ -195,6 +196,15 @@ team_manager_id (uuid nullable), status (text — ACTIVE|INACTIVE), created_at (
 ### teams table — confirmed live columns (verified March 20, 2026 via REST API)
 id (uuid), department_id (uuid FK → departments), tenant_id (uuid),
 name (text), status (text — ACTIVE|INACTIVE), created_at (timestamptz)
+
+### learner_attempts table — KSS-DB-CA-002 (March 23, 2026)
+id (uuid PK), learner_id (uuid FK → learners), content_id (uuid),
+content_type (text — ASSESSMENT|COURSE), tenant_id (uuid FK → tenants),
+score_pct (numeric 5,2 — 0–100), passed (boolean),
+attempted_at (timestamptz), time_taken_seconds (integer nullable)
+Pass threshold convention: ASSESSMENT >= 60% | COURSE = 100% completion
+B2B only — separate from B2C `attempts` table (which uses user_id).
+50 seed rows for Akash Institute Delhi across 15 learners × 9 content items.
 
 ### Client Admin Tables (V1 — KSS-DB-CA-001, authorised March 20, 2026)
 learner_profiles   — B2B extension per learner: employee_roll_number, notes
@@ -877,8 +887,12 @@ Client Admin (KSS-CA sprint, March 20, 2026):
                    - Search by title
                    - Info callout: private content explanation (violet-50)
 🟡 KSS-CA-006     Reports (R3: Per-Learner Score, R5: Content Performance, R6: Certificates, R7: Activity Log)
-                   Prerequisite: seed mock attempts/completions data first (Q7=B decision)
+                   DB: KSS-DB-CA-002 DONE (March 23, 2026) — learner_attempts table + last_active_at +
+                       50 attempt rows + 9 certificates + 15 learner activity timestamps seeded
                    Sub-navigation: Learner Performance | Content Performance | Certificates | Learner Activity
+                   Layout: 4 tabs on single /reports page (Q4=A)
+                   CSV export: client-side download per report (Q5=A)
+                   Pass threshold: ASSESSMENT >= 60% | COURSE = 100%
 🟡 KSS-CA-007     CA Dashboard — PENDING
                    Widgets: active learner count + seat bar, dept/team counts,
                    catalog item count, quick links to Learners/Global Catalog
