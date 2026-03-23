@@ -289,16 +289,21 @@ export default function B2CUserProfilePage() {
   const [error, setError] = useState<string | null>(null)
 
   async function loadUser() {
-    const [u, att, cp] = await Promise.all([
-      fetchB2CUser(id),
-      fetchUserAttempts(id),
-      fetchUserCourseProgress(id),
-    ])
-    setUser(u)
-    setAttempts(att)
-    setSummary(computeAssessmentSummary(att))
-    setCourseProgress(cp)
-    setLoading(false)
+    try {
+      const [u, att, cp] = await Promise.all([
+        fetchB2CUser(id),
+        fetchUserAttempts(id),
+        fetchUserCourseProgress(id),
+      ])
+      setUser(u)
+      setAttempts(att)
+      setSummary(computeAssessmentSummary(att))
+      setCourseProgress(cp)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load profile.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { loadUser() }, [id])
