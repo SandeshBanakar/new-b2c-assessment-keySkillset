@@ -886,13 +886,14 @@ Client Admin (KSS-CA sprint, March 20, 2026):
                    - Archive: sets status=ARCHIVED
                    - Search by title
                    - Info callout: private content explanation (violet-50)
-🟡 KSS-CA-006     Reports (R3: Per-Learner Score, R5: Content Performance, R6: Certificates, R7: Activity Log)
-                   DB: KSS-DB-CA-002 DONE (March 23, 2026) — learner_attempts table + last_active_at +
-                       50 attempt rows + 9 certificates + 15 learner activity timestamps seeded
-                   Sub-navigation: Learner Performance | Content Performance | Certificates | Learner Activity
-                   Layout: 4 tabs on single /reports page (Q4=A)
-                   CSV export: client-side download per report (Q5=A)
-                   Pass threshold: ASSESSMENT >= 60% | COURSE = 100%
+✅ KSS-CA-006     Reports — DONE (March 23, 2026)
+                   4 tabs on single /reports page: Learner Performance | Content Performance | Certificates | Learner Activity
+                   DB: KSS-DB-CA-002 — learner_attempts table + last_active_at on learners
+                       50 attempt rows + 9 certificates + 15 activity timestamps seeded
+                   Per-tab CSV export (client-side Blob download, UTF-8 BOM for Excel)
+                   Pass threshold: ASSESSMENT >= 60% | COURSE = 100% (completion)
+                   R7 dormancy: null/>=30d = rose-600, >=14d = amber-700
+                   R5 sort: pass_rate ascending (worst performers first — most actionable)
 🟡 KSS-CA-007     CA Dashboard — PENDING
                    Widgets: active learner count + seat bar, dept/team counts,
                    catalog item count, quick links to Learners/Global Catalog
