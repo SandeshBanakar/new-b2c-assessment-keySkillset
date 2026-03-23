@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 5.5 | Updated: March 22, 2026
+# Version: 6.0 | Updated: March 23, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -134,6 +134,26 @@ id (uuid PK), tenant_id (uuid FK → tenants), plan_id (uuid FK → plans),
 created_at (timestamptz DEFAULT now())
 Purpose: assigns B2B plans to tenants. Plans tab queries through this.
 RLS: OFF (consistent with all Super Admin tables).
+
+### plan_subscribers table — confirmed columns (March 23, 2026)
+id (uuid PK), plan_id (uuid FK → plans), subscriber_count (integer DEFAULT 0),
+updated_at (timestamptz DEFAULT now())
+NOTE: mock_mrr column was DROPPED (KSS-DB-SA-006, March 23, 2026).
+MRR is ALWAYS computed: plan.price × subscriber_count (never stored).
+Only B2C plans have rows in plan_subscribers. B2B plans: price=0, billing via contract.
+
+### Subscriber count — Demo vs Production (locked — March 23, 2026)
+Demo (current): subscriber_count is seeded static data.
+  Active subscriber count = Math.round(subscriber_count * 0.8) — computed in UI, no DB column.
+Phase 1 (V1 production): ADD COLUMN active_subscriber_count integer DEFAULT 0 to plan_subscribers.
+  Updated by AWS scheduled job (daily): queries Stripe API for active subscriptions per plan,
+  cross-references auth.users.last_sign_in_at for recency. No subscriptions table in Phase 1.
+Phase 2 (V2): Individual subscriptions table with Stripe fields (see Section 32).
+
+### plan_content_map — polymorphic content_id (KSS-DB-SA-005, March 23, 2026)
+plan_content_map.content_item_id FK was DROPPED (no longer references content_items.id).
+content_id is now polymorphic — references either content_items.id (ASSESSMENT)
+or courses.id (COURSE) based on content_type column. No FK constraint.
 
 ### Content table join path (locked)
 Plan content uses content_items table (NOT assessments table).
@@ -435,10 +455,15 @@ On expand → shows content accordion inside:
   Assessment sub-section:
     Columns: TITLE | CATEGORY | TYPE | STATUS (LIVE badge green-600)
     Duplicate badge: ⚠ In N plans (amber-600, amber-50 bg, amber-200 border)
-      Shown when same item appears in multiple plans for this tenant.
-      Informational only. No blocking.
+      Shown when item.inPlanCount > 1 (same content in multiple plans for this tenant).
+      Clickable → ContentPlanUsageModal (tenant-scoped, tenantId passed as prop).
+      Modal shows all plans containing the item for this tenant, with remove action per row.
   Course sub-section:
-    BookOpen icon + "Courses module coming soon" placeholder
+    Columns: TITLE | TYPE | STATUS (LIVE badge green-600)
+    Empty state: BookOpen icon + "No courses in this plan."
+    Data: plan_content_map WHERE content_type='COURSE' → courses table
+    Duplicate badge: same amber badge pattern as assessments (inPlanCount > 1)
+    — badge shows ⚠ In N plans, clickable → ContentPlanUsageModal (tenant-scoped)
 
 ### Assign Plan Slide-Over (AssignPlanSlideOver.tsx — BUILD THIS)
   Pattern: right-side panel, 480px wide
@@ -801,15 +826,27 @@ No Team Manager persona selector — role permanently removed from V1.
     - Flag 3: B2B plans seeded (via KSS-DB-SA-003) — Plans tab now populated
     - Sidebar: Course Creation group + Create Course item
 
-✅ KSS-SA-004   Plans & Pricing — DONE (March 20, 2026):
-               Tab 1: B2C swimlane (Free/Basic/Pro/Premium) + category plans
-               Tab 2: Course Plans — Individual Course Pricing + Course Bundle Plans
-               Tab 3: B2B card grid (no price shown)
-               Create Assessment Plan + Create Course Plan + Create B2B Plan — tab-scoped
-               Course Bundle Plans: plan_category='COURSE_BUNDLE', annual subscription,
-               platform-wide, purchasable courses allowed in bundles (Q1e=B locked)
-               PRD: https://keyskillset-product-management.atlassian.net/
-                    wiki/spaces/EKSS/pages/93093890 (updated to v3.1)
+✅ KSS-SA-004   Plans & Pricing — DONE (March 23, 2026 — restructured from 3→4 tabs):
+               Tab 1: Assessment Plans — B2C swimlane (Free/Basic/Pro/Premium) + category plans
+               Tab 2: Single Course Plan — inline pricing for LIVE B2C courses (toggle for purchasable)
+               Tab 3: Course Bundle Plans — card grid + "Create Bundle Plan" button
+               Tab 4: B2B Plans — card grid (no price shown)
+               KSS-DB-SA-005: plan_content_map FK dropped (polymorphic content_id)
+               KSS-DB-SA-006: plan_subscribers.mock_mrr dropped — MRR computed from price × subscribers
+
+✅ KSS-FIX-plans-pricing-4tab  Plans & Pricing fixes — DONE (March 23, 2026):
+               - 4-tab restructure: Single Course Plan tab + Course Bundle Plans tab
+               - Tailwind toggle switch replacing raw checkbox for is_individually_purchasable
+               - Removed duplicate "Create Bundle Plan" button from empty state
+               - Renamed "Create Course Plan" → "Create Bundle Plan"
+               - Removed all mock_mrr references — MRR computed in UI
+
+✅ KSS-FIX-content-plan-usage-modal  ContentPlanUsageModal — DONE (March 22–23, 2026):
+               - ContentPlanUsageModal component built + wired in PlansTab (tenant-scoped)
+                 and PlanContentTab (platform-wide)
+               - Amber duplicate badge clickable → opens modal
+               - Inline confirm per-row removal (no nested modals)
+               - fetchPlansContainingContent() added to plans.ts
 
 🟡 KSS-SA-009   Content Bank (unified assessments + courses table, Make Live workflow)
 🟡 KSS-SA-005   Audit Log
@@ -940,26 +977,19 @@ BUG-002  Upgrade banner not showing after free attempt
 
 ## 22. OPEN DECISIONS (do not resolve without product owner confirmation)
 
-1.  questions table (B2C) vs content_items (SA) — merge or keep separate
-2.  Supabase vs AWS RDS migration — pending engineering decision
-3.  Client Admin routes build sprint — pending
-4.  ~~Course Store~~ — CLOSED: removed from scope entirely
-5.  Licensed Categories sync between tenant + contract — update save logic
-6.  Confluence MCP for PRD updates — handled in Claude Code sessions
-7.  ~~FIX-SA-003-MODAL-PLANS~~ — CLOSED: Plans tab is now active surface
-8.  ~~courses table schema~~ — CLOSED: confirmed via KSS-DB-SA-001
-9.  ~~plan_content_map~~ — CLOSED: single discriminator table confirmed
-10. ~~Sub-PRD 4~~ — CLOSED: updated to v2.2 March 18, 2026
-11. CA self-serve plan assignment (V2 deferred — SA-curated model in V1)
-12. B2B Stripe integration (V2 — billing via contract in V1)
-13. V2 DEFERRED: Assessments and courses in one plan — a single B2C/B2B plan
-    will contain both assessment content AND course content together.
-    Currently: assessments and courses are managed separately within plans.
-    Do not build. Do not reference in V1 code.
-14. Course à la carte + plan subscription coexistence — if a course is
-    is_individually_purchasable = true, can a subscriber who has it in their
-    plan retain access after unsubscribing? Not resolved for V1.
-    Gate is: purchasable courses cannot be IN plans (mutually exclusive in V1).
+1.  questions table (B2C) vs content_items (SA) — merge or keep separate.
+    B2C exam questions currently live in src/data/exams/ (static). SA content_items
+    is the structured bank. Merge path unclear until B2C exam creation surface is scoped.
+
+2.  Licensed Categories sync between tenant + contract — update save logic.
+    licensed_categories column on both tenants and contracts is metadata only.
+    When edited in one location, it currently does NOT sync to the other.
+    Engineering decision needed: single source of truth vs separate editable fields.
+
+3.  Course à la carte + plan subscription coexistence post-unsubscribe.
+    If a course is is_individually_purchasable = true and a learner unsubscribes from a
+    plan that included it, do they retain access? Not resolved for V1.
+    Current gate: purchasable courses cannot be in subscription plans (mutually exclusive V1).
 
 ---
 
@@ -1163,12 +1193,17 @@ Otherwise: require individual promotion.
 
 ---
 
-## 28. PLANS & PRICING PAGE SPEC (KSS-SA-004)
+## 28. PLANS & PRICING PAGE SPEC (KSS-SA-004 — updated March 23, 2026)
 
-Route: /super-admin/plans-pricing (existing route, 3-tab structure)
+Route: /super-admin/plans-pricing (4-tab structure — updated from 3 tabs March 23, 2026)
 Page subtitle: "Manage B2C and B2B subscription plans and content entitlements"
-MRR strip: Total Platform MRR shown at top (global, covers all B2C plans)
-Header: NO global "+ Create Plan" button. Create buttons live inside each tab.
+Header: NO global "+ Create Plan" button. Create buttons are tab-scoped.
+
+### 4-Tab Structure (locked March 23, 2026)
+Tab 1: Assessment Plans   — B2C swimlane + category plans + "Create Assess Plan" button
+Tab 2: Single Course Plan — inline pricing table for LIVE B2C courses (no create button)
+Tab 3: Course Bundle Plans — bundle plan list + "Create Bundle Plan" button top-right
+Tab 4: B2B Plans          — card grid + "Create B2B Plan" button in info strip
 
 ### Tab 1 — Assessment Plans (B2C)
 MRR strip: shown INSIDE Tab 1 only (not above the tabs — removed from page header area).
@@ -1200,29 +1235,37 @@ Create: "Create B2C Plan" button (blue-700, top-right of Tab 1)
   → /super-admin/plans-pricing/new?audience=B2C
   Creates assessment subscription plans ONLY. No course plans. (Option Z — locked)
 
-### Tab 2 — Course Plans (renamed from "Course Pricing" — March 20, 2026)
-Tab name: "Course Plans". Two sections inside:
+### Tab 2 — Single Course Plan (locked March 23, 2026)
+Tab name: "Single Course Plan". No Create button on this tab.
+Purpose: SA sets pricing for individually purchasable LIVE B2C courses inline.
+No plan record is created — these fields live directly on the courses table.
 
-#### Section A — Individual Course Pricing (top)
 Layout: Table of LIVE B2C courses (audience_type = B2C_ONLY or BOTH only — no NULL/INACTIVE)
 Columns: Course | Type | Price (₹) | Purchasable | Stripe Price ID | Actions
-SA edits per course row inline:
-  price (INR) | is_individually_purchasable | stripe_price_id
+SA edits per course row inline (Edit button → save/cancel inline):
+  price (INR) | is_individually_purchasable (toggle switch) | stripe_price_id
 stripe_price_id = recurring ANNUAL Stripe Price ID (managed by Stripe, not the platform)
 Empty state: "No courses available for pricing. Promote courses to Live in the Content Bank first."
+
+Toggle switch (is_individually_purchasable): pill/thumb toggle — bg-blue-700 on, bg-zinc-300 off.
+  Read view: Yes badge (emerald) or No badge (zinc). Never a raw checkbox.
 
 GATE (locked): A course with is_individually_purchasable = true cannot be assigned
   to any B2C subscription plan.
   In AddContentSlideOver (course picker): show purchasable courses greyed out with
   tooltip: "This course is sold individually and cannot be added to a plan."
 
-#### Section B — Course Bundle Plans (bottom)
+### Tab 3 — Course Bundle Plans (locked March 23, 2026)
+Tab name: "Course Bundle Plans". "Create Bundle Plan" button top-right.
+Description: Annual B2C plans containing curated course collections.
+
 Layout: Table rows
 Columns: Plan Name | Display Name | Price (₹/year) | Courses | Status | Actions (View)
-"Create Course Plan" button at top-right of entire Tab 2.
-Empty state in section B: shows Create Course Plan button inline.
+Empty state: LayoutGrid icon + "No bundle plans yet." + descriptive text (no duplicate button).
+Create button at top-right of tab header area ONLY — NOT in empty state.
 
-#### Create Course Plan form (/new?audience=B2C&category=COURSE_BUNDLE)
+#### Create Bundle Plan form (/new?audience=B2C&category=COURSE_BUNDLE)
+Page title: "Create Bundle Plan"
 plan_category = 'COURSE_BUNDLE', plan_audience = 'B2C', scope = 'PLATFORM_WIDE' (always)
 Sections:
   1. Plan Identity: name*, display_name, description, tagline
@@ -1244,16 +1287,14 @@ Sections:
   Overview tab: Name, Display Name, Tagline, Scope, Price (₹/year), Billing Cycle
   Content tab: courses only (add/remove same mechanism as assessment plans)
 
-No "Create" button on Tab 2 for individual course pricing rows (SA edits inline only).
-
-### Tab 3 — B2B Plans
+### Tab 4 — B2B Plans
 Layout: Card grid
 Each card: Plan Name | Assigned Tenants count | Content Items count | Status badge
 No price shown anywhere on B2B cards.
 Note at section top: "B2B plan pricing is managed per-tenant via the Contract tab."
 Actions per card: "View" → plan detail page (/super-admin/plans-pricing/[id])
 
-Create: "Create B2B Plan" button (blue-700, top-right of Tab 3)
+Create: "Create B2B Plan" button (blue-700, inside info strip right side of Tab 4)
   → /super-admin/plans-pricing/new?audience=B2B
 
 ### Create B2C Plan form (/new?audience=B2C)
@@ -1594,7 +1635,73 @@ VALUES
 
 ---
 
-*CLAUDE.md — keySkillset v5.0 — Updated March 20, 2026*
+## 32. SUBSCRIBER COUNT SPEC — PHASES (locked March 23, 2026)
+
+### Current: Demo (Supabase)
+plan_subscribers has: id, plan_id, subscriber_count, updated_at.
+subscriber_count is seeded static data (demo only).
+Active count displayed in UI = Math.round(subscriber_count * 0.8) — computed, not stored.
+MRR displayed = plan.price × subscriber_count — computed, never stored.
+
+DB: Supabase (demo). Production: AWS (confirmed — engineering team decides the AWS DB service).
+
+### Phase 1 (V1 Production — engineering requirement, NOT in demo)
+ADD COLUMN active_subscriber_count integer DEFAULT 0 to plan_subscribers.
+AWS background job (daily):
+  1. Query Stripe API → active subscriptions per plan
+  2. Cross-reference auth users' last_sign_in_at for recency
+  3. UPDATE plan_subscribers SET active_subscriber_count = [count], updated_at = now()
+No individual subscriptions table in Phase 1.
+MRR still computed: plan.price × subscriber_count.
+
+### Phase 2 (V2 Production — engineering requirement, NOT in demo)
+Individual subscriptions table:
+  id (uuid PK)
+  user_id (uuid FK → auth.users)
+  plan_id (uuid FK → plans)
+  stripe_subscription_id (text)
+  stripe_customer_id (text)
+  stripe_price_id (text)
+  status (text — ACTIVE | CANCELLED | PAST_DUE | TRIALING)
+  subscribed_at (timestamptz)
+  last_sign_in_at (timestamptz)
+  cancelled_at (timestamptz nullable)
+
+Note: Master PRD calls this "UserSubscription" — our table is named `subscriptions`.
+Active subscriber count = live SQL query on subscriptions WHERE status = 'ACTIVE'.
+MRR = live SQL: SUM(plans.price) for active subscriptions per plan.
+
+---
+
+## 33. CONTENT PLAN USAGE MODAL SPEC (KSS-FIX-content-plan-usage-modal)
+
+Component: src/components/plans/ContentPlanUsageModal.tsx
+Purpose: When SA clicks the ⚠ "In N plans" amber badge on a content item, this modal
+  shows all plans that contain that content item, and allows removing from any plan.
+
+Props:
+  contentId: string       — the content_items.id or courses.id
+  contentTitle: string    — shown in header
+  tenantId?: string       — if present: tenant-scoped (PlansTab); if absent: platform-wide (PlanContentTab)
+  onClose: () => void
+  onRemoved: () => void   — called when at least one removal happens; triggers parent refetch
+
+Data: fetchPlansContainingContent(contentId, tenantId?)
+  If tenantId: JOINs tenant_plan_map to scope plans to this tenant
+  If no tenantId: returns all plans platform-wide
+
+Columns: Plan Name | Audience badge | Status badge | Remove (trash icon)
+Inline confirm per row: clicking trash shows "Remove from [plan]?" with Cancel + Confirm
+  No nested modals. Confirm calls removeContentFromPlan(pcmId).
+After removal: filters local state. Auto-closes when < 2 plans remain (no more "in multiple" state).
+
+Used in:
+  PlansTab.tsx → tenantId passed (tenant-scoped: only shows plans this tenant has)
+  PlanContentTab.tsx → no tenantId (platform-wide: all plans containing this content)
+
+---
+
+*CLAUDE.md — keySkillset v6.0 — Updated March 23, 2026*
 *Source of truth for Claude Code sessions*
 *PRD updates: use Confluence MCP tools in Claude Code or Claude.ai*
 *Do not edit this file manually*
