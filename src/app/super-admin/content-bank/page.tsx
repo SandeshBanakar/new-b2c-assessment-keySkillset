@@ -304,7 +304,7 @@ export default function ContentBankPage() {
           <table className="w-full text-sm">
             <thead className="bg-zinc-50 border-b border-zinc-200">
               <tr>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 w-2/5">TITLE</th>
+                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 w-1/4">TITLE</th>
                 <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">TYPE</th>
                 <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">CATEGORY</th>
                 <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">STATUS</th>
@@ -323,8 +323,8 @@ export default function ContentBankPage() {
                   }`}
                 >
                   {/* Title */}
-                  <td className="px-4 py-3 font-medium text-zinc-900 leading-snug">
-                    {item.title}
+                  <td className="px-4 py-3 font-medium text-zinc-900 max-w-0">
+                    <span className="block truncate" title={item.title}>{item.title}</span>
                   </td>
 
                   {/* Type badge */}
@@ -379,19 +379,19 @@ export default function ContentBankPage() {
                   </td>
 
                   {/* Actions */}
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 min-w-42">
                     <div className="flex items-center gap-2 justify-end">
                       {item.status === 'INACTIVE' && (
                         <>
                           <button
                             onClick={() => setMakeLiveItem(item)}
-                            className="text-xs font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md px-2.5 py-1 transition-colors"
+                            className="text-xs font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md px-2.5 py-1 transition-colors whitespace-nowrap"
                           >
                             Make Live
                           </button>
                           <button
                             onClick={() => setArchiveItem(item)}
-                            className="text-xs font-medium text-zinc-600 border border-zinc-200 rounded-md px-2.5 py-1 hover:bg-zinc-50 transition-colors"
+                            className="text-xs font-medium text-zinc-600 border border-zinc-200 rounded-md px-2.5 py-1 hover:bg-zinc-50 transition-colors whitespace-nowrap"
                           >
                             Archive
                           </button>
@@ -402,13 +402,13 @@ export default function ContentBankPage() {
                         <>
                           <button
                             onClick={() => setReclassifyItem(item)}
-                            className="text-xs font-medium text-zinc-600 border border-zinc-200 rounded-md px-2.5 py-1 hover:bg-zinc-50 transition-colors"
+                            className="text-xs font-medium text-zinc-600 border border-zinc-200 rounded-md px-2.5 py-1 hover:bg-zinc-50 transition-colors whitespace-nowrap"
                           >
                             Reclassify
                           </button>
                           <button
                             onClick={() => setArchiveItem(item)}
-                            className="text-xs font-medium text-zinc-600 border border-zinc-200 rounded-md px-2.5 py-1 hover:bg-zinc-50 transition-colors"
+                            className="text-xs font-medium text-zinc-600 border border-zinc-200 rounded-md px-2.5 py-1 hover:bg-zinc-50 transition-colors whitespace-nowrap"
                           >
                             Archive
                           </button>
