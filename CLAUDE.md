@@ -996,17 +996,26 @@ BUG-002  Upgrade banner not showing after free attempt
 ## 23. PRD CONFLUENCE LINKS
 
 ### Super Admin PRDs
-Super Admin Master PRD (v2.0):
+Super Admin Master PRD (page 91226113):
   https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/91226113
 
-SA Sub-PRD 2 — Content Bank & Taxonomy (v3.0):
+SA Sub-PRD 1 — Side Navigation Structure (page 98664450):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/98664450
+
+SA Sub-PRD 2 — Content Bank & Taxonomy (page 93421571):
   https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93421571
 
-SA Sub-PRD 3 — Tenant, RBAC & Licensing (v2.3):
+SA Sub-PRD 3 — Tenant, RBAC & Licensing (page 93913089):
   https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93913089
 
-SA Sub-PRD 4 — Plans & Entitlements (v2.2):
+SA Sub-PRD 4 — Plans & Entitlements (page 93093890):
   https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93093890
+
+SA Sub-PRD 5 — Marketing & Config (page 93323269):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93323269
+
+SA Sub-PRD 6 — Analytics & Reporting (page 94928898):
+  https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/94928898
 
 ### Client Admin PRDs (added March 22, 2026)
 Client Admin Master PRD (v2.0):
