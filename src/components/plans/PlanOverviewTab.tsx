@@ -124,7 +124,7 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
             ]
           : [
               { label: 'Subscribers', value: plan.plan_subscribers?.subscriber_count ?? 0 },
-              { label: 'MRR',         value: `₹${(plan.plan_subscribers?.mock_mrr ?? 0).toLocaleString('en-IN')}` },
+              { label: 'MRR',         value: `₹${((plan.plan_subscribers?.subscriber_count ?? 0) * plan.price).toLocaleString('en-IN')}` },
               { label: 'Price',       value: plan.price === 0 ? 'Free' : `₹${plan.price}/mo` },
             ]
         ).map((item) => (

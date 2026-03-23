@@ -19,7 +19,7 @@ import { PlanStatusBadge } from '@/components/plans/PlanStatusBadge'
 import { PlanTypeBadge } from '@/components/plans/PlanTypeBadge'
 import { EditPlanSlideOver } from '@/components/plans/EditPlanSlideOver'
 
-type Tab = 'assessment-plans' | 'course-plans' | 'b2b-plans'
+type Tab = 'assessment-plans' | 'single-course-plan' | 'course-bundle-plans' | 'b2b-plans'
 
 // Tier column order for the B2C swimlane — maps tier DB value to display label
 const B2C_TIERS = [
@@ -100,7 +100,7 @@ function PlanColumn({
         {sub?.subscriber_count ?? 0}
       </div>
       <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
-        {formatINR(sub?.mock_mrr ?? 0)}
+        {formatINR((plan.price ?? 0) * (sub?.subscriber_count ?? 0))}
       </div>
       <div className="px-4 h-11 flex items-center justify-center">
         <PlanStatusBadge status={plan.status} />
@@ -145,7 +145,7 @@ function AssessmentPlansTab({
   const planByTier = (tier: string) => platformPlans.find((p) => p.tier === tier)
 
   const b2cMRR = b2cPlans.reduce(
-    (sum, p) => sum + (p.plan_subscribers?.mock_mrr ?? 0),
+    (sum, p) => sum + (p.price ?? 0) * (p.plan_subscribers?.subscriber_count ?? 0),
     0
   )
 
@@ -231,7 +231,7 @@ function AssessmentPlansTab({
                         {plan.price === 0 ? 'Free' : `${formatINR(plan.price)}/mo`}
                       </td>
                       <td className="px-4 py-3 text-right text-zinc-600">{sub?.subscriber_count ?? 0}</td>
-                      <td className="px-4 py-3 text-right text-zinc-600">{formatINR(sub?.mock_mrr ?? 0)}</td>
+                      <td className="px-4 py-3 text-right text-zinc-600">{formatINR((plan.price ?? 0) * (sub?.subscriber_count ?? 0))}</td>
                       <td className="px-4 py-3 text-right"><PlanStatusBadge status={plan.status} /></td>
                       <td className="px-4 py-3 text-right"><PlanTypeBadge type={derivePlanType(plan.scope)} /></td>
                       <td className="px-4 py-3 text-right text-zinc-600">{plan.max_attempts_per_assessment ?? '—'}</td>
@@ -343,11 +343,19 @@ function IndividualCoursePricingSection() {
                       />
                     </td>
                     <td className="px-4 py-2 text-center">
-                      <input
-                        type="checkbox" checked={editDraft.is_individually_purchasable ?? false}
-                        onChange={(e) => setEditDraft((d) => ({ ...d, is_individually_purchasable: e.target.checked }))}
-                        className="accent-blue-700 w-4 h-4"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditDraft((d) => ({ ...d, is_individually_purchasable: !(d.is_individually_purchasable ?? false) }))}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                          (editDraft.is_individually_purchasable ?? false) ? 'bg-blue-700' : 'bg-zinc-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            (editDraft.is_individually_purchasable ?? false) ? 'translate-x-[18px]' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
                     </td>
                     <td className="px-4 py-2">
                       <input
@@ -401,7 +409,7 @@ function IndividualCoursePricingSection() {
   )
 }
 
-function CourseBundlePlansSection({ onCreateCoursePlan }: { onCreateCoursePlan: () => void }) {
+function CourseBundlePlansSection() {
   const router = useRouter()
   const [bundles, setBundles] = useState<CourseBundlePlanRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -417,16 +425,10 @@ function CourseBundlePlansSection({ onCreateCoursePlan }: { onCreateCoursePlan: 
   if (loading) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
   if (error) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
   if (bundles.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-28 gap-2">
+    <div className="flex flex-col items-center justify-center h-28 gap-1">
       <LayoutGrid className="w-6 h-6 text-zinc-300" />
-      <p className="text-sm text-zinc-500">No course bundle plans yet.</p>
-      <button
-        onClick={onCreateCoursePlan}
-        className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-medium px-3 py-1.5 rounded-md transition-colors mt-1"
-      >
-        <Plus className="w-3.5 h-3.5" />
-        Create Course Plan
-      </button>
+      <p className="text-sm text-zinc-500">No bundle plans yet.</p>
+      <p className="text-xs text-zinc-400">Use the &quot;Create Bundle Plan&quot; button above to add one.</p>
     </div>
   )
 
@@ -469,31 +471,39 @@ function CourseBundlePlansSection({ onCreateCoursePlan }: { onCreateCoursePlan: 
   )
 }
 
-function CoursePlansTab({ onCreateCoursePlan }: { onCreateCoursePlan: () => void }) {
+// ─── Tab 2: Single Course Plan ────────────────────────────────────────────────
+function SingleCoursePlanTab() {
   return (
-    <div className="space-y-8">
-      {/* Tab-level controls — Create Course Plan at top-right of entire Tab 2 */}
-      <div className="flex justify-end">
+    <div>
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold text-zinc-700">Individual Course Pricing</h2>
+        <p className="text-xs text-zinc-400 mt-0.5">
+          Set pricing for individually purchasable LIVE B2C courses. Purchasable courses cannot be added to assessment subscription plans.
+        </p>
+      </div>
+      <IndividualCoursePricingSection />
+    </div>
+  )
+}
+
+// ─── Tab 3: Course Bundle Plans ───────────────────────────────────────────────
+function CourseBundlePlansTab({ onCreateBundlePlan }: { onCreateBundlePlan: () => void }) {
+  return (
+    <div>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-700">Course Bundle Plans</h2>
+          <p className="text-xs text-zinc-400 mt-0.5">Annual B2C plans containing curated course collections.</p>
+        </div>
         <button
-          onClick={onCreateCoursePlan}
-          className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors"
+          onClick={onCreateBundlePlan}
+          className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0"
         >
           <Plus className="w-4 h-4" />
-          Create Course Plan
+          Create Bundle Plan
         </button>
       </div>
-
-      {/* Section A — Individual Course Pricing (no Create button here) */}
-      <div>
-        <h2 className="text-sm font-semibold text-zinc-700 mb-4">Individual Course Pricing</h2>
-        <IndividualCoursePricingSection />
-      </div>
-
-      {/* Section B — Course Bundle Plans */}
-      <div>
-        <h2 className="text-sm font-semibold text-zinc-700 mb-4">Course Bundle Plans</h2>
-        <CourseBundlePlansSection onCreateCoursePlan={onCreateCoursePlan} />
-      </div>
+      <CourseBundlePlansSection />
     </div>
   )
 }
@@ -598,9 +608,10 @@ export default function PlansPage() {
   useEffect(() => { loadPlans() }, [loadPlans])
 
   const TABS: { id: Tab; label: string }[] = [
-    { id: 'assessment-plans', label: 'Assessment Plans' },
-    { id: 'course-plans',     label: 'Course Plans' },
-    { id: 'b2b-plans',        label: 'B2B Plans' },
+    { id: 'assessment-plans',   label: 'Assessment Plans' },
+    { id: 'single-course-plan', label: 'Single Course Plan' },
+    { id: 'course-bundle-plans', label: 'Course Bundle Plans' },
+    { id: 'b2b-plans',          label: 'B2B Plans' },
   ]
 
   if (loading) return (
@@ -648,9 +659,12 @@ export default function PlansPage() {
           onCreateB2C={() => router.push('/super-admin/plans-pricing/new?audience=B2C')}
         />
       )}
-      {activeTab === 'course-plans' && (
-        <CoursePlansTab
-          onCreateCoursePlan={() => router.push('/super-admin/plans-pricing/new?audience=B2C&category=COURSE_BUNDLE')}
+      {activeTab === 'single-course-plan' && (
+        <SingleCoursePlanTab />
+      )}
+      {activeTab === 'course-bundle-plans' && (
+        <CourseBundlePlansTab
+          onCreateBundlePlan={() => router.push('/super-admin/plans-pricing/new?audience=B2C&category=COURSE_BUNDLE')}
         />
       )}
       {activeTab === 'b2b-plans' && (

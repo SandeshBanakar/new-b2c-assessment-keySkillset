@@ -1103,7 +1103,7 @@ function NewPlanInner() {
   const pageTitle = audience === 'B2B'
     ? 'Create B2B Plan'
     : isCourseBundlePlan
-      ? 'Create Course Plan'
+      ? 'Create Bundle Plan'
       : 'Create Assessment Plan'
 
   const pageSubtitle = audience === 'B2B'

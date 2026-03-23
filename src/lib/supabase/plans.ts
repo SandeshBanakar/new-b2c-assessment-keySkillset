@@ -24,7 +24,6 @@ export type PlanRow = {
   created_at: string
   plan_subscribers: {
     subscriber_count: number
-    mock_mrr: number
   } | null
 }
 
@@ -61,8 +60,7 @@ export async function fetchPlans(): Promise<PlanRow[]> {
       created_at,
       plan_category,
       plan_subscribers (
-        subscriber_count,
-        mock_mrr
+        subscriber_count
       )
     `)
     .order('created_at', { ascending: false })
@@ -206,7 +204,7 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
       max_attempts_per_assessment, feature_bullets,
       tagline, footnote, is_popular, cta_label,
       created_at,
-      plan_subscribers (subscriber_count, mock_mrr)
+      plan_subscribers (subscriber_count)
     `)
     .eq('id', id)
     .single()
@@ -215,8 +213,8 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
 
   const row = data as PlanDetail & {
     plan_subscribers:
-      | { subscriber_count: number; mock_mrr: number }[]
-      | { subscriber_count: number; mock_mrr: number }
+      | { subscriber_count: number }[]
+      | { subscriber_count: number }
       | null
   }
 
