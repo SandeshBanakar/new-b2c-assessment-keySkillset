@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 6.1 | Updated: March 23, 2026
+# Version: 6.2 | Updated: March 23, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -82,10 +82,67 @@ Content access is derived from Plan membership exclusively.
 Never use licensed_categories to gate content assignment.
 
 ### Demo B2C User UUIDs (locked — Supabase synced)
-Free:    9a3b56a5-31f6-4a58-81fa-66157c68d4f0
+Free:    9a3b56a5-31f6-4a58-81fa-66157c68d4f0  (INACTIVE demo — last_active_date = 45 days ago)
 Basic:   a0c16137-7fd5-44f5-96e6-60e4617d9230
-Pro:     e150d59c-13c1-4db3-b6d7-4f30c29178e9
+Pro:     e150d59c-13c1-4db3-b6d7-4f30c29178e9  (display_name: Priya Sharma)
 Premium: 191c894d-b532-4fa8-b1fe-746e5cdcdcc8
+
+### users table — confirmed columns (KSS-DB-SA-011, March 23, 2026)
+id (uuid), email (text), display_name (text nullable),
+subscription_tier (text DEFAULT 'free' — 'free'|'basic'|'professional'|'premium'),
+subscription_status (text DEFAULT 'free' — subscription state from Stripe),
+subscription_start_date (timestamptz nullable),
+subscription_end_date (timestamptz nullable),
+stripe_subscription_id (text nullable — added KSS-DB-SA-011),
+status (text DEFAULT 'ACTIVE' CHECK IN ('ACTIVE','SUSPENDED') — added KSS-DB-SA-011),
+  ACTIVE: account in good standing
+  SUSPENDED: SA manually blocked — user cannot access platform
+  INACTIVE: NOT stored — UI-computed when status='ACTIVE' AND last_active_date > 30 days ago
+last_active_date (date nullable),
+user_onboarded (boolean DEFAULT false),
+selected_exams (text[] DEFAULT '{}'),
+goal (text nullable), xp (integer DEFAULT 0), streak (integer DEFAULT 0),
+role (text DEFAULT 'student'), free_attempt_used (boolean DEFAULT false),
+organization_id (text nullable), created_at (timestamptz), updated_at (timestamptz)
+
+B2C Users page: /super-admin/b2c-users — 16 demo users seeded (4 original + 12 new)
+  Tier distribution: 5 Free, 4 Basic, 3 Professional, 4 Premium
+  Status demo: 1 Suspended (Meera Krishnan), 3 Inactive (Arjun Reddy, Priya Nair, Kavya Pillai)
+  Attempts seeded for Basic/Pro/Premium original users (4–5 attempts each, mixed scores)
+  Stripe subscription data seeded for all paid users (sub_demo_* format)
+
+### attempts table — added column (KSS-DB-SA-011, March 23, 2026)
+passed (boolean nullable):
+  true/false → chapter-test / subject-test (accuracy_percent >= 60%)
+  null → full-test or CLAT (no fixed pass threshold — show score only)
+Accuracy formula: correct_count / (correct_count + incorrect_count) * 100 (excludes skipped)
+Avg time per question: time_spent_seconds / total_questions → displayed as "Xs"
+
+### b2c_course_progress table — created KSS-DB-SA-011 (March 23, 2026)
+id (uuid PK), user_id (uuid — references users.id),
+course_id (uuid — references courses.id),
+status (text CHECK IN ('IN_PROGRESS','COMPLETED')),
+progress_pct (integer DEFAULT 0 — 0–100),
+started_at (timestamptz DEFAULT now()), completed_at (timestamptz nullable)
+RLS: OFF. B2C only. No FK constraints (consistent with polymorphic pattern).
+Seeded: 6 rows across Basic/Pro/Premium/Aditya/Siddharth/Divya for HIPAA course.
+
+### courses table — post-cleanup (March 23, 2026)
+9 courses total (4 B2B LIVE + 1 B2C LIVE + 1 INACTIVE + 3 B2B duplicate cleanup):
+B2C_ONLY LIVE (1): HIPAA Compliance Training
+B2B_ONLY LIVE (7): JEE Physics — Mechanics Fundamentals, NEET Biology — Cell Biology Module,
+  SAT Math — Algebra Foundations, Python for Competitive Coders,
+  Call Centre Etiquettes, Employee Policy Handbook, Provident Fund Basics
+INACTIVE (1): CLAT Legal Reasoning — Introduction
+Duplicates removed: 4 rows (1 duplicate HIPAA + 3 B2C_ONLY duplicates of B2B courses)
+
+### content_items — tenant names removed (March 23, 2026)
+5 TENANT_PRIVATE items renamed to remove tenant prefixes:
+  'TechCorp SAT Prep Corporate Track' → 'SAT Prep — Corporate Track'
+  'Akash NEET Crash Course Batch A' → 'NEET Crash Course — Batch A'
+  'Akash Institute — Physics Mechanics Practice Set' → 'Physics Mechanics Practice Set'
+  'Akash Institute — NEET Internal Mock Test Series 1' → 'NEET Internal Mock Test Series 1'
+  'Akash Institute — NEET Foundation Batch Notes' → 'NEET Foundation Batch Notes'
 
 ### tenants table — feature_toggle_mode values (locked)
 FULL_CREATOR → tenant has Content Creator access + own database usage
@@ -862,7 +919,18 @@ No Team Manager persona selector — role permanently removed from V1.
 🟡 KSS-SA-005   Audit Log
 🟡 KSS-SA-006   Analytics
 🟡 KSS-SA-007   Marketing Config
-🟡 KSS-SA-008   Master Organisation
+✅ KSS-SA-008   Master Organisation — B2C Users DONE (March 23, 2026):
+               - DB: KSS-DB-SA-011 — users.status, users.stripe_subscription_id,
+                 attempts.passed, b2c_course_progress table
+               - 12 new B2C users seeded (5F/3B/2P/2Pm), attempts + course progress seeded
+               - Content renames: 5 tenant-named items renamed
+               - Course cleanup: 4 duplicate courses deleted
+               - src/lib/supabase/b2c-users.ts: full data layer
+               - src/app/super-admin/b2c-users/page.tsx: list (tier tabs + status/search filters)
+               - src/app/super-admin/b2c-users/[id]/page.tsx: profile (identity + subscription + assessment + course)
+               - Pass threshold: chapter/subject-test >= 60%, full-test = score only, null = no badge
+               - INACTIVE = UI-computed (last_active_date > 30 days) — not stored
+               - Content Creators page: PENDING (separate sprint)
 🟡 KSS-SA-010   Dashboard (last)
 
 Client Admin (KSS-CA sprint, March 20, 2026):
