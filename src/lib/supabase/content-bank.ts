@@ -39,7 +39,7 @@ export async function fetchContentBank(): Promise<ContentBankItem[]> {
   // Fetch plan counts — no FK so we query separately
   const { data: pcmRows, error: pcmErr } = await supabase
     .from('plan_content_map')
-    .select('content_id, content_type')
+    .select('content_item_id, content_type')
 
   if (pcmErr) throw new Error(pcmErr.message)
 
@@ -47,9 +47,9 @@ export async function fetchContentBank(): Promise<ContentBankItem[]> {
   const coursePlanCounts = new Map<string, number>()
   for (const row of pcmRows ?? []) {
     if (row.content_type === 'ASSESSMENT') {
-      assessmentPlanCounts.set(row.content_id, (assessmentPlanCounts.get(row.content_id) ?? 0) + 1)
+      assessmentPlanCounts.set(row.content_item_id, (assessmentPlanCounts.get(row.content_item_id) ?? 0) + 1)
     } else if (row.content_type === 'COURSE') {
-      coursePlanCounts.set(row.content_id, (coursePlanCounts.get(row.content_id) ?? 0) + 1)
+      coursePlanCounts.set(row.content_item_id, (coursePlanCounts.get(row.content_item_id) ?? 0) + 1)
     }
   }
 
@@ -133,7 +133,7 @@ export async function fetchContentPlanMembership(
   const { data, error } = await supabase
     .from('plan_content_map')
     .select('id, plan_id, plans(id, name, plan_audience)')
-    .eq('content_id', id)
+    .eq('content_item_id', id)
     .eq('content_type', contentType)
 
   if (error) throw new Error(error.message)
@@ -171,7 +171,7 @@ export async function archiveContent(
   await supabase
     .from('plan_content_map')
     .delete()
-    .eq('content_id', id)
+    .eq('content_item_id', id)
     .eq('content_type', contentType)
 
   const table = contentType === 'ASSESSMENT' ? 'content_items' : 'courses'
