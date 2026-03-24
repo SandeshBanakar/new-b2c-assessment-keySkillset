@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, GripVertical, Plus, Trash2, Info, Search } from 'lucide-react'
-import { updatePlan, writePlanAuditLog, addContentToPlan, fetchAllLiveB2CAssessments, type PlanRow } from '@/lib/supabase/plans'
+import { updatePlan, writePlanAuditLog, addContentToPlan, fetchAllLiveB2CAssessments, updateSingleCoursePlan, type PlanRow, type SingleCoursePlanRow } from '@/lib/supabase/plans'
 
 type AssessmentType = 'FULL_TEST' | 'SUBJECT_TEST' | 'CHAPTER_TEST'
 
@@ -809,4 +809,189 @@ export function EditPlanSlideOver(props: Props) {
   if (props.plan.plan_audience === 'B2B') return <B2BEditForm {...props} />
   if (props.plan.plan_category === 'COURSE_BUNDLE') return <CourseBundleEditForm {...props} />
   return <B2CEditForm {...props} />
+}
+
+// ─── Single Course Plan Edit Slide-Over ───────────────────────────────────────
+
+export function SingleCoursePlanEditSlideOver({
+  plan,
+  onClose,
+  onSaved,
+}: {
+  plan: SingleCoursePlanRow
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [name, setName]               = useState(plan.name)
+  const [displayName, setDisplayName] = useState(plan.display_name ?? '')
+  const [price, setPrice]             = useState<number | ''>(plan.price ?? '')
+  const [priceUsd, setPriceUsd]       = useState<number | ''>(plan.price_usd ?? '')
+  const [stripeId, setStripeId]       = useState(plan.stripe_price_id ?? '')
+  const [status, setStatus]           = useState<'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>(
+    plan.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+  )
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState<string | null>(null)
+
+  function validate(): string | null {
+    if (!name.trim()) return 'Plan name is required.'
+    if (price === '' || Number(price) < 0) return 'Price (₹) must be a valid number.'
+    if (priceUsd === '' || Number(priceUsd) < 0) return 'Price (USD) must be a valid number.'
+    return null
+  }
+
+  async function handleSave() {
+    const err = validate()
+    if (err) { setError(err); return }
+    setError(null)
+    setSaving(true)
+    try {
+      await updateSingleCoursePlan(plan.id, {
+        name:            name.trim(),
+        display_name:    displayName.trim() || null,
+        price:           price as number,
+        price_usd:       priceUsd as number,
+        stripe_price_id: stripeId.trim() || null,
+        status,
+      })
+      onSaved()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Save failed.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-[480px] bg-white shadow-xl z-50 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
+          <div>
+            <p className="text-sm font-semibold text-zinc-900">Edit Single Course Plan</p>
+            <p className="text-xs text-zinc-400 mt-0.5 truncate max-w-[340px]">{plan.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+          {/* Linked course — read-only */}
+          <div>
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Linked Course</p>
+            <p className="text-sm text-zinc-700 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-2">
+              {plan.course_name ?? <span className="text-zinc-400">No course linked</span>}
+            </p>
+            <p className="text-xs text-zinc-400 mt-1">The linked course cannot be changed after creation.</p>
+          </div>
+
+          {/* Plan Identity */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Identity</p>
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 mb-1">Plan name (internal) <span className="text-rose-500">*</span></label>
+              <input
+                type="text" value={name} onChange={(e) => setName(e.target.value)}
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 mb-1">Display name (customer-facing)</label>
+              <input
+                type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Pricing */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Pricing</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Price (₹) <span className="text-rose-500">*</span></label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
+                  <input
+                    type="number" min={0} value={price}
+                    onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Price (USD) <span className="text-rose-500">*</span></label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+                  <input
+                    type="number" min={0} step="0.01" value={priceUsd}
+                    onChange={(e) => setPriceUsd(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 mb-1">Stripe Price ID</label>
+              <input
+                type="text" value={stripeId} onChange={(e) => setStripeId(e.target.value)}
+                placeholder="price_annual_..."
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              />
+              <p className="text-xs text-zinc-400 mt-1">Auto-synced to course record on save.</p>
+            </div>
+          </div>
+
+          {/* Status */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</p>
+            <div className="flex gap-2">
+              {(['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const).map((s) => (
+                <button
+                  key={s} type="button"
+                  onClick={() => setStatus(s)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                    status === s
+                      ? 'bg-blue-700 text-white border-blue-700'
+                      : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                  }`}
+                >
+                  {s.charAt(0) + s.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+            {status === 'PUBLISHED' && (
+              <p className="text-xs text-emerald-600">Publishing will set the course as individually purchasable and sync prices.</p>
+            )}
+            {status === 'ARCHIVED' && (
+              <p className="text-xs text-amber-600">Archiving will remove the individually purchasable flag from the course.</p>
+            )}
+          </div>
+
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 rounded-md px-4 py-3">
+              <p className="text-sm text-rose-600">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 px-6 py-4 border-t border-zinc-200 flex items-center justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave} disabled={saving}
+            className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
 }

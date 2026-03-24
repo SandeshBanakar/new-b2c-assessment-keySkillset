@@ -7,20 +7,17 @@ import {
   fetchPlans,
   derivePlanType,
   fetchB2BPlansForGrid,
-  fetchB2CCoursesForPricing,
-  updateCoursePricing,
   fetchCourseBundlePlans,
   fetchSingleCoursePlans,
   updatePlan,
   type PlanRow,
   type B2BPlanCard,
-  type CoursePricingRow,
   type CourseBundlePlanRow,
   type SingleCoursePlanRow,
 } from '@/lib/supabase/plans'
 import { PlanStatusBadge } from '@/components/plans/PlanStatusBadge'
 import { PlanTypeBadge } from '@/components/plans/PlanTypeBadge'
-import { EditPlanSlideOver } from '@/components/plans/EditPlanSlideOver'
+import { EditPlanSlideOver, SingleCoursePlanEditSlideOver } from '@/components/plans/EditPlanSlideOver'
 
 type Tab = 'assessment-plans' | 'single-course-plan' | 'course-bundle-plans' | 'b2b-plans'
 
@@ -312,157 +309,6 @@ function AssessmentPlansTab({
 
 // ─── Tab 2: Course Plans ──────────────────────────────────────────────────────
 
-function IndividualCoursePricingSection() {
-  const [courses, setCourses] = useState<CoursePricingRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<Partial<CoursePricingRow>>({})
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    fetchB2CCoursesForPricing()
-      .then(setCourses)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
-
-  function startEdit(course: CoursePricingRow) {
-    setEditingId(course.id)
-    setEditDraft({
-      price:                       course.price,
-      is_individually_purchasable: course.is_individually_purchasable,
-      stripe_price_id:             course.stripe_price_id,
-    })
-  }
-
-  function cancelEdit() { setEditingId(null); setEditDraft({}) }
-
-  async function saveEdit(courseId: string) {
-    setSaving(true)
-    try {
-      await updateCoursePricing(courseId, {
-        price:                       editDraft.price ?? null,
-        is_individually_purchasable: editDraft.is_individually_purchasable ?? false,
-        stripe_price_id:             editDraft.stripe_price_id ?? null,
-      })
-      setCourses((prev) =>
-        prev.map((c) => c.id === courseId ? { ...c, ...editDraft } as CoursePricingRow : c)
-      )
-      cancelEdit()
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Save failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (loading) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
-  if (error) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
-  if (courses.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-28 gap-1">
-      <BookOpen className="w-6 h-6 text-zinc-300" />
-      <p className="text-sm text-zinc-500">No courses available for pricing.</p>
-      <p className="text-xs text-zinc-400">Promote courses to Live in the Content Bank first.</p>
-    </div>
-  )
-
-  return (
-    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 bg-zinc-50">
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Type</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹)</th>
-            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Purchasable</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Stripe Price ID</th>
-            <th className="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-100">
-          {courses.map((course) => {
-            const isEditing = editingId === course.id
-            return (
-              <tr key={course.id} className={`transition-colors ${isEditing ? 'bg-blue-50/30' : 'hover:bg-zinc-50'}`}>
-                <td className="px-4 py-3 font-medium text-zinc-900">{course.title}</td>
-                <td className="px-4 py-3 text-xs text-zinc-500">{course.course_type}</td>
-                {isEditing ? (
-                  <>
-                    <td className="px-4 py-2 text-right">
-                      <input
-                        type="number" min={0} value={editDraft.price ?? ''}
-                        onChange={(e) => setEditDraft((d) => ({ ...d, price: e.target.value === '' ? null : Number(e.target.value) }))}
-                        className="w-24 border border-zinc-200 rounded-md px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        placeholder="0"
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => setEditDraft((d) => ({ ...d, is_individually_purchasable: !(d.is_individually_purchasable ?? false) }))}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                          (editDraft.is_individually_purchasable ?? false) ? 'bg-blue-700' : 'bg-zinc-300'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                            (editDraft.is_individually_purchasable ?? false) ? 'translate-x-[18px]' : 'translate-x-0.5'
-                          }`}
-                        />
-                      </button>
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="text" value={editDraft.stripe_price_id ?? ''}
-                        onChange={(e) => setEditDraft((d) => ({ ...d, stripe_price_id: e.target.value || null }))}
-                        className="w-full border border-zinc-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        placeholder="price_annual_..."
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={cancelEdit} className="text-xs text-zinc-500 hover:text-zinc-800">Cancel</button>
-                        <button
-                          onClick={() => saveEdit(course.id)} disabled={saving}
-                          className="text-xs font-medium bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded-md disabled:opacity-50"
-                        >
-                          {saving ? 'Saving…' : 'Save'}
-                        </button>
-                      </div>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className="px-4 py-3 text-right text-zinc-700">
-                      {course.price != null ? formatINR(course.price) : <span className="text-zinc-400">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {course.is_individually_purchasable ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Yes</span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">No</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-400 text-xs font-mono truncate max-w-45">{course.stripe_price_id ?? '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => startEdit(course)} className="text-xs text-blue-700 hover:text-blue-800 font-medium">Edit</button>
-                    </td>
-                  </>
-                )}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-3">
-        <p className="text-xs text-zinc-400">
-          Stripe Price ID must be a recurring annual price ID. Price (₹) is the source of truth for Stripe checkout and B2C pricing page display.
-        </p>
-      </div>
-    </div>
-  )
-}
 
 function CourseBundlePlansSection() {
   const router = useRouter()
@@ -533,13 +379,17 @@ function SingleCoursePlansSection({ onCreateSingleCoursePlan }: { onCreateSingle
   const [plans, setPlans] = useState<SingleCoursePlanRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingPlan, setEditingPlan] = useState<SingleCoursePlanRow | null>(null)
 
-  useEffect(() => {
+  function loadPlans() {
+    setLoading(true)
     fetchSingleCoursePlans()
       .then(setPlans)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadPlans() }, [])
 
   if (loading) return <div className="h-16 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
   if (error) return <div className="h-16 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
@@ -552,55 +402,69 @@ function SingleCoursePlansSection({ onCreateSingleCoursePlan }: { onCreateSingle
   )
 
   return (
-    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 bg-zinc-50">
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Display Name</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹)</th>
-            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course</th>
-            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
-            <th className="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-100">
-          {plans.map((plan) => (
-            <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
-              <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
-              <td className="px-4 py-3 text-zinc-500">{plan.display_name ?? <span className="text-zinc-300">—</span>}</td>
-              <td className="px-4 py-3 text-right text-zinc-700 font-medium">{formatINR(plan.price)}</td>
-              <td className="px-4 py-3 text-center text-zinc-500">{plan.course_count}</td>
-              <td className="px-4 py-3 text-center">
-                <PlanStatusBadge status={plan.status} />
-              </td>
-              <td className="px-4 py-3 text-right">
-                <button
-                  onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
-                  className="text-xs text-blue-700 hover:text-blue-800 font-medium"
-                >
-                  View
-                </button>
-              </td>
+    <>
+      <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50">
+              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course Name</th>
+              <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (USD)</th>
+              <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
+              <th className="px-4 py-3" />
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {plans.map((plan) => (
+              <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
+                <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
+                <td className="px-4 py-3 text-zinc-600">
+                  {plan.course_name ?? <span className="text-zinc-400">—</span>}
+                </td>
+                <td className="px-4 py-3 text-right text-zinc-700 font-medium">
+                  {plan.price_usd != null ? `$${Number(plan.price_usd).toFixed(2)}` : <span className="text-zinc-400">—</span>}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <PlanStatusBadge status={plan.status} />
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
+                      className="text-xs text-blue-700 hover:text-blue-800 font-medium"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => setEditingPlan(plan)}
+                      className="text-xs text-zinc-500 hover:text-zinc-800 font-medium"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {editingPlan && (
+        <SingleCoursePlanEditSlideOver
+          plan={editingPlan}
+          onClose={() => setEditingPlan(null)}
+          onSaved={() => { setEditingPlan(null); loadPlans() }}
+        />
+      )}
+    </>
   )
 }
 
 function SingleCoursePlanTab({ onCreateSingleCoursePlan }: { onCreateSingleCoursePlan: () => void }) {
   return (
     <div>
-      {/* Section header */}
       <div className="flex items-start justify-between mb-6">
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-700">Single Course Plans</h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Set pricing for individually purchasable LIVE B2C courses and manage their plan records.
-          </p>
-        </div>
+        <h2 className="text-sm font-semibold text-zinc-700">Plan Records</h2>
         <button
           onClick={onCreateSingleCoursePlan}
           className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0"
@@ -609,15 +473,6 @@ function SingleCoursePlanTab({ onCreateSingleCoursePlan }: { onCreateSingleCours
           Create Single Course Plan
         </button>
       </div>
-
-      {/* Course pricing table */}
-      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Individual Course Pricing</p>
-      <div className="mb-8">
-        <IndividualCoursePricingSection />
-      </div>
-
-      {/* Single Course Plan records */}
-      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Plan Records</p>
       <SingleCoursePlansSection onCreateSingleCoursePlan={onCreateSingleCoursePlan} />
     </div>
   )

@@ -1102,17 +1102,52 @@ export type SingleCoursePlanRow = {
   id: string
   name: string
   display_name: string | null
-  price: number
+  price: number | null
+  price_usd: number | null
+  stripe_price_id: string | null
   status: string
-  course_count: number
+  course_id: string | null
+  course_name: string | null
 }
 
 export type CreateSingleCoursePlanPayload = {
   name: string
   display_name: string | null
   price: number
+  price_usd: number
   stripe_price_id: string | null
   status: 'DRAFT' | 'PUBLISHED'
+}
+
+export type UpdateSingleCoursePlanPayload = {
+  name: string
+  display_name: string | null
+  price: number
+  price_usd: number
+  stripe_price_id: string | null
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+}
+
+export async function syncCourseFromPlan(
+  courseId: string,
+  plan: { price: number; price_usd: number; stripe_price_id: string | null; status: string }
+) {
+  if (plan.status === 'PUBLISHED') {
+    await supabase
+      .from('courses')
+      .update({
+        is_individually_purchasable: true,
+        price:           plan.price,
+        price_usd:       plan.price_usd,
+        stripe_price_id: plan.stripe_price_id,
+      })
+      .eq('id', courseId)
+  } else if (plan.status === 'ARCHIVED') {
+    await supabase
+      .from('courses')
+      .update({ is_individually_purchasable: false })
+      .eq('id', courseId)
+  }
 }
 
 export async function createSingleCoursePlan(
@@ -1124,6 +1159,8 @@ export async function createSingleCoursePlan(
       name:            payload.name,
       display_name:    payload.display_name,
       price:           payload.price,
+      price_usd:       payload.price_usd,
+      stripe_price_id: payload.stripe_price_id,
       billing_cycle:   'ANNUAL',
       feature_bullets: [],
       plan_audience:   'B2C',
@@ -1139,35 +1176,88 @@ export async function createSingleCoursePlan(
   return (data as { id: string }).id
 }
 
+export async function updateSingleCoursePlan(
+  planId: string,
+  payload: UpdateSingleCoursePlanPayload
+): Promise<void> {
+  const { error } = await supabase
+    .from('plans')
+    .update({
+      name:            payload.name,
+      display_name:    payload.display_name,
+      price:           payload.price,
+      price_usd:       payload.price_usd,
+      stripe_price_id: payload.stripe_price_id,
+      status:          payload.status,
+    })
+    .eq('id', planId)
+  if (error) throw new Error(error.message)
+
+  // Sync is_individually_purchasable + prices to linked course
+  const { data: pcmRow } = await supabase
+    .from('plan_content_map')
+    .select('content_item_id')
+    .eq('plan_id', planId)
+    .eq('content_type', 'COURSE')
+    .maybeSingle()
+  if (pcmRow) {
+    await syncCourseFromPlan((pcmRow as { content_item_id: string }).content_item_id, payload)
+  }
+}
+
 export async function fetchSingleCoursePlans(): Promise<SingleCoursePlanRow[]> {
   const { data: plans, error } = await supabase
     .from('plans')
-    .select('id, name, display_name, price, status')
+    .select('id, name, display_name, price, price_usd, stripe_price_id, status')
     .eq('plan_category', 'SINGLE_COURSE_PLAN')
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
 
-  const planList = (plans ?? []) as { id: string; name: string; display_name: string | null; price: number; status: string }[]
+  const planList = (plans ?? []) as {
+    id: string; name: string; display_name: string | null
+    price: number | null; price_usd: number | null; stripe_price_id: string | null; status: string
+  }[]
   if (planList.length === 0) return []
 
+  // Fetch linked course names via plan_content_map
   const planIds = planList.map((p) => p.id)
   const { data: pcmRows } = await supabase
     .from('plan_content_map')
-    .select('plan_id')
+    .select('plan_id, content_item_id')
     .in('plan_id', planIds)
-  const countMap: Record<string, number> = {}
-  ;(pcmRows ?? []).forEach((r: { plan_id: string }) => {
-    countMap[r.plan_id] = (countMap[r.plan_id] ?? 0) + 1
+    .eq('content_type', 'COURSE')
+
+  const courseIdByPlan: Record<string, string> = {}
+  ;(pcmRows ?? []).forEach((r: { plan_id: string; content_item_id: string }) => {
+    courseIdByPlan[r.plan_id] = r.content_item_id
   })
 
-  return planList.map((p) => ({
-    id:           p.id,
-    name:         p.name,
-    display_name: p.display_name,
-    price:        p.price,
-    status:       p.status,
-    course_count: countMap[p.id] ?? 0,
-  }))
+  const courseIds = Object.values(courseIdByPlan)
+  const courseNameMap: Record<string, string> = {}
+  if (courseIds.length > 0) {
+    const { data: courseRows } = await supabase
+      .from('courses')
+      .select('id, title')
+      .in('id', courseIds)
+    ;(courseRows ?? []).forEach((c: { id: string; title: string }) => {
+      courseNameMap[c.id] = c.title
+    })
+  }
+
+  return planList.map((p) => {
+    const courseId = courseIdByPlan[p.id] ?? null
+    return {
+      id:              p.id,
+      name:            p.name,
+      display_name:    p.display_name,
+      price:           p.price,
+      price_usd:       p.price_usd,
+      stripe_price_id: p.stripe_price_id,
+      status:          p.status,
+      course_id:       courseId,
+      course_name:     courseId ? (courseNameMap[courseId] ?? null) : null,
+    }
+  })
 }
 
 // ─── Content plan usage modal (duplicate badge) ────────────────────────────────

@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 6.3 | Updated: March 24, 2026
+# Version: 6.4 | Updated: March 24, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -156,9 +156,10 @@ status (text — LIVE/INACTIVE/DRAFT/ARCHIVED), source (text),
 tenant_id (uuid nullable), created_by (uuid nullable),
 created_at (timestamptz), updated_at (timestamptz),
 audience_type (text — B2C_ONLY/B2B_ONLY/BOTH, nullable),
-price (numeric, nullable — null = not priced individually),
+price (numeric, nullable — INR price, null = not priced individually),
+price_usd (numeric, nullable — USD price in actual dollars e.g. 29.99, added KSS-DB-SA-015),
 currency (text DEFAULT 'INR'),
-is_individually_purchasable (boolean DEFAULT false),
+is_individually_purchasable (boolean DEFAULT false — managed via SINGLE_COURSE_PLAN plan lifecycle),
 stripe_price_id (text, nullable)
 
 MIGRATION KSS-DB-SA-003 (authorised March 19, 2026):
@@ -256,9 +257,10 @@ tier text NOT NULL                 — CHECK: 'BASIC'|'PRO'|'PREMIUM'|'ENTERPRIS
                                    B2C plans use BASIC/PRO/PREMIUM
                                    B2B plans use ENTERPRISE (constraint extended KSS-DB-SA-003)
 audience_type text DEFAULT 'B2C'   — legacy column (pre KSS-DB-SA-002), keep as 'B2C'
-price_usd_cents integer DEFAULT 0  — price in USD cents. NOT legacy. Live field.
+price_usd numeric                   — price in actual USD dollars (e.g. 29.99). Live field.
                                    Label in UI: "Price (USD)". Source of truth for
                                    Stripe checkout and B2C pricing page display.
+                                   Replaces price_usd_cents (KSS-DB-SA-015, March 24, 2026).
 price integer DEFAULT 0            — price in INR. Label in UI: "Price (₹)".
                                    Source of truth for INR Stripe checkout and
                                    B2C pricing page display.
@@ -677,17 +679,22 @@ Client Admin: can view Sections 1 and 2 (read-only). Cannot see Section 3.
     See decision 15 for full locked spec. Permission guard: price fields are
     SA-editable only, not Content Creators.
 
-15. Course à la carte pricing (locked — March 19, 2026):
-    Fields on course record: price (INR), price_usd_cents (USD),
+15. Course à la carte pricing (locked — updated March 24, 2026):
+    Fields on course record: price (INR), price_usd (USD numeric — actual dollars, e.g. 29.99),
     is_individually_purchasable (boolean), stripe_price_id (text).
-    SA manages from Plans & Pricing → Tab 2 (Course Pricing). Both INR and USD
-    prices are editable by SA in Tab 2.
-    stripe_price_id for courses = recurring ANNUAL Stripe Price ID (Stripe-managed).
+    price_usd_cents REMOVED — replaced by price_usd numeric (KSS-DB-SA-015).
+    Source of truth = SINGLE_COURSE_PLAN plan record. Plan record is created/managed
+    from Plans & Pricing → Tab 2 (Single Course Plan → Plan Records table).
+    On plan PUBLISHED → courses.is_individually_purchasable = true, price + price_usd +
+    stripe_price_id synced to course record automatically.
+    On plan ARCHIVED → courses.is_individually_purchasable = false (prices kept as-is).
+    SA edits both INR + USD prices via SingleCoursePlanEditSlideOver (Edit button in table).
+    stripe_price_id = recurring ANNUAL Stripe Price ID (managed by Stripe, synced to course).
     GATE: is_individually_purchasable = true → course EXCLUDED from all B2C
     subscription plan content assignment. Mutually exclusive. Enforce in UI + query.
-    If already in a plan: warn SA → confirm → auto-remove from plans → set purchasable.
     Option X (single-course subscription plan) = REJECTED AND LOCKED. Never build.
-    Tab 2 (Course Pricing) is the ONLY surface for course à la carte pricing.
+    Tab 2 Plan Records table is the ONLY surface for course à la carte pricing.
+    IndividualCoursePricingSection REMOVED — replaced by Plan Records table.
 
 16. B2C subscription tiers: free (default) | basic | professional | premium.
     Stored as subscription_tier on the user/demoUsers record.
@@ -971,6 +978,16 @@ No Team Manager persona selector — role permanently removed from V1.
                - Single Course Plan creation form (Tab 2 of Plans & Pricing, plan_category=SINGLE_COURSE_PLAN)
                - Assessment picker added to B2C Create Plan form (Section 6) + EditPlanSlideOver (Section 6)
                - B2CEditForm assessment picker: additive only (remove via plan detail page)
+✅ KSS-SA-016   Single Course Plan overhaul (March 24, 2026):
+               DB: KSS-DB-SA-015 — courses.price_usd numeric + plans.price_usd numeric,
+                   plans.price_usd_cents DROPPED (data migrated: cents ÷ 100)
+               - Tab 2 Plan Records: removed IndividualCoursePricingSection entirely
+               - Plan record = source of truth for is_individually_purchasable
+               - Plan Records table: Plan Name | Course Name | Price (USD) | Status | Actions
+               - SingleCoursePlanEditSlideOver: name, display_name, INR+USD price, status, stripe_price_id
+               - On PUBLISHED: syncs is_individually_purchasable=true + price+price_usd+stripe_price_id to course
+               - On ARCHIVED: sets is_individually_purchasable=false on course
+               - Create form: Section 3 now has both Price (₹) + Price (USD) fields
 
 ✅ KSS-SA-008   Master Organisation — B2C Users DONE (March 23, 2026):
                - DB: KSS-DB-SA-011 — users.status, users.stripe_subscription_id,
@@ -1222,11 +1239,14 @@ Run this full checklist before presenting any code:
 [ ] Plans & Pricing page subtitle: "Manage B2C and B2B subscription plans and content entitlements"
 [ ] No global Create Plan button in page header — tab-scoped buttons only
 [ ] derivePlanType() must use actual scope column from DB, not name heuristics
-[ ] price_usd_cents labeled "Price (USD)" everywhere — never "legacy USD" in UI or code
-[ ] Tab 2 (Course Pricing) shows LIVE courses only — audience_type B2C_ONLY or BOTH
+[ ] price_usd (numeric, actual dollars) used everywhere — never price_usd_cents
 [ ] Purchasable courses greyed out in AddContentSlideOver with tooltip
 [ ] MRR strip inside Tab 1 only — not in page header, not in Tab 2 or Tab 3
-[ ] Tab 2 label = "Course Plans" (not "Course Pricing")
+[ ] Tab 2 Plan Records table: Plan Name | Course Name | Price (USD) | Status | Actions (View + Edit)
+[ ] is_individually_purchasable managed ONLY via SINGLE_COURSE_PLAN plan lifecycle — no manual toggle
+[ ] SingleCoursePlanEditSlideOver used for Edit button in Plan Records table
+[ ] On SINGLE_COURSE_PLAN PUBLISHED: sync price+price_usd+stripe_price_id to course + set purchasable=true
+[ ] On SINGLE_COURSE_PLAN ARCHIVED: set is_individually_purchasable=false on course (prices kept)
 [ ] plan_category = 'COURSE_BUNDLE' for course bundle plans (not 'ASSESSMENT')
 [ ] Course bundle plans: B2C only, platform-wide, annual, no tier, no is_popular/cta_label
 [ ] derivePlanType() uses plan.scope — never plan.name
@@ -1388,20 +1408,31 @@ Create: "Create B2C Plan" button (blue-700, top-right of Tab 1)
   → /super-admin/plans-pricing/new?audience=B2C
   Creates assessment subscription plans ONLY. No course plans. (Option Z — locked)
 
-### Tab 2 — Single Course Plan (locked March 23, 2026)
-Tab name: "Single Course Plan". No Create button on this tab.
-Purpose: SA sets pricing for individually purchasable LIVE B2C courses inline.
-No plan record is created — these fields live directly on the courses table.
+### Tab 2 — Single Course Plan (updated March 24, 2026)
+Tab name: "Single Course Plan". "Create Single Course Plan" button top-right.
+Purpose: Manage single-course plan records. Plan record IS the source of truth for
+  course purchasability — creating/publishing a plan sets is_individually_purchasable=true
+  on the course and syncs price (INR), price_usd (USD), stripe_price_id.
 
-Layout: Table of LIVE B2C courses (audience_type = B2C_ONLY or BOTH only — no NULL/INACTIVE)
-Columns: Course | Type | Price (₹) | Purchasable | Stripe Price ID | Actions
-SA edits per course row inline (Edit button → save/cancel inline):
-  price (INR) | is_individually_purchasable (toggle switch) | stripe_price_id
-stripe_price_id = recurring ANNUAL Stripe Price ID (managed by Stripe, not the platform)
-Empty state: "No courses available for pricing. Promote courses to Live in the Content Bank first."
+Layout: Single section titled "Plan Records" (no subtitle).
+Table columns: Plan Name | Course Name | Price (USD) | Status | Actions (View + Edit)
 
-Toggle switch (is_individually_purchasable): pill/thumb toggle — bg-blue-700 on, bg-zinc-300 off.
-  Read view: Yes badge (emerald) or No badge (zinc). Never a raw checkbox.
+SingleCoursePlanEditSlideOver (Edit button):
+  Linked Course (read-only — cannot change after creation)
+  Plan Identity: name*, display_name
+  Pricing: Price (₹)* + Price (USD)* (both editable) + Stripe Price ID (auto-synced note)
+  Status: DRAFT | PUBLISHED | ARCHIVED selector
+    PUBLISHED → is_individually_purchasable=true + syncs price+price_usd+stripe_price_id to course
+    ARCHIVED → is_individually_purchasable=false (prices kept on course)
+
+Create Single Course Plan form (/new?audience=B2C&category=SINGLE_COURSE_PLAN):
+  Section 1: Plan Identity (name*, display_name)
+  Section 2: Course radio picker (LIVE B2C courses)
+  Section 3: Pricing — Price (₹)* + Price (USD)* + Stripe Price ID
+  On Publish: links course + syncs course record
+
+IndividualCoursePricingSection REMOVED (March 24, 2026). is_individually_purchasable
+  managed exclusively via SINGLE_COURSE_PLAN plan lifecycle. Never add manual toggle back.
 
 GATE (locked): A course with is_individually_purchasable = true cannot be assigned
   to any B2C subscription plan.

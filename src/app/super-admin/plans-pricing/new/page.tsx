@@ -1180,6 +1180,7 @@ function SingleCoursePlanForm() {
   const [name, setName]               = useState('')
   const [displayName, setDisplayName] = useState('')
   const [price, setPrice]             = useState<number | ''>('')
+  const [priceUsd, setPriceUsd]       = useState<number | ''>('')
   const [stripePriceId, setStripePriceId] = useState('')
 
   const [courseItems, setCourseItems]         = useState<B2CCourseBundlePickerItem[]>([])
@@ -1202,7 +1203,8 @@ function SingleCoursePlanForm() {
 
   function validate(): string | null {
     if (!name.trim()) return 'Plan name is required.'
-    if (price === '' || price < 0) return 'Price must be 0 or a positive number.'
+    if (price === '' || Number(price) < 0) return 'Price (₹) must be 0 or a positive number.'
+    if (priceUsd === '' || Number(priceUsd) < 0) return 'Price (USD) must be 0 or a positive number.'
     return null
   }
 
@@ -1216,11 +1218,22 @@ function SingleCoursePlanForm() {
         name:            name.trim(),
         display_name:    displayName.trim() || null,
         price:           price as number,
+        price_usd:       priceUsd as number,
         stripe_price_id: stripePriceId.trim() || null,
         status,
       })
       if (selectedCourse) {
         await addContentToPlan(planId, selectedCourse, 'COURSE')
+        // Sync purchasable flag + prices to course when publishing
+        if (status === 'PUBLISHED') {
+          const { syncCourseFromPlan } = await import('@/lib/supabase/plans')
+          await syncCourseFromPlan(selectedCourse, {
+            price:           price as number,
+            price_usd:       priceUsd as number,
+            stripe_price_id: stripePriceId.trim() || null,
+            status,
+          })
+        }
       }
       router.push(`/super-admin/plans-pricing/${planId}`)
     } catch (e: unknown) {
@@ -1301,8 +1314,8 @@ function SingleCoursePlanForm() {
 
       {/* SECTION 3 — Pricing */}
       <div className="bg-white border border-zinc-200 rounded-md p-6">
-        <SectionHeading number="3" title="Pricing" subtitle="Set the price and Stripe Price ID for this individual course plan." />
-        <div className="grid grid-cols-2 gap-4">
+        <SectionHeading number="3" title="Pricing" subtitle="Set the INR and USD prices and Stripe Price ID for this individual course plan." />
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <FieldLabel label="Price (₹)" required />
             <div className="relative">
@@ -1316,13 +1329,26 @@ function SingleCoursePlanForm() {
             </div>
           </div>
           <div>
-            <FieldLabel label="Stripe Price ID" />
-            <input
-              type="text" value={stripePriceId} onChange={(e) => setStripePriceId(e.target.value)}
-              placeholder="price_annual_..."
-              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-            />
+            <FieldLabel label="Price (USD)" required />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+              <input
+                type="number" min={0} step="0.01" value={priceUsd}
+                onChange={(e) => setPriceUsd(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="12.99"
+                className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              />
+            </div>
           </div>
+        </div>
+        <div>
+          <FieldLabel label="Stripe Price ID" />
+          <input
+            type="text" value={stripePriceId} onChange={(e) => setStripePriceId(e.target.value)}
+            placeholder="price_annual_..."
+            className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+          />
+          <p className="text-xs text-zinc-400 mt-1">Auto-synced to the course record on Publish.</p>
         </div>
       </div>
 
