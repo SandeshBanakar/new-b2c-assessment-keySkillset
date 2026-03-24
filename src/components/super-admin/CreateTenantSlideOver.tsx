@@ -113,7 +113,7 @@ function SuccessToast({ info, onDismiss }: { info: ToastInfo; onDismiss: () => v
           onClick={() => router.push(`/super-admin/tenants/${info.tenantId}`)}
           className="text-blue-700 hover:text-blue-800 font-medium"
         >
-          View tenant →
+          View client admin →
         </button>
       </span>
       <button onClick={onDismiss} className="ml-1 text-zinc-400 hover:text-zinc-600">
@@ -135,7 +135,7 @@ function DiscardDialog({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-md shadow-lg p-6 w-80">
-        <p className="text-base font-semibold text-zinc-900 mb-2">Discard this tenant?</p>
+        <p className="text-base font-semibold text-zinc-900 mb-2">Discard this client admin?</p>
         <p className="text-sm text-zinc-500 mb-6">Your changes will not be saved.</p>
         <div className="flex justify-end gap-3">
           <button
@@ -699,7 +699,7 @@ export default function CreateTenantSlideOver({
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center flex-shrink-0">
-          <p className="text-lg font-semibold text-zinc-900">Create Tenant</p>
+          <p className="text-lg font-semibold text-zinc-900">Create Client Admin</p>
           <button onClick={attemptClose} className="text-zinc-500 hover:text-zinc-700 cursor-pointer">
             <X className="w-5 h-5" />
           </button>
@@ -708,12 +708,12 @@ export default function CreateTenantSlideOver({
         {/* Body */}
         <div ref={bodyRef} className="flex-1 overflow-y-auto px-6 py-6">
 
-          {/* ── SECTION 1: TENANT SETUP ── */}
-          <SectionHeader title="Tenant Setup" />
+          {/* ── SECTION 1: CLIENT SETUP ── */}
+          <SectionHeader title="Client Setup" />
 
-          {/* Tenant Name */}
+          {/* Client Name */}
           <div className="mb-5" data-field="name">
-            <FieldLabel required>Tenant Name</FieldLabel>
+            <FieldLabel required>Client Name</FieldLabel>
             <TextInput
               value={form.name}
               onChange={field('name')}
@@ -1040,7 +1040,7 @@ export default function CreateTenantSlideOver({
                 className="bg-blue-700 hover:bg-blue-800 text-white rounded-md px-4 py-2 font-medium text-sm disabled:opacity-50 flex items-center gap-2"
               >
                 {form.isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                Create Tenant
+                Create Client Admin
               </button>
             </>
           )}

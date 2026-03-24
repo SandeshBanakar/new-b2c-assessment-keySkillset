@@ -1079,6 +1079,97 @@ export async function fetchAllLiveB2CCoursesForBundle(): Promise<B2CCourseBundle
   )
 }
 
+// ─── B2C Assessment picker (for B2C plan create/edit) ─────────────────────────
+
+export async function fetchAllLiveB2CAssessments(): Promise<
+  { id: string; title: string; assessmentType: string }[]
+> {
+  const { data, error } = await supabase
+    .from('content_items')
+    .select('id, title, test_type')
+    .eq('status', 'LIVE')
+    .or('audience_type.eq.B2C_ONLY,audience_type.eq.BOTH')
+    .order('title', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data as { id: string; title: string; test_type: string }[]).map(
+    (a) => ({ id: a.id, title: a.title, assessmentType: a.test_type })
+  )
+}
+
+// ─── Single Course Plan ───────────────────────────────────────────────────────
+
+export type SingleCoursePlanRow = {
+  id: string
+  name: string
+  display_name: string | null
+  price: number
+  status: string
+  course_count: number
+}
+
+export type CreateSingleCoursePlanPayload = {
+  name: string
+  display_name: string | null
+  price: number
+  stripe_price_id: string | null
+  status: 'DRAFT' | 'PUBLISHED'
+}
+
+export async function createSingleCoursePlan(
+  payload: CreateSingleCoursePlanPayload
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('plans')
+    .insert({
+      name:            payload.name,
+      display_name:    payload.display_name,
+      price:           payload.price,
+      billing_cycle:   'ANNUAL',
+      feature_bullets: [],
+      plan_audience:   'B2C',
+      audience_type:   'B2C',
+      plan_category:   'SINGLE_COURSE_PLAN',
+      scope:           'PLATFORM_WIDE',
+      status:          payload.status,
+      is_popular:      false,
+    })
+    .select('id')
+    .single()
+  if (error) throw new Error(error.message)
+  return (data as { id: string }).id
+}
+
+export async function fetchSingleCoursePlans(): Promise<SingleCoursePlanRow[]> {
+  const { data: plans, error } = await supabase
+    .from('plans')
+    .select('id, name, display_name, price, status')
+    .eq('plan_category', 'SINGLE_COURSE_PLAN')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+
+  const planList = (plans ?? []) as { id: string; name: string; display_name: string | null; price: number; status: string }[]
+  if (planList.length === 0) return []
+
+  const planIds = planList.map((p) => p.id)
+  const { data: pcmRows } = await supabase
+    .from('plan_content_map')
+    .select('plan_id')
+    .in('plan_id', planIds)
+  const countMap: Record<string, number> = {}
+  ;(pcmRows ?? []).forEach((r: { plan_id: string }) => {
+    countMap[r.plan_id] = (countMap[r.plan_id] ?? 0) + 1
+  })
+
+  return planList.map((p) => ({
+    id:           p.id,
+    name:         p.name,
+    display_name: p.display_name,
+    price:        p.price,
+    status:       p.status,
+    course_count: countMap[p.id] ?? 0,
+  }))
+}
+
 // ─── Content plan usage modal (duplicate badge) ────────────────────────────────
 
 export type PlanUsageItem = {

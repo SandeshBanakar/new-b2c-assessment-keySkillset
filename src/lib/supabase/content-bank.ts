@@ -183,6 +183,30 @@ export async function archiveContent(
   if (error) throw new Error(error.message)
 }
 
+export async function makeInactive(
+  id: string,
+  contentType: 'ASSESSMENT' | 'COURSE',
+): Promise<void> {
+  const table = contentType === 'ASSESSMENT' ? 'content_items' : 'courses'
+  const { error } = await supabase
+    .from(table)
+    .update({ status: 'INACTIVE' })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function restoreContent(
+  id: string,
+  contentType: 'ASSESSMENT' | 'COURSE',
+): Promise<void> {
+  const table = contentType === 'ASSESSMENT' ? 'content_items' : 'courses'
+  const { error } = await supabase
+    .from(table)
+    .update({ status: 'INACTIVE' })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 export async function reclassifyAudience(
   id: string,
   contentType: 'ASSESSMENT' | 'COURSE',

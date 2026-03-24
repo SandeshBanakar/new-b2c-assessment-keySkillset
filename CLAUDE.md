@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 6.2 | Updated: March 23, 2026
+# Version: 6.3 | Updated: March 24, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -216,6 +216,39 @@ or courses.id (COURSE) based on content_type column. No FK constraint.
 Plan content uses content_items table (NOT assessments table).
 plan_content_map.content_id → content_items.id for ASSESSMENT rows.
 plan_content_map.content_id → courses.id for COURSE rows.
+
+### contracts table — added column (KSS-DB-SA-012, March 24, 2026)
+content_creator_seats integer DEFAULT 0 — visible in Contract tab ONLY when
+  tenant.feature_toggle_mode === 'FULL_CREATOR'. Hidden for RUN_ONLY tenants.
+
+### course_modules table — created KSS-DB-SA-014 (March 24, 2026)
+id (uuid PK), course_id (uuid FK → courses), title (text),
+order_index (integer), created_at (timestamptz)
+RLS: OFF.
+Seeded: 5 modules for HIPAA Compliance Training course.
+
+### course_topics table — created KSS-DB-SA-014 (March 24, 2026)
+id (uuid PK), module_id (uuid FK → course_modules), title (text),
+order_index (integer), created_at (timestamptz)
+RLS: OFF.
+Seeded: 3 topics per module (15 topics total for HIPAA).
+
+### b2c_module_progress table — existing (schema verified March 24, 2026)
+id (uuid PK), user_id (uuid), module_id (uuid FK → course_modules),
+topic_id (uuid nullable FK → course_topics),
+progress_pct (integer DEFAULT 0),
+status (text — 'COMPLETED'|'IN_PROGRESS'|'NOT_STARTED'),
+updated_at (timestamptz)
+UNIQUE constraint: (user_id, module_id, topic_id) — added KSS-DB-SA-014
+Module-level rows: topic_id IS NULL. Topic-level rows: topic_id IS NOT NULL.
+Seeded progress for Priya Sharma (Pro) and Premium demo user.
+
+### plans table — plan_category constraint extended (KSS-DB-SA-013, March 24, 2026)
+plan_category CHECK now includes 'SINGLE_COURSE_PLAN' in addition to
+'ASSESSMENT' and 'COURSE_BUNDLE'.
+Valid values: 'ASSESSMENT' | 'COURSE_BUNDLE' | 'SINGLE_COURSE_PLAN'
+SINGLE_COURSE_PLAN: B2C only, platform-wide, single course linked via plan_content_map.
+Managed from Plans & Pricing → Tab 2 (Single Course Plan section).
 
 ### plans table — full field list (KSS-DB-SA-002 + KSS-DB-SA-003 + KSS-DB-SA-004)
 plan_type text NOT NULL            — 'WHOLE_PLATFORM' | 'CATEGORY_BUNDLE'
@@ -919,6 +952,26 @@ No Team Manager persona selector — role permanently removed from V1.
 🟡 KSS-SA-005   Audit Log
 🟡 KSS-SA-006   Analytics
 🟡 KSS-SA-007   Marketing Config
+✅ KSS-SA-011   Platform overhaul (March 24, 2026) — 14-item SA + B2C changes:
+               DB: KSS-DB-SA-012 — contracts.content_creator_seats column
+               DB: KSS-DB-SA-013 — plans.plan_category constraint + SINGLE_COURSE_PLAN
+               DB: KSS-DB-SA-014 — course_modules, course_topics, b2c_module_progress seeding
+               - Assessment Plans tab: two tables (Platform Plans + Category Plans) + 3-dot menus
+               - Content Bank: no Draft tab; 3-dot kebab menus; warning modals before actions
+               - Logout button in SA sidebar footer
+               - SA sidebar: "How It Works" tooltip on Content Bank
+               - EditDetailsSlideOver reordered: Section 1=Tenant Setup, Section 2=Address+Locale,
+                 Section 3=Client Profile (contact + CA assign inline)
+               - Contract tab: read-only by default + Edit button; Learner Seats + Creator Seats
+                 (Creator Seats shown for FULL_CREATOR only)
+               - Global Toast system: ToastProvider + useToast() hook (@/components/ui/Toast)
+               - SA UI: Tenant → Client Admin rename across tenants pages + sidebar nav
+               - B2C User Profile: fully fluid width, removed 4 info cards from Assessment section
+               - Course accordion in B2C profile: inline row expand → module list + topics + %
+               - Single Course Plan creation form (Tab 2 of Plans & Pricing, plan_category=SINGLE_COURSE_PLAN)
+               - Assessment picker added to B2C Create Plan form (Section 6) + EditPlanSlideOver (Section 6)
+               - B2CEditForm assessment picker: additive only (remove via plan detail page)
+
 ✅ KSS-SA-008   Master Organisation — B2C Users DONE (March 23, 2026):
                - DB: KSS-DB-SA-011 — users.status, users.stripe_subscription_id,
                  attempts.passed, b2c_course_progress table
@@ -1179,6 +1232,19 @@ Run this full checklist before presenting any code:
 [ ] derivePlanType() uses plan.scope — never plan.name
 [ ] CourseBundleEditForm shown for plan_category === 'COURSE_BUNDLE' in EditPlanSlideOver
 [ ] Purchasable courses allowed in course bundles (CP-Q1e=B) — no gate for bundles
+[ ] Contract tab: read-only by default — Edit button (Pencil, blue-bordered) unlocks editing
+[ ] Creator Seats field in Contract tab: visible ONLY when feature_toggle_mode === 'FULL_CREATOR'
+[ ] "Learner Seats" label used everywhere (NOT "Seat Count") in Contract tab
+[ ] Global Toast via useToast() from @/components/ui/Toast — no local toast state in pages
+[ ] SA sidebar shows "B2C Users" under "Master Organisation" nav group
+[ ] Tenant renamed to Client Admin in SA tenants pages and nav (display/UI only)
+[ ] B2C User Profile: no 4 info cards in Assessment section — stats shown inline
+[ ] Course row in B2C profile: click expands inline accordion showing modules + topics + %
+[ ] Module progress uses b2c_module_progress (progress_pct int, status text) — NOT completed/completed_at
+[ ] SINGLE_COURSE_PLAN plans: B2C only, platform-wide, annual, single course linked via plan_content_map
+[ ] B2C Create Plan form has Section 6 — Assessment picker (LIVE B2C assessments, search only)
+[ ] EditPlanSlideOver B2CEditForm has Section 6 — Add Assessments (additive only)
+[ ] content_creator_seats on contracts table: DEFAULT 0, visible for FULL_CREATOR only in Contract tab
 
 ---
 
@@ -1788,7 +1854,7 @@ Used in:
 
 ---
 
-*CLAUDE.md — keySkillset v6.0 — Updated March 23, 2026*
+*CLAUDE.md — keySkillset v6.3 — Updated March 24, 2026*
 *Source of truth for Claude Code sessions*
 *PRD updates: use Confluence MCP tools in Claude Code or Claude.ai*
 *Do not edit this file manually*

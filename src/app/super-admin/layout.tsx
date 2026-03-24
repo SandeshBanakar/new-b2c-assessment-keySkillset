@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useRef, useState, useEffect } from 'react'
+import { ToastProvider } from '@/components/ui/Toast'
 import {
   LayoutDashboard,
   Library,
@@ -17,6 +19,8 @@ import {
   BarChart2,
   Shield,
   PlaySquare,
+  LogOut,
+  MoreHorizontal,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -37,7 +41,7 @@ function NavItem({
       href={href}
       className={
         isActive
-          ? 'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700 border-l-2 border-blue-700 pl-[6px]'
+          ? 'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700 border-l-2 border-blue-700 pl-1.5'
           : 'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm font-medium text-zinc-600 cursor-pointer hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
       }
     >
@@ -53,9 +57,22 @@ export default function SuperAdminLayout({
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    if (menuOpen) document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [menuOpen])
+
   return (
+    <ToastProvider>
     <div className="flex h-screen overflow-hidden bg-zinc-50">
-      <aside className="w-60 flex-shrink-0 flex flex-col bg-white border-r border-zinc-200 h-screen fixed left-0 top-0 overflow-y-auto">
+      <aside className="w-60 shrink-0 flex flex-col bg-white border-r border-zinc-200 h-screen fixed left-0 top-0 overflow-y-auto">
         <div className="px-4 py-4 border-b border-zinc-200">
           <p className="text-sm font-semibold text-zinc-900">keySkillset</p>
           <span className="text-xs font-medium bg-blue-50 text-blue-700 rounded-md px-2 py-0.5 mt-1 inline-block">
@@ -79,9 +96,9 @@ export default function SuperAdminLayout({
           <NavItem href="/super-admin/content-creators" icon={PenTool} label="Content Creators" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
-            Organisations
+            Client Admins
           </p>
-          <NavItem href="/super-admin/tenants" icon={Building2} label="Tenants" />
+          <NavItem href="/super-admin/tenants" icon={Building2} label="Client Admins" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Course Creation
@@ -104,15 +121,35 @@ export default function SuperAdminLayout({
           <NavItem href="/super-admin/audit-log" icon={Shield} label="Audit Log" />
         </nav>
 
-        <div className="mt-auto px-4 py-4 border-t border-zinc-200">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-700">
-              SA
+        <div className="mt-auto px-3 py-3 border-t border-zinc-200">
+          <div ref={menuRef} className="relative">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-md bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-700 shrink-0">
+                SA
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-zinc-900 truncate">Super Admin</p>
+                <p className="text-xs text-zinc-400 truncate">SUPER_ADMIN</p>
+              </div>
+              <button
+                onClick={() => setMenuOpen((o) => !o)}
+                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors shrink-0"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
             </div>
-            <div>
-              <p className="text-sm font-medium text-zinc-900">Super Admin</p>
-              <p className="text-xs text-zinc-400">SUPER_ADMIN</p>
-            </div>
+
+            {menuOpen && (
+              <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border border-zinc-200 rounded-md shadow-lg py-1 z-50">
+                <button
+                  onClick={() => { setMenuOpen(false); router.push('/') }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-zinc-400" />
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -121,5 +158,6 @@ export default function SuperAdminLayout({
         {children}
       </main>
     </div>
+    </ToastProvider>
   )
 }

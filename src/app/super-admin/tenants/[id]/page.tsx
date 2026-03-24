@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
 import PlansTab from '@/components/tenant-detail/PlansTab'
+import { useToast } from '@/components/ui/Toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ interface Contract {
   id?: string
   tenant_id: string
   seat_count: number
+  content_creator_seats?: number | null
   arr: number
   start_date: string
   end_date: string
@@ -360,13 +362,13 @@ function TabOverview({
         )}
       </div>
 
-      {/* Row 1: Tenant Details + Seat Usage */}
+      {/* Row 1: Client Admin Details + Seat Usage */}
       <div className="flex gap-6">
-        {/* Tenant Details card */}
+        {/* Client Admin Details card */}
         <div className="flex-1 bg-white rounded-md border border-zinc-200 p-5">
-          <p className="text-sm font-semibold text-zinc-900 mb-4">Tenant Details</p>
+          <p className="text-sm font-semibold text-zinc-900 mb-4">Client Admin Details</p>
           <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 items-start">
-            <p className="text-sm text-zinc-500">Tenant Name</p>
+            <p className="text-sm text-zinc-500">Client Name</p>
             <p className="text-sm text-zinc-900">{tenant.name}</p>
 
             <p className="text-sm text-zinc-500">Type</p>
@@ -1062,8 +1064,13 @@ function TabContract({
   onSaved: (c: Contract) => void
   featureToggleMode: string
 }) {
+  const { showToast } = useToast()
+  const isFullCreator = featureToggleMode === 'FULL_CREATOR'
+
+  const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<Omit<Contract, 'tenant_id' | 'id' | 'updated_at'>>({
     seat_count: contract?.seat_count ?? 0,
+    content_creator_seats: contract?.content_creator_seats ?? 0,
     arr: Math.max(0, Number(contract?.arr) || 0) / 100,
     start_date: contract?.start_date?.split('T')[0] ?? '',
     end_date: contract?.end_date?.split('T')[0] ?? '',
@@ -1072,9 +1079,24 @@ function TabContract({
     plan_id: contract?.plan_id ?? null,
   })
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState(false)
   const [arrError, setArrError] = useState('')
-  const set = (key: keyof typeof form, val: string | number) =>
+
+  function startEdit() {
+    setForm({
+      seat_count: contract?.seat_count ?? 0,
+      content_creator_seats: contract?.content_creator_seats ?? 0,
+      arr: Math.max(0, Number(contract?.arr) || 0) / 100,
+      start_date: contract?.start_date?.split('T')[0] ?? '',
+      end_date: contract?.end_date?.split('T')[0] ?? '',
+      stripe_subscription_id: contract?.stripe_subscription_id ?? '',
+      notes: contract?.notes ?? '',
+      plan_id: contract?.plan_id ?? null,
+    })
+    setArrError('')
+    setEditing(true)
+  }
+
+  const set = (key: keyof typeof form, val: string | number | null) =>
     setForm(prev => ({ ...prev, [key]: val }))
 
   const save = async () => {
@@ -1089,6 +1111,7 @@ function TabContract({
       const payload = {
         tenant_id: tenantId,
         seat_count: Number(form.seat_count),
+        content_creator_seats: isFullCreator ? Number(form.content_creator_seats ?? 0) : 0,
         arr: Math.round(Number(form.arr) * 100),
         start_date: form.start_date || null,
         end_date: form.end_date || null,
@@ -1111,116 +1134,147 @@ function TabContract({
         after_state: { seat_count: payload.seat_count, arr: payload.arr },
       })
       onSaved({ ...payload, id: contract?.id } as Contract)
-      setToast(true)
+      setEditing(false)
+      showToast('Contract saved successfully.')
+    } catch {
+      showToast('Failed to save contract.', 'error')
     } finally {
       setSaving(false)
     }
   }
 
   const inputCls = 'text-sm border border-zinc-200 rounded-md px-3 py-1.5 w-full focus:ring-1 focus:ring-blue-700 outline-none'
+  const readVal = (v: string | number | null | undefined) =>
+    v != null && v !== '' ? String(v) : <span className="text-zinc-400">—</span>
 
   return (
     <div className="bg-white rounded-md border border-zinc-200 p-5">
-      <p className="text-sm font-semibold text-zinc-900 mb-4">Contract Details</p>
 
-      {/* Contract Details form */}
-      <div className="space-y-4">
-
-        {/* Stripe Subscription ID */}
-        <div>
-          <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-            Stripe Subscription ID
-          </label>
-          <input
-            type="text"
-            value={form.stripe_subscription_id}
-            onChange={e => set('stripe_subscription_id', e.target.value)}
-            className={inputCls}
-          />
-        </div>
-
-        {/* Row 2 — Seat Count + ARR */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-              Seat Count
-            </label>
-            <input
-              type="number"
-              value={form.seat_count}
-              onChange={e => set('seat_count', e.target.value)}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-              ARR ($)
-            </label>
-            <input
-              type="text"
-              value={form.arr}
-              onChange={e => { set('arr', e.target.value); setArrError('') }}
-              placeholder="0.00"
-              className={`${inputCls} ${arrError ? 'border-rose-400' : ''}`}
-            />
-            {arrError && <p className="text-xs text-rose-600 mt-1">{arrError}</p>}
-          </div>
-        </div>
-
-        {/* Row 3 — Start Date + End Date */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={form.start_date}
-              onChange={e => set('start_date', e.target.value)}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={form.end_date}
-              onChange={e => set('end_date', e.target.value)}
-              className={inputCls}
-            />
-          </div>
-        </div>
-
-        {/* Row 4 — Notes full width */}
-        <div>
-          <label className="block text-xs font-medium text-zinc-600 mb-1.5">
-            Notes
-          </label>
-          <textarea
-            value={form.notes}
-            onChange={e => set('notes', e.target.value)}
-            rows={3}
-            className={`${inputCls} resize-none`}
-          />
-        </div>
-
+      {/* Section 1 — Contract Details */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-semibold text-zinc-900">Contract Details</p>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800 border border-blue-200 rounded-md px-3 py-1.5 hover:bg-blue-50 transition-colors"
+          >
+            <Pencil className="w-3 h-3" />
+            Edit
+          </button>
+        )}
       </div>
-      <button
-        onClick={save}
-        disabled={saving}
-        className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 mt-4 flex items-center gap-2 disabled:opacity-70"
-      >
-        {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-        Save Contract
-      </button>
-      {contract?.updated_at && (
-        <p className="text-xs text-zinc-400 mt-2">Last updated {formatDate(contract.updated_at)}</p>
+
+      {editing ? (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1.5">Stripe Subscription ID</label>
+            <input type="text" value={form.stripe_subscription_id} onChange={e => set('stripe_subscription_id', e.target.value)} className={inputCls} />
+          </div>
+
+          <div className={`grid gap-4 ${isFullCreator ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Learner Seats</label>
+              <input type="number" value={form.seat_count} onChange={e => set('seat_count', e.target.value)} className={inputCls} />
+            </div>
+            {isFullCreator && (
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1.5">Creator Seats</label>
+                <input type="number" value={form.content_creator_seats ?? 0} onChange={e => set('content_creator_seats', e.target.value)} className={inputCls} />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">ARR ($)</label>
+              <input
+                type="text" value={form.arr}
+                onChange={e => { set('arr', e.target.value); setArrError('') }}
+                placeholder="0.00"
+                className={`${inputCls} ${arrError ? 'border-rose-400' : ''}`}
+              />
+              {arrError && <p className="text-xs text-rose-600 mt-1">{arrError}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Start Date</label>
+              <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">End Date</label>
+              <input type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1.5">Notes</label>
+            <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} className={`${inputCls} resize-none`} />
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={save}
+              disabled={saving}
+              className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70"
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Contract
+            </button>
+            <button
+              onClick={() => { setEditing(false); setArrError('') }}
+              className="text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md px-4 py-2 hover:bg-zinc-50"
+            >
+              Cancel
+            </button>
+            {contract?.updated_at && (
+              <p className="text-xs text-zinc-400 ml-auto">Last updated {formatDate(contract.updated_at)}</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        // Read-only view
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+            <div>
+              <p className="text-xs text-zinc-400">Stripe Subscription ID</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5 font-mono text-xs">{readVal(contract?.stripe_subscription_id)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-400">ARR</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.arr != null ? `$${(contract.arr / 100).toFixed(2)}` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-400">Learner Seats</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5">{readVal(contract?.seat_count)}</p>
+            </div>
+            {isFullCreator && (
+              <div>
+                <p className="text-xs text-zinc-400">Creator Seats</p>
+                <p className="text-sm font-medium text-zinc-900 mt-0.5">{readVal(contract?.content_creator_seats)}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-zinc-400">Start Date</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.start_date ? formatDate(contract.start_date) : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-400">End Date</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.end_date ? formatDate(contract.end_date) : '—'}</p>
+            </div>
+          </div>
+          {contract?.notes && (
+            <div>
+              <p className="text-xs text-zinc-400">Notes</p>
+              <p className="text-sm text-zinc-700 mt-0.5">{contract.notes}</p>
+            </div>
+          )}
+          {contract?.updated_at && (
+            <p className="text-xs text-zinc-400 pt-1">Last updated {formatDate(contract.updated_at)}</p>
+          )}
+        </div>
       )}
 
       {/* Section 2 — Payment Overview */}
-      {form.stripe_subscription_id ? (
+      {contract?.stripe_subscription_id ? (
         <div className="mt-6 pt-6 border-t border-zinc-100">
           <p className="text-sm font-semibold text-zinc-900 mb-4">Payment Overview</p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -1230,7 +1284,7 @@ function TabContract({
               ['Latest Invoice Status', 'Paid'],
               ['Latest Invoice Amount', '$4,200.00'],
               ['Renewal Date', '01-01-2027'],
-              ['MRR', form.arr ? `$${(Number(form.arr) / 12).toFixed(2)}` : '—'],
+              ['MRR', contract?.arr != null ? `$${((contract.arr / 100) / 12).toFixed(2)}` : '—'],
             ].map(([label, value]) => (
               <div key={label} className="flex">
                 <p className="text-xs text-zinc-500 w-44 shrink-0">{label}</p>
@@ -1238,10 +1292,7 @@ function TabContract({
               </div>
             ))}
           </div>
-          <a
-            href="#"
-            className="inline-block mt-3 text-xs font-medium text-blue-700 hover:underline"
-          >
+          <a href="#" className="inline-block mt-3 text-xs font-medium text-blue-700 hover:underline">
             View in Stripe Dashboard →
           </a>
         </div>
@@ -1281,7 +1332,6 @@ function TabContract({
         )}
       </div>
 
-      {toast && <Toast message="Contract saved" onDismiss={() => setToast(false)} />}
     </div>
   )
 }
@@ -1513,7 +1563,7 @@ export default function TenantDetailPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm mb-4">
         <Link href="/super-admin/tenants" className="text-zinc-500 hover:text-zinc-700">
-          Tenants
+          Client Admins
         </Link>
         <ChevronRight className="w-4 h-4 text-zinc-400" />
         <span className="text-zinc-900 font-medium">{tenant.name}</span>

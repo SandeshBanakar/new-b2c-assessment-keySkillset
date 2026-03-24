@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, Pencil } from 'lucide-react'
+import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, MoreVertical, Eye, Pencil, Archive, AlertTriangle, X, Loader2 } from 'lucide-react'
 import {
   fetchPlans,
   derivePlanType,
@@ -10,10 +10,13 @@ import {
   fetchB2CCoursesForPricing,
   updateCoursePricing,
   fetchCourseBundlePlans,
+  fetchSingleCoursePlans,
+  updatePlan,
   type PlanRow,
   type B2BPlanCard,
   type CoursePricingRow,
   type CourseBundlePlanRow,
+  type SingleCoursePlanRow,
 } from '@/lib/supabase/plans'
 import { PlanStatusBadge } from '@/components/plans/PlanStatusBadge'
 import { PlanTypeBadge } from '@/components/plans/PlanTypeBadge'
@@ -21,137 +24,241 @@ import { EditPlanSlideOver } from '@/components/plans/EditPlanSlideOver'
 
 type Tab = 'assessment-plans' | 'single-course-plan' | 'course-bundle-plans' | 'b2b-plans'
 
-// Tier column order for the B2C swimlane — maps tier DB value to display label
-const B2C_TIERS = [
-  { tier: 'BASIC',   label: 'Basic' },
-  { tier: 'PRO',     label: 'Professional' },
-  { tier: 'PREMIUM', label: 'Premium' },
-] as const
-
 function formatINR(value: number): string {
   return `₹${value.toLocaleString('en-IN')}`
 }
 
-// ─── Free column (read-only reference, no plan record) ────────────────────────
-function FreeTierColumn() {
-  return (
-    <div className="flex flex-col">
-      <div className="px-4 h-15 bg-zinc-50 border-b border-zinc-200 flex flex-col items-center justify-center">
-        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Free</p>
-        <p className="text-xs text-zinc-400 mt-0.5">Default</p>
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-500">₹0</div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">—</div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">—</div>
-      <div className="px-4 h-11 flex items-center justify-center">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
-          Read-only
-        </span>
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">—</div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">1 attempt</div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-400">—</div>
-    </div>
-  )
-}
-
-// ─── Swimlane column for a B2C tier plan ──────────────────────────────────────
-function PlanColumn({
+// ─── Archive Warning Modal ────────────────────────────────────────────────────
+function ArchivePlanModal({
   plan,
-  label,
-  onEdit,
+  onClose,
+  onConfirm,
 }: {
-  plan: PlanRow | undefined
-  label: string
-  onEdit: (plan: PlanRow) => void
+  plan: PlanRow
+  onClose: () => void
+  onConfirm: () => Promise<void>
 }) {
-  if (!plan) {
-    return (
-      <div className="flex flex-col">
-        <div className="px-4 h-15 bg-zinc-50 border-b border-zinc-200 flex flex-col items-center justify-center">
-          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">{label}</p>
-          <p className="text-xs text-zinc-300 mt-0.5">Not configured</p>
-        </div>
-        {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="px-4 h-11 flex items-center justify-center text-sm text-zinc-300">—</div>
-        ))}
-      </div>
-    )
+  const [saving, setSaving] = useState(false)
+  const subscriberCount = plan.plan_subscribers?.subscriber_count ?? 0
+
+  async function handleConfirm() {
+    setSaving(true)
+    try { await onConfirm() } finally { setSaving(false) }
   }
 
-  const sub = plan.plan_subscribers
-  const bulletCount = Array.isArray(plan.feature_bullets) ? plan.feature_bullets.length : 0
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-md border border-zinc-200 shadow-xl w-full max-w-md">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+            <h2 className="text-sm font-semibold text-zinc-900">Archive Plan</h2>
+            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="flex items-start gap-3 p-3 rounded-md bg-rose-50 border border-rose-100">
+              <AlertTriangle className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-rose-700">{plan.name}</p>
+                <p className="text-xs text-rose-600 mt-0.5">
+                  {subscriberCount > 0
+                    ? `${subscriberCount} subscriber${subscriberCount !== 1 ? 's' : ''} on this plan.`
+                    : 'No active subscribers on this plan.'}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-zinc-700">
+              This action is destructive. Make sure you inform the users via Salesforce about this action.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-100">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50">
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={saving}
+              className="px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-md disabled:opacity-50 flex items-center gap-2"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {saving ? 'Archiving…' : 'Archive Plan'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── Plan Actions 3-dot menu ──────────────────────────────────────────────────
+function PlanActionsMenu({
+  plan,
+  onView,
+  onEdit,
+  onArchive,
+}: {
+  plan: PlanRow
+  onView: () => void
+  onEdit: () => void
+  onArchive: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    if (open) document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  const isArchived = plan.status === 'ARCHIVED'
 
   return (
-    <div className="flex flex-col group">
-      <div className="px-4 h-15 bg-zinc-50 border-b border-zinc-200 flex flex-col items-center justify-center">
-        <p className="text-xs font-semibold text-zinc-700 uppercase tracking-wide">{label}</p>
-        <button
-          onClick={() => onEdit(plan)}
-          className="mt-1 inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 font-medium opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Pencil className="w-3 h-3" /> Edit
-        </button>
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-700 font-medium">
-        {plan.price === 0 ? 'Free' : `${formatINR(plan.price)}/mo`}
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
-        {sub?.subscriber_count ?? 0}
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
-        {formatINR((plan.price ?? 0) * (sub?.subscriber_count ?? 0))}
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center">
-        <PlanStatusBadge status={plan.status} />
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center">
-        <PlanTypeBadge type={derivePlanType(plan.scope)} />
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
-        {plan.max_attempts_per_assessment ?? '—'}
-      </div>
-      <div className="px-4 h-11 flex items-center justify-center text-sm text-zinc-600">
-        {bulletCount > 0 ? `${bulletCount} bullet${bulletCount !== 1 ? 's' : ''}` : '—'}
-      </div>
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-7 z-20 w-36 bg-white border border-zinc-200 rounded-md shadow-md py-1">
+          <button
+            onClick={() => { setOpen(false); onView() }}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+          >
+            <Eye className="w-3.5 h-3.5 text-zinc-400" /> View
+          </button>
+          <button
+            onClick={() => { setOpen(false); onEdit() }}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+          >
+            <Pencil className="w-3.5 h-3.5 text-zinc-400" /> Edit
+          </button>
+          {!isArchived && (
+            <button
+              onClick={() => { setOpen(false); onArchive() }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
+            >
+              <Archive className="w-3.5 h-3.5" /> Archive
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-const SWIMLANE_ROW_LABELS = [
-  'Price',
-  'Subscribers',
-  'MRR',
-  'Status',
-  'Scope',
-  'Max Attempts',
-  'Feature Bullets',
-]
+// ─── Shared plan table ────────────────────────────────────────────────────────
+function PlanTable({
+  plans,
+  showScope,
+  onView,
+  onEdit,
+  onArchive,
+}: {
+  plans: PlanRow[]
+  showScope?: boolean
+  onView: (plan: PlanRow) => void
+  onEdit: (plan: PlanRow) => void
+  onArchive: (plan: PlanRow) => void
+}) {
+  if (plans.length === 0) return (
+    <p className="text-sm text-zinc-400 px-4 py-6 text-center">No plans found.</p>
+  )
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 bg-zinc-50">
+            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Display Name</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹/mo)</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Subscribers</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">MRR</th>
+            {showScope && <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Scope</th>}
+            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Max Attempts</th>
+            <th className="px-4 py-3 w-10" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-100">
+          {plans.map((plan) => {
+            const sub = plan.plan_subscribers
+            const mrr = (plan.price ?? 0) * (sub?.subscriber_count ?? 0)
+            return (
+              <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
+                <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
+                <td className="px-4 py-3 text-zinc-500">{plan.display_name ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 text-right text-zinc-700">
+                  {plan.price === 0 ? <span className="text-zinc-400">Free</span> : `${formatINR(plan.price)}/mo`}
+                </td>
+                <td className="px-4 py-3 text-right text-zinc-600">{sub?.subscriber_count ?? 0}</td>
+                <td className="px-4 py-3 text-right text-zinc-600">{formatINR(mrr)}</td>
+                {showScope && (
+                  <td className="px-4 py-3 text-center">
+                    <PlanTypeBadge type={derivePlanType(plan.scope)} />
+                  </td>
+                )}
+                <td className="px-4 py-3 text-center">
+                  <PlanStatusBadge status={plan.status} />
+                </td>
+                <td className="px-4 py-3 text-right text-zinc-600">{plan.max_attempts_per_assessment ?? '—'}</td>
+                <td className="px-4 py-3 text-right">
+                  <PlanActionsMenu
+                    plan={plan}
+                    onView={() => onView(plan)}
+                    onEdit={() => onEdit(plan)}
+                    onArchive={() => onArchive(plan)}
+                  />
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 // ─── Tab 1: Assessment Plans ──────────────────────────────────────────────────
 function AssessmentPlansTab({
   plans,
   onEdit,
   onCreateB2C,
+  onPlanArchived,
 }: {
   plans: PlanRow[]
   onEdit: (plan: PlanRow) => void
   onCreateB2C: () => void
+  onPlanArchived: () => void
 }) {
-  const b2cPlans = plans.filter((p) => p.plan_audience === 'B2C')
+  const router = useRouter()
+  const [archivingPlan, setArchivingPlan] = useState<PlanRow | null>(null)
+
+  const b2cPlans = plans.filter((p) => p.plan_audience === 'B2C' && p.plan_category === 'ASSESSMENT')
   const platformPlans = b2cPlans.filter((p) => p.scope === 'PLATFORM_WIDE')
   const categoryPlans = b2cPlans.filter((p) => p.scope === 'CATEGORY_BUNDLE')
-
-  const planByTier = (tier: string) => platformPlans.find((p) => p.tier === tier)
 
   const b2cMRR = b2cPlans.reduce(
     (sum, p) => sum + (p.price ?? 0) * (p.plan_subscribers?.subscriber_count ?? 0),
     0
   )
 
+  async function handleArchive(plan: PlanRow) {
+    await updatePlan(plan.id, { status: 'ARCHIVED' })
+    setArchivingPlan(null)
+    onPlanArchived()
+  }
+
   return (
     <div>
-      {/* MRR strip — inside Tab 1 only, B2C plans only */}
+      {/* MRR strip — inside Tab 1 only */}
       <div className="bg-white border border-zinc-200 rounded-md px-5 py-4 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-zinc-400" />
@@ -161,95 +268,43 @@ function AssessmentPlansTab({
         <span className="text-xs text-zinc-400">Demo data — live figures in production</span>
       </div>
 
-      {/* Section header + Create button */}
-      <div className="flex items-center justify-between mb-4">
+      {/* Platform Plans */}
+      <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-zinc-700">Platform Plans</h2>
         <button
           onClick={onCreateB2C}
           className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Create Assess Plan
+          Create Assessment Plan
         </button>
       </div>
-
-      {/* Swimlane */}
-      <div className="bg-white border border-zinc-200 rounded-md overflow-x-auto mb-8">
-        <div className="grid grid-cols-[140px_1fr_1fr_1fr_1fr] min-w-175 divide-x divide-zinc-200">
-          {/* Row label column */}
-          <div className="flex flex-col">
-            <div className="px-4 py-3 h-15 bg-zinc-50 border-b border-zinc-200 flex items-center">
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Plan</p>
-            </div>
-            {SWIMLANE_ROW_LABELS.map((row) => (
-              <div key={row} className="px-4 h-11 flex items-center text-xs font-medium text-zinc-500">
-                {row}
-              </div>
-            ))}
-          </div>
-
-          {/* Free column */}
-          <FreeTierColumn />
-
-          {/* B2C tier columns */}
-          {B2C_TIERS.map((t) => (
-            <PlanColumn
-              key={t.tier}
-              plan={planByTier(t.tier)}
-              label={t.label}
-              onEdit={onEdit}
-            />
-          ))}
-        </div>
+      <div className="mb-8">
+        <PlanTable
+          plans={platformPlans}
+          onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
+          onEdit={onEdit}
+          onArchive={setArchivingPlan}
+        />
       </div>
 
       {/* Category Plans */}
-      {categoryPlans.length > 0 && (
-        <>
-          <h2 className="text-sm font-semibold text-zinc-700 mb-3">Category Plans</h2>
-          <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 bg-zinc-50">
-                  {['Plan', 'Price', 'Subscribers', 'MRR', 'Status', 'Scope', 'Max Attempts', ''].map((h) => (
-                    <th
-                      key={h}
-                      className={`px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide ${h === 'Plan' || h === '' ? 'text-left' : 'text-right'}`}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {categoryPlans.map((plan) => {
-                  const sub = plan.plan_subscribers
-                  return (
-                    <tr key={plan.id} className="hover:bg-zinc-50 transition-colors group">
-                      <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
-                      <td className="px-4 py-3 text-right text-zinc-700">
-                        {plan.price === 0 ? 'Free' : `${formatINR(plan.price)}/mo`}
-                      </td>
-                      <td className="px-4 py-3 text-right text-zinc-600">{sub?.subscriber_count ?? 0}</td>
-                      <td className="px-4 py-3 text-right text-zinc-600">{formatINR((plan.price ?? 0) * (sub?.subscriber_count ?? 0))}</td>
-                      <td className="px-4 py-3 text-right"><PlanStatusBadge status={plan.status} /></td>
-                      <td className="px-4 py-3 text-right"><PlanTypeBadge type={derivePlanType(plan.scope)} /></td>
-                      <td className="px-4 py-3 text-right text-zinc-600">{plan.max_attempts_per_assessment ?? '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => onEdit(plan)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-blue-700 hover:text-blue-800 font-medium"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+      <h2 className="text-sm font-semibold text-zinc-700 mb-3">Category Plans</h2>
+      <PlanTable
+        plans={categoryPlans}
+        showScope
+        onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
+        onEdit={onEdit}
+        onArchive={setArchivingPlan}
+      />
+
+      {/* Archive modal */}
+      {archivingPlan && (
+        <ArchivePlanModal
+          plan={archivingPlan}
+          onClose={() => setArchivingPlan(null)}
+          onConfirm={() => handleArchive(archivingPlan)}
+        />
       )}
     </div>
   )
@@ -472,16 +527,98 @@ function CourseBundlePlansSection() {
 }
 
 // ─── Tab 2: Single Course Plan ────────────────────────────────────────────────
-function SingleCoursePlanTab() {
+
+function SingleCoursePlansSection({ onCreateSingleCoursePlan }: { onCreateSingleCoursePlan: () => void }) {
+  const router = useRouter()
+  const [plans, setPlans] = useState<SingleCoursePlanRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchSingleCoursePlans()
+      .then(setPlans)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="h-16 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
+  if (error) return <div className="h-16 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
+  if (plans.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-24 gap-1">
+      <BookOpen className="w-5 h-5 text-zinc-300" />
+      <p className="text-sm text-zinc-500">No single course plans yet.</p>
+      <p className="text-xs text-zinc-400">Use the &quot;Create Single Course Plan&quot; button above to add one.</p>
+    </div>
+  )
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 bg-zinc-50">
+            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Display Name</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹)</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
+            <th className="px-4 py-3" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-100">
+          {plans.map((plan) => (
+            <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
+              <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
+              <td className="px-4 py-3 text-zinc-500">{plan.display_name ?? <span className="text-zinc-300">—</span>}</td>
+              <td className="px-4 py-3 text-right text-zinc-700 font-medium">{formatINR(plan.price)}</td>
+              <td className="px-4 py-3 text-center text-zinc-500">{plan.course_count}</td>
+              <td className="px-4 py-3 text-center">
+                <PlanStatusBadge status={plan.status} />
+              </td>
+              <td className="px-4 py-3 text-right">
+                <button
+                  onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
+                  className="text-xs text-blue-700 hover:text-blue-800 font-medium"
+                >
+                  View
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function SingleCoursePlanTab({ onCreateSingleCoursePlan }: { onCreateSingleCoursePlan: () => void }) {
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="text-sm font-semibold text-zinc-700">Individual Course Pricing</h2>
-        <p className="text-xs text-zinc-400 mt-0.5">
-          Set pricing for individually purchasable LIVE B2C courses. Purchasable courses cannot be added to assessment subscription plans.
-        </p>
+      {/* Section header */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-700">Single Course Plans</h2>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Set pricing for individually purchasable LIVE B2C courses and manage their plan records.
+          </p>
+        </div>
+        <button
+          onClick={onCreateSingleCoursePlan}
+          className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          Create Single Course Plan
+        </button>
       </div>
-      <IndividualCoursePricingSection />
+
+      {/* Course pricing table */}
+      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Individual Course Pricing</p>
+      <div className="mb-8">
+        <IndividualCoursePricingSection />
+      </div>
+
+      {/* Single Course Plan records */}
+      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Plan Records</p>
+      <SingleCoursePlansSection onCreateSingleCoursePlan={onCreateSingleCoursePlan} />
     </div>
   )
 }
@@ -657,10 +794,13 @@ export default function PlansPage() {
           plans={plans}
           onEdit={setEditingPlan}
           onCreateB2C={() => router.push('/super-admin/plans-pricing/new?audience=B2C')}
+          onPlanArchived={loadPlans}
         />
       )}
       {activeTab === 'single-course-plan' && (
-        <SingleCoursePlanTab />
+        <SingleCoursePlanTab
+          onCreateSingleCoursePlan={() => router.push('/super-admin/plans-pricing/new?audience=B2C&category=SINGLE_COURSE_PLAN')}
+        />
       )}
       {activeTab === 'course-bundle-plans' && (
         <CourseBundlePlansTab

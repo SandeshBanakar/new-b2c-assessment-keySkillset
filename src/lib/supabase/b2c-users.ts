@@ -191,6 +191,90 @@ export async function fetchUserCourseProgress(userId: string): Promise<UserCours
   })
 }
 
+// ─── Course Module Progress ───────────────────────────────────────────────────
+
+export type CourseTopic = {
+  id: string
+  title: string
+  orderIndex: number
+  completed: boolean
+}
+
+export type CourseModule = {
+  id: string
+  title: string
+  orderIndex: number
+  progressPct: number
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED'
+  topics: CourseTopic[]
+}
+
+export async function fetchCourseModuleProgress(
+  courseId: string,
+  userId: string,
+): Promise<CourseModule[]> {
+  const { data: modules, error: modErr } = await supabase
+    .from('course_modules')
+    .select('id, title, order_index')
+    .eq('course_id', courseId)
+    .order('order_index')
+
+  if (modErr) throw new Error(modErr.message)
+  if (!modules || modules.length === 0) return []
+
+  const moduleIds = modules.map((m: { id: string }) => m.id)
+
+  const [{ data: modProgress }, { data: topics }] = await Promise.all([
+    supabase
+      .from('b2c_module_progress')
+      .select('module_id, progress_pct, status')
+      .eq('user_id', userId)
+      .in('module_id', moduleIds)
+      .is('topic_id', null),
+    supabase
+      .from('course_topics')
+      .select('id, module_id, title, order_index')
+      .in('module_id', moduleIds)
+      .order('order_index'),
+  ])
+
+  const topicIds = (topics ?? []).map((t: { id: string }) => t.id)
+  const { data: topicProgress } = topicIds.length > 0
+    ? await supabase
+        .from('b2c_module_progress')
+        .select('topic_id, status')
+        .eq('user_id', userId)
+        .in('topic_id', topicIds)
+    : { data: [] }
+
+  return modules.map((m: { id: string; title: string; order_index: number }) => {
+    const mp = (modProgress ?? []).find((p: { module_id: string }) => p.module_id === m.id) as
+      | { progress_pct: number; status: string }
+      | undefined
+    const moduleTopics = (topics ?? [])
+      .filter((t: { module_id: string }) => t.module_id === m.id)
+      .map((t: { id: string; title: string; order_index: number }) => {
+        const tp = (topicProgress ?? []).find((p: { topic_id: string }) => p.topic_id === t.id) as
+          | { status: string }
+          | undefined
+        return {
+          id: t.id,
+          title: t.title,
+          orderIndex: t.order_index,
+          completed: tp?.status === 'COMPLETED',
+        }
+      })
+    return {
+      id: m.id,
+      title: m.title,
+      orderIndex: m.order_index,
+      progressPct: mp?.progress_pct ?? 0,
+      status: (mp?.status ?? 'NOT_STARTED') as 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED',
+      topics: moduleTopics,
+    }
+  })
+}
+
 export async function suspendUser(id: string): Promise<void> {
   const { error } = await supabase
     .from('users')

@@ -1,19 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ChevronLeft, Loader2, X, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronDown, ChevronRight, Loader2, X, AlertTriangle, CheckCircle2, Circle } from 'lucide-react'
 import {
   fetchB2CUser,
   fetchUserAttempts,
   fetchUserCourseProgress,
-  computeAssessmentSummary,
+  fetchCourseModuleProgress,
   suspendUser,
   unsuspendUser,
   type B2CUser,
   type UserAttempt,
   type UserCourseProgress,
-  type AssessmentSummary,
+  type CourseModule,
   type DisplayStatus,
 } from '@/lib/supabase/b2c-users'
 
@@ -131,27 +131,10 @@ function SuspendModal({
 
 // ─── Assessment Performance Section ─────────────────────────────────────────
 
-function AssessmentPerformanceSection({ attempts, summary }: { attempts: UserAttempt[], summary: AssessmentSummary }) {
+function AssessmentPerformanceSection({ attempts }: { attempts: UserAttempt[] }) {
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-semibold text-zinc-900">Assessment Performance</h2>
-
-      {/* Summary stats */}
-      {summary.totalAttempts > 0 && (
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: 'Total Attempts',        value: String(summary.totalAttempts) },
-            { label: 'Avg Accuracy',          value: summary.avgAccuracy != null ? `${summary.avgAccuracy.toFixed(1)}%` : '—' },
-            { label: 'Avg Time / Question',   value: summary.avgTimePerQuestion != null ? `${Math.round(summary.avgTimePerQuestion)}s` : '—' },
-            { label: 'Best Accuracy',         value: summary.bestAccuracy != null ? `${summary.bestAccuracy.toFixed(1)}%` : '—' },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-zinc-50 border border-zinc-200 rounded-md px-4 py-3">
-              <p className="text-xs text-zinc-500">{stat.label}</p>
-              <p className="text-lg font-semibold text-zinc-900 mt-0.5">{stat.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
 
       {attempts.length === 0 ? (
         <div className="bg-white border border-zinc-200 rounded-md px-4 py-10 text-center">
@@ -210,7 +193,102 @@ function AssessmentPerformanceSection({ attempts, summary }: { attempts: UserAtt
 
 // ─── Course Performance Section ──────────────────────────────────────────────
 
-function CoursePerformanceSection({ progress }: { progress: UserCourseProgress[] }) {
+function ModuleBreakdown({
+  modules,
+  loading,
+}: {
+  modules: CourseModule[]
+  loading: boolean
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 px-6 py-4 text-xs text-zinc-400">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        Loading modules…
+      </div>
+    )
+  }
+  if (modules.length === 0) {
+    return (
+      <p className="px-6 py-4 text-xs text-zinc-400">No module breakdown available for this course.</p>
+    )
+  }
+  return (
+    <div className="px-4 py-3 bg-zinc-50 border-t border-zinc-100 space-y-3">
+      {modules.map((mod) => (
+        <div key={mod.id} className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+          {/* Module header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100">
+            <span className="text-xs font-medium text-zinc-800">{mod.title}</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-16 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-blue-700"
+                    style={{ width: `${mod.progressPct}%` }}
+                  />
+                </div>
+                <span className="text-xs text-zinc-500">{mod.progressPct}%</span>
+              </div>
+              {mod.status === 'COMPLETED' ? (
+                <span className="text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-md">Done</span>
+              ) : mod.status === 'IN_PROGRESS' ? (
+                <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">In Progress</span>
+              ) : (
+                <span className="text-xs font-medium bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">Not Started</span>
+              )}
+            </div>
+          </div>
+          {/* Topics */}
+          {mod.topics.length > 0 && (
+            <ul className="divide-y divide-zinc-50">
+              {mod.topics.map((topic) => (
+                <li key={topic.id} className="flex items-center gap-2.5 px-4 py-2">
+                  {topic.completed
+                    ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                    : <Circle className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
+                  }
+                  <span className={`text-xs ${topic.completed ? 'text-zinc-700' : 'text-zinc-400'}`}>
+                    {topic.title}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CoursePerformanceSection({
+  progress,
+  userId,
+}: {
+  progress: UserCourseProgress[]
+  userId: string
+}) {
+  const [expandedCourse, setExpandedCourse] = useState<string | null>(null)
+  const [moduleData, setModuleData] = useState<Record<string, CourseModule[]>>({})
+  const [loadingCourse, setLoadingCourse] = useState<string | null>(null)
+
+  async function toggleCourse(courseId: string) {
+    if (expandedCourse === courseId) {
+      setExpandedCourse(null)
+      return
+    }
+    setExpandedCourse(courseId)
+    if (!moduleData[courseId]) {
+      setLoadingCourse(courseId)
+      try {
+        const modules = await fetchCourseModuleProgress(courseId, userId)
+        setModuleData((prev) => ({ ...prev, [courseId]: modules }))
+      } finally {
+        setLoadingCourse(null)
+      }
+    }
+  }
+
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-semibold text-zinc-900">Course Performance</h2>
@@ -224,6 +302,7 @@ function CoursePerformanceSection({ progress }: { progress: UserCourseProgress[]
           <table className="w-full text-sm">
             <thead className="bg-zinc-50 border-b border-zinc-200">
               <tr>
+                <th className="w-6 px-4 py-2.5" />
                 <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">COURSE</th>
                 <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">TYPE</th>
                 <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">PROGRESS</th>
@@ -232,39 +311,63 @@ function CoursePerformanceSection({ progress }: { progress: UserCourseProgress[]
                 <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">COMPLETED</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {progress.map((p) => (
-                <tr key={p.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-zinc-900 max-w-0">
-                    <span className="block truncate" title={p.courseTitle}>{p.courseTitle}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs font-medium bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-md">
-                      {p.courseType ?? '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-blue-700"
-                          style={{ width: `${p.progressPct}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-zinc-600">{p.progressPct}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {p.status === 'COMPLETED' ? (
-                      <span className="text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-md">Completed</span>
-                    ) : (
-                      <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">In Progress</span>
+            <tbody>
+              {progress.map((p) => {
+                const isExpanded = expandedCourse === p.courseId
+                return (
+                  <Fragment key={p.id}>
+                    <tr
+                      onClick={() => toggleCourse(p.courseId)}
+                      className={`border-b border-zinc-100 hover:bg-zinc-50 transition-colors cursor-pointer${isExpanded ? ' bg-zinc-50' : ''}`}
+                    >
+                      <td className="px-4 py-3 w-6">
+                        {isExpanded
+                          ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                          : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+                        }
+                      </td>
+                      <td className="px-4 py-3 font-medium text-zinc-900 max-w-0">
+                        <span className="block truncate" title={p.courseTitle}>{p.courseTitle}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-medium bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-md">
+                          {p.courseType ?? '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-blue-700"
+                              style={{ width: `${p.progressPct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-zinc-600">{p.progressPct}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {p.status === 'COMPLETED' ? (
+                          <span className="text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-md">Completed</span>
+                        ) : (
+                          <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">In Progress</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500">{fmt(p.startedAt)}</td>
+                      <td className="px-4 py-3 text-zinc-500">{fmt(p.completedAt)}</td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="border-b border-zinc-100">
+                        <td colSpan={7} className="p-0">
+                          <ModuleBreakdown
+                            modules={moduleData[p.courseId] ?? []}
+                            loading={loadingCourse === p.courseId}
+                          />
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500">{fmt(p.startedAt)}</td>
-                  <td className="px-4 py-3 text-zinc-500">{fmt(p.completedAt)}</td>
-                </tr>
-              ))}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -282,7 +385,6 @@ export default function B2CUserProfilePage() {
   const [user, setUser] = useState<B2CUser | null>(null)
   const [attempts, setAttempts] = useState<UserAttempt[]>([])
   const [courseProgress, setCourseProgress] = useState<UserCourseProgress[]>([])
-  const [summary, setSummary] = useState<AssessmentSummary>({ totalAttempts: 0, avgAccuracy: null, avgTimePerQuestion: null, bestAccuracy: null })
   const [loading, setLoading] = useState(true)
   const [showSuspendModal, setShowSuspendModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
@@ -297,7 +399,6 @@ export default function B2CUserProfilePage() {
       ])
       setUser(u)
       setAttempts(att)
-      setSummary(computeAssessmentSummary(att))
       setCourseProgress(cp)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load profile.')
@@ -345,7 +446,7 @@ export default function B2CUserProfilePage() {
   const isSuspended = user.displayStatus === 'SUSPENDED'
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
+    <div className="p-6 space-y-6">
       {/* Back nav */}
       <button
         onClick={() => router.push('/super-admin/b2c-users')}
@@ -449,10 +550,10 @@ export default function B2CUserProfilePage() {
       </div>
 
       {/* Section 3: Assessment Performance */}
-      <AssessmentPerformanceSection attempts={attempts} summary={summary} />
+      <AssessmentPerformanceSection attempts={attempts} />
 
       {/* Section 4: Course Performance */}
-      <CoursePerformanceSection progress={courseProgress} />
+      <CoursePerformanceSection progress={courseProgress} userId={user.id} />
 
       {/* Suspend modal */}
       {showSuspendModal && (

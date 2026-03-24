@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { X, GripVertical, Plus, Trash2, Info } from 'lucide-react'
-import { updatePlan, writePlanAuditLog, type PlanRow } from '@/lib/supabase/plans'
+import { useState, useEffect } from 'react'
+import { X, GripVertical, Plus, Trash2, Info, Search } from 'lucide-react'
+import { updatePlan, writePlanAuditLog, addContentToPlan, fetchAllLiveB2CAssessments, type PlanRow } from '@/lib/supabase/plans'
 
 type AssessmentType = 'FULL_TEST' | 'SUBJECT_TEST' | 'CHAPTER_TEST'
 
@@ -206,10 +206,26 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState<string | null>(null)
 
+  // Section 6 — Assessments (additive only; removals via plan detail page)
+  const [assessments, setAssessments]                 = useState<{ id: string; title: string; assessmentType: string }[]>([])
+  const [assessmentSearch, setAssessmentSearch]       = useState('')
+  const [selectedAssessments, setSelectedAssessments] = useState<Set<string>>(new Set())
+  const [assessmentsLoading, setAssessmentsLoading]   = useState(true)
+
+  useEffect(() => {
+    fetchAllLiveB2CAssessments()
+      .then(setAssessments)
+      .finally(() => setAssessmentsLoading(false))
+  }, [])
+
   function toggleType(type: AssessmentType) {
     setAllowedTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     )
+  }
+
+  function toggleAssessment(id: string) {
+    setSelectedAssessments((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
 
   function addBullet() {
@@ -248,6 +264,11 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
         feature_bullets:             cleanBullets,
         footnote:                    footnote.trim() || null,
       })
+      if (selectedAssessments.size > 0) {
+        await Promise.all(
+          Array.from(selectedAssessments).map((id) => addContentToPlan(plan.id, id, 'ASSESSMENT'))
+        )
+      }
       await writePlanAuditLog(plan.id, 'PLAN_UPDATED', { updated_by: 'super_admin' })
       onSaved()
     } catch (e: unknown) {
@@ -507,6 +528,60 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
                 placeholder="Small print below CTA on pricing card"
                 className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
               />
+            </div>
+          </div>
+
+          {/* Section 6 — Add Assessments */}
+          <div>
+            <SectionHeading number="6" title="Add Assessments" subtitle="Optionally add more LIVE B2C assessments. Existing content managed via plan detail page." />
+            <div className="border border-zinc-200 rounded-md overflow-hidden">
+              <div className="relative border-b border-zinc-200">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Search assessments..."
+                  value={assessmentSearch}
+                  onChange={(e) => setAssessmentSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none"
+                />
+              </div>
+              <div className="max-h-44 overflow-y-auto">
+                {assessmentsLoading ? (
+                  <div className="p-3 space-y-2">
+                    {[0, 1, 2].map((i) => <div key={i} className="h-8 rounded bg-zinc-100 animate-pulse" />)}
+                  </div>
+                ) : assessments.filter((a) => a.title.toLowerCase().includes(assessmentSearch.toLowerCase())).length === 0 ? (
+                  <p className="text-xs text-zinc-400 text-center py-5">
+                    {assessments.length === 0 ? 'No live B2C assessments available.' : 'No matches.'}
+                  </p>
+                ) : (
+                  <div className="divide-y divide-zinc-100">
+                    {assessments
+                      .filter((a) => a.title.toLowerCase().includes(assessmentSearch.toLowerCase()))
+                      .map((a) => (
+                        <label key={a.id} className="flex items-center gap-3 px-3 py-2 hover:bg-zinc-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedAssessments.has(a.id)}
+                            onChange={() => toggleAssessment(a.id)}
+                            className="accent-blue-700"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-zinc-900 truncate">{a.title}</p>
+                            <p className="text-xs text-zinc-400">{a.assessmentType}</p>
+                          </div>
+                        </label>
+                      ))}
+                  </div>
+                )}
+              </div>
+              {selectedAssessments.size > 0 && (
+                <div className="border-t border-zinc-100 bg-zinc-50 px-3 py-2">
+                  <p className="text-xs text-blue-700 font-medium">
+                    {selectedAssessments.size} assessment{selectedAssessments.size !== 1 ? 's' : ''} will be added on save
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

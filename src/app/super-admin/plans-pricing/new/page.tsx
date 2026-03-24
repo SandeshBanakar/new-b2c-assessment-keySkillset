@@ -7,9 +7,11 @@ import {
   createPlan,
   createB2BPlan,
   createCourseBundlePlan,
+  createSingleCoursePlan,
   addContentToPlan,
   fetchAllLiveB2BAssessments,
   fetchAllLiveB2BCourses,
+  fetchAllLiveB2CAssessments,
   fetchAllLiveB2CCoursesForBundle,
   type B2CCourseBundlePickerItem,
 } from '@/lib/supabase/plans'
@@ -80,14 +82,30 @@ function B2CForm() {
   const [bullets, setBullets]   = useState<string[]>(['', '', ''])
   const [footnote, setFootnote] = useState('')
 
+  // Section 6 — Assessments
+  const [assessments, setAssessments]           = useState<{ id: string; title: string; assessmentType: string }[]>([])
+  const [assessmentSearch, setAssessmentSearch] = useState('')
+  const [selectedAssessments, setSelectedAssessments] = useState<Set<string>>(new Set())
+  const [assessmentsLoading, setAssessmentsLoading]   = useState(true)
+
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [showToast, setShowToast]   = useState(false)
+
+  useEffect(() => {
+    fetchAllLiveB2CAssessments()
+      .then(setAssessments)
+      .finally(() => setAssessmentsLoading(false))
+  }, [])
 
   function toggleAssessmentType(type: AssessmentType) {
     setAllowedTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     )
+  }
+
+  function toggleAssessment(id: string) {
+    setSelectedAssessments((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
 
   function addBullet() {
@@ -119,7 +137,7 @@ function B2CForm() {
     setError(null)
     setSubmitting(true)
     try {
-      await createPlan({
+      const planId = await createPlan({
         name:                        name.trim(),
         display_name:                displayName.trim() || null,
         description:                 null,
@@ -136,6 +154,11 @@ function B2CForm() {
         footnote:                    footnote.trim() || null,
         plan_audience:               'B2C',
       })
+      if (selectedAssessments.size > 0) {
+        await Promise.all(
+          Array.from(selectedAssessments).map((id) => addContentToPlan(planId, id, 'ASSESSMENT'))
+        )
+      }
       if (status === 'PUBLISHED') {
         setShowToast(true)
         setTimeout(() => {
@@ -436,6 +459,64 @@ function B2CForm() {
                 Small print below the CTA button on the pricing card.
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* SECTION 6 — Assessments */}
+        <div className="bg-white border border-zinc-200 rounded-md p-6">
+          <SectionHeading
+            number="6"
+            title="Assessments"
+            subtitle="Optionally add LIVE B2C assessments now. You can always add more from the plan detail page."
+          />
+          <div className="border border-zinc-200 rounded-md overflow-hidden">
+            <div className="relative border-b border-zinc-200">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search assessments..."
+                value={assessmentSearch}
+                onChange={(e) => setAssessmentSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none"
+              />
+            </div>
+            <div className="max-h-52 overflow-y-auto">
+              {assessmentsLoading ? (
+                <div className="p-3 space-y-2">
+                  {[0, 1, 2].map((i) => <div key={i} className="h-9 rounded bg-zinc-100 animate-pulse" />)}
+                </div>
+              ) : assessments.filter((a) => a.title.toLowerCase().includes(assessmentSearch.toLowerCase())).length === 0 ? (
+                <p className="text-xs text-zinc-400 text-center py-6">
+                  {assessments.length === 0 ? 'No live B2C assessments available.' : 'No matches.'}
+                </p>
+              ) : (
+                <div className="divide-y divide-zinc-100">
+                  {assessments
+                    .filter((a) => a.title.toLowerCase().includes(assessmentSearch.toLowerCase()))
+                    .map((a) => (
+                      <label key={a.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedAssessments.has(a.id)}
+                          onChange={() => toggleAssessment(a.id)}
+                          className="accent-blue-700"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-zinc-900 truncate">{a.title}</p>
+                          <p className="text-xs text-zinc-400">{a.assessmentType}</p>
+                        </div>
+                      </label>
+                    ))}
+                </div>
+              )}
+            </div>
+            {selectedAssessments.size > 0 && (
+              <div className="border-t border-zinc-100 bg-zinc-50 px-3 py-2">
+                <p className="text-xs text-blue-700 font-medium">
+                  {selectedAssessments.size} assessment{selectedAssessments.size !== 1 ? 's' : ''} selected
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1091,6 +1172,194 @@ function CourseBundleForm() {
   )
 }
 
+// ─── Single Course Plan Form ───────────────────────────────────────────────────
+
+function SingleCoursePlanForm() {
+  const router = useRouter()
+
+  const [name, setName]               = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [price, setPrice]             = useState<number | ''>('')
+  const [stripePriceId, setStripePriceId] = useState('')
+
+  const [courseItems, setCourseItems]         = useState<B2CCourseBundlePickerItem[]>([])
+  const [contentLoading, setContentLoading]   = useState(true)
+  const [selectedCourse, setSelectedCourse]   = useState<string | null>(null)
+  const [courseSearch, setCourseSearch]       = useState('')
+
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError]           = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchAllLiveB2CCoursesForBundle()
+      .then(setCourseItems)
+      .finally(() => setContentLoading(false))
+  }, [])
+
+  const filteredCourses = courseItems.filter((c) =>
+    c.title.toLowerCase().includes(courseSearch.toLowerCase())
+  )
+
+  function validate(): string | null {
+    if (!name.trim()) return 'Plan name is required.'
+    if (price === '' || price < 0) return 'Price must be 0 or a positive number.'
+    return null
+  }
+
+  async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
+    const err = validate()
+    if (err) { setError(err); return }
+    setError(null)
+    setSubmitting(true)
+    try {
+      const planId = await createSingleCoursePlan({
+        name:            name.trim(),
+        display_name:    displayName.trim() || null,
+        price:           price as number,
+        stripe_price_id: stripePriceId.trim() || null,
+        status,
+      })
+      if (selectedCourse) {
+        await addContentToPlan(planId, selectedCourse, 'COURSE')
+      }
+      router.push(`/super-admin/plans-pricing/${planId}`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'An unexpected error occurred.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* SECTION 1 — Plan Identity */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading number="1" title="Plan Identity" subtitle="Name for this single-course plan." />
+        <div className="space-y-4">
+          <div>
+            <FieldLabel label="Plan name (internal)" required />
+            <input
+              type="text" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. HIPAA Compliance — Individual"
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <FieldLabel label="Display name (customer-facing)" />
+            <input
+              type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="e.g. HIPAA Compliance"
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 2 — Course */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading number="2" title="Course" subtitle="Select the single B2C course this plan provides access to." />
+        <div className="border border-zinc-200 rounded-md overflow-hidden">
+          <div className="relative border-b border-zinc-200">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+            <input
+              type="text" placeholder="Search courses..."
+              value={courseSearch} onChange={(e) => setCourseSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {contentLoading ? (
+              <div className="p-3 space-y-2">
+                {[0, 1, 2].map((i) => <div key={i} className="h-9 rounded bg-zinc-100 animate-pulse" />)}
+              </div>
+            ) : filteredCourses.length === 0 ? (
+              <p className="text-xs text-zinc-400 text-center py-6">
+                {courseItems.length === 0 ? 'No live B2C courses available.' : 'No matches.'}
+              </p>
+            ) : (
+              <div className="divide-y divide-zinc-100">
+                {filteredCourses.map((course) => (
+                  <label key={course.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 cursor-pointer">
+                    <input
+                      type="radio" name="single-course" value={course.id}
+                      checked={selectedCourse === course.id}
+                      onChange={() => setSelectedCourse(course.id)}
+                      className="accent-blue-700"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-zinc-900 truncate">{course.title}</p>
+                      <p className="text-xs text-zinc-400">{course.courseType}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 3 — Pricing */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading number="3" title="Pricing" subtitle="Set the price and Stripe Price ID for this individual course plan." />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <FieldLabel label="Price (₹)" required />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
+              <input
+                type="number" min={0} value={price}
+                onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="999"
+                className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <div>
+            <FieldLabel label="Stripe Price ID" />
+            <input
+              type="text" value={stripePriceId} onChange={(e) => setStripePriceId(e.target.value)}
+              placeholder="price_annual_..."
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded-md px-4 py-3">
+          <p className="text-sm text-rose-600">{error}</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2">
+        <button
+          type="button"
+          onClick={() => router.push('/super-admin/plans-pricing')}
+          className="text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
+        >
+          Cancel
+        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button" disabled={submitting} onClick={() => handleSubmit('DRAFT')}
+            className="px-4 py-2 text-sm font-medium text-zinc-700 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Save as Draft
+          </button>
+          <button
+            type="button" disabled={submitting} onClick={() => handleSubmit('PUBLISHED')}
+            className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Publishing...' : 'Publish Plan'}
+          </button>
+        </div>
+      </div>
+
+    </div>
+  )
+}
+
 // ─── Inner component (uses useSearchParams — must be wrapped in Suspense) ─────
 
 function NewPlanInner() {
@@ -1098,19 +1367,24 @@ function NewPlanInner() {
   const searchParams = useSearchParams()
   const audience     = searchParams.get('audience') === 'B2B' ? 'B2B' : 'B2C'
   const category     = searchParams.get('category')
-  const isCourseBundlePlan = audience === 'B2C' && category === 'COURSE_BUNDLE'
+  const isCourseBundlePlan    = audience === 'B2C' && category === 'COURSE_BUNDLE'
+  const isSingleCoursePlan    = audience === 'B2C' && category === 'SINGLE_COURSE_PLAN'
 
   const pageTitle = audience === 'B2B'
     ? 'Create B2B Plan'
     : isCourseBundlePlan
       ? 'Create Bundle Plan'
-      : 'Create Assessment Plan'
+      : isSingleCoursePlan
+        ? 'Create Single Course Plan'
+        : 'Create Assessment Plan'
 
   const pageSubtitle = audience === 'B2B'
     ? 'Define a platform-wide B2B plan. Assign it to tenants from their Plans tab.'
     : isCourseBundlePlan
       ? 'Define a B2C course bundle plan with annual subscription pricing.'
-      : 'Define the plan identity, scope, pricing, and access rules.'
+      : isSingleCoursePlan
+        ? 'Create a plan for individual access to a single B2C course.'
+        : 'Define the plan identity, scope, pricing, and access rules.'
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -1128,7 +1402,13 @@ function NewPlanInner() {
         <p className="text-sm text-zinc-500 mt-0.5">{pageSubtitle}</p>
       </div>
 
-      {audience === 'B2B' ? <B2BForm /> : isCourseBundlePlan ? <CourseBundleForm /> : <B2CForm />}
+      {audience === 'B2B'
+        ? <B2BForm />
+        : isCourseBundlePlan
+          ? <CourseBundleForm />
+          : isSingleCoursePlan
+            ? <SingleCoursePlanForm />
+            : <B2CForm />}
 
     </div>
   )
