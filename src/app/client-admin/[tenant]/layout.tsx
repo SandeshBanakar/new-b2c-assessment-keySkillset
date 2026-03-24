@@ -23,6 +23,7 @@ interface TenantRow {
   id: string
   name: string
   feature_toggle_mode: string
+  logo_url?: string | null
 }
 
 interface AdminUser {
@@ -89,7 +90,7 @@ export default function ClientAdminLayout({
     Promise.all([
       supabase
         .from('tenants')
-        .select('id, name, feature_toggle_mode')
+        .select('id, name, feature_toggle_mode, logo_url')
         .eq('id', tenantId)
         .single(),
       supabase
@@ -123,10 +124,18 @@ export default function ClientAdminLayout({
       <aside className="w-60 shrink-0 flex flex-col bg-white border-r border-zinc-200 h-screen fixed left-0 top-0 overflow-y-auto">
         {/* Tenant header */}
         <div className="px-4 py-4 border-b border-zinc-200">
-          <p className="text-sm font-semibold text-zinc-900">
-            {tenant?.name ?? 'Loading…'}
-          </p>
-          <span className="text-xs font-medium bg-violet-50 text-violet-700 rounded-md px-2 py-0.5 mt-1 inline-block">
+          {tenant?.logo_url ? (
+            <img
+              src={tenant.logo_url}
+              alt={tenant.name}
+              className="h-8 max-w-32 object-contain mb-1"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-md bg-violet-100 flex items-center justify-center text-xs font-semibold text-violet-700 mb-1">
+              {tenant ? getInitials(tenant.name) : '…'}
+            </div>
+          )}
+          <span className="text-xs font-medium bg-violet-50 text-violet-700 rounded-md px-2 py-0.5 inline-block">
             Client Admin
           </span>
         </div>

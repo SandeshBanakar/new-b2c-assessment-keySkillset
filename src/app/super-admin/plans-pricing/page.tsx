@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, MoreVertical, Eye, Pencil, Archive, AlertTriangle, X, Loader2 } from 'lucide-react'
+import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, MoreVertical, Eye, Pencil, Archive, AlertTriangle, X, Loader2, FileText } from 'lucide-react'
 import {
   fetchPlans,
-  derivePlanType,
+  fetchAssessmentCountsByPlan,
+  fetchAssessmentsInPlan,
   fetchB2BPlansForGrid,
   fetchCourseBundlePlans,
   fetchSingleCoursePlans,
@@ -14,9 +15,9 @@ import {
   type B2BPlanCard,
   type CourseBundlePlanRow,
   type SingleCoursePlanRow,
+  type AssessmentInPlan,
 } from '@/lib/supabase/plans'
 import { PlanStatusBadge } from '@/components/plans/PlanStatusBadge'
-import { PlanTypeBadge } from '@/components/plans/PlanTypeBadge'
 import { EditPlanSlideOver, SingleCoursePlanEditSlideOver } from '@/components/plans/EditPlanSlideOver'
 
 type Tab = 'assessment-plans' | 'single-course-plan' | 'course-bundle-plans' | 'b2b-plans'
@@ -150,76 +151,187 @@ function PlanActionsMenu({
   )
 }
 
-// ─── Shared plan table ────────────────────────────────────────────────────────
-function PlanTable({
+// ─── Plan Assessments Slide-Over ─────────────────────────────────────────────
+function PlanAssessmentsSlideOver({
+  planId,
+  planName,
+  onClose,
+}: {
+  planId: string
+  planName: string
+  onClose: () => void
+}) {
+  const [items, setItems] = useState<AssessmentInPlan[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchAssessmentsInPlan(planId)
+      .then(setItems)
+      .finally(() => setLoading(false))
+  }, [planId])
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl z-50 flex flex-col">
+        <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center shrink-0">
+          <div>
+            <p className="text-sm font-semibold text-zinc-900">Assessments in Plan</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{planName}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-20">
+              <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 gap-2">
+              <FileText className="w-6 h-6 text-zinc-300" />
+              <p className="text-sm text-zinc-500">No assessments in this plan.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-zinc-100">
+              {items.map((item) => (
+                <div key={item.id} className="px-6 py-3">
+                  <p className="text-sm font-medium text-zinc-900">{item.title}</p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    {item.category_name && (
+                      <span className="text-xs text-zinc-500">{item.category_name}</span>
+                    )}
+                    <span className="text-xs text-zinc-400">·</span>
+                    <span className="text-xs text-zinc-500">{item.test_type}</span>
+                    {item.audience_type && (
+                      <span className="text-xs font-medium bg-green-50 text-green-700 rounded px-1.5 py-0.5">
+                        {item.audience_type}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── Assessment Plan Card ─────────────────────────────────────────────────────
+const TIER_BADGE: Record<string, string> = {
+  BASIC:      'bg-zinc-100 text-zinc-600',
+  PRO:        'bg-blue-50 text-blue-700',
+  PREMIUM:    'bg-amber-50 text-amber-700',
+  ENTERPRISE: 'bg-violet-50 text-violet-700',
+}
+
+function AssessmentPlanCard({
+  plan,
+  assessmentCount,
+  onView,
+  onEdit,
+  onArchive,
+  onCountClick,
+}: {
+  plan: PlanRow
+  assessmentCount: number
+  onView: () => void
+  onEdit: () => void
+  onArchive: () => void
+  onCountClick: () => void
+}) {
+  const subscribers = plan.plan_subscribers?.subscriber_count ?? 0
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-md p-5 hover:border-zinc-300 hover:shadow-sm transition-all flex flex-col">
+      <div className="flex items-start justify-between mb-2">
+        <p className="text-sm font-semibold text-zinc-900 leading-snug pr-2">
+          {plan.display_name ?? plan.name}
+        </p>
+        <PlanStatusBadge status={plan.status} />
+      </div>
+      {plan.tier && (
+        <span className={`text-xs font-medium rounded px-1.5 py-0.5 w-fit mb-3 ${TIER_BADGE[plan.tier] ?? 'bg-zinc-100 text-zinc-600'}`}>
+          {plan.tier}
+        </span>
+      )}
+      <div className="flex items-center gap-4 text-xs text-zinc-500 mt-auto">
+        <button
+          onClick={(e) => { e.stopPropagation(); onCountClick() }}
+          className="flex items-center gap-1 hover:text-blue-700 transition-colors"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          {assessmentCount} assessment{assessmentCount !== 1 ? 's' : ''}
+        </button>
+        <span className="flex items-center gap-1">
+          <Users className="w-3.5 h-3.5" />
+          {subscribers} subscriber{subscribers !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-zinc-100">
+        <button
+          onClick={onView}
+          className="text-xs text-blue-700 hover:text-blue-800 font-medium"
+        >
+          View
+        </button>
+        <PlanActionsMenu
+          plan={plan}
+          onView={onView}
+          onEdit={onEdit}
+          onArchive={onArchive}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── Assessment Plan Card Grid ────────────────────────────────────────────────
+function AssessmentPlanCardGrid({
   plans,
-  showScope,
+  counts,
   onView,
   onEdit,
   onArchive,
 }: {
   plans: PlanRow[]
-  showScope?: boolean
+  counts: Record<string, number>
   onView: (plan: PlanRow) => void
   onEdit: (plan: PlanRow) => void
   onArchive: (plan: PlanRow) => void
 }) {
+  const [viewingPlan, setViewingPlan] = useState<PlanRow | null>(null)
+
   if (plans.length === 0) return (
-    <p className="text-sm text-zinc-400 px-4 py-6 text-center">No plans found.</p>
+    <p className="text-sm text-zinc-400 py-6 text-center">No plans found.</p>
   )
 
   return (
-    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 bg-zinc-50">
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Display Name</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹/mo)</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Subscribers</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">MRR</th>
-            {showScope && <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Scope</th>}
-            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Max Attempts</th>
-            <th className="px-4 py-3 w-10" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-100">
-          {plans.map((plan) => {
-            const sub = plan.plan_subscribers
-            const mrr = (plan.price ?? 0) * (sub?.subscriber_count ?? 0)
-            return (
-              <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
-                <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
-                <td className="px-4 py-3 text-zinc-500">{plan.display_name ?? <span className="text-zinc-300">—</span>}</td>
-                <td className="px-4 py-3 text-right text-zinc-700">
-                  {plan.price === 0 ? <span className="text-zinc-400">Free</span> : `${formatINR(plan.price)}/mo`}
-                </td>
-                <td className="px-4 py-3 text-right text-zinc-600">{sub?.subscriber_count ?? 0}</td>
-                <td className="px-4 py-3 text-right text-zinc-600">{formatINR(mrr)}</td>
-                {showScope && (
-                  <td className="px-4 py-3 text-center">
-                    <PlanTypeBadge type={derivePlanType(plan.scope)} />
-                  </td>
-                )}
-                <td className="px-4 py-3 text-center">
-                  <PlanStatusBadge status={plan.status} />
-                </td>
-                <td className="px-4 py-3 text-right text-zinc-600">{plan.max_attempts_per_assessment ?? '—'}</td>
-                <td className="px-4 py-3 text-right">
-                  <PlanActionsMenu
-                    plan={plan}
-                    onView={() => onView(plan)}
-                    onEdit={() => onEdit(plan)}
-                    onArchive={() => onArchive(plan)}
-                  />
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="grid grid-cols-3 gap-4">
+        {plans.map((plan) => (
+          <AssessmentPlanCard
+            key={plan.id}
+            plan={plan}
+            assessmentCount={counts[plan.id] ?? 0}
+            onView={() => onView(plan)}
+            onEdit={() => onEdit(plan)}
+            onArchive={() => onArchive(plan)}
+            onCountClick={() => setViewingPlan(plan)}
+          />
+        ))}
+      </div>
+      {viewingPlan && (
+        <PlanAssessmentsSlideOver
+          planId={viewingPlan.id}
+          planName={viewingPlan.display_name ?? viewingPlan.name}
+          onClose={() => setViewingPlan(null)}
+        />
+      )}
+    </>
   )
 }
 
@@ -237,6 +349,11 @@ function AssessmentPlansTab({
 }) {
   const router = useRouter()
   const [archivingPlan, setArchivingPlan] = useState<PlanRow | null>(null)
+  const [counts, setCounts] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    fetchAssessmentCountsByPlan().then(setCounts)
+  }, [])
 
   const b2cPlans = plans.filter((p) => p.plan_audience === 'B2C' && p.plan_category === 'ASSESSMENT')
   const platformPlans = b2cPlans.filter((p) => p.scope === 'PLATFORM_WIDE')
@@ -266,7 +383,7 @@ function AssessmentPlansTab({
       </div>
 
       {/* Platform Plans */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-zinc-700">Platform Plans</h2>
         <button
           onClick={onCreateB2C}
@@ -276,9 +393,10 @@ function AssessmentPlansTab({
           Create Assessment Plan
         </button>
       </div>
-      <div className="mb-8">
-        <PlanTable
+      <div className="mb-10">
+        <AssessmentPlanCardGrid
           plans={platformPlans}
+          counts={counts}
           onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
           onEdit={onEdit}
           onArchive={setArchivingPlan}
@@ -286,10 +404,10 @@ function AssessmentPlansTab({
       </div>
 
       {/* Category Plans */}
-      <h2 className="text-sm font-semibold text-zinc-700 mb-3">Category Plans</h2>
-      <PlanTable
+      <h2 className="text-sm font-semibold text-zinc-700 mb-4">Category Plans</h2>
+      <AssessmentPlanCardGrid
         plans={categoryPlans}
-        showScope
+        counts={counts}
         onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
         onEdit={onEdit}
         onArchive={setArchivingPlan}

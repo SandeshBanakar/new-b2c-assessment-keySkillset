@@ -10,6 +10,8 @@ import {
   ChevronUp,
   CheckCircle,
   Loader2,
+  Upload,
+  Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -465,6 +467,21 @@ export default function CreateTenantSlideOver({
   const [contractError, setContractError] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
 
+  // Logo state
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [logoDragOver, setLogoDragOver] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+
+  const handleLogoFile = (file: File) => {
+    if (!['image/jpeg', 'image/png'].includes(file.type)) return
+    if (file.size > 512000) return
+    setLogoFile(file)
+    const reader = new FileReader()
+    reader.onload = (e) => setLogoPreview(e.target?.result as string)
+    reader.readAsDataURL(file)
+  }
+
   // Escape key
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -484,6 +501,8 @@ export default function CreateTenantSlideOver({
 
   const discardAndClose = () => {
     setForm(INITIAL_FORM)
+    setLogoFile(null)
+    setLogoPreview(null)
     setShowDiscard(false)
     onClose()
   }
@@ -651,8 +670,21 @@ export default function CreateTenantSlideOver({
         })
       }
 
+      // Upload logo if provided
+      if (logoFile) {
+        const { error: uploadErr } = await supabase.storage
+          .from('tenant-logo')
+          .upload(`${newId}.jpg`, logoFile, { upsert: true, contentType: logoFile.type })
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('tenant-logo').getPublicUrl(`${newId}.jpg`)
+          await supabase.from('tenants').update({ logo_url: urlData.publicUrl + '?t=' + Date.now() }).eq('id', newId)
+        }
+      }
+
       // Success
       const savedName = form.name.trim()
+      setLogoFile(null)
+      setLogoPreview(null)
       setForm(INITIAL_FORM)
       onCreated()
       setToast({ tenantName: savedName, tenantId: newId })
@@ -752,6 +784,52 @@ export default function CreateTenantSlideOver({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Logo Upload */}
+          <div className="mb-5">
+            <FieldLabel>Logo <span className="text-zinc-400 font-normal text-xs">(optional)</span></FieldLabel>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f) }}
+            />
+            {logoPreview ? (
+              <div className="flex items-center gap-3 p-3 border border-zinc-200 rounded-md bg-zinc-50">
+                <img src={logoPreview} alt="Logo preview" className="h-10 w-auto max-w-30 object-contain rounded" />
+                <p className="flex-1 text-xs text-zinc-500 truncate min-w-0">{logoFile?.name}</p>
+                <button
+                  type="button"
+                  onClick={() => { setLogoFile(null); setLogoPreview(null) }}
+                  className="text-zinc-400 hover:text-rose-600 transition-colors shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => logoInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setLogoDragOver(true) }}
+                onDragLeave={() => setLogoDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setLogoDragOver(false)
+                  const f = e.dataTransfer.files?.[0]
+                  if (f) handleLogoFile(f)
+                }}
+                className={`flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed rounded-md cursor-pointer transition-colors ${
+                  logoDragOver ? 'border-blue-700 bg-blue-50' : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50'
+                }`}
+              >
+                <Upload className="w-5 h-5 text-zinc-400" />
+                <p className="text-xs text-zinc-500">
+                  <span className="text-blue-700 font-medium">Click to upload</span> or drag and drop
+                </p>
+                <p className="text-xs text-zinc-400">PNG, JPG · max 500KB</p>
+              </div>
+            )}
           </div>
 
           {/* ── SECTION 2: CLIENT PROFILE ── */}

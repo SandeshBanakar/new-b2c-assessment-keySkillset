@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 6.4 | Updated: March 24, 2026
+# Version: 6.5 | Updated: March 24, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # This file is the single source of truth for Claude Code.
 # It is maintained by Claude Code sessions — never edit manually.
@@ -57,19 +57,25 @@ Always add a comment: // DESIGN DEVIATION: [token] — [rationale]
 - Never modify schema without a KSS-DB-XXX prompt authorised
   in the Claude.ai project chat first
 
-### tenants table — confirmed columns (March 17, 2026)
+### tenants table — confirmed columns (March 24, 2026)
 id, name, type, feature_toggle_mode, licensed_categories (ARRAY),
 stripe_customer_id, is_active, created_at,
 contact_name, contact_email, contact_phone,
 timezone (DEFAULT 'Asia/Kolkata'),
 date_format (DEFAULT 'DD/MM/YYYY'),
-address_line1, address_line2, city, state, country, zip_code
+address_line1, address_line2, city, state, country, zip_code,
+logo_url (text nullable — KSS-DB-SA-016, public Supabase Storage URL)
+Storage bucket: tenant-logo (public), file naming: {tenant_id}.jpg (overwrite on re-upload)
+Max 500KB, PNG/JPG only. Fallback: tenant initials badge.
 
-### admin_users table — confirmed columns (March 17, 2026)
+### admin_users table — confirmed columns (March 24, 2026)
 id (uuid), email (text), name (text), role (text),
-tenant_id (uuid), is_active (boolean), created_at (timestamptz)
+tenant_id (uuid), is_active (boolean), created_at (timestamptz),
+password_hash (text nullable — KSS-DB-SA-017, demo-only password storage)
 Valid roles (V1): SUPER_ADMIN | CLIENT_ADMIN | CONTENT_CREATOR
 TEAM_MANAGER role deferred to V2 — never add it to code in V1.
+Master Org CCs: role='CONTENT_CREATOR', tenant_id IS NULL
+B2B CCs: role='CONTENT_CREATOR', tenant_id = B2B tenant UUID
 
 ### Client Admin JOIN (confirmed — no FK constraint, logical only)
 SELECT name, email FROM admin_users
@@ -150,7 +156,7 @@ RUN_ONLY     → tenant has Client Admin access only; no own DB; relies on SA
                for content. Storage & Hosting section HIDDEN for RUN_ONLY.
                Condition: feature_toggle_mode === 'RUN_ONLY'
 
-### courses table — confirmed columns (KSS-DB-SA-001 + KSS-DB-SA-003)
+### courses table — confirmed columns (KSS-DB-SA-001 + KSS-DB-SA-003 + KSS-DB-SA-018)
 id (uuid), title (text), description (text), course_type (text),
 status (text — LIVE/INACTIVE/DRAFT/ARCHIVED), source (text),
 tenant_id (uuid nullable), created_by (uuid nullable),
@@ -160,12 +166,13 @@ price (numeric, nullable — INR price, null = not priced individually),
 price_usd (numeric, nullable — USD price in actual dollars e.g. 29.99, added KSS-DB-SA-015),
 currency (text DEFAULT 'INR'),
 is_individually_purchasable (boolean DEFAULT false — managed via SINGLE_COURSE_PLAN plan lifecycle),
-stripe_price_id (text, nullable)
+stripe_price_id (text, nullable),
+last_modified_by (uuid nullable — KSS-DB-SA-018, updated on every save by any editor)
 
 MIGRATION KSS-DB-SA-003 (authorised March 19, 2026):
   See Section 27 for full SQL.
 
-### content_items table — confirmed live columns (verified March 20, 2026 via REST API)
+### content_items table — confirmed live columns (March 24, 2026)
 id (uuid), title (text),
 exam_category_id (uuid FK → exam_categories),
 test_type (text), source (text),
@@ -176,7 +183,8 @@ visibility_scope (text DEFAULT 'GLOBAL' — 'GLOBAL'|'TENANT_PRIVATE'|'PENDING_P
   tenant_scope_id NOT NULL → 'TENANT_PRIVATE' (tenant-authored, FULL_CREATOR only)
   'PENDING_PROMOTION' → V2 (push to SA global bank — NOT BUILT IN V1)
 tenant_scope_id (uuid nullable),  ← IMPORTANT: column is tenant_scope_id NOT tenant_id
-created_by (uuid nullable),
+created_by (uuid nullable — original author, never changes),
+last_modified_by (uuid nullable — KSS-DB-SA-018, updated on every save by any editor),
 created_at (timestamptz), updated_at (timestamptz)
 COLUMNS THAT DO NOT EXIST: description (no such column in live schema)
 
@@ -467,31 +475,42 @@ No inline edit links on any card header.
 ## 11. EDIT DETAILS SLIDE-OVER (built March 17, 2026)
 
 Component: src/components/tenant-detail/EditDetailsSlideOver.tsx
-Pattern: right-side panel, 480px wide, fixed overlay bg-black/30
+Pattern: right-side panel, fixed overlay bg-black/30
 
-4 sections (single scroll, no wizard):
-  Section 1 — Platform Setup: Tenant Name*, Feature Toggle Mode
-  Section 2 — Contact: Contact Name, Contact Email, Contact Phone
-  Section 3 — Address: Line 1, Line 2, City, State, Zip Code,
-               Country (searchable combobox dropdown — full country list)
-  Section 4 — Locale:
-    Timezone — IANA dropdown (Intl.supportedValuesOf('timeZone'))
-               Display format: "Asia/Kolkata" (IANA key only, not offset label)
-    Date Format — dropdown: DD/MM/YYYY | MM/DD/YYYY | YYYY-MM-DD | DD-MM-YYYY
+3 sections (single scroll, no wizard):
+  Section 1 — Tenant Setup:
+    Client Name* (text input)
+    Feature Toggle Mode (select: Run Only | Full Creator)
+    Logo (optional drag-and-drop upload — PNG/JPG, max 500KB)
+      Shows preview + Trash icon when logo exists (current or newly uploaded)
+      Drag-drop zone when no logo. Trash → marks for removal on save.
+      On save: uploads to tenant-logo bucket as {tenant_id}.jpg (upsert)
+               Updates tenants.logo_url with public URL
+               On removal: removes from storage, sets logo_url = null
+
+  Section 2 — Address & Locale:
+    Address Line 1, Address Line 2, City, State, Zip Code
+    Country (searchable combobox — full country list)
+    Timezone (searchable combobox — Intl.supportedValuesOf('timeZone'), IANA key only)
+    Date Format (select: DD/MM/YYYY | MM/DD/YYYY | YYYY-MM-DD | DD-MM-YYYY)
+
+  Section 3 — Client Profile:
+    Contact Name, Contact Email, Contact Phone
+    Client Admin (inline assignment):
+      Shows current CA (name + email) if assigned — read-only "Assigned" badge
+      Shows "Add Client Admin" button if none assigned
+        Form: Name* + Email* → INSERT admin_users (role=CLIENT_ADMIN, tenant_id=this_tenant)
+      Success state shows confirmation text
 
 NOT editable here: Contract fields (Seat Count, ARR, dates)
   → those are edited in Contract tab only
 
-NOT editable here: Client Admin reassignment
-  → that is a separate protected action with its own warning modal
-
 Unsaved changes guard: dirty form + Cancel/overlay click
-  → "Discard changes?" modal with Keep Editing | Discard
+  → "Discard changes?" banner with Keep Editing | Discard buttons
 
-On save: UPDATE tenants SET ... WHERE id = :tenant_id
+On save: logo upload/removal (if changed) → UPDATE tenants SET ... WHERE id = :tenant_id
   + write TENANT_UPDATED audit entry
-  + success toast
-  + close panel
+  + close panel (parent shows toast)
 
 ---
 
@@ -701,12 +720,13 @@ Client Admin: can view Sections 1 and 2 (read-only). Cannot see Section 3.
     Free = default unsubscribed state. NOT a plan record. Users get:
       - 1 free attempt per assessment (per assessment, all tiers)
       - Access to courses where is_individually_purchasable=false AND price=null
-    Plans & Pricing swimlane shows "Free (Default)" as a read-only reference
-    column alongside the 3 paid tiers.
+    Plans & Pricing Tab 1 shows assessment plans as a card grid (not swimlane).
+    Free tier is NOT shown as a card — it is the default unsubscribed state only.
 
-17. Plans & Pricing page has 3 tabs: Assessment Plans | Course Pricing | B2B Plans.
+17. Plans & Pricing page has 4 tabs: Assessment Plans | Single Course Plan | Course Bundle Plans | B2B Plans.
     Full spec in Section 28. Tab-scoped Create buttons only — no global Create button.
-    "Create B2C Plan" (Tab 1) | "Create B2B Plan" (Tab 3) | No button on Tab 2.
+    Tab 1: "Create B2C Plan" | Tab 2: "Create Single Course Plan" |
+    Tab 3: "Create Bundle Plan" | Tab 4: "Create B2B Plan"
     Page subtitle: "Manage B2C and B2B subscription plans and content entitlements"
 
 18. Feature bullets for plans: JSONB array (feature_bullets column).
@@ -800,6 +820,36 @@ src/components/plans/PlanContentTab.tsx  [UPDATE — KSS-SA-004-ARCH]
   — Multi-tenant callout: "This plan is assigned to N tenants"
   — audience_type badge on each content row
 
+src/app/super-admin/plans-pricing/page.tsx
+  — 4-tab main page (Assessment Plans | Single Course Plan | Course Bundle Plans | B2B Plans)
+  — AssessmentPlansTab: card grid, PlanAssessmentsSlideOver (read-only count badge)
+  — SingleCoursePlansSection: Plan Records table with View + Edit (SingleCoursePlanEditSlideOver)
+  — CourseBundlePlansSection, B2BPlansTab (card grid)
+
+src/app/super-admin/plans-pricing/new/page.tsx
+  — Create forms: B2CCreatePlanForm | B2BCreatePlanForm | SingleCoursePlanForm | BundlePlanForm
+  — Routes: ?audience=B2C | ?audience=B2B | ?audience=B2C&category=SINGLE_COURSE_PLAN |
+             ?audience=B2C&category=COURSE_BUNDLE
+
+src/components/plans/EditPlanSlideOver.tsx
+  — Exports: EditPlanSlideOver (B2C/B2B/Bundle routing by plan_category)
+             SingleCoursePlanEditSlideOver (used in Tab 2 Plan Records)
+  — CourseBundleEditForm for plan_category='COURSE_BUNDLE'
+  — B2CEditForm (Section 6: additive assessment picker)
+
+src/lib/supabase/plans.ts
+  — fetchPlans, createPlan, updatePlan, fetchB2BPlansForGrid, fetchCourseBundlePlans
+  — fetchSingleCoursePlans, createSingleCoursePlan, updateSingleCoursePlan, syncCourseFromPlan
+  — fetchAssessmentCountsByPlan, fetchAssessmentsInPlan
+  — fetchPlansContainingContent (ContentPlanUsageModal support)
+
+src/lib/supabase/content-creators.ts
+  — Content Creators data layer: fetch list, detail, assessments, courses, create, update, toggle
+src/app/super-admin/content-creators/page.tsx
+  — Content Creators list + CreateCCSlideOver
+src/app/super-admin/content-creators/[id]/page.tsx
+  — Content Creator detail: header + assessments table + courses table + EditCCSlideOver + ToggleActiveModal
+
 src/app/assessments/[id]/exam/page.tsx
   — LinearExamPlayer, ExamHeader, ExamFooter,
     PaletteSidebar, QuestionArea, ExitConfirmModal, SubmitConfirmModal
@@ -832,8 +882,8 @@ Section              Item                  Status
 (none)               Dashboard             Coming Soon
 Content Management   Content Bank          ✅ KSS-SA-009 built
 Content Management   Plans & Pricing       ✅ KSS-SA-004 built
-Master Org           B2C Users             Coming Soon
-Master Org           Content Creators      Coming Soon
+Master Org           B2C Users             ✅ KSS-SA-008 built
+Master Org           Content Creators      ✅ KSS-SA-017 built
 Organisations        Tenants               ✅ KSS-SA-003 built
 Course Creation      Create Course         🟡 pending (route: /super-admin/create-course)
 Assessment Creation  Sources & Questions   Coming Soon
@@ -988,6 +1038,27 @@ No Team Manager persona selector — role permanently removed from V1.
                - On PUBLISHED: syncs is_individually_purchasable=true + price+price_usd+stripe_price_id to course
                - On ARCHIVED: sets is_individually_purchasable=false on course
                - Create form: Section 3 now has both Price (₹) + Price (USD) fields
+
+✅ KSS-SA-016   Single Course Plan tab overhaul — DONE (March 24, 2026):
+               - Removed IndividualCoursePricingSection entirely
+               - Tab 2 = Plan Records table only (Plan Name | Course Name | Price USD | Status | Actions)
+               - Plan record = source of truth for is_individually_purchasable
+               - price_usd replaces price_usd_cents on plans + courses tables
+               - SingleCoursePlanEditSlideOver + updateSingleCoursePlan + syncCourseFromPlan
+               - Create form: Price (₹) + Price (USD) fields
+
+✅ KSS-SA-017   Three SA platform improvements — DONE (March 24, 2026):
+               DB: KSS-DB-SA-016 — tenants.logo_url text nullable
+               DB: KSS-DB-SA-017 — admin_users.password_hash text nullable
+               DB: KSS-DB-SA-018 — content_items.last_modified_by + courses.last_modified_by uuid nullable
+               Storage: tenant-logo bucket (public, {tenant_id}.jpg, 500KB, PNG/JPG)
+               - Assessment Plans tab: swimlane → card grid (plan name, tier badge, assessment count badge,
+                 subscriber count, status, 3-dot menu). Count badge → PlanAssessmentsSlideOver (read-only)
+               - Tenant logo upload: drag-and-drop in CreateTenantSlideOver + EditDetailsSlideOver Section 1
+                 Displayed above "Client Admin Details" card on tenant Overview tab
+               - CA sidebar: logo replaces tenant initials at top-left; fallback = tenant initials
+               - Content Creators page: list + detail + create/edit slide-overs + deactivate/reactivate
+                 src/lib/supabase/content-creators.ts, /super-admin/content-creators, /[id]
 
 ✅ KSS-SA-008   Master Organisation — B2C Users DONE (March 23, 2026):
                - DB: KSS-DB-SA-011 — users.status, users.stripe_subscription_id,
@@ -1265,6 +1336,12 @@ Run this full checklist before presenting any code:
 [ ] B2C Create Plan form has Section 6 — Assessment picker (LIVE B2C assessments, search only)
 [ ] EditPlanSlideOver B2CEditForm has Section 6 — Add Assessments (additive only)
 [ ] content_creator_seats on contracts table: DEFAULT 0, visible for FULL_CREATOR only in Contract tab
+[ ] Tenant logo_url: drag-drop upload in CreateTenantSlideOver + EditDetailsSlideOver; displayed on Overview card
+[ ] CA sidebar: logo replaces tenant initials when logo_url present; fallback = initials badge
+[ ] last_modified_by updated on every save to content_items and courses (uuid of editor)
+[ ] created_by never changes — always original author
+[ ] Content Creators page: /super-admin/content-creators — list + detail + create/edit + deactivate
+[ ] Assessment Plans tab: card grid (not swimlane); count badge → PlanAssessmentsSlideOver (read-only)
 
 ---
 
@@ -1372,31 +1449,37 @@ Route: /super-admin/plans-pricing (4-tab structure — updated from 3 tabs March
 Page subtitle: "Manage B2C and B2B subscription plans and content entitlements"
 Header: NO global "+ Create Plan" button. Create buttons are tab-scoped.
 
-### 4-Tab Structure (locked March 23, 2026)
-Tab 1: Assessment Plans   — B2C swimlane + category plans + "Create Assess Plan" button
-Tab 2: Single Course Plan — inline pricing table for LIVE B2C courses (no create button)
-Tab 3: Course Bundle Plans — bundle plan list + "Create Bundle Plan" button top-right
+### 4-Tab Structure (locked March 23, 2026; updated March 24, 2026)
+Tab 1: Assessment Plans   — B2C card grid (Platform Plans + Category Plans) + "Create B2C Plan" button
+Tab 2: Single Course Plan — Plan Records table for purchasable courses + "Create Single Course Plan" button
+Tab 3: Course Bundle Plans — bundle plan table + "Create Bundle Plan" button top-right
 Tab 4: B2B Plans          — card grid + "Create B2B Plan" button in info strip
 
-### Tab 1 — Assessment Plans (B2C)
+### Tab 1 — Assessment Plans (B2C) (updated March 24, 2026 — KSS-SA-017)
 MRR strip: shown INSIDE Tab 1 only (not above the tabs — removed from page header area).
   Shows B2C plans MRR only. B2B plans excluded (price=0, billing via contract).
 
-Layout: Swimlane comparison table
-Columns: Free (Default) [read-only] | Basic | Professional | Premium
-  Column headers = tier display labels (hardcoded). Maps to plans.tier:
-    Basic → tier='BASIC', plan_audience='B2C'
-    Professional → tier='PRO', plan_audience='B2C'
-    Premium → tier='PREMIUM', plan_audience='B2C'
-Below swimlane: category-specific plans in a separate section
-  (SAT Pro, NEET Pro, JEE Premium — shown as table rows with same columns)
+Layout: Card grid (replaced swimlane comparison table — KSS-SA-017)
+Two sections:
+  "Platform Plans" — scope='PLATFORM_WIDE', plan_audience='B2C' (Basic, Pro, Premium)
+  "Category Plans" — scope='CATEGORY_BUNDLE', plan_audience='B2C' (SAT Pro, NEET Pro, etc.)
 
-Swimlane row attributes (rows of the comparison table):
-  Price (₹/month) | Subscriber Count | MRR | Status badge |
-  Scope | Allowed Types | Max Attempts | Feature Bullets count
-  Scope values display as: "Platform-wide" | "Category Bundle"
+Each card displays:
+  Plan Name | Tier badge (BASIC/PRO/PREMIUM — colour-coded) |
+  Assessment count badge (clickable → PlanAssessmentsSlideOver read-only) |
+  Subscriber Count | Status badge | 3-dot menu
 
-Actions: Edit button per plan → opens EditPlanSlideOver (480px right panel)
+Tier badge colours:
+  BASIC     → bg-zinc-100 text-zinc-600
+  PRO       → bg-blue-50 text-blue-700
+  PREMIUM   → bg-amber-50 text-amber-700
+  ENTERPRISE → bg-violet-50 text-violet-700
+
+Assessment count badge: shows "N assessments". Clicking opens PlanAssessmentsSlideOver.
+PlanAssessmentsSlideOver: read-only slide-over listing Title | Category | Type | Audience badge.
+  Data: plan_content_map (ASSESSMENT rows) → content_items.
+
+3-dot menu actions: Edit → opens EditPlanSlideOver (480px right panel)
   Edit slide-over sections:
     Plan Identity: name (internal), display_name, tagline, is_popular, cta_label
     Scope: PLATFORM_WIDE / CATEGORY_BUNDLE (segmented control)

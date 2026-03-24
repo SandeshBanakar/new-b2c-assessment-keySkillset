@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, Loader2, Search, Plus, UserCircle } from 'lucide-react'
+import { X, Loader2, Search, Plus, UserCircle, Upload, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ export interface TenantRow {
   zip_code?: string | null
   timezone?: string | null
   date_format?: string | null
+  logo_url?: string | null
 }
 
 interface FormState {
@@ -199,6 +200,13 @@ export function EditDetailsSlideOver({
   const [dirty, setDirty] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
 
+  // Logo state
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [removeLogo, setRemoveLogo] = useState(false)
+  const [logoDragOver, setLogoDragOver] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+
   // Client Admin state
   const [currentCA, setCurrentCA] = useState<ClientAdminRecord | null | undefined>(undefined)
   const [showAddCA, setShowAddCA] = useState(false)
@@ -234,6 +242,9 @@ export function EditDetailsSlideOver({
       setCaName('')
       setCaEmail('')
       setCaSuccess(false)
+      setLogoFile(null)
+      setLogoPreview(null)
+      setRemoveLogo(false)
 
       // Fetch current Client Admin
       supabase
@@ -252,6 +263,17 @@ export function EditDetailsSlideOver({
   const set = (key: keyof FormState, val: string) => {
     setForm((prev) => ({ ...prev, [key]: val }))
     setDirty(true)
+  }
+
+  const handleLogoFile = (file: File) => {
+    if (!['image/jpeg', 'image/png'].includes(file.type)) return
+    if (file.size > 512000) return
+    setLogoFile(file)
+    setRemoveLogo(false)
+    setDirty(true)
+    const reader = new FileReader()
+    reader.onload = (e) => setLogoPreview(e.target?.result as string)
+    reader.readAsDataURL(file)
   }
 
   const handleClose = () => {
@@ -287,6 +309,20 @@ export function EditDetailsSlideOver({
         zip_code: form.zip_code.trim() || null,
         timezone: form.timezone || 'Asia/Kolkata',
         date_format: form.date_format || 'DD/MM/YYYY',
+      }
+
+      // Handle logo upload / removal
+      if (logoFile) {
+        const { error: uploadErr } = await supabase.storage
+          .from('tenant-logo')
+          .upload(`${tenant.id}.jpg`, logoFile, { upsert: true, contentType: logoFile.type })
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('tenant-logo').getPublicUrl(`${tenant.id}.jpg`)
+          payload.logo_url = urlData.publicUrl + '?t=' + Date.now()
+        }
+      } else if (removeLogo) {
+        await supabase.storage.from('tenant-logo').remove([`${tenant.id}.jpg`])
+        payload.logo_url = null
       }
 
       const { error } = await supabase
@@ -397,6 +433,58 @@ export function EditDetailsSlideOver({
               <option value="RUN_ONLY">Run Only</option>
               <option value="FULL_CREATOR">Full Creator</option>
             </select>
+          </div>
+
+          {/* Logo Upload */}
+          <div className="mt-4">
+            <label className={labelCls}>Logo <span className="text-zinc-400 font-normal">(optional)</span></label>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f) }}
+            />
+            {(logoPreview || (!removeLogo && tenant.logo_url)) ? (
+              <div className="flex items-center gap-3 p-3 border border-zinc-200 rounded-md bg-zinc-50">
+                <img
+                  src={logoPreview ?? tenant.logo_url ?? ''}
+                  alt="Tenant logo"
+                  className="h-10 w-auto max-w-30 object-contain rounded"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-500 truncate">{logoFile?.name ?? 'Current logo'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setLogoFile(null); setLogoPreview(null); setRemoveLogo(true); setDirty(true) }}
+                  className="text-zinc-400 hover:text-rose-600 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => logoInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setLogoDragOver(true) }}
+                onDragLeave={() => setLogoDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setLogoDragOver(false)
+                  const f = e.dataTransfer.files?.[0]
+                  if (f) handleLogoFile(f)
+                }}
+                className={`flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed rounded-md cursor-pointer transition-colors ${
+                  logoDragOver ? 'border-blue-700 bg-blue-50' : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50'
+                }`}
+              >
+                <Upload className="w-5 h-5 text-zinc-400" />
+                <p className="text-xs text-zinc-500">
+                  <span className="text-blue-700 font-medium">Click to upload</span> or drag and drop
+                </p>
+                <p className="text-xs text-zinc-400">PNG, JPG · max 500KB</p>
+              </div>
+            )}
           </div>
 
           {/* Section 2 — Address & Locale */}

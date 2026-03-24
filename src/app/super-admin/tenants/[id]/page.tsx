@@ -366,6 +366,13 @@ function TabOverview({
       <div className="flex gap-6">
         {/* Client Admin Details card */}
         <div className="flex-1 bg-white rounded-md border border-zinc-200 p-5">
+          {tenant.logo_url && (
+            <img
+              src={tenant.logo_url}
+              alt={tenant.name}
+              className="h-10 w-auto max-w-32 object-contain mb-4"
+            />
+          )}
           <p className="text-sm font-semibold text-zinc-900 mb-4">Client Admin Details</p>
           <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 items-start">
             <p className="text-sm text-zinc-500">Client Name</p>

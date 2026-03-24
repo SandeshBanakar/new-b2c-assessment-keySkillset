@@ -64,7 +64,8 @@
       "Bash(ls c:/Projects/new-b2c-assessment-keySkillset/src/app/client-admin/[tenant]/)",
       "mcp__claude_ai_Supabase__apply_migration",
       "Bash(find /c/Projects/new-b2c-assessment-keySkillset -name *Users*Roles* -o -name *users*roles*)",
-      "mcp__claude_ai_Atlassian__getConfluenceSpaces"
+      "mcp__claude_ai_Atlassian__getConfluenceSpaces",
+      "Bash(npx eslint:*)"
     ]
   }
 }

@@ -82,6 +82,54 @@ export async function fetchPlans(): Promise<PlanRow[]> {
   return normalised as PlanRow[]
 }
 
+// ─── Assessment counts per plan ────────────────────────────────────────────────
+
+export async function fetchAssessmentCountsByPlan(): Promise<Record<string, number>> {
+  const { data } = await supabase
+    .from('plan_content_map')
+    .select('plan_id')
+    .eq('content_type', 'ASSESSMENT')
+
+  const counts: Record<string, number> = {}
+  for (const row of data ?? []) {
+    const id = (row as { plan_id: string }).plan_id
+    counts[id] = (counts[id] ?? 0) + 1
+  }
+  return counts
+}
+
+export type AssessmentInPlan = {
+  id: string
+  title: string
+  test_type: string
+  audience_type: string | null
+  category_name: string | null
+}
+
+export async function fetchAssessmentsInPlan(planId: string): Promise<AssessmentInPlan[]> {
+  const { data: mapRows } = await supabase
+    .from('plan_content_map')
+    .select('content_id')
+    .eq('plan_id', planId)
+    .eq('content_type', 'ASSESSMENT')
+
+  const ids = (mapRows ?? []).map((r: { content_id: string }) => r.content_id)
+  if (ids.length === 0) return []
+
+  const { data: items } = await supabase
+    .from('content_items')
+    .select('id, title, test_type, audience_type, exam_categories(name)')
+    .in('id', ids)
+
+  return (items ?? []).map((item: Record<string, unknown>) => ({
+    id: item.id as string,
+    title: item.title as string,
+    test_type: item.test_type as string,
+    audience_type: item.audience_type as string | null,
+    category_name: (item.exam_categories as { name: string } | null)?.name ?? null,
+  }))
+}
+
 // ─── Write helpers (KSS-SA-004-B) ────────────────────────────────────────────
 
 export type CreatePlanPayload = {
