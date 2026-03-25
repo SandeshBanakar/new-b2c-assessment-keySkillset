@@ -68,7 +68,10 @@
       "Bash(npx eslint:*)",
       "Bash(npm install:*)",
       "Bash(node -e \"require\\(''recharts''\\); console.log\\(''recharts OK''\\)\")",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(find /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/plans -name *.tsx)",
+      "Bash(find /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/content-creators -name *.tsx)",
+      "Bash(find /c/Projects/new-b2c-assessment-keySkillset/src/components/analytics -name *.tsx)"
     ]
   }
 }
