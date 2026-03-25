@@ -364,7 +364,7 @@ export async function fetchAssessmentsAnalytics(range: DateRange): Promise<Asses
   const titleMap: Record<string, string> = {}
   if (assessmentIds.length > 0) {
     const { data: contentData } = await supabase
-      .from('content_items')
+      .from('assessments')
       .select('id, title')
       .in('id', assessmentIds)
     for (const c of contentData ?? []) titleMap[c.id] = c.title

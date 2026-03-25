@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, Eye, Pencil, Archive, AlertTriangle, X, Loader2, FileText } from 'lucide-react'
+import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, AlertTriangle, X, Loader2, FileText } from 'lucide-react'
 import {
   fetchPlans,
   fetchAssessmentCountsByPlan,
@@ -18,7 +18,7 @@ import {
   type AssessmentInPlan,
 } from '@/lib/supabase/plans'
 import { PlanStatusBadge } from '@/components/plans/PlanStatusBadge'
-import { EditPlanSlideOver, SingleCoursePlanEditSlideOver } from '@/components/plans/EditPlanSlideOver'
+import { SingleCoursePlanEditSlideOver } from '@/components/plans/EditPlanSlideOver'
 
 type Tab = 'assessment-plans' | 'single-course-plan' | 'course-bundle-plans' | 'b2b-plans'
 
@@ -172,14 +172,12 @@ function AssessmentPlanCard({
   plan,
   assessmentCount,
   onView,
-  onEdit,
   onArchive,
   onCountClick,
 }: {
   plan: PlanRow
   assessmentCount: number
   onView: () => void
-  onEdit: () => void
   onArchive: () => void
   onCountClick: () => void
 }) {
@@ -211,19 +209,12 @@ function AssessmentPlanCard({
           {subscribers} subscriber{subscribers !== 1 ? 's' : ''}
         </span>
       </div>
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-zinc-100">
+      <div className="mt-4 pt-3 border-t border-zinc-100">
         <button
           onClick={onView}
           className="text-xs text-blue-700 hover:text-blue-800 font-medium"
         >
           View
-        </button>
-        <button
-          onClick={onEdit}
-          className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
-          title="Edit plan"
-        >
-          <Pencil className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
@@ -235,13 +226,11 @@ function AssessmentPlanCardGrid({
   plans,
   counts,
   onView,
-  onEdit,
   onArchive,
 }: {
   plans: PlanRow[]
   counts: Record<string, number>
   onView: (plan: PlanRow) => void
-  onEdit: (plan: PlanRow) => void
   onArchive: (plan: PlanRow) => void
 }) {
   const [viewingPlan, setViewingPlan] = useState<PlanRow | null>(null)
@@ -259,7 +248,6 @@ function AssessmentPlanCardGrid({
             plan={plan}
             assessmentCount={counts[plan.id] ?? 0}
             onView={() => onView(plan)}
-            onEdit={() => onEdit(plan)}
             onArchive={() => onArchive(plan)}
             onCountClick={() => setViewingPlan(plan)}
           />
@@ -279,12 +267,10 @@ function AssessmentPlanCardGrid({
 // ─── Tab 1: Assessment Plans ──────────────────────────────────────────────────
 function AssessmentPlansTab({
   plans,
-  onEdit,
   onCreateB2C,
   onPlanArchived,
 }: {
   plans: PlanRow[]
-  onEdit: (plan: PlanRow) => void
   onCreateB2C: () => void
   onPlanArchived: () => void
 }) {
@@ -339,7 +325,6 @@ function AssessmentPlansTab({
           plans={platformPlans}
           counts={counts}
           onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
-          onEdit={onEdit}
           onArchive={setArchivingPlan}
         />
       </div>
@@ -350,7 +335,6 @@ function AssessmentPlansTab({
         plans={categoryPlans}
         counts={counts}
         onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
-        onEdit={onEdit}
         onArchive={setArchivingPlan}
       />
 
@@ -646,8 +630,6 @@ export default function PlansPage() {
   const [plans, setPlans] = useState<PlanRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [editingPlan, setEditingPlan] = useState<PlanRow | null>(null)
-
   const loadPlans = useCallback(() => {
     setLoading(true)
     fetchPlans()
@@ -706,7 +688,6 @@ export default function PlansPage() {
       {activeTab === 'assessment-plans' && (
         <AssessmentPlansTab
           plans={plans}
-          onEdit={setEditingPlan}
           onCreateB2C={() => router.push('/super-admin/plans-pricing/new?audience=B2C')}
           onPlanArchived={loadPlans}
         />
@@ -727,14 +708,6 @@ export default function PlansPage() {
         />
       )}
 
-      {/* Edit slide-over (B2C plans only) */}
-      {editingPlan && (
-        <EditPlanSlideOver
-          plan={editingPlan}
-          onClose={() => setEditingPlan(null)}
-          onSaved={() => { setEditingPlan(null); loadPlans() }}
-        />
-      )}
     </div>
   )
 }
