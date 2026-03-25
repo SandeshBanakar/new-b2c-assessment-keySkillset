@@ -5,13 +5,15 @@ import { buildRange, type DateRange } from '@/lib/supabase/analytics'
 import PlatformHealthTab from '@/components/analytics/PlatformHealthTab'
 import RevenueTab from '@/components/analytics/RevenueTab'
 import TenantsTab from '@/components/analytics/TenantsTab'
+import AssessmentsTab from '@/components/analytics/AssessmentsTab'
 
-type TabId = 'health' | 'revenue' | 'tenants'
+type TabId = 'health' | 'revenue' | 'tenants' | 'assessments'
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'health',  label: 'Platform Health' },
-  { id: 'revenue', label: 'Revenue' },
-  { id: 'tenants', label: 'Client Admins' },
+  { id: 'health',      label: 'Platform Health' },
+  { id: 'revenue',     label: 'Revenue' },
+  { id: 'tenants',     label: 'Client Admins' },
+  { id: 'assessments', label: 'Assessments' },
 ]
 
 type Preset = '7d' | '30d' | '90d'
@@ -71,9 +73,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'health'  && <PlatformHealthTab range={range} />}
-      {activeTab === 'revenue' && <RevenueTab        range={range} />}
-      {activeTab === 'tenants' && <TenantsTab        range={range} />}
+      {activeTab === 'health'      && <PlatformHealthTab range={range} />}
+      {activeTab === 'revenue'     && <RevenueTab        range={range} />}
+      {activeTab === 'tenants'     && <TenantsTab        range={range} />}
+      {activeTab === 'assessments' && <AssessmentsTab    range={range} />}
     </div>
   )
 }

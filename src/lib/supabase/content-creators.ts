@@ -135,12 +135,12 @@ export async function createContentCreator(payload: {
 
 export async function updateContentCreator(
   id: string,
-  payload: { name: string; email: string; password?: string }
+  payload: { name: string; email?: string; password?: string }
 ): Promise<void> {
   const update: Record<string, string> = {
     name: payload.name.trim(),
-    email: payload.email.trim(),
   }
+  if (payload.email) update.email = payload.email.trim()
   if (payload.password) update.password_hash = payload.password
 
   const { error } = await supabase.from('admin_users').update(update).eq('id', id)

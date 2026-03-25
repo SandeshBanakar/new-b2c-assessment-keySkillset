@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Fragment } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronDown, ChevronRight, Loader2, X, AlertTriangle, CheckCircle2, Circle } from 'lucide-react'
+import { ChevronLeft, ChevronDown, ChevronRight, Loader2, X, AlertTriangle, CheckCircle2, Circle, CircleDot } from 'lucide-react'
 import {
   fetchB2CUser,
   fetchUserAttempts,
@@ -193,6 +193,15 @@ function AssessmentPerformanceSection({ attempts }: { attempts: UserAttempt[] })
 
 // ─── Course Performance Section ──────────────────────────────────────────────
 
+function computeCourseProgress(modules: CourseModule[]): { pct: number; status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED' } {
+  if (modules.length === 0) return { pct: 0, status: 'NOT_STARTED' }
+  const pct = Math.round(modules.reduce((s, m) => s + m.progressPct, 0) / modules.length)
+  const allDone = modules.every((m) => m.status === 'COMPLETED')
+  const anyProgress = modules.some((m) => m.status === 'IN_PROGRESS' || m.progressPct > 0)
+  const status = allDone ? 'COMPLETED' : anyProgress ? 'IN_PROGRESS' : 'NOT_STARTED'
+  return { pct, status }
+}
+
 function ModuleBreakdown({
   modules,
   loading,
@@ -219,7 +228,15 @@ function ModuleBreakdown({
         <div key={mod.id} className="bg-white border border-zinc-200 rounded-md overflow-hidden">
           {/* Module header */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100">
-            <span className="text-xs font-medium text-zinc-800">{mod.title}</span>
+            <div className="flex items-center gap-2">
+              {mod.status === 'COMPLETED'
+                ? <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                : mod.status === 'IN_PROGRESS'
+                ? <CircleDot className="w-4 h-4 text-blue-700 shrink-0" />
+                : <Circle className="w-4 h-4 text-zinc-300 shrink-0" />
+              }
+              <span className="text-xs font-medium text-zinc-800">{mod.title}</span>
+            </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-16 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
@@ -314,6 +331,12 @@ function CoursePerformanceSection({
             <tbody>
               {progress.map((p) => {
                 const isExpanded = expandedCourse === p.courseId
+                const loadedModules = moduleData[p.courseId]
+                const computed = loadedModules && loadedModules.length > 0
+                  ? computeCourseProgress(loadedModules)
+                  : null
+                const displayPct = computed ? computed.pct : p.progressPct
+                const displayStatus = computed ? computed.status : p.status
                 return (
                   <Fragment key={p.id}>
                     <tr
@@ -339,17 +362,19 @@ function CoursePerformanceSection({
                           <div className="w-20 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
                             <div
                               className="h-full rounded-full bg-blue-700"
-                              style={{ width: `${p.progressPct}%` }}
+                              style={{ width: `${displayPct}%` }}
                             />
                           </div>
-                          <span className="text-xs text-zinc-600">{p.progressPct}%</span>
+                          <span className="text-xs text-zinc-600">{displayPct}%</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {p.status === 'COMPLETED' ? (
+                        {displayStatus === 'COMPLETED' ? (
                           <span className="text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-md">Completed</span>
-                        ) : (
+                        ) : displayStatus === 'IN_PROGRESS' ? (
                           <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">In Progress</span>
+                        ) : (
+                          <span className="text-xs font-medium bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">Not Started</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-zinc-500">{fmt(p.startedAt)}</td>

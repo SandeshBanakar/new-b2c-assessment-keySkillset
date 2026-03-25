@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, Loader2, Eye, PenTool } from 'lucide-react'
+import { Plus, X, Loader2, Eye, PenTool, Pencil, PowerOff, Power } from 'lucide-react'
 import {
   fetchContentCreators,
   createContentCreator,
+  updateContentCreator,
+  toggleContentCreatorActive,
   type ContentCreatorRow,
 } from '@/lib/supabase/content-creators'
 import { useToast } from '@/components/ui/Toast'
@@ -136,6 +138,159 @@ function CreateCCSlideOver({
   )
 }
 
+// ─── Edit Slide-Over (list) ────────────────────────────────────────────────────
+
+function EditCCSlideOver({
+  cc,
+  onClose,
+  onSaved,
+}: {
+  cc: ContentCreatorRow
+  onClose: () => void
+  onSaved: (updated: { name: string }) => void
+}) {
+  const { showToast } = useToast()
+  const [name, setName] = useState(cc.name)
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    const e: Record<string, string> = {}
+    if (!name.trim()) e.name = 'Name is required.'
+    if (password && password.length < 6) e.password = 'Minimum 6 characters.'
+    if (password && password !== confirm) e.confirm = 'Passwords do not match.'
+    if (Object.keys(e).length > 0) { setErrors(e); return }
+
+    setSaving(true)
+    try {
+      await updateContentCreator(cc.id, { name, password: password || undefined })
+      showToast('Changes saved.', 'success')
+      onSaved({ name: name.trim() })
+      onClose()
+    } catch {
+      showToast('Failed to save changes.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = (err?: string) =>
+    `border rounded-md px-3 py-2 text-sm text-zinc-900 focus:ring-2 focus:ring-blue-700 focus:border-transparent outline-none w-full ${
+      err ? 'border-rose-400' : 'border-zinc-200'
+    }`
+  const labelCls = 'text-sm font-medium text-zinc-700 block mb-1'
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-120 bg-white shadow-xl z-50 flex flex-col">
+        <div className="px-6 py-4 border-b border-zinc-200 flex justify-between items-center shrink-0">
+          <p className="text-base font-semibold text-zinc-900">Edit Content Creator</p>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          <div>
+            <label className={labelCls}>Name <span className="text-rose-500">*</span></label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls(errors.name)} />
+            {errors.name && <p className="text-xs text-rose-600 mt-1">{errors.name}</p>}
+          </div>
+          <div>
+            <label className={labelCls}>Email</label>
+            <p className="text-sm text-zinc-900 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-2">{cc.email}</p>
+            <p className="text-xs text-zinc-400 mt-1">Email cannot be changed after creation.</p>
+          </div>
+          <div className="border-t border-zinc-100 pt-4">
+            <label className={labelCls}>
+              New Password{' '}
+              <span className="text-zinc-400 font-normal text-xs">(leave blank to keep existing)</span>
+            </label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 6 characters" className={inputCls(errors.password)} />
+            {errors.password && <p className="text-xs text-rose-600 mt-1">{errors.password}</p>}
+          </div>
+          {password && (
+            <div>
+              <label className={labelCls}>Confirm New Password <span className="text-rose-500">*</span></label>
+              <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={inputCls(errors.confirm)} />
+              {errors.confirm && <p className="text-xs text-rose-600 mt-1">{errors.confirm}</p>}
+            </div>
+          )}
+        </div>
+        <div className="border-t border-zinc-200 px-6 py-4 flex justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md px-4 py-2 hover:bg-zinc-50">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70">
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── Toggle Active Modal (list) ────────────────────────────────────────────────
+
+function ToggleActiveModal({
+  cc,
+  onClose,
+  onConfirmed,
+}: {
+  cc: ContentCreatorRow
+  onClose: () => void
+  onConfirmed: () => void
+}) {
+  const { showToast } = useToast()
+  const [saving, setSaving] = useState(false)
+  const deactivating = cc.is_active
+
+  async function handleConfirm() {
+    setSaving(true)
+    try {
+      await toggleContentCreatorActive(cc.id, !cc.is_active)
+      showToast(deactivating ? `${cc.name} deactivated.` : `${cc.name} reactivated.`, 'success')
+      onConfirmed()
+    } catch {
+      showToast('Action failed.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-md border border-zinc-200 shadow-xl w-full max-w-sm p-6">
+          <h2 className="text-sm font-semibold text-zinc-900 mb-2">
+            {deactivating ? 'Deactivate' : 'Reactivate'} Content Creator
+          </h2>
+          <p className="text-sm text-zinc-500 mb-6">
+            {deactivating
+              ? `${cc.name} will lose access to the platform. Their content will not be affected.`
+              : `${cc.name} will regain access to the platform.`}
+          </p>
+          <div className="flex justify-end gap-3">
+            <button onClick={onClose} className="text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md px-4 py-2 hover:bg-zinc-50">Cancel</button>
+            <button
+              onClick={handleConfirm}
+              disabled={saving}
+              className={`text-sm font-medium text-white rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70 ${
+                deactivating ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-700 hover:bg-blue-800'
+              }`}
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {deactivating ? 'Deactivate' : 'Reactivate'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function StatusBadge({ isActive }: { isActive: boolean }) {
@@ -154,6 +309,8 @@ export default function ContentCreatorsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<ContentCreatorRow | null>(null)
+  const [toggling, setToggling] = useState<ContentCreatorRow | null>(null)
 
   function load() {
     setLoading(true)
@@ -203,7 +360,7 @@ export default function ContentCreatorsPage() {
                 <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Assessments</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Courses</th>
-                <th className="px-4 py-3 w-16" />
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
@@ -216,14 +373,36 @@ export default function ContentCreatorsPage() {
                   </td>
                   <td className="px-4 py-3 text-center text-zinc-600">{cc.assessment_count}</td>
                   <td className="px-4 py-3 text-center text-zinc-600">{cc.course_count}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => router.push(`/super-admin/content-creators/${cc.id}`)}
-                      className="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 font-medium"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      View
-                    </button>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => router.push(`/super-admin/content-creators/${cc.id}`)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 font-medium"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        View
+                      </button>
+                      <button
+                        onClick={() => setEditing(cc)}
+                        className="inline-flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-800 font-medium"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setToggling(cc)}
+                        className={`inline-flex items-center gap-1 text-xs font-medium ${
+                          cc.is_active
+                            ? 'text-rose-600 hover:text-rose-700'
+                            : 'text-blue-700 hover:text-blue-800'
+                        }`}
+                      >
+                        {cc.is_active
+                          ? <><PowerOff className="w-3.5 h-3.5" />Deactivate</>
+                          : <><Power className="w-3.5 h-3.5" />Reactivate</>
+                        }
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -236,6 +415,28 @@ export default function ContentCreatorsPage() {
         <CreateCCSlideOver
           onClose={() => setShowCreate(false)}
           onCreated={load}
+        />
+      )}
+
+      {editing && (
+        <EditCCSlideOver
+          cc={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(updated) => {
+            setCreators((prev) => prev.map((c) => c.id === editing.id ? { ...c, ...updated } : c))
+            setEditing(null)
+          }}
+        />
+      )}
+
+      {toggling && (
+        <ToggleActiveModal
+          cc={toggling}
+          onClose={() => setToggling(null)}
+          onConfirmed={() => {
+            setToggling(null)
+            load()
+          }}
         />
       )}
     </div>

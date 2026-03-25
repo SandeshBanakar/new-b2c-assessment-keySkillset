@@ -9,7 +9,7 @@ export type PlanRow = {
   billing_cycle: string
   audience_type: string
   plan_audience: 'B2C' | 'B2B'
-  plan_category: 'ASSESSMENT' | 'COURSE_BUNDLE'
+  plan_category: 'ASSESSMENT' | 'COURSE_BUNDLE' | 'SINGLE_COURSE_PLAN'
   status: string
   scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
   tier: 'BASIC' | 'PRO' | 'PREMIUM' | 'ENTERPRISE' | null
@@ -72,7 +72,7 @@ export async function fetchPlans(): Promise<PlanRow[]> {
   // allowed_assessment_types is not a DB column — default to [] client-side.
   const normalised = (data ?? []).map((row) => ({
     ...row,
-    plan_category: ((row as {plan_category?: string}).plan_category ?? 'ASSESSMENT') as 'ASSESSMENT' | 'COURSE_BUNDLE',
+    plan_category: ((row as {plan_category?: string}).plan_category ?? 'ASSESSMENT') as 'ASSESSMENT' | 'COURSE_BUNDLE' | 'SINGLE_COURSE_PLAN',
     allowed_assessment_types: [],
     plan_subscribers: Array.isArray(row.plan_subscribers)
       ? (row.plan_subscribers[0] ?? null)
@@ -268,7 +268,7 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
 
   return {
     ...row,
-    plan_category: ((row as {plan_category?: string}).plan_category ?? 'ASSESSMENT') as 'ASSESSMENT' | 'COURSE_BUNDLE',
+    plan_category: ((row as {plan_category?: string}).plan_category ?? 'ASSESSMENT') as 'ASSESSMENT' | 'COURSE_BUNDLE' | 'SINGLE_COURSE_PLAN',
     // allowed_assessment_types is not a DB column — default to [] client-side
     allowed_assessment_types: [],
     plan_subscribers: Array.isArray(row.plan_subscribers)

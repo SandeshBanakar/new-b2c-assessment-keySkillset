@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 6.7 | Updated: March 25, 2026
+# Version: 6.8 | Updated: March 25, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # Single source of truth. Maintained by Claude Code sessions — never edit manually.
 
@@ -276,6 +276,15 @@ No Team Manager persona — permanently removed from V1.
 ## 13. CURRENT BUILD QUEUE
 
 Completed: All KSS-SA-004 through KSS-SA-017, KSS-SA-008/009/010, KSS-DB-CA-001, KSS-CA-001 through KSS-CA-006, KSS-CA-008, all BUG-SA and FIX-SA items — DONE.
+Also completed (March 25, 2026 — fix/minor-upgrades):
+  - Module status icons on B2C profile: CheckCircle2/CircleDot/Circle per COMPLETED/IN_PROGRESS/NOT_STARTED
+  - Course % recomputed from module averages (Option A — no DB change, computed in UI)
+  - Email immutable after creation on all edit surfaces (learners, content creators, CC in CA Users & Roles)
+  - Content Creators list: Actions column (View + Edit + Deactivate/Reactivate)
+  - Assessment Plans cards: 3-dot menu replaced with Pencil icon Edit button in card footer
+  - PlanContentTab validation: ASSESSMENT plans hide Add Course; COURSE_BUNDLE plans hide Add Assessment
+  - plan_category type extended to include 'SINGLE_COURSE_PLAN' in PlanRow/PlanDetail
+  - Dashboard: Assessments tab added (4th tab) — 4 KPI cards + dual-series AreaChart + per-assessment table
 
 Pending:
 🟡 KSS-SA-005   Audit Log (SA)
@@ -400,6 +409,14 @@ Use MCP Atlassian updateConfluencePage after all code committed and build passes
 [ ] Plans & Pricing subtitle: "Manage B2C and B2B subscription plans and content entitlements"
 [ ] No global Create Plan button in page header — tab-scoped buttons only
 [ ] Assessment Plans tab: card grid (not swimlane); count badge → PlanAssessmentsSlideOver (read-only)
+[ ] Content Creators list: Actions column — View + Edit + Deactivate/Reactivate on every row
+[ ] Content Creators edit: email is read-only — never editable after creation. Show static text + note.
+[ ] Assessment Plans cards: Pencil icon Edit button in card footer — no 3-dot menu
+[ ] PlanContentTab: ASSESSMENT plans hide Add Course; COURSE_BUNDLE plans hide Add Assessment
+[ ] plan_category type union includes 'SINGLE_COURSE_PLAN' (3 values total)
+[ ] Dashboard: 4 tabs — Platform Health | Revenue | Client Admins | Assessments
+[ ] Assessments tab: 4 KPIs (Total Users, Assessments in Use, Avg Score, Total Attempts) + dual AreaChart + per-assessment table
+[ ] Email never editable after creation — applies to all edit forms (learners, CCs, CA Users & Roles CC form)
 [ ] Content Creators page: /super-admin/content-creators — list + detail + create/edit + deactivate
 [ ] /super-admin/analytics permanently redirects to /super-admin/dashboard
 [ ] Learner removal: Archive (reversible, LEARNER_ARCHIVED) vs Hard Delete (GDPR two-step, tombstone)

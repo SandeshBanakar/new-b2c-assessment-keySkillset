@@ -209,13 +209,13 @@ function LearnerSlideOver({
 
   async function handleSave() {
     if (!fullName.trim()) { setError('Full name is required.'); return }
-    if (!email.trim()) { setError('Email is required.'); return }
+    if (!editing && !email.trim()) { setError('Email is required.'); return }
     setSaving(true)
     setError(null)
 
     const payload = {
       full_name: fullName.trim(),
-      email: email.trim(),
+      ...(editing ? {} : { email: email.trim() }),
       phone: phone.trim() || null,
       department_id: departmentId || null,
       team_id: teamId || null,
@@ -276,15 +276,22 @@ function LearnerSlideOver({
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1">
-                  Email <span className="text-rose-600">*</span>
+                  Email {!editing && <span className="text-rose-600">*</span>}
                 </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setDirty(true) }}
-                  placeholder="e.g. arjun@example.com"
-                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                />
+                {editing ? (
+                  <>
+                    <p className="text-sm text-zinc-900 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-2">{editing.email}</p>
+                    <p className="text-xs text-zinc-400 mt-1">Email cannot be changed after creation.</p>
+                  </>
+                ) : (
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setDirty(true) }}
+                    placeholder="e.g. arjun@example.com"
+                    className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1">Phone</label>

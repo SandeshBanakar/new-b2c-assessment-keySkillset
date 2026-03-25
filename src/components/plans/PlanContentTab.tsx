@@ -64,6 +64,9 @@ export function PlanContentTab({ plan }: Props) {
   }
 
   const planAudience = (plan as PlanDetail & { plan_audience?: 'B2C' | 'B2B' }).plan_audience ?? 'B2C'
+  const planCategory = plan.plan_category ?? 'ASSESSMENT'
+  const showAssessments = planCategory !== 'COURSE_BUNDLE'
+  const showCourses = planCategory !== 'ASSESSMENT'
 
   return (
     <div className="space-y-8">
@@ -97,7 +100,7 @@ export function PlanContentTab({ plan }: Props) {
       </div>
 
       {/* Assessments section */}
-      <div>
+      {showAssessments && <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
             Assessments ({assessments.length})
@@ -181,10 +184,10 @@ export function PlanContentTab({ plan }: Props) {
             </table>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Courses section */}
-      <div>
+      {showCourses && <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
             Courses ({courses.length})
@@ -253,7 +256,7 @@ export function PlanContentTab({ plan }: Props) {
             </table>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Add content slide-over */}
       {addSlideOver && (

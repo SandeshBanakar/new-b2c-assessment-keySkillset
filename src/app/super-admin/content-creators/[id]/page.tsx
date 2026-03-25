@@ -28,7 +28,6 @@ function EditCCSlideOver({
 }) {
   const { showToast } = useToast()
   const [name, setName] = useState(cc.name)
-  const [email, setEmail] = useState(cc.email)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -37,16 +36,15 @@ function EditCCSlideOver({
   async function handleSave() {
     const e: Record<string, string> = {}
     if (!name.trim()) e.name = 'Name is required.'
-    if (!email.trim()) e.email = 'Email is required.'
     if (password && password.length < 6) e.password = 'Minimum 6 characters.'
     if (password && password !== confirm) e.confirm = 'Passwords do not match.'
     if (Object.keys(e).length > 0) { setErrors(e); return }
 
     setSaving(true)
     try {
-      await updateContentCreator(cc.id, { name, email, password: password || undefined })
+      await updateContentCreator(cc.id, { name, password: password || undefined })
       showToast('Changes saved.', 'success')
-      onSaved({ name: name.trim(), email: email.trim() })
+      onSaved({ name: name.trim() })
       onClose()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save.'
@@ -89,14 +87,9 @@ function EditCCSlideOver({
             {errors.name && <p className="text-xs text-rose-600 mt-1">{errors.name}</p>}
           </div>
           <div>
-            <label className={labelCls}>Email <span className="text-rose-500">*</span></label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={inputCls(errors.email)}
-            />
-            {errors.email && <p className="text-xs text-rose-600 mt-1">{errors.email}</p>}
+            <label className={labelCls}>Email</label>
+            <p className="text-sm text-zinc-900 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-2">{cc.email}</p>
+            <p className="text-xs text-zinc-400 mt-1">Email cannot be changed after creation.</p>
           </div>
           <div className="border-t border-zinc-100 pt-4">
             <label className={labelCls}>

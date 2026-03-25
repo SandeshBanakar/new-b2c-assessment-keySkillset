@@ -290,3 +290,104 @@ export async function fetchTenantsAnalytics(range: DateRange): Promise<TenantsDa
     tenantRows,
   }
 }
+
+// ─── Assessments ──────────────────────────────────────────────────────────────
+
+export type AssessmentStat = {
+  assessmentId: string
+  title: string
+  totalAttempts: number
+  uniqueUsers: number
+  avgScore: number
+}
+
+export type AssessmentsAnalyticsData = {
+  totalUniqueUsers: number
+  assessmentsInUse: number
+  avgScore: number
+  totalAttempts: number
+  attemptsSeries: TimeSeriesPoint[]
+  uniqueUsersSeries: TimeSeriesPoint[]
+  assessmentStats: AssessmentStat[]
+}
+
+export async function fetchAssessmentsAnalytics(range: DateRange): Promise<AssessmentsAnalyticsData> {
+  const granularity = pickGranularity(range)
+
+  const { data: attemptsData } = await supabase
+    .from('attempts')
+    .select('user_id, assessment_id, accuracy_percent, created_at')
+    .gte('created_at', range.from)
+    .lte('created_at', range.to)
+
+  const attempts = attemptsData ?? []
+
+  const totalAttempts = attempts.length
+  const uniqueUserSet = new Set(attempts.map((a) => a.user_id as string))
+  const totalUniqueUsers = uniqueUserSet.size
+  const uniqueAssessmentSet = new Set(attempts.map((a) => a.assessment_id as string))
+  const assessmentsInUse = uniqueAssessmentSet.size
+
+  const scored = attempts.filter((a) => a.accuracy_percent != null)
+  const avgScore = scored.length > 0
+    ? Math.round(scored.reduce((s: number, a) => s + (a.accuracy_percent as number), 0) / scored.length)
+    : 0
+
+  // Time series
+  const attemptsByDay: Record<string, number> = {}
+  const usersByDay: Record<string, Set<string>> = {}
+  for (const a of attempts) {
+    const dt = new Date(a.created_at as string)
+    let key: string
+    if (granularity === 'daily') {
+      key = dt.toISOString().slice(0, 10)
+    } else {
+      const day = dt.getDay()
+      const diff = day === 0 ? -6 : 1 - day
+      const monday = new Date(dt)
+      monday.setDate(dt.getDate() + diff)
+      key = monday.toISOString().slice(0, 10)
+    }
+    attemptsByDay[key] = (attemptsByDay[key] ?? 0) + 1
+    if (!usersByDay[key]) usersByDay[key] = new Set()
+    usersByDay[key].add(a.user_id as string)
+  }
+  const attemptsSeries: TimeSeriesPoint[] = Object.entries(attemptsByDay)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, count]) => ({ date, count }))
+  const uniqueUsersSeries: TimeSeriesPoint[] = Object.entries(usersByDay)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, set]) => ({ date, count: set.size }))
+
+  // Fetch assessment titles
+  const assessmentIds = Array.from(uniqueAssessmentSet)
+  const titleMap: Record<string, string> = {}
+  if (assessmentIds.length > 0) {
+    const { data: contentData } = await supabase
+      .from('content_items')
+      .select('id, title')
+      .in('id', assessmentIds)
+    for (const c of contentData ?? []) titleMap[c.id] = c.title
+  }
+
+  // Per-assessment stats
+  const byAssessment: Record<string, { users: Set<string>; scores: number[]; count: number }> = {}
+  for (const a of attempts) {
+    const id = a.assessment_id as string
+    if (!byAssessment[id]) byAssessment[id] = { users: new Set(), scores: [], count: 0 }
+    byAssessment[id].users.add(a.user_id as string)
+    byAssessment[id].count++
+    if (a.accuracy_percent != null) byAssessment[id].scores.push(a.accuracy_percent as number)
+  }
+  const assessmentStats: AssessmentStat[] = Object.entries(byAssessment)
+    .map(([id, { users, scores, count }]) => ({
+      assessmentId: id,
+      title: titleMap[id] ?? 'Unknown Assessment',
+      totalAttempts: count,
+      uniqueUsers: users.size,
+      avgScore: scores.length > 0 ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) : 0,
+    }))
+    .sort((a, b) => b.totalAttempts - a.totalAttempts)
+
+  return { totalUniqueUsers, assessmentsInUse, avgScore, totalAttempts, attemptsSeries, uniqueUsersSeries, assessmentStats }
+}

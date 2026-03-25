@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, MoreVertical, Eye, Pencil, Archive, AlertTriangle, X, Loader2, FileText } from 'lucide-react'
+import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, Eye, Pencil, Archive, AlertTriangle, X, Loader2, FileText } from 'lucide-react'
 import {
   fetchPlans,
   fetchAssessmentCountsByPlan,
@@ -90,66 +90,6 @@ function ArchivePlanModal({
   )
 }
 
-// ─── Plan Actions 3-dot menu ──────────────────────────────────────────────────
-function PlanActionsMenu({
-  plan,
-  onView,
-  onEdit,
-  onArchive,
-}: {
-  plan: PlanRow
-  onView: () => void
-  onEdit: () => void
-  onArchive: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    if (open) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
-  const isArchived = plan.status === 'ARCHIVED'
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
-      >
-        <MoreVertical className="w-4 h-4" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-7 z-20 w-36 bg-white border border-zinc-200 rounded-md shadow-md py-1">
-          <button
-            onClick={() => { setOpen(false); onView() }}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-          >
-            <Eye className="w-3.5 h-3.5 text-zinc-400" /> View
-          </button>
-          <button
-            onClick={() => { setOpen(false); onEdit() }}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-          >
-            <Pencil className="w-3.5 h-3.5 text-zinc-400" /> Edit
-          </button>
-          {!isArchived && (
-            <button
-              onClick={() => { setOpen(false); onArchive() }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
-            >
-              <Archive className="w-3.5 h-3.5" /> Archive
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ─── Plan Assessments Slide-Over ─────────────────────────────────────────────
 function PlanAssessmentsSlideOver({
@@ -278,12 +218,13 @@ function AssessmentPlanCard({
         >
           View
         </button>
-        <PlanActionsMenu
-          plan={plan}
-          onView={onView}
-          onEdit={onEdit}
-          onArchive={onArchive}
-        />
+        <button
+          onClick={onEdit}
+          className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+          title="Edit plan"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   )
