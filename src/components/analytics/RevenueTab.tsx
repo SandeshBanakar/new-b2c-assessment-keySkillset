@@ -33,19 +33,6 @@ function formatInr(n: number) {
   return `₹${n}`
 }
 
-function exportCsv(data: RevenueData) {
-  const rows = [
-    ['Plan', 'Subscribers', 'Price (INR)', 'MRR (INR)'],
-    ...data.planRows.map((r) => [r.name, r.subscriberCount, r.price, r.mrr]),
-  ]
-  const csv = rows.map((r) => r.join(',')).join('\n')
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = 'revenue.csv'; a.click()
-  URL.revokeObjectURL(url)
-}
-
 export default function RevenueTab({ range }: { range: DateRange }) {
   const [data, setData]       = useState<RevenueData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,16 +62,6 @@ export default function RevenueTab({ range }: { range: DateRange }) {
 
   return (
     <div className="space-y-6">
-      {/* Export */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => exportCsv(data)}
-          className="text-xs font-medium text-zinc-500 border border-zinc-200 rounded-md px-3 py-1.5 hover:bg-zinc-50 transition-colors"
-        >
-          Export CSV
-        </button>
-      </div>
-
       {/* KPI strip */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white border border-zinc-200 rounded-md p-4 space-y-1">

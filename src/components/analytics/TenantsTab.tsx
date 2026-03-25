@@ -11,23 +11,6 @@ function formatInr(n: number) {
   return `₹${n.toLocaleString()}`
 }
 
-function exportCsv(data: TenantsData) {
-  const rows = [
-    ['Tenant', 'Active', 'Total Learners', 'Active Learners (Period)', 'ARR (INR)', 'Contract End'],
-    ...data.tenantRows.map((r) => [
-      r.name, r.isActive ? 'Yes' : 'No',
-      r.totalLearners, r.activeLearners, r.arr,
-      r.contractEnd ?? '—',
-    ]),
-  ]
-  const csv = rows.map((r) => r.join(',')).join('\n')
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = 'tenants-analytics.csv'; a.click()
-  URL.revokeObjectURL(url)
-}
-
 function LearnerBar({ active, total }: { active: number; total: number }) {
   const pct = total > 0 ? Math.round((active / total) * 100) : 0
   const color = pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-blue-700' : 'bg-zinc-300'
@@ -99,16 +82,6 @@ export default function TenantsTab({ range }: { range: DateRange }) {
 
   return (
     <div className="space-y-6">
-      {/* Export */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => exportCsv(data)}
-          className="text-xs font-medium text-zinc-500 border border-zinc-200 rounded-md px-3 py-1.5 hover:bg-zinc-50 transition-colors"
-        >
-          Export CSV
-        </button>
-      </div>
-
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="bg-white border border-zinc-200 rounded-md p-4 space-y-1">

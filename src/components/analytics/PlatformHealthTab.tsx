@@ -47,21 +47,6 @@ function formatAxisDate(d: string) {
   return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }
 
-function exportCsv(data: PlatformHealthData) {
-  const rows = [
-    ['Date', 'Attempts', 'DAU'],
-    ...data.attemptsSeries.map((r, i) => [
-      r.date, r.count, data.dauSeries[i]?.count ?? '',
-    ]),
-  ]
-  const csv = rows.map((r) => r.join(',')).join('\n')
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = 'platform-health.csv'; a.click()
-  URL.revokeObjectURL(url)
-}
-
 export default function PlatformHealthTab({ range }: { range: DateRange }) {
   const [data, setData]     = useState<PlatformHealthData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -87,34 +72,24 @@ export default function PlatformHealthTab({ range }: { range: DateRange }) {
   }
   if (!data) return null
 
-  // Merge attemptsSeries + dauSeries by date for combined chart
+  // Merge dauSeries + newSignupsSeries by date for combined chart
   const dateSet = new Set([
-    ...data.attemptsSeries.map((r) => r.date),
     ...data.dauSeries.map((r) => r.date),
+    ...data.newSignupsSeries.map((r) => r.date),
   ])
-  const attMap: Record<string, number> = {}
   const dauMap: Record<string, number> = {}
-  for (const r of data.attemptsSeries) attMap[r.date] = r.count
-  for (const r of data.dauSeries)      dauMap[r.date] = r.count
+  const signupsMap: Record<string, number> = {}
+  for (const r of data.dauSeries)       dauMap[r.date]     = r.count
+  for (const r of data.newSignupsSeries) signupsMap[r.date] = r.count
 
   const combined = [...dateSet].sort().map((d) => ({
     date: d,
-    attempts: attMap[d] ?? 0,
     dau: dauMap[d] ?? 0,
+    newSignups: signupsMap[d] ?? 0,
   }))
 
   return (
     <div className="space-y-6">
-      {/* Export */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => exportCsv(data)}
-          className="text-xs font-medium text-zinc-500 border border-zinc-200 rounded-md px-3 py-1.5 hover:bg-zinc-50 transition-colors"
-        >
-          Export CSV
-        </button>
-      </div>
-
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard icon={Users}    label="Total B2C Subscribers" value={data.totalB2CSubscribers} trend={TRENDS.subscribers} />
@@ -123,20 +98,20 @@ export default function PlatformHealthTab({ range }: { range: DateRange }) {
         <KpiCard icon={Building2} label="Total B2B Learners"    value={data.totalB2BLearners}     trend={TRENDS.b2b} />
       </div>
 
-      {/* Chart: Attempts + DAU */}
+      {/* Chart: DAU + New Sign-ups */}
       {combined.length > 0 ? (
         <div className="bg-white border border-zinc-200 rounded-md p-4 space-y-1">
           <p className="text-sm font-medium text-zinc-900">Daily Activity</p>
-          <p className="text-xs text-zinc-400">Assessment attempts and unique active learners per day</p>
+          <p className="text-xs text-zinc-400">Active learners and new B2C sign-ups per day</p>
           <div className="mt-4" style={{ height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={combined} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="gradAttempts" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="gradDau" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor={chartColors.blue700} stopOpacity={0.15} />
                     <stop offset="95%" stopColor={chartColors.blue700} stopOpacity={0} />
                   </linearGradient>
-                  <linearGradient id="gradDau" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="gradSignups" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor={chartColors.emerald600} stopOpacity={0.15} />
                     <stop offset="95%" stopColor={chartColors.emerald600} stopOpacity={0} />
                   </linearGradient>
@@ -149,15 +124,15 @@ export default function PlatformHealthTab({ range }: { range: DateRange }) {
                   contentStyle={{ fontSize: 12, borderColor: chartColors.zinc200, borderRadius: 6 }}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Area type="monotone" dataKey="attempts" name="Attempts" stroke={chartColors.blue700} fill="url(#gradAttempts)" strokeWidth={2} />
-                <Area type="monotone" dataKey="dau" name="Active Users (DAU)" stroke={chartColors.emerald600} fill="url(#gradDau)" strokeWidth={2} />
+                <Area type="monotone" dataKey="dau" name="Active Users (DAU)" stroke={chartColors.blue700} fill="url(#gradDau)" strokeWidth={2} />
+                <Area type="monotone" dataKey="newSignups" name="New Sign-ups" stroke={chartColors.emerald600} fill="url(#gradSignups)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
       ) : (
         <div className="bg-white border border-zinc-200 rounded-md p-8 text-center text-sm text-zinc-400">
-          No attempt data in the selected date range.
+          No activity data in the selected date range.
         </div>
       )}
     </div>

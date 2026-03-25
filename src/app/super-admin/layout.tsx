@@ -16,7 +16,6 @@ import {
   Upload,
   CreditCard,
   Megaphone,
-  BarChart2,
   Shield,
   PlaySquare,
   LogOut,
@@ -117,7 +116,10 @@ export default function SuperAdminLayout({
             Configuration
           </p>
           <NavItem href="/super-admin/marketing" icon={Megaphone} label="Marketing Config" />
-          <NavItem href="/super-admin/analytics" icon={BarChart2} label="Analytics" />
+
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
+            Compliance
+          </p>
           <NavItem href="/super-admin/audit-log" icon={Shield} label="Audit Log" />
         </nav>
 

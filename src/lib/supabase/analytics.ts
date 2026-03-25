@@ -52,12 +52,12 @@ export function pickGranularity(range: DateRange): 'daily' | 'weekly' {
 export type TimeSeriesPoint = { date: string; count: number }
 
 export type PlatformHealthData = {
-  totalB2CSubscribers: number       // all-time from plan_subscribers (static)
-  activeB2CLearners: number         // unique users with attempt in range
-  newB2CSignups: number             // users.created_at in range
-  totalB2BLearners: number          // all active learners (all tenants)
-  attemptsSeries: TimeSeriesPoint[] // attempts per day/week in range
-  dauSeries: TimeSeriesPoint[]      // distinct users per day/week in range
+  totalB2CSubscribers: number        // all-time from plan_subscribers (static)
+  activeB2CLearners: number          // unique users with attempt in range
+  newB2CSignups: number              // users.created_at in range
+  totalB2BLearners: number           // all active learners (all tenants)
+  dauSeries: TimeSeriesPoint[]       // distinct users per day/week in range
+  newSignupsSeries: TimeSeriesPoint[] // new B2C signups per day/week in range
 }
 
 export type RevenuePlanRow = {
@@ -72,20 +72,6 @@ export type RevenueData = {
   totalMrr: number
   planRows: RevenuePlanRow[]
   newSubsSeries: TimeSeriesPoint[] // subscription_start_date in range
-}
-
-export type ContentRow = {
-  id: string
-  title: string
-  type: 'Assessment' | 'Course'
-  attempts: number
-  avgAccuracy: number | null   // null = no data
-  passRate: number | null      // null = all full-tests (passed=null)
-}
-
-export type ContentData = {
-  rows: ContentRow[]           // sorted: highest attempts first
-  zeroAttempts: ContentRow[]   // assessments with 0 attempts all-time
 }
 
 export type TenantRow = {
@@ -141,9 +127,6 @@ export async function fetchPlatformHealth(range: DateRange): Promise<PlatformHea
   const attemptsInRange = attemptsRes.data ?? []
   const activeB2CLearners = new Set(attemptsInRange.map((r) => r.user_id)).size
 
-  const allDates = attemptsInRange.map((r) => r.created_at as string)
-  const attemptsSeries = groupByPeriod(allDates, granularity)
-
   // DAU: unique users per day/week
   const userDayMap: Record<string, Set<string>> = {}
   for (const r of attemptsInRange) {
@@ -165,13 +148,16 @@ export async function fetchPlatformHealth(range: DateRange): Promise<PlatformHea
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, set]) => ({ date, count: set.size }))
 
+  const signupDates = (signupsRes.data ?? []).map((r) => r.created_at as string)
+  const newSignupsSeries = groupByPeriod(signupDates, granularity)
+
   return {
     totalB2CSubscribers,
     activeB2CLearners,
     newB2CSignups: (signupsRes.data ?? []).length,
     totalB2BLearners: learnersRes.count ?? 0,
-    attemptsSeries,
     dauSeries,
+    newSignupsSeries,
   }
 }
 
@@ -219,85 +205,6 @@ export async function fetchRevenue(range: DateRange): Promise<RevenueData> {
   const newSubsSeries = groupByPeriod(subDates, granularity)
 
   return { totalMrr, planRows, newSubsSeries }
-}
-
-// ─── Content ─────────────────────────────────────────────────────────────────
-
-export async function fetchContentAnalytics(range: DateRange): Promise<ContentData> {
-  // attempts.assessment_id references assessments.id (not content_items.id)
-  const [dbAssessmentsRes, coursesRes, attemptsRes] = await Promise.all([
-    supabase.from('assessments').select('id, title, assessment_type'),
-    supabase.from('courses').select('id, title').eq('status', 'LIVE'),
-    supabase
-      .from('attempts')
-      .select('assessment_id, accuracy_percent, passed')
-      .gte('created_at', range.from)
-      .lte('created_at', range.to)
-      .eq('status', 'COMPLETED'),
-  ])
-
-  const dbAssessments = dbAssessmentsRes.data ?? []
-  const courses       = coursesRes.data ?? []
-  const attempts      = attemptsRes.data ?? []
-
-  // Group attempts by assessment_id
-  type AttemptStats = { count: number; accuracySum: number; passCount: number; totalWithPass: number }
-  const statsMap: Record<string, AttemptStats> = {}
-
-  for (const a of attempts) {
-    const id = a.assessment_id as string
-    if (!statsMap[id]) statsMap[id] = { count: 0, accuracySum: 0, passCount: 0, totalWithPass: 0 }
-    statsMap[id].count++
-    if (a.accuracy_percent != null) statsMap[id].accuracySum += Number(a.accuracy_percent)
-    if (a.passed !== null) {
-      statsMap[id].totalWithPass++
-      if (a.passed) statsMap[id].passCount++
-    }
-  }
-
-  const rows: ContentRow[] = []
-  const zeroAttempts: ContentRow[] = []
-
-  for (const a of dbAssessments) {
-    const stats = statsMap[a.id]
-    if (!stats || stats.count === 0) {
-      zeroAttempts.push({
-        id: a.id,
-        title: a.title,
-        type: 'Assessment',
-        attempts: 0,
-        avgAccuracy: null,
-        passRate: null,
-      })
-    } else {
-      rows.push({
-        id: a.id,
-        title: a.title,
-        type: 'Assessment',
-        attempts: stats.count,
-        avgAccuracy: stats.count > 0 ? Math.round(stats.accuracySum / stats.count) : null,
-        passRate: stats.totalWithPass > 0
-          ? Math.round((stats.passCount / stats.totalWithPass) * 100)
-          : null,
-      })
-    }
-  }
-
-  // Courses: no attempts table for courses (B2C uses b2c_course_progress) — show with 0 for now
-  for (const c of courses) {
-    rows.push({
-      id: c.id,
-      title: c.title,
-      type: 'Course',
-      attempts: 0,
-      avgAccuracy: null,
-      passRate: null,
-    })
-  }
-
-  rows.sort((a, b) => b.attempts - a.attempts)
-
-  return { rows, zeroAttempts }
 }
 
 // ─── Tenants ──────────────────────────────────────────────────────────────────
