@@ -139,6 +139,7 @@ export type CreatePlanPayload = {
   tagline: string | null
   is_popular: boolean
   cta_label: string | null
+  tier: 'BASIC' | 'PRO' | 'PREMIUM'
   price: number
   billing_cycle: string
   status: 'DRAFT' | 'PUBLISHED'
@@ -166,6 +167,8 @@ export async function createPlan(
       cta_label:                     payload.cta_label,
       audience_type:                 'B2C', // legacy column — keep default
       plan_audience:                 payload.plan_audience,
+      plan_type:                     payload.scope === 'CATEGORY_BUNDLE' ? 'CATEGORY_BUNDLE' : 'WHOLE_PLATFORM',
+      tier:                          payload.tier,
       price:                         payload.price,
       billing_cycle:                 payload.billing_cycle,
       status:                        payload.status,
@@ -911,6 +914,8 @@ export async function createB2BPlan(payload: CreateB2BPlanPayload): Promise<stri
       description:                 payload.description,
       price:                       0,
       plan_audience:               'B2B',
+      plan_type:                   'WHOLE_PLATFORM',
+      tier:                        'ENTERPRISE',
       audience_type:               'B2C', // legacy column — keep default
       scope:                       'PLATFORM_WIDE',
       status:                      payload.status,
@@ -1089,6 +1094,8 @@ export async function createCourseBundlePlan(
       billing_cycle:   payload.billing_cycle,
       feature_bullets: payload.feature_bullets,
       plan_audience:   'B2C',
+      plan_type:       'WHOLE_PLATFORM',
+      tier:            'BASIC',
       audience_type:   'B2C', // legacy column — keep default
       plan_category:   'COURSE_BUNDLE',
       scope:           'PLATFORM_WIDE',
@@ -1212,6 +1219,8 @@ export async function createSingleCoursePlan(
       billing_cycle:   'ANNUAL',
       feature_bullets: [],
       plan_audience:   'B2C',
+      plan_type:       'WHOLE_PLATFORM',
+      tier:            'BASIC',
       audience_type:   'B2C',
       plan_category:   'SINGLE_COURSE_PLAN',
       scope:           'PLATFORM_WIDE',

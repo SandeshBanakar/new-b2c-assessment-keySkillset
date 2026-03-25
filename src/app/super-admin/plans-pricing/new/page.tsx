@@ -64,6 +64,7 @@ function B2CForm() {
   const [name, setName]             = useState('')
   const [displayName, setDisplayName] = useState('')
   const [tagline, setTagline]       = useState('')
+  const [tier, setTier]             = useState<'BASIC' | 'PRO' | 'PREMIUM'>('BASIC')
   const [isPopular, setIsPopular]   = useState(false)
   const [ctaLabel, setCtaLabel]     = useState('')
 
@@ -142,6 +143,7 @@ function B2CForm() {
         display_name:                displayName.trim() || null,
         description:                 null,
         tagline:                     tagline.trim() || null,
+        tier,
         is_popular:                  isPopular,
         cta_label:                   ctaLabel.trim() || null,
         scope,
@@ -226,6 +228,27 @@ function B2CForm() {
                 placeholder="e.g. Everything you need to crack the exam"
                 className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
               />
+            </div>
+            <div>
+              <FieldLabel label="Tier" required />
+              <div className="flex gap-2">
+                {(['BASIC', 'PRO', 'PREMIUM'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTier(t)}
+                    className={`px-4 py-2 text-xs font-medium rounded-md border transition-colors ${
+                      tier === t
+                        ? t === 'BASIC' ? 'bg-zinc-800 text-white border-zinc-800'
+                          : t === 'PRO' ? 'bg-blue-700 text-white border-blue-700'
+                          : 'bg-amber-600 text-white border-amber-600'
+                        : 'bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex items-center gap-2.5">
               <button
