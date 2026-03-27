@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useRef, useState, useEffect } from 'react'
 import { ToastProvider } from '@/components/ui/Toast'
+import { FooterAdmins } from '@/components/layout/FooterAdmins'
 import {
   LayoutDashboard,
   Library,
@@ -156,8 +157,11 @@ export default function SuperAdminLayout({
         </div>
       </aside>
 
-      <main className="ml-60 flex-1 min-h-screen bg-zinc-50 overflow-y-auto">
-        {children}
+      <main className="ml-60 flex-1 min-h-screen bg-zinc-50 overflow-y-auto flex flex-col">
+        <div className="flex-1">
+          {children}
+        </div>
+        <FooterAdmins />
       </main>
     </div>
     </ToastProvider>

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId } from '@/lib/client-admin/tenants'
+import { FooterAdmins } from '@/components/layout/FooterAdmins'
 
 interface TenantRow {
   id: string
@@ -211,8 +212,11 @@ export default function ClientAdminLayout({
         </div>
       </aside>
 
-      <main className="ml-60 flex-1 min-h-screen bg-zinc-50 overflow-y-auto">
-        {children}
+      <main className="ml-60 flex-1 min-h-screen bg-zinc-50 overflow-y-auto flex flex-col">
+        <div className="flex-1">
+          {children}
+        </div>
+        <FooterAdmins />
       </main>
     </div>
   )

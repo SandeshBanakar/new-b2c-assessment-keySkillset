@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 6.8 | Updated: March 25, 2026
+# Version: 6.9 | Updated: March 27, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # Single source of truth. Maintained by Claude Code sessions — never edit manually.
 
@@ -310,6 +310,24 @@ BUG-002  Upgrade banner not showing after free attempt — deferred (DB-003 revi
 
 ---
 
+## 14a. DEFERRED SCHEMA CHANGES (pending KSS-DB-XXX authorisation)
+
+DB-TODO-001  Rename `content_items` table → `assessments`.
+             Reason: naming confusion between assessments and courses in plans. Both live in different
+             tables but share plan_content_map. Full rename requires updating all queries, FK refs,
+             check constraints, and RLS policies across the entire codebase.
+             Do NOT attempt without explicit KSS-DB-XXX authorisation in Claude.ai project chat.
+
+DB-TODO-002  MAINTENANCE status in content_items + courses.
+             Status already added to content_items_status_check constraint (March 27, 2026).
+             When building the Content Creator platform, add MAINTENANCE as a first-class workflow state:
+             - CC can mark content as MAINTENANCE (temporarily unavailable)
+             - SA can see MAINTENANCE items in Content Bank
+             - Learners cannot access MAINTENANCE content via plans
+             - Badge colour: orange-50/orange-700
+
+---
+
 ## 15. OPEN DECISIONS (do not resolve without product owner confirmation)
 
 1. B2C questions table vs SA content_items — merge or keep separate. Static files currently.
@@ -376,6 +394,17 @@ Use MCP Atlassian updateConfluencePage after all code committed and build passes
 [ ] B2B plans have NO display_name, tagline, feature_bullets, is_popular, cta_label
 [ ] B2B plans grant ALL assessment types — no allowed_assessment_types filter
 [ ] B2B max_attempts default = 10, editable in form and plan detail Overview tab
+[ ] B2B plans use plan_category = 'ALL_CONTENT' — always show BOTH assessments and courses in Content tab
+[ ] B2B plan Overview: no MRR/Subscribers/Price metric boxes — Plan Details shown at top instead
+[ ] B2B plan Overview: no Stripe Product ID or Billing Cycle in Plan Details
+[ ] SINGLE_COURSE_PLAN Content tab: shows Courses section ONLY — no Assessments section
+[ ] Tenant detail page header chips: Feature Mode (FULL_CREATOR=amber, RUN_ONLY=zinc) + Status (Active/Inactive)
+[ ] Remove user from Users & Roles: popup modal (not inline confirm) with destructive copy
+[ ] RUN_ONLY tenant Invite User slideover: no Content Creator role option — Client Admin only
+[ ] FooterAdmins (Copyright Hotkey Holdings LLC) on super admin + client admin layouts ONLY
+[ ] FooterEndUser (Copyright keySkillset 2026) on B2C PageWrapper ONLY — never swap these
+[ ] Make Live modal: no Plan Impact section — audience selection only
+[ ] Archive modal: single modal with warning callout + Removed From plan list (no Stays In section)
 [ ] is_individually_purchasable managed ONLY via SINGLE_COURSE_PLAN plan lifecycle — no manual toggle
 [ ] is_individually_purchasable courses EXCLUDED from B2C subscription plan pickers
 [ ] SingleCoursePlanEditSlideOver used for Edit in Plan Records table

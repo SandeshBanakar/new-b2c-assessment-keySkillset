@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
-import { Footer } from '@/components/layout/Footer';
+import { FooterEndUser } from '@/components/layout/FooterEndUser';
 
 interface PageWrapperProps {
   children: ReactNode;
@@ -13,7 +13,7 @@ export default function PageWrapper({ children, className }: PageWrapperProps) {
       <div className={cn('max-w-5xl mx-auto px-4 py-6 md:px-8 md:py-8', className)}>
         {children}
       </div>
-      <Footer />
+      <FooterEndUser />
     </>
   );
 }

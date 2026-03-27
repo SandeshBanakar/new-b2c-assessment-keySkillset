@@ -23,15 +23,17 @@ import {
 } from '@/lib/supabase/content-bank'
 import { MakeLiveModal } from '@/components/content-bank/MakeLiveModal'
 import { ReclassifyModal } from '@/components/content-bank/ReclassifyModal'
+import { ArchiveModal } from '@/components/content-bank/ArchiveModal'
 import { useToast } from '@/components/ui/Toast'
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    LIVE:     'bg-green-50 text-green-700 border border-green-200',
-    INACTIVE: 'bg-amber-50 text-amber-700 border border-amber-200',
-    ARCHIVED: 'bg-zinc-50 text-zinc-400 border border-zinc-200',
+    LIVE:        'bg-green-50 text-green-700 border border-green-200',
+    INACTIVE:    'bg-amber-50 text-amber-700 border border-amber-200',
+    ARCHIVED:    'bg-zinc-50 text-zinc-400 border border-zinc-200',
+    MAINTENANCE: 'bg-orange-50 text-orange-700 border border-orange-200',
   }
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] ?? styles.ARCHIVED}`}>
@@ -302,9 +304,10 @@ export default function ContentBankPage() {
   const [pendingTrigger, setPendingTrigger] = useState<ActionTrigger | null>(null)
   const [warningLoading, setWarningLoading] = useState(false)
 
-  // Second-step modals (Make Live, Reclassify) — shown after warning confirmed
+  // Second-step modals (Make Live, Reclassify, Archive) — shown after warning confirmed
   const [makeLiveItem, setMakeLiveItem]     = useState<ContentBankItem | null>(null)
   const [reclassifyItem, setReclassifyItem] = useState<ContentBankItem | null>(null)
+  const [archiveItem, setArchiveItem]       = useState<ContentBankItem | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -337,6 +340,11 @@ export default function ContentBankPage() {
       setReclassifyItem(item)
       return
     }
+    if (action === 'archive') {
+      setPendingTrigger(null)
+      setArchiveItem(item)
+      return
+    }
 
     // Direct actions — execute immediately
     setWarningLoading(true)
@@ -344,9 +352,6 @@ export default function ContentBankPage() {
       if (action === 'make-inactive') {
         await makeInactive(item.id, item.contentType)
         showToast(`"${item.title}" moved to Inactive.`)
-      } else if (action === 'archive') {
-        await archiveContent(item.id, item.contentType)
-        showToast(`"${item.title}" archived.`)
       } else if (action === 'restore') {
         await restoreContent(item.id, item.contentType)
         showToast(`"${item.title}" restored to Inactive.`)
@@ -616,6 +621,19 @@ export default function ContentBankPage() {
           onReclassified={() => {
             setReclassifyItem(null)
             showToast(`"${reclassifyItem.title}" audience updated.`)
+            loadData()
+          }}
+        />
+      )}
+
+      {/* Archive modal (step 2, after warning) */}
+      {archiveItem && (
+        <ArchiveModal
+          item={archiveItem}
+          onClose={() => setArchiveItem(null)}
+          onArchived={() => {
+            showToast(`"${archiveItem.title}" archived.`)
+            setArchiveItem(null)
             loadData()
           }}
         />

@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase/client'
 import {
   ChevronRight, CheckCircle, X, Loader2,
   UploadCloud, Plus, Users, Download,
-  Pencil, PowerOff, Power,
+  Pencil, PowerOff, Power, AlertTriangle,
 } from 'lucide-react'
 import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
 import PlansTab from '@/components/tenant-detail/PlansTab'
@@ -192,16 +192,19 @@ function Toast({
 
 function InviteUserSlideOver({
   tenantId,
+  featureToggleMode,
   onClose,
   onInvited,
 }: {
   tenantId: string
+  featureToggleMode: string
   onClose: () => void
   onInvited: () => void
 }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'CLIENT_ADMIN' | 'CONTENT_CREATOR'>('CLIENT_ADMIN')
+  const isRunOnly = featureToggleMode === 'RUN_ONLY'
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -278,7 +281,7 @@ function InviteUserSlideOver({
               className="text-sm border border-zinc-200 rounded-md px-3 py-1.5 w-full focus:ring-1 focus:ring-blue-700 outline-none"
             >
               <option value="CLIENT_ADMIN">Client Admin</option>
-              <option value="CONTENT_CREATOR">Content Creator</option>
+              {!isRunOnly && <option value="CONTENT_CREATOR">Content Creator</option>}
             </select>
           </div>
         </div>
@@ -492,14 +495,16 @@ function TabUsersRoles({
   tenantId,
   adminUsers,
   onRefresh,
+  featureToggleMode,
 }: {
   tenantId: string
   adminUsers: AdminUser[]
   onRefresh: () => void
+  featureToggleMode: string
 }) {
   const [showInvite, setShowInvite] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
-  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [removeModal, setRemoveModal] = useState<{ id: string; name: string } | null>(null)
 
   const removeUser = async (userId: string) => {
     setRemoving(userId)
@@ -514,7 +519,7 @@ function TabUsersRoles({
         before_state: { is_active: true },
         after_state: { is_active: false },
       })
-      setConfirmId(null)
+      setRemoveModal(null)
       onRefresh()
     } finally {
       setRemoving(null)
@@ -583,28 +588,12 @@ function TabUsersRoles({
                   </td>
                   <td className="px-4 py-3">
                     {u.is_active && (
-                      confirmId === u.id ? (
-                        <span className="flex items-center gap-2 text-sm">
-                          <span className="text-zinc-500">Remove?</span>
-                          <button
-                            onClick={() => removeUser(u.id)}
-                            disabled={removing === u.id}
-                            className="text-rose-600 hover:text-rose-700 font-medium"
-                          >
-                            {removing === u.id ? 'Removing…' : 'Confirm'}
-                          </button>
-                          <button onClick={() => setConfirmId(null)} className="text-zinc-400 hover:text-zinc-600">
-                            Cancel
-                          </button>
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmId(u.id)}
-                          className="text-sm text-rose-600 hover:text-rose-700"
-                        >
-                          Remove
-                        </button>
-                      )
+                      <button
+                        onClick={() => setRemoveModal({ id: u.id, name: u.name })}
+                        className="text-sm text-rose-600 hover:text-rose-700"
+                      >
+                        Remove
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -617,12 +606,49 @@ function TabUsersRoles({
       {showInvite && (
         <InviteUserSlideOver
           tenantId={tenantId}
+          featureToggleMode={featureToggleMode}
           onClose={() => setShowInvite(false)}
           onInvited={() => {
             setShowInvite(false)
             onRefresh()
           }}
         />
+      )}
+
+      {/* Remove user confirmation modal */}
+      {removeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-md border border-zinc-200 w-full max-w-sm mx-4 shadow-xl">
+            <div className="px-6 py-5">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 w-8 h-8 rounded-md bg-rose-50 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900">Remove {removeModal.name}?</p>
+                  <p className="text-sm text-zinc-500 mt-1">
+                    This is a destructive action. If you remove this user, they will lose access to their role immediately. Are you sure you want to continue?
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100">
+              <button
+                onClick={() => setRemoveModal(null)}
+                className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => removeUser(removeModal.id)}
+                disabled={removing === removeModal.id}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-md transition-colors disabled:opacity-50"
+              >
+                {removing === removeModal.id ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -1579,7 +1605,15 @@ export default function TenantDetailPage() {
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-xl font-semibold text-zinc-900">{tenant.name}</h1>
-        <span className="text-xs font-medium bg-blue-50 text-blue-700 rounded-md px-2 py-0.5">B2B</span>
+        <span
+          className={`text-xs font-medium rounded-md px-2 py-0.5 ${
+            tenant.feature_toggle_mode === 'FULL_CREATOR'
+              ? 'bg-amber-50 text-amber-700'
+              : 'bg-zinc-100 text-zinc-600'
+          }`}
+        >
+          {tenant.feature_toggle_mode ?? 'RUN_ONLY'}
+        </span>
         <span
           className={`text-xs font-medium rounded-md px-2 py-0.5 ${
             tenant.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
@@ -1625,6 +1659,7 @@ export default function TenantDetailPage() {
           tenantId={id}
           adminUsers={adminUsers}
           onRefresh={refreshUsers}
+          featureToggleMode={tenant.feature_toggle_mode ?? 'RUN_ONLY'}
         />
       )}
       {activeTab === 'Learners' && (

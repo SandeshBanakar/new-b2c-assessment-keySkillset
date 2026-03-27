@@ -73,17 +73,17 @@ export function ReclassifyModal({ item, onClose, onReclassified }: Props) {
     <>
       <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-md border border-zinc-200 shadow-xl w-full max-w-lg">
+        <div className="bg-white rounded-md border border-zinc-200 shadow-xl w-full max-w-lg flex flex-col max-h-[80vh]">
 
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
             <h2 className="text-sm font-semibold text-zinc-900">Reclassify Audience</h2>
             <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="px-6 py-5 space-y-5">
+          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
             {/* Item summary */}
             <div>
               <p className="text-sm font-medium text-zinc-900">{item.title}</p>
@@ -177,7 +177,7 @@ export function ReclassifyModal({ item, onClose, onReclassified }: Props) {
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-100">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-100 shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"

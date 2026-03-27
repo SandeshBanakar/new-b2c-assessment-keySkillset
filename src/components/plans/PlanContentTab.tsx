@@ -65,8 +65,9 @@ export function PlanContentTab({ plan }: Props) {
 
   const planAudience = (plan as PlanDetail & { plan_audience?: 'B2C' | 'B2B' }).plan_audience ?? 'B2C'
   const planCategory = plan.plan_category ?? 'ASSESSMENT'
-  const showAssessments = planCategory !== 'COURSE_BUNDLE'
-  const showCourses = planCategory !== 'ASSESSMENT'
+  // B2B plans always show both; SINGLE_COURSE_PLAN shows courses only; COURSE_BUNDLE shows courses only
+  const showAssessments = planAudience === 'B2B' || (planCategory !== 'COURSE_BUNDLE' && planCategory !== 'SINGLE_COURSE_PLAN')
+  const showCourses = planAudience === 'B2B' || planCategory !== 'ASSESSMENT'
 
   return (
     <div className="space-y-8">
