@@ -16,6 +16,7 @@ import {
   type CourseModule,
   type DisplayStatus,
 } from '@/lib/supabase/b2c-users'
+import { formatCourseType } from '@/lib/utils'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -354,7 +355,7 @@ function CoursePerformanceSection({
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-medium bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-md">
-                          {p.courseType ?? '—'}
+                          {formatCourseType(p.courseType) ?? '—'}
                         </span>
                       </td>
                       <td className="px-4 py-3">

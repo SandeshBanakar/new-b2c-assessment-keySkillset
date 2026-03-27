@@ -9,6 +9,7 @@ import {
 } from '@/lib/supabase/plans'
 import type { PlanDetail, PlanAssignedAssessment, PlanAssignedCourse } from '@/lib/supabase/plans'
 import { AddContentSlideOver } from './AddContentSlideOver'
+import { formatCourseType } from '@/lib/utils'
 import { RemoveFromPlanModal } from './RemoveFromPlanModal'
 import { ContentPlanUsageModal } from './ContentPlanUsageModal'
 
@@ -193,13 +194,29 @@ export function PlanContentTab({ plan }: Props) {
           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
             Courses ({courses.length})
           </p>
-          <button
-            onClick={() => setAddSlideOver('COURSE')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-700 text-white hover:bg-blue-800 transition-colors"
-          >
-            <Plus size={13} />
-            Add Course
-          </button>
+          {planCategory === 'SINGLE_COURSE_PLAN' && courses.length >= 1 ? (
+            <div className="relative group">
+              <button
+                disabled
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-700 text-white opacity-50 cursor-not-allowed"
+              >
+                <Plus size={13} />
+                Add Course
+              </button>
+              <div className="absolute top-full mt-2 right-0 z-10 w-64 px-3 py-2 bg-zinc-900 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                A course is already assigned to this plan. Remove it first to replace.
+                <div className="absolute -top-1 right-4 w-2 h-2 bg-zinc-900 rotate-45" />
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddSlideOver('COURSE')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-700 text-white hover:bg-blue-800 transition-colors"
+            >
+              <Plus size={13} />
+              Add Course
+            </button>
+          )}
         </div>
 
         {courses.length === 0 ? (
@@ -231,7 +248,7 @@ export function PlanContentTab({ plan }: Props) {
                     className={idx < courses.length - 1 ? 'border-b border-zinc-100' : ''}
                   >
                     <td className="px-4 py-3 font-medium text-zinc-900">{item.title}</td>
-                    <td className="px-4 py-3 text-zinc-600">{item.courseType}</td>
+                    <td className="px-4 py-3 text-zinc-600">{formatCourseType(item.courseType) ?? '—'}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
                         {item.status}
@@ -265,6 +282,7 @@ export function PlanContentTab({ plan }: Props) {
           planId={plan.id}
           contentType={addSlideOver}
           planAudience={planAudience}
+          singleSelect={planCategory === 'SINGLE_COURSE_PLAN' && addSlideOver === 'COURSE'}
           onClose={() => setAddSlideOver(null)}
           onAdded={() => {
             fetchContent()

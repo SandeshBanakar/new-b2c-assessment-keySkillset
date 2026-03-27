@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   X,
-  Search,
   AlertTriangle,
   ChevronDown,
   ChevronUp,
@@ -17,19 +16,10 @@ import { supabase } from '@/lib/supabase/client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface AdminUser {
-  id: string
-  name: string
-  email: string
-  tenant_id: string | null
-  tenant_name?: string | null
-}
-
 interface FormState {
-  // Section 1
+  // Section 1 — Client Setup
   name: string
-  clientAdminMode: 'search' | 'invite'
-  selectedAdmin: { id: string; name: string; email: string } | null
+  // Section 1b — Client Admin
   inviteAdmin: { name: string; email: string }
   featureMode: 'RUN_ONLY' | 'FULL_CREATOR'
   // Section 2
@@ -63,8 +53,6 @@ interface FormState {
 
 const INITIAL_FORM: FormState = {
   name: '',
-  clientAdminMode: 'search',
-  selectedAdmin: null,
   inviteAdmin: { name: '', email: '' },
   featureMode: 'RUN_ONLY',
   contactName: '',
@@ -97,6 +85,7 @@ const INITIAL_FORM: FormState = {
 interface ToastInfo {
   tenantName: string
   tenantId: string
+  caEmail: string
 }
 
 function SuccessToast({ info, onDismiss }: { info: ToastInfo; onDismiss: () => void }) {
@@ -107,17 +96,35 @@ function SuccessToast({ info, onDismiss }: { info: ToastInfo; onDismiss: () => v
   }, [onDismiss])
 
   return (
-    <div className="fixed bottom-6 right-6 z-[70] bg-white border border-zinc-200 shadow-md rounded-md px-4 py-3 text-sm flex items-center gap-2 max-w-xs">
+    <div className="fixed bottom-6 right-6 z-[70] bg-white border border-zinc-200 shadow-md rounded-md px-4 py-3 text-sm flex items-center gap-2 max-w-sm">
       <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
       <span className="text-zinc-700">
-        <span className="font-medium">{info.tenantName}</span> created.{' '}
+        Tenant Created. Invite email sent to{' '}
+        <span className="font-medium">{info.caEmail}</span>.{' '}
         <button
           onClick={() => router.push(`/super-admin/tenants/${info.tenantId}`)}
           className="text-blue-700 hover:text-blue-800 font-medium"
         >
-          View client admin →
+          View tenant →
         </button>
       </span>
+      <button onClick={onDismiss} className="ml-1 text-zinc-400 hover:text-zinc-600">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  )
+}
+
+function ErrorToast({ msg, onDismiss }: { msg: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 6000)
+    return () => clearTimeout(t)
+  }, [onDismiss])
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[70] bg-white border border-zinc-200 shadow-md rounded-md px-4 py-3 text-sm flex items-center gap-2 max-w-sm">
+      <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+      <span className="text-zinc-700">{msg}</span>
       <button onClick={onDismiss} className="ml-1 text-zinc-400 hover:text-zinc-600">
         <X className="w-4 h-4" />
       </button>
@@ -158,242 +165,25 @@ function DiscardDialog({
   )
 }
 
-// ─── Client Admin Search ──────────────────────────────────────────────────────
+// ─── Duplicate Email Modal ────────────────────────────────────────────────────
 
-function ClientAdminField({
-  form,
-  setForm,
-}: {
-  form: FormState
-  setForm: React.Dispatch<React.SetStateAction<FormState>>
-}) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<AdminUser[]>([])
-  const [searching, setSearching] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [showInvite, setShowInvite] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const search = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); setShowDropdown(false); return }
-    setSearching(true)
-    const { data } = await supabase
-      .from('admin_users')
-      .select('id, name, email, tenant_id, tenants(name)')
-      .ilike('email', `%${q}%`)
-      .limit(4)
-    const rows: AdminUser[] = (data ?? []).map((r: Record<string, unknown>) => ({
-      id: r.id as string,
-      name: r.name as string,
-      email: r.email as string,
-      tenant_id: r.tenant_id as string | null,
-      tenant_name: r.tenant_id
-        ? (r.tenants as { name: string } | null)?.name ?? null
-        : null,
-    }))
-    setResults(rows)
-    setShowDropdown(true)
-    setSearching(false)
-  }, [])
-
-  const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value
-    setQuery(v)
-    setForm(f => ({ ...f, isDirty: true }))
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => search(v), 300)
-  }
-
-  const selectAdmin = (user: AdminUser) => {
-    setForm(f => ({
-      ...f,
-      selectedAdmin: { id: user.id, name: user.name, email: user.email },
-      clientAdminMode: 'search',
-      isDirty: true,
-      errors: { ...f.errors, clientAdmin: '' },
-    }))
-    setShowDropdown(false)
-    setQuery('')
-  }
-
-  const clearSelected = () => {
-    setForm(f => ({ ...f, selectedAdmin: null, isDirty: true }))
-  }
-
-  const initials = (name: string) => name.trim().charAt(0).toUpperCase() || '?'
-
-  const blockedUsers = results.filter(r => r.tenant_id !== null)
-  const showInviteOption =
-    showDropdown &&
-    (results.length === 0 || blockedUsers.length === results.length)
-
+function DuplicateEmailModal({ onDismiss }: { onDismiss: () => void }) {
   return (
-    <div>
-      <label className="text-sm font-medium text-zinc-700 block mb-0.5">
-        Client Admin <span className="text-rose-500">*</span>
-      </label>
-      <p className="text-xs text-zinc-500 mb-2">Search by email to find or invite an admin.</p>
-
-      {form.selectedAdmin ? (
-        <div className="border border-blue-700 bg-blue-50 rounded-md p-3 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-md bg-blue-700 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">
-            {initials(form.selectedAdmin.name || form.selectedAdmin.email)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-zinc-900 truncate">{form.selectedAdmin.name}</p>
-            <p className="text-xs text-zinc-500 truncate">{form.selectedAdmin.email}</p>
-          </div>
-          <button onClick={clearSelected} className="text-zinc-400 hover:text-zinc-600 flex-shrink-0">
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-md shadow-lg p-6 w-80">
+        <p className="text-base font-semibold text-zinc-900 mb-2">Client Admin Already Exists</p>
+        <p className="text-sm text-zinc-500 mb-6">
+          This email is already registered as a Client Admin for another tenant. Each Client Admin can only be assigned to one tenant.
+        </p>
+        <div className="flex justify-end">
+          <button
+            onClick={onDismiss}
+            className="bg-blue-700 text-white rounded-md px-4 py-2 text-sm font-medium"
+          >
+            Got it
           </button>
         </div>
-      ) : (
-        <>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
-            <input
-              type="text"
-              value={query}
-              onChange={handleQueryChange}
-              placeholder="Search by email..."
-              className="w-full border border-zinc-200 rounded-md pl-9 pr-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700"
-            />
-            {searching && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-zinc-400" />
-            )}
-          </div>
-
-          {showDropdown && (
-            <div className="border border-zinc-200 rounded-md bg-white shadow-sm overflow-hidden mt-1">
-              {results.length === 0 ? (
-                <p className="text-sm text-zinc-500 px-3 py-2.5">No admin found for this email.</p>
-              ) : (
-                results.map(user => {
-                  const blocked = user.tenant_id !== null
-                  return (
-                    <div
-                      key={user.id}
-                      onClick={() => !blocked && selectAdmin(user)}
-                      className={`flex items-center gap-3 px-3 py-2.5 ${
-                        blocked
-                          ? 'bg-amber-50 cursor-not-allowed'
-                          : 'hover:bg-zinc-50 cursor-pointer'
-                      }`}
-                    >
-                      {blocked ? (
-                        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-md bg-blue-700 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">
-                          {initials(user.name || user.email)}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-zinc-900 truncate">{user.name}</p>
-                        <p className="text-xs text-zinc-500 truncate">{user.email}</p>
-                        {blocked && (
-                          <p className="text-xs text-amber-700">
-                            Client Admin of {user.tenant_name ?? 'another tenant'}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          )}
-
-          {showInviteOption && (
-            <button
-              type="button"
-              onClick={() => { setShowInvite(true); setShowDropdown(false) }}
-              className="mt-2 text-sm text-blue-700 font-medium cursor-pointer"
-            >
-              + Invite as new Client Admin
-            </button>
-          )}
-        </>
-      )}
-
-      {form.errors.clientAdmin && (
-        <p className="text-sm text-rose-600 mt-1">{form.errors.clientAdmin}</p>
-      )}
-
-      {showInvite && !form.selectedAdmin && (
-        <InviteAdminForm
-          initialEmail={query}
-          form={form}
-          setForm={setForm}
-          onCancel={() => setShowInvite(false)}
-        />
-      )}
-    </div>
-  )
-}
-
-// ─── Invite Admin Form ────────────────────────────────────────────────────────
-
-function InviteAdminForm({
-  initialEmail,
-  form,
-  setForm,
-  onCancel,
-}: {
-  initialEmail: string
-  form: FormState
-  setForm: React.Dispatch<React.SetStateAction<FormState>>
-  onCancel: () => void
-}) {
-  const [localName, setLocalName] = useState(form.inviteAdmin.name)
-  const [localEmail, setLocalEmail] = useState(form.inviteAdmin.email || initialEmail)
-
-  const sync = (name: string, email: string) => {
-    setForm(f => ({
-      ...f,
-      inviteAdmin: { name, email },
-      clientAdminMode: 'invite',
-      isDirty: true,
-    }))
-  }
-
-  const bothFilled = localName.trim() && localEmail.trim()
-
-  return (
-    <div className="mt-3 p-3 border border-zinc-200 rounded-md bg-zinc-50">
-      <div className="flex justify-between items-center mb-3">
-        <p className="text-xs font-medium text-zinc-700 uppercase tracking-wide">Invite new admin</p>
-        <button onClick={onCancel} className="text-zinc-400 hover:text-zinc-600">
-          <X className="w-4 h-4" />
-        </button>
       </div>
-      <div className="space-y-2">
-        <div>
-          <label className="text-sm font-medium text-zinc-700 block mb-1">Full Name</label>
-          <input
-            type="text"
-            value={localName}
-            onChange={e => { setLocalName(e.target.value); sync(e.target.value, localEmail) }}
-            className="w-full border border-zinc-200 rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-700"
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-zinc-700 block mb-1">Email</label>
-          <input
-            type="email"
-            value={localEmail}
-            onChange={e => { setLocalEmail(e.target.value); sync(localName, e.target.value) }}
-            className="w-full border border-zinc-200 rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-700"
-          />
-        </div>
-      </div>
-
-      {bothFilled && (
-        <div className="mt-3 border border-blue-700 bg-blue-50 rounded-md p-3">
-          <p className="text-xs text-blue-700 mb-1">Will be invited as Client Admin</p>
-          <p className="text-sm font-medium text-zinc-900">{localName}</p>
-          <p className="text-sm text-zinc-500">{localEmail}</p>
-        </div>
-      )}
     </div>
   )
 }
@@ -463,7 +253,9 @@ export default function CreateTenantSlideOver({
   const router = useRouter()
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [showDiscard, setShowDiscard] = useState(false)
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
   const [toast, setToast] = useState<ToastInfo | null>(null)
+  const [errorToastMsg, setErrorToastMsg] = useState<string | null>(null)
   const [contractError, setContractError] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -511,13 +303,14 @@ export default function CreateTenantSlideOver({
 
   const validate = (): Record<string, string> => {
     const e: Record<string, string> = {}
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!form.name.trim()) e.name = 'Tenant name is required.'
-    const hasAdmin =
-      form.selectedAdmin ||
-      (form.clientAdminMode === 'invite' &&
-        form.inviteAdmin.name.trim() &&
-        form.inviteAdmin.email.trim())
-    if (!hasAdmin) e.clientAdmin = 'Select or invite a Client Admin.'
+    if (!form.inviteAdmin.name.trim()) e.inviteAdminName = 'Client Admin name is required.'
+    if (!form.inviteAdmin.email.trim()) {
+      e.inviteAdminEmail = 'Client Admin email is required.'
+    } else if (!emailRegex.test(form.inviteAdmin.email.trim())) {
+      e.inviteAdminEmail = 'Enter a valid email address.'
+    }
     if (!form.contactName.trim()) e.contactName = 'Contact name is required.'
     if (!form.contactEmail.trim()) e.contactEmail = 'Contact email is required.'
     if (!form.contactPhone.trim()) e.contactPhone = 'Contact phone is required.'
@@ -535,7 +328,7 @@ export default function CreateTenantSlideOver({
 
   const scrollToFirstError = (errors: Record<string, string>) => {
     const order = [
-      'name', 'clientAdmin',
+      'name', 'inviteAdminName', 'inviteAdminEmail',
       'contactName', 'contactEmail', 'contactPhone', 'timezone', 'dateFormat',
       'addressLine1', 'city', 'state', 'country', 'zipCode',
     ]
@@ -558,6 +351,19 @@ export default function CreateTenantSlideOver({
     setForm(f => ({ ...f, isSubmitting: true, errors: {} }))
 
     try {
+      // Duplicate email check before any DB writes
+      const { data: existingAdmin } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('email', form.inviteAdmin.email.trim())
+        .maybeSingle()
+
+      if (existingAdmin) {
+        setShowDuplicateModal(true)
+        setForm(f => ({ ...f, isSubmitting: false }))
+        return
+      }
+
       // Phase 1 — tenant record
       const { data: tenant, error: tErr } = await supabase
         .from('tenants')
@@ -596,20 +402,25 @@ export default function CreateTenantSlideOver({
 
       const newId = tenant.id
 
-      // Admin user
-      if (form.selectedAdmin) {
-        await supabase
-          .from('admin_users')
-          .update({ tenant_id: newId })
-          .eq('id', form.selectedAdmin.id)
-      } else if (form.clientAdminMode === 'invite') {
-        await supabase.from('admin_users').insert({
-          email: form.inviteAdmin.email.trim(),
-          name: form.inviteAdmin.name.trim(),
-          role: 'CLIENT_ADMIN',
-          tenant_id: newId,
-          is_active: true,
-        })
+      // Insert Client Admin
+      const { error: adminErr } = await supabase.from('admin_users').insert({
+        email: form.inviteAdmin.email.trim(),
+        name: form.inviteAdmin.name.trim(),
+        role: 'CLIENT_ADMIN',
+        tenant_id: newId,
+        is_active: true,
+      })
+
+      if (adminErr) {
+        if (adminErr.code === '23505') {
+          // Race condition — unique constraint fired at DB level
+          setShowDuplicateModal(true)
+          setForm(f => ({ ...f, isSubmitting: false }))
+          return
+        }
+        setErrorToastMsg('Insert failed. Something went wrong. Please try again.')
+        setForm(f => ({ ...f, isSubmitting: false }))
+        return
       }
 
       // Audit log
@@ -650,7 +461,6 @@ export default function CreateTenantSlideOver({
         if (cErr) {
           setContractError(true)
           setForm(f => ({ ...f, isSubmitting: false }))
-          // Scroll to contract section
           const el = bodyRef.current?.querySelector('[data-section="contract"]')
           el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           return
@@ -683,15 +493,15 @@ export default function CreateTenantSlideOver({
 
       // Success
       const savedName = form.name.trim()
+      const savedEmail = form.inviteAdmin.email.trim()
       setLogoFile(null)
       setLogoPreview(null)
       setForm(INITIAL_FORM)
       onCreated()
-      setToast({ tenantName: savedName, tenantId: newId })
+      setToast({ tenantName: savedName, tenantId: newId, caEmail: savedEmail })
     } catch {
       setForm(f => ({ ...f, isSubmitting: false }))
-      // Show error toast via a simple state — handled below
-      alert('Failed to create tenant. Please try again.')
+      setErrorToastMsg('Failed to create tenant. Something went wrong. Please try again.')
     }
   }
 
@@ -711,9 +521,10 @@ export default function CreateTenantSlideOver({
       setContractError(false)
       const savedName = form.name.trim()
       const savedId = form.newTenantId
+      const savedEmail = form.inviteAdmin.email.trim()
       setForm(INITIAL_FORM)
       onCreated()
-      setToast({ tenantName: savedName, tenantId: savedId })
+      setToast({ tenantName: savedName, tenantId: savedId, caEmail: savedEmail })
     } else {
       setForm(f => ({ ...f, isSubmitting: false }))
     }
@@ -754,9 +565,42 @@ export default function CreateTenantSlideOver({
             />
           </div>
 
-          {/* Client Admin */}
-          <div className="mb-5" data-field="clientAdmin">
-            <ClientAdminField form={form} setForm={setForm} />
+          {/* ── SECTION 1b: CLIENT ADMIN ── */}
+          <div className="border-t border-zinc-200 my-6" />
+          <SectionHeader title="Client Admin" />
+          <p className="text-xs text-zinc-500 -mt-3 mb-4">
+            Invite an admin and an email will be sent to them post creation.
+          </p>
+
+          <div className="mb-5" data-field="inviteAdminName">
+            <FieldLabel required>Client Admin Name</FieldLabel>
+            <TextInput
+              value={form.inviteAdmin.name}
+              onChange={v => setForm(f => ({
+                ...f,
+                inviteAdmin: { ...f.inviteAdmin, name: v },
+                isDirty: true,
+                errors: { ...f.errors, inviteAdminName: '' },
+              }))}
+              placeholder="e.g. Raj Sharma"
+              error={form.errors.inviteAdminName}
+            />
+          </div>
+
+          <div className="mb-5" data-field="inviteAdminEmail">
+            <FieldLabel required>Client Admin Email</FieldLabel>
+            <TextInput
+              type="email"
+              value={form.inviteAdmin.email}
+              onChange={v => setForm(f => ({
+                ...f,
+                inviteAdmin: { ...f.inviteAdmin, email: v },
+                isDirty: true,
+                errors: { ...f.errors, inviteAdminEmail: '' },
+              }))}
+              placeholder="e.g. raj@akashinstitute.com"
+              error={form.errors.inviteAdminEmail}
+            />
           </div>
 
           {/* Feature Mode */}
@@ -1133,9 +977,19 @@ export default function CreateTenantSlideOver({
         />
       )}
 
+      {/* Duplicate Email Modal */}
+      {showDuplicateModal && (
+        <DuplicateEmailModal onDismiss={() => setShowDuplicateModal(false)} />
+      )}
+
       {/* Success Toast */}
       {toast && (
         <SuccessToast info={toast} onDismiss={() => setToast(null)} />
+      )}
+
+      {/* Error Toast */}
+      {errorToastMsg && (
+        <ErrorToast msg={errorToastMsg} onDismiss={() => setErrorToastMsg(null)} />
       )}
     </>
   )

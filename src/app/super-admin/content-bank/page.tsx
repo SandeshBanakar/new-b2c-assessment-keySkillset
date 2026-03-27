@@ -25,6 +25,7 @@ import { MakeLiveModal } from '@/components/content-bank/MakeLiveModal'
 import { ReclassifyModal } from '@/components/content-bank/ReclassifyModal'
 import { ArchiveModal } from '@/components/content-bank/ArchiveModal'
 import { useToast } from '@/components/ui/Toast'
+import { formatCourseType } from '@/lib/utils'
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -552,7 +553,7 @@ export default function ContentBankPage() {
                         )}
                       </span>
                     ) : (
-                      <span>{item.courseType ?? '—'}</span>
+                      <span>{formatCourseType(item.courseType) ?? '—'}</span>
                     )}
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={item.status} /></td>

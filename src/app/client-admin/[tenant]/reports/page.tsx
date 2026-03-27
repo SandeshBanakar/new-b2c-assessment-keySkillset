@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId } from '@/lib/client-admin/tenants'
+import { formatCourseType } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -402,7 +403,7 @@ function ContentPerformanceTab({ tenantId }: { tenantId: string }) {
         ;(cs ?? []).forEach(c => {
           infoMap[c.id] = {
             title: c.title,
-            category: (c.course_type as string ?? '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            category: formatCourseType(c.course_type as string) ?? '—',
           }
         })
       }

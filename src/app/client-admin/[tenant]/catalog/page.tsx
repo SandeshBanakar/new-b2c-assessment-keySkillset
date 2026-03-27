@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId, CA_ADMIN_USER_MAP } from '@/lib/client-admin/tenants'
+import { formatCourseType } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -668,7 +669,7 @@ export default function CatalogPage() {
           id: c.id,
           title: c.title,
           content_type: 'COURSE',
-          item_type: c.course_type ?? '',
+          item_type: formatCourseType(c.course_type) ?? '',
           category: null,
           audience_type: c.audience_type,
           source: 'GLOBAL',

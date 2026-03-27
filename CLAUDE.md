@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 6.9 | Updated: March 27, 2026
+# Version: 7.0 | Updated: March 27, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # Single source of truth. Maintained by Claude Code sessions — never edit manually.
 
@@ -49,7 +49,7 @@ logo_url (text nullable) — Storage bucket: tenant-logo (public), {tenant_id}.j
 feature_toggle_mode: FULL_CREATOR (CC access + own DB) | RUN_ONLY (CA only, hides Storage & Hosting)
 
 ### admin_users
-id (uuid), email, name, role, tenant_id (uuid), is_active (boolean), created_at,
+id (uuid), email (UNIQUE — KSS-DB-SA-018), name, role, tenant_id (uuid), is_active (boolean), created_at,
 password_hash (text nullable — demo only)
 Valid roles V1: SUPER_ADMIN | CLIENT_ADMIN | CONTENT_CREATOR
 TEAM_MANAGER deferred to V2 — never add to V1 code.
@@ -286,6 +286,18 @@ Also completed (March 25, 2026 — fix/minor-upgrades):
   - plan_category type extended to include 'SINGLE_COURSE_PLAN' in PlanRow/PlanDetail
   - Dashboard: Assessments tab added (4th tab) — 4 KPI cards + dual-series AreaChart + per-assessment table
 
+Also completed (March 27, 2026 — fix/formatCourseType + SINGLE_COURSE_PLAN enforcement):
+  - formatCourseType() utility added to src/lib/utils.ts — maps raw DB course_type to human-readable labels
+    (VIDEO→Video, DOCUMENT→Document, CLICK_BASED→Click Based, CODING_SANDBOX→Simulation,
+     COMBINATION→Combination, KEYBOARD_TRAINER→Keyboard Based). Applied platform-wide across 10 locations.
+  - SINGLE_COURSE_PLAN Content tab: Add Course button disabled (opacity-50, cursor-not-allowed) with
+    Tailwind tooltip (zinc-900, below, fade-in) when courses.length >= 1. Tooltip text: "A course is
+    already assigned to this plan. Remove it first to replace."
+  - AddContentSlideOver: singleSelect prop added. When true (SINGLE_COURSE_PLAN + COURSE content type),
+    shows radio buttons instead of checkboxes — enforces exactly 1 selection.
+  - DB: 6 course rows corrected from DOCUMENT → VIDEO (JEE Mains Math ×2, Organic Chemistry ×2,
+    English Grammar Fundamentals ×2).
+
 Pending:
 🟡 KSS-SA-005   Audit Log (SA)
 🟡 KSS-SA-007   Marketing Config
@@ -398,6 +410,9 @@ Use MCP Atlassian updateConfluencePage after all code committed and build passes
 [ ] B2B plan Overview: no MRR/Subscribers/Price metric boxes — Plan Details shown at top instead
 [ ] B2B plan Overview: no Stripe Product ID or Billing Cycle in Plan Details
 [ ] SINGLE_COURSE_PLAN Content tab: shows Courses section ONLY — no Assessments section
+[ ] SINGLE_COURSE_PLAN max 1 course — Add Course button disabled (Tailwind tooltip below, zinc-900) when courses.length >= 1
+[ ] AddContentSlideOver singleSelect=true for SINGLE_COURSE_PLAN COURSE content — radio buttons, exactly 1 selection
+[ ] formatCourseType() from @/lib/utils used everywhere course_type is displayed — never raw DB value
 [ ] Tenant detail page header chips: Feature Mode (FULL_CREATOR=amber, RUN_ONLY=zinc) + Status (Active/Inactive)
 [ ] Remove user from Users & Roles: popup modal (not inline confirm) with destructive copy
 [ ] RUN_ONLY tenant Invite User slideover: no Content Creator role option — Client Admin only

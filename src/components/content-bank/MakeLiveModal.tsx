@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Loader2, X } from 'lucide-react'
 import type { ContentBankItem } from '@/lib/supabase/content-bank'
 import { makeLive } from '@/lib/supabase/content-bank'
+import { formatCourseType } from '@/lib/utils'
 
 type Props = {
   item: ContentBankItem
@@ -51,7 +52,7 @@ export function MakeLiveModal({ item, onClose, onMadeLive }: Props) {
   const typeLabel = item.contentType === 'ASSESSMENT' ? 'Assessment' : 'Course'
   const categoryLabel = item.contentType === 'ASSESSMENT'
     ? (item.category ?? '—') + (item.testType ? ` · ${item.testType}` : '')
-    : (item.courseType ?? '—')
+    : (formatCourseType(item.courseType) ?? '—')
 
   return (
     <>

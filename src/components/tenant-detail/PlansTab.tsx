@@ -9,6 +9,7 @@ import {
 } from '@/lib/supabase/plans'
 import { supabase } from '@/lib/supabase/client'
 import { AssignPlanSlideOver } from './AssignPlanSlideOver'
+import { formatCourseType } from '@/lib/utils'
 import { ContentPlanUsageModal } from '@/components/plans/ContentPlanUsageModal'
 
 interface Props {
@@ -227,7 +228,7 @@ function PlanAccordionRow({
                           className={idx < plan.courses.length - 1 ? 'border-b border-zinc-100' : ''}
                         >
                           <td className="px-4 py-3 font-medium text-zinc-900">{course.title}</td>
-                          <td className="px-4 py-3 text-zinc-600">{course.courseType}</td>
+                          <td className="px-4 py-3 text-zinc-600">{formatCourseType(course.courseType) ?? '—'}</td>
                           <td className="px-4 py-3">
                             <span className="text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
                               {course.status}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X, Search } from 'lucide-react'
+import { formatCourseType } from '@/lib/utils'
 import {
   fetchAvailableAssessmentsForPlan,
   fetchAvailableCoursesForPlan,
@@ -13,21 +14,24 @@ interface Props {
   planId: string
   contentType: 'ASSESSMENT' | 'COURSE'
   planAudience?: 'B2C' | 'B2B'
+  singleSelect?: boolean
   onClose: () => void
   onAdded: () => void
 }
 
-export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C', onClose, onAdded }: Props) {
+export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C', singleSelect = false, onClose, onAdded }: Props) {
   const isAssessment = contentType === 'ASSESSMENT'
   const label = isAssessment ? 'Assessment' : 'Course'
 
   const [items, setItems] = useState<
-    { id: string; title: string; sub: string; disabled?: boolean }[]
+    { id: string; title: string; sub?: string; disabled?: boolean }[]
   >([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  // Multi-select uses Set; single-select uses string | null
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selectedSingle, setSelectedSingle] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(false)
 
@@ -51,7 +55,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
             data.map((c) => ({
               id: c.id,
               title: c.title,
-              sub: c.courseType,
+              sub: formatCourseType(c.courseType) ?? undefined,
               disabled: c.isIndividuallyPurchasable,
             }))
           )
@@ -72,25 +76,32 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
   const toggleSelect = (id: string) => {
     const item = items.find((i) => i.id === id)
     if (item?.disabled) return
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    if (singleSelect) {
+      setSelectedSingle((prev) => (prev === id ? null : id))
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        return next
+      })
+    }
   }
 
+  const selectionSize = singleSelect ? (selectedSingle ? 1 : 0) : selected.size
+
   const handleAdd = async () => {
-    if (selected.size === 0) return
+    if (selectionSize === 0) return
     setSaving(true)
     setSaveError(false)
+    const ids = singleSelect ? [selectedSingle!] : Array.from(selected)
     try {
       await Promise.all(
-        Array.from(selected).map((id) => addContentToPlan(planId, id, contentType))
+        ids.map((id) => addContentToPlan(planId, id, contentType))
       )
       await writePlanAuditLog(planId, 'CONTENT_ADDED', {
         content_type: contentType,
-        count: String(selected.size),
+        count: String(ids.length),
       })
       onAdded()
     } catch {
@@ -156,16 +167,27 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-md ${item.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-zinc-50 cursor-pointer'}`}
                   onClick={() => !item.disabled && toggleSelect(item.id)}
                 >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(item.id)}
-                    onChange={() => !item.disabled && toggleSelect(item.id)}
-                    disabled={item.disabled}
-                    className="accent-blue-700 disabled:cursor-not-allowed"
-                  />
+                  {singleSelect ? (
+                    <input
+                      type="radio"
+                      name="single-course-select"
+                      checked={selectedSingle === item.id}
+                      onChange={() => !item.disabled && toggleSelect(item.id)}
+                      disabled={item.disabled}
+                      className="accent-blue-700 disabled:cursor-not-allowed"
+                    />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(item.id)}
+                      onChange={() => !item.disabled && toggleSelect(item.id)}
+                      disabled={item.disabled}
+                      className="accent-blue-700 disabled:cursor-not-allowed"
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-900 truncate">{item.title}</p>
-                    <p className="text-xs text-zinc-400">{item.sub}</p>
+                    {item.sub && <p className="text-xs text-zinc-400">{item.sub}</p>}
                   </div>
                 </div>
               ))}
@@ -179,7 +201,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
             <p className="text-sm text-rose-600">Failed to add content. Try again.</p>
           )}
           <div className="flex items-center justify-between">
-            <span className="text-sm text-zinc-500">{selected.size} selected</span>
+            <span className="text-sm text-zinc-500">{selectionSize} selected</span>
             <div className="flex gap-2">
               <button
                 onClick={onClose}
@@ -189,7 +211,7 @@ export function AddContentSlideOver({ planId, contentType, planAudience = 'B2C',
               </button>
               <button
                 onClick={handleAdd}
-                disabled={selected.size === 0 || saving}
+                disabled={selectionSize === 0 || saving}
                 className="px-3 py-1.5 text-sm font-medium rounded-md bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Adding...' : `Add Selected`}

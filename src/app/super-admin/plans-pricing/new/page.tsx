@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useState, useEffect } from 'react'
+import { formatCourseType } from '@/lib/utils'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, GripVertical, Info, Plus, Trash2, Search } from 'lucide-react'
 import {
@@ -676,7 +677,7 @@ function B2BForm() {
     Promise.all([fetchAllLiveB2BAssessments(), fetchAllLiveB2BCourses()])
       .then(([a, c]) => {
         setAssessments(a.map((x) => ({ id: x.id, title: x.title, sub: x.assessmentType })))
-        setCourses(c.map((x) => ({ id: x.id, title: x.title, sub: x.courseType })))
+        setCourses(c.map((x) => ({ id: x.id, title: x.title, sub: formatCourseType(x.courseType) ?? '' })))
       })
       .finally(() => setContentLoading(false))
   }, [])
@@ -1140,7 +1141,7 @@ function CourseBundleForm() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-zinc-900 truncate">{course.title}</p>
                       <p className="text-xs text-zinc-400">
-                        {course.courseType}
+                        {formatCourseType(course.courseType)}
                         {course.isIndividuallyPurchasable && (
                           <span className="ml-2 text-amber-600">· Also sold individually</span>
                         )}
@@ -1325,7 +1326,7 @@ function SingleCoursePlanForm() {
                     />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-zinc-900 truncate">{course.title}</p>
-                      <p className="text-xs text-zinc-400">{course.courseType}</p>
+                      <p className="text-xs text-zinc-400">{formatCourseType(course.courseType)}</p>
                     </div>
                   </label>
                 ))}
