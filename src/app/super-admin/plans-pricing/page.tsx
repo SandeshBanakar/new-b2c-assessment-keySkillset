@@ -18,7 +18,6 @@ import {
   type AssessmentInPlan,
 } from '@/lib/supabase/plans'
 import { PlanStatusBadge } from '@/components/plans/PlanStatusBadge'
-import { SingleCoursePlanEditSlideOver } from '@/components/plans/EditPlanSlideOver'
 
 type Tab = 'assessment-plans' | 'single-course-plan' | 'course-bundle-plans' | 'b2b-plans'
 
@@ -417,22 +416,19 @@ function CourseBundlePlansSection() {
 
 // ─── Tab 2: Single Course Plan ────────────────────────────────────────────────
 
-function SingleCoursePlansSection({ onCreateSingleCoursePlan }: { onCreateSingleCoursePlan: () => void }) {
+function SingleCoursePlansSection() {
   const router = useRouter()
   const [plans, setPlans] = useState<SingleCoursePlanRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [editingPlan, setEditingPlan] = useState<SingleCoursePlanRow | null>(null)
 
-  function loadPlans() {
+  useEffect(() => {
     setLoading(true)
     fetchSingleCoursePlans()
       .then(setPlans)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { loadPlans() }, [])
+  }, [])
 
   if (loading) return <div className="h-16 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
   if (error) return <div className="h-16 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
@@ -445,61 +441,43 @@ function SingleCoursePlansSection({ onCreateSingleCoursePlan }: { onCreateSingle
   )
 
   return (
-    <>
-      <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-200 bg-zinc-50">
-              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course Name</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (USD)</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
-              <th className="px-4 py-3" />
+    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 bg-zinc-50">
+            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course Name</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (USD)</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
+            <th className="px-4 py-3" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-100">
+          {plans.map((plan) => (
+            <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
+              <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
+              <td className="px-4 py-3 text-zinc-600">
+                {plan.course_name ?? <span className="text-zinc-400">—</span>}
+              </td>
+              <td className="px-4 py-3 text-right text-zinc-700 font-medium">
+                {plan.price_usd != null ? `$${Number(plan.price_usd).toFixed(2)}` : <span className="text-zinc-400">—</span>}
+              </td>
+              <td className="px-4 py-3 text-center">
+                <PlanStatusBadge status={plan.status} />
+              </td>
+              <td className="px-4 py-3 text-right">
+                <button
+                  onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
+                  className="text-xs text-blue-700 hover:text-blue-800 font-medium"
+                >
+                  View / Edit
+                </button>
+              </td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {plans.map((plan) => (
-              <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
-                <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
-                <td className="px-4 py-3 text-zinc-600">
-                  {plan.course_name ?? <span className="text-zinc-400">—</span>}
-                </td>
-                <td className="px-4 py-3 text-right text-zinc-700 font-medium">
-                  {plan.price_usd != null ? `$${Number(plan.price_usd).toFixed(2)}` : <span className="text-zinc-400">—</span>}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <PlanStatusBadge status={plan.status} />
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-3">
-                    <button
-                      onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
-                      className="text-xs text-blue-700 hover:text-blue-800 font-medium"
-                    >
-                      View
-                    </button>
-                    <button
-                      onClick={() => setEditingPlan(plan)}
-                      className="text-xs text-zinc-500 hover:text-zinc-800 font-medium"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {editingPlan && (
-        <SingleCoursePlanEditSlideOver
-          plan={editingPlan}
-          onClose={() => setEditingPlan(null)}
-          onSaved={() => { setEditingPlan(null); loadPlans() }}
-        />
-      )}
-    </>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -516,7 +494,7 @@ function SingleCoursePlanTab({ onCreateSingleCoursePlan }: { onCreateSingleCours
           Create Single Course Plan
         </button>
       </div>
-      <SingleCoursePlansSection onCreateSingleCoursePlan={onCreateSingleCoursePlan} />
+      <SingleCoursePlansSection />
     </div>
   )
 }

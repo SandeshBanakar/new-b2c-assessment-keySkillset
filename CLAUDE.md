@@ -228,7 +228,7 @@ src/app/super-admin/plans/[id]/page.tsx — Plan detail (audience gate in AddCon
 src/components/plans/AddContentSlideOver.tsx — audience_type gate by plan.plan_audience
 src/components/plans/PlanContentTab.tsx — multi-tenant callout, audience badges
 src/components/plans/ContentPlanUsageModal.tsx — ⚠ In N plans modal
-src/components/plans/EditPlanSlideOver.tsx — B2C/B2B/Bundle routing by plan_category; SingleCoursePlanEditSlideOver
+src/components/plans/EditPlanSlideOver.tsx — B2C/B2B/Bundle routing by plan_category; SingleCoursePlanEditSlideOver (used from plan detail page only — not from Plans & Pricing table)
 src/app/super-admin/plans-pricing/page.tsx — 4-tab: Assessment | Single Course | Bundle | B2B
 src/app/super-admin/plans-pricing/new/page.tsx — Create forms (?audience=B2C|B2B, ?category=SINGLE_COURSE_PLAN|COURSE_BUNDLE)
 src/lib/supabase/plans.ts — fetchPlans, createPlan, updatePlan, fetchB2BPlansForGrid, fetchCourseBundlePlans,
@@ -422,7 +422,6 @@ Use MCP Atlassian updateConfluencePage after all code committed and build passes
 [ ] Archive modal: single modal with warning callout + Removed From plan list (no Stays In section)
 [ ] is_individually_purchasable managed ONLY via SINGLE_COURSE_PLAN plan lifecycle — no manual toggle
 [ ] is_individually_purchasable courses EXCLUDED from B2C subscription plan pickers
-[ ] SingleCoursePlanEditSlideOver used for Edit in Plan Records table
 [ ] On SINGLE_COURSE_PLAN PUBLISHED: sync price+price_usd+stripe_price_id to course + purchasable=true
 [ ] On SINGLE_COURSE_PLAN ARCHIVED: set is_individually_purchasable=false on course (prices kept)
 [ ] Purchasable courses ALLOWED in course bundles (CP-Q1e=B) — no gate for bundles
@@ -500,7 +499,7 @@ Subtitle: "Manage B2C and B2B subscription plans and content entitlements"
 
 Tab 1 — Assessment Plans: Card grid, two sections: Platform Plans (PLATFORM_WIDE B2C) + Category Plans (CATEGORY_BUNDLE B2C). Each card: Plan Name | Tier badge | Assessment count badge (→ PlanAssessmentsSlideOver read-only) | Subscriber Count | Status | 3-dot Edit. Tier colours: BASIC=zinc-100/zinc-600, PRO=blue-50/blue-700, PREMIUM=amber-50/amber-700, ENTERPRISE=violet-50/violet-700. MRR strip inside Tab 1 only.
 
-Tab 2 — Single Course Plan: Plan Records table (Plan Name | Course Name | Price USD | Status | Actions: View + Edit). Edit → SingleCoursePlanEditSlideOver (name, display_name, ₹+USD price, Stripe ID, status). PUBLISHED syncs course record + purchasable=true. ARCHIVED sets purchasable=false.
+Tab 2 — Single Course Plan: Plan Records table (Plan Name | Course Name | Price USD | Status | Actions: View / Edit). "View / Edit" navigates to plan detail page — editing done inside the individual plan page via SingleCoursePlanEditSlideOver. PUBLISHED syncs course record + purchasable=true. ARCHIVED sets purchasable=false.
 
 Tab 3 — Course Bundle Plans: Table (Plan Name | Display Name | Price ₹/year | Courses | Status | View). B2C only, PLATFORM_WIDE, annual, no tier, no is_popular/cta_label. Create button top-right only — NOT in empty state.
 
