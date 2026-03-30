@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 7.0 | Updated: March 27, 2026
+# Version: 7.1 | Updated: March 30, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # Single source of truth. Maintained by Claude Code sessions — never edit manually.
 
@@ -62,11 +62,13 @@ stripe_subscription_id, status ('ACTIVE'|'SUSPENDED'),
 last_active_date, user_onboarded, selected_exams, goal, xp, streak, role,
 free_attempt_used, organization_id, created_at, updated_at
 INACTIVE = UI-computed: status='ACTIVE' AND last_active_date > 30 days (never stored in DB)
+subscription_tier = assessment plan tier ONLY. Course plan subscriptions are in b2c_course_subscriptions.
+Free tier = no assessment plan subscription row — default unsubscribed state.
 
 Demo B2C UUIDs (locked):
   Free: 9a3b56a5-31f6-4a58-81fa-66157c68d4f0 | Basic: a0c16137-7fd5-44f5-96e6-60e4617d9230
   Pro:  e150d59c-13c1-4db3-b6d7-4f30c29178e9 (Priya Sharma) | Premium: 191c894d-b532-4fa8-b1fe-746e5cdcdcc8
-16 demo users: 5 Free, 4 Basic, 3 Pro, 4 Premium. 1 Suspended (Meera Krishnan), 3 Inactive.
+16 demo users: 6 Free, 4 Basic, 3 Pro, 3 Premium. 1 Suspended (Meera Krishnan), 3 Inactive.
 
 ### attempts
 passed (boolean nullable): true/false = chapter/subject-test (>=60%) | null = full-test/CLAT
@@ -78,7 +80,7 @@ tenant_id, created_by, created_at, updated_at,
 audience_type (B2C_ONLY/B2B_ONLY/BOTH nullable), price (INR nullable),
 price_usd (numeric nullable — actual dollars e.g. 29.99), currency (DEFAULT 'INR'),
 is_individually_purchasable (boolean DEFAULT false), stripe_price_id, last_modified_by (uuid nullable)
-9 courses: 1 B2C LIVE (HIPAA), 7 B2B LIVE, 1 INACTIVE (CLAT)
+9 courses: 1 B2C ARCHIVED (HIPAA — 425b71f4, is_individually_purchasable=true, $12.99), 7 B2B LIVE, 1 INACTIVE (CLAT)
 
 ### content_items
 id, title, exam_category_id (FK→exam_categories), test_type, source,
@@ -127,6 +129,29 @@ course_topics: id, module_id (FK), title, order_index, created_at — 3/module (
 id, user_id, module_id (FK), topic_id (nullable FK), progress_pct (int),
 status (COMPLETED|IN_PROGRESS|NOT_STARTED), updated_at
 UNIQUE (user_id, module_id, topic_id). Module-level rows: topic_id IS NULL.
+
+### b2c_assessment_subscriptions (KSS-DB-XXX — March 30, 2026)
+id, user_id, plan_id (nullable — plan may be retired), stripe_subscription_id, stripe_customer_id,
+product_name (Stripe product catalogue name / plan.display_name), price_usd (numeric 10,2),
+currency (DEFAULT 'USD'), billing_interval (DEFAULT 'month'), status CHECK ('active'|'canceled'|'past_due'|'trialing'|'incomplete'|'unpaid'),
+cancel_at_period_end (boolean DEFAULT false), current_period_start, current_period_end (= next billing date),
+canceled_at, ended_at, created_at. RLS: OFF.
+One row per subscription lifecycle. Multiple rows per user allowed (tracks history).
+In production: populated via Stripe webhook events (customer.subscription.created/updated/deleted).
+Access gate: WHERE user_id=X AND status='active' AND current_period_end > NOW().
+Seeded: 11 rows covering 10 of 16 demo users (Free users have no assessment subscription rows).
+
+### b2c_course_subscriptions (KSS-DB-XXX — March 30, 2026)
+id, user_id, plan_id (nullable — FK→plans.id SINGLE_COURSE_PLAN), course_id (nullable — FK→courses.id),
+stripe_subscription_id, stripe_customer_id, product_name, price_usd (numeric 10,2),
+currency (DEFAULT 'USD'), billing_interval (DEFAULT 'year'), status CHECK (same as above),
+cancel_at_period_end, current_period_start, current_period_end, canceled_at, ended_at, created_at. RLS: OFF.
+One row per subscription lifecycle. Multiple rows per user allowed.
+All course plans are yearly recurring Stripe subscriptions.
+Access gate: WHERE user_id=X AND course_id=Y AND status='active' AND current_period_end > NOW().
+Free course detection: no row in b2c_course_subscriptions for user+course = free access (show 'Free' badge in Course Performance).
+Free-tier users CAN have course subscriptions (independent of assessment tier).
+Seeded: 11 rows across 8 demo users.
 
 ### learners
 id, tenant_id, full_name, email, phone, department_id, team_id,
@@ -234,8 +259,11 @@ src/app/super-admin/plans-pricing/new/page.tsx — Create forms (?audience=B2C|B
 src/lib/supabase/plans.ts — fetchPlans, createPlan, updatePlan, fetchB2BPlansForGrid, fetchCourseBundlePlans,
   fetchSingleCoursePlans, createSingleCoursePlan, updateSingleCoursePlan, syncCourseFromPlan, fetchPlansContainingContent
 src/lib/supabase/content-creators.ts | src/lib/supabase/b2c-users.ts | src/lib/supabase/content-bank.ts
+  b2c-users.ts exports: fetchUserAssessmentSubscriptions, fetchUserCourseSubscriptions,
+  AssessmentSubscription type, CourseSubscription type
 src/app/super-admin/content-creators/page.tsx + /[id]/page.tsx
-src/app/super-admin/b2c-users/page.tsx + /[id]/page.tsx
+src/app/super-admin/b2c-users/page.tsx — paginated (20/page), URL param state (page/tier/status/search), Suspense wrapper
+src/app/super-admin/b2c-users/[id]/page.tsx — Subscriptions History section (2 sub-sections), Course Performance paginated (10/page) + Free badge
 src/app/super-admin/dashboard/page.tsx — 3-tab analytics (Platform Health | Revenue | Client Admins)
 src/app/assessments/[id]/exam/page.tsx — LinearExamPlayer
 src/hooks/useExamEngine.ts — state machine, timer, localStorage
@@ -298,6 +326,19 @@ Also completed (March 27, 2026 — fix/formatCourseType + SINGLE_COURSE_PLAN enf
   - DB: 6 course rows corrected from DOCUMENT → VIDEO (JEE Mains Math ×2, Organic Chemistry ×2,
     English Grammar Fundamentals ×2).
 
+Also completed (March 30, 2026 — B2C subscription tables + SA user list/profile upgrades):
+  - DB: b2c_assessment_subscriptions table created (RLS OFF, 11 seeded rows, KSS-DB-XXX)
+  - DB: b2c_course_subscriptions table created (RLS OFF, 11 seeded rows, KSS-DB-XXX)
+  - Open Decision #3 resolved: assessment plan + course plan subscriptions coexist freely (not mutually exclusive)
+  - B2C user profile [id]/page.tsx: Subscription section rewritten → "Subscriptions History" with two
+    sub-sections (Assessment Plan table + Course Plans table). Instructional callout re: Stripe webhook
+    integration. cancel_at_period_end amber warning. Course Plan [Cancelled] display for canceled rows.
+  - B2C user profile: Course Performance section paginated (10/page) + 'Free' badge on courses with no
+    subscription row in b2c_course_subscriptions
+  - B2C users list page.tsx: client-side pagination (20/page), URL param state preservation
+    (?page, ?tier, ?status, ?search), Suspense wrapper for useSearchParams, "Showing X–Y of Z users" footer,
+    Previous/Next controls (greyed when disabled)
+
 Pending:
 🟡 KSS-SA-005   Audit Log (SA)
 🟡 KSS-SA-007   Marketing Config
@@ -344,7 +385,11 @@ DB-TODO-002  MAINTENANCE status in content_items + courses.
 
 1. B2C questions table vs SA content_items — merge or keep separate. Static files currently.
 2. licensed_categories sync between tenants + contracts — currently not synced. Single source TBD.
-3. Course à la carte + plan subscription coexistence post-unsubscribe. V1: mutually exclusive gate.
+
+RESOLVED (March 30, 2026): Assessment plan + individual course plan subscriptions coexist freely.
+  A user may hold 1 assessment plan (PLATFORM_WIDE OR CATEGORY_BUNDLE — not both) AND N course plan
+  subscriptions simultaneously. These are independent Stripe subscriptions. Cancelling one does not
+  affect the other. subscription_tier on users reflects assessment plan tier only.
 
 ---
 
@@ -401,6 +446,14 @@ Use MCP Atlassian updateConfluencePage after all code committed and build passes
 [ ] display_name used for customer-facing plan names
 [ ] Course pricing fields are SA-editable only (not content creators)
 [ ] Free tier is NOT a plan record — default unsubscribed state only
+[ ] B2C user profile Subscription section = "Subscriptions History" (two sub-sections: Assessment Plan + Course Plans)
+[ ] subscription_tier on users = assessment plan tier only — course subscriptions in b2c_course_subscriptions
+[ ] Assessment plan + course plan subscriptions coexist freely — never gate one based on the other
+[ ] Course Performance 'Free' badge: show when no b2c_course_subscriptions row exists for user+course
+[ ] B2C users list: paginated 20/page, URL params (?page ?tier ?status ?search), Suspense wrapper
+[ ] Course Performance section: paginated 10/page
+[ ] cancel_at_period_end=true: show amber "Cancels [date]" below Active badge — never change badge to non-Active
+[ ] Canceled course subscription row: display "Course Plan [Cancelled]" not the product name
 [ ] Create B2C Plan form creates assessment subscription plans ONLY
 [ ] Create B2B Plan form: name + description + max_attempts (default 10) ONLY
 [ ] B2B plans have NO display_name, tagline, feature_bullets, is_popular, cta_label

@@ -292,3 +292,103 @@ export async function unsuspendUser(id: string): Promise<void> {
 
   if (error) throw new Error(error.message)
 }
+
+// ─── Subscription Types ───────────────────────────────────────────────────────
+
+export type AssessmentSubscription = {
+  id: string
+  userId: string
+  planId: string | null
+  stripeSubscriptionId: string | null
+  stripeCustomerId: string | null
+  productName: string
+  priceUsd: number | null
+  currency: string
+  billingInterval: string
+  status: string
+  cancelAtPeriodEnd: boolean
+  currentPeriodStart: string | null
+  currentPeriodEnd: string | null
+  canceledAt: string | null
+  endedAt: string | null
+  createdAt: string
+}
+
+export type CourseSubscription = {
+  id: string
+  userId: string
+  planId: string | null
+  courseId: string | null
+  stripeSubscriptionId: string | null
+  stripeCustomerId: string | null
+  productName: string
+  priceUsd: number | null
+  currency: string
+  billingInterval: string
+  status: string
+  cancelAtPeriodEnd: boolean
+  currentPeriodStart: string | null
+  currentPeriodEnd: string | null
+  canceledAt: string | null
+  endedAt: string | null
+  createdAt: string
+}
+
+export async function fetchUserAssessmentSubscriptions(userId: string): Promise<AssessmentSubscription[]> {
+  const { data, error } = await supabase
+    .from('b2c_assessment_subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    userId: s.user_id,
+    planId: s.plan_id,
+    stripeSubscriptionId: s.stripe_subscription_id,
+    stripeCustomerId: s.stripe_customer_id,
+    productName: s.product_name,
+    priceUsd: s.price_usd != null ? Number(s.price_usd) : null,
+    currency: s.currency,
+    billingInterval: s.billing_interval,
+    status: s.status,
+    cancelAtPeriodEnd: s.cancel_at_period_end,
+    currentPeriodStart: s.current_period_start,
+    currentPeriodEnd: s.current_period_end,
+    canceledAt: s.canceled_at,
+    endedAt: s.ended_at,
+    createdAt: s.created_at,
+  }))
+}
+
+export async function fetchUserCourseSubscriptions(userId: string): Promise<CourseSubscription[]> {
+  const { data, error } = await supabase
+    .from('b2c_course_subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    userId: s.user_id,
+    planId: s.plan_id,
+    courseId: s.course_id,
+    stripeSubscriptionId: s.stripe_subscription_id,
+    stripeCustomerId: s.stripe_customer_id,
+    productName: s.product_name,
+    priceUsd: s.price_usd != null ? Number(s.price_usd) : null,
+    currency: s.currency,
+    billingInterval: s.billing_interval,
+    status: s.status,
+    cancelAtPeriodEnd: s.cancel_at_period_end,
+    currentPeriodStart: s.current_period_start,
+    currentPeriodEnd: s.current_period_end,
+    canceledAt: s.canceled_at,
+    endedAt: s.ended_at,
+    createdAt: s.created_at,
+  }))
+}

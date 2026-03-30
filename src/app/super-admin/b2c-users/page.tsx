@@ -1,18 +1,17 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useMemo, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, Loader2 } from 'lucide-react'
 import { fetchB2CUsers, type B2CUser, type DisplayStatus } from '@/lib/supabase/b2c-users'
+
+const PAGE_SIZE = 20
 
 const TIERS = ['All', 'free', 'basic', 'professional', 'premium'] as const
 type TierFilter = typeof TIERS[number]
 
 const TIER_LABELS: Record<string, string> = {
-  free: 'Free',
-  basic: 'Basic',
-  professional: 'Professional',
-  premium: 'Premium',
+  free: 'Free', basic: 'Basic', professional: 'Professional', premium: 'Premium',
 }
 
 const TIER_BADGE: Record<string, string> = {
@@ -38,13 +37,47 @@ function StatusBadge({ status }: { status: DisplayStatus }) {
   )
 }
 
-export default function B2CUsersPage() {
+// ─── Inner content (uses useSearchParams — requires Suspense parent) ──────────
+
+function B2CUsersContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [users, setUsers] = useState<B2CUser[]>([])
   const [loading, setLoading] = useState(true)
-  const [tierFilter, setTierFilter] = useState<TierFilter>('All')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [search, setSearch] = useState('')
+
+  // Initialise from URL params
+  const [tierFilter, setTierFilterRaw] = useState<TierFilter>(
+    () => (searchParams.get('tier') as TierFilter) ?? 'All'
+  )
+  const [statusFilter, setStatusFilterRaw] = useState(
+    () => searchParams.get('status') ?? 'all'
+  )
+  const [search, setSearchRaw] = useState(
+    () => searchParams.get('search') ?? ''
+  )
+  const [currentPage, setCurrentPageRaw] = useState(
+    () => Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+  )
+
+  // Helpers that also reset page to 1
+  function setTierFilter(v: TierFilter) { setTierFilterRaw(v); setCurrentPageRaw(1) }
+  function setStatusFilter(v: string)   { setStatusFilterRaw(v); setCurrentPageRaw(1) }
+  function setSearch(v: string)         { setSearchRaw(v); setCurrentPageRaw(1) }
+  function setCurrentPage(v: number)    { setCurrentPageRaw(v) }
+
+  // Sync state → URL (skip initial mount to avoid spurious navigation)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    const params = new URLSearchParams()
+    if (currentPage > 1)         params.set('page', String(currentPage))
+    if (tierFilter !== 'All')    params.set('tier', tierFilter)
+    if (statusFilter !== 'all')  params.set('status', statusFilter)
+    if (search)                  params.set('search', search)
+    const qs = params.toString()
+    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false })
+  }, [currentPage, tierFilter, statusFilter, search])
 
   useEffect(() => {
     fetchB2CUsers()
@@ -64,12 +97,19 @@ export default function B2CUsersPage() {
     })
   }, [users, tierFilter, statusFilter, search])
 
-  // Tier counts
+  // Tier counts across ALL loaded users (accurate because load-all client-side)
   const tierCounts = useMemo(() => {
     const counts: Record<string, number> = { All: users.length }
     for (const t of TIERS.slice(1)) counts[t] = users.filter((u) => u.subscriptionTier === t).length
     return counts
   }, [users])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  const showingFrom = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
+  const showingTo   = Math.min(safePage * PAGE_SIZE, filtered.length)
 
   return (
     <div className="p-6 space-y-6">
@@ -133,69 +173,110 @@ export default function B2CUsersPage() {
             Loading users…
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-50 border-b border-zinc-200">
-              <tr>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 w-1/4">NAME</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">EMAIL</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">TIER</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">STATUS</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">LAST ACTIVE</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">JOINED</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {filtered.length === 0 ? (
+          <>
+            <table className="w-full text-sm">
+              <thead className="bg-zinc-50 border-b border-zinc-200">
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-zinc-400">
-                    No users match the current filters.
-                  </td>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 w-1/4">NAME</th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">EMAIL</th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">TIER</th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">STATUS</th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">LAST ACTIVE</th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">JOINED</th>
+                  <th className="px-4 py-2.5" />
                 </tr>
-              ) : (
-                filtered.map((user) => (
-                  <tr key={user.id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="px-4 py-3 max-w-0">
-                      <span className="block truncate font-medium text-zinc-900" title={user.displayName ?? user.email}>
-                        {user.displayName ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600 max-w-0">
-                      <span className="block truncate" title={user.email}>{user.email}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${TIER_BADGE[user.subscriptionTier] ?? 'bg-zinc-100 text-zinc-600'}`}>
-                        {TIER_LABELS[user.subscriptionTier] ?? user.subscriptionTier}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={user.displayStatus} />
-                    </td>
-                    <td className="px-4 py-3 text-zinc-500">
-                      {user.lastActiveDate
-                        ? new Date(user.lastActiveDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-500">
-                      {new Date(user.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-4 py-3 min-w-20 text-right">
-                      <button
-                        onClick={() => router.push(`/super-admin/b2c-users/${user.id}`)}
-                        className="text-xs font-medium text-blue-700 border border-blue-200 rounded-md px-2.5 py-1 hover:bg-blue-50 transition-colors whitespace-nowrap"
-                      >
-                        View
-                      </button>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {paginated.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-zinc-400">
+                      No users match the current filters.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  paginated.map((user) => (
+                    <tr key={user.id} className="hover:bg-zinc-50 transition-colors">
+                      <td className="px-4 py-3 max-w-0">
+                        <span className="block truncate font-medium text-zinc-900" title={user.displayName ?? user.email}>
+                          {user.displayName ?? '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600 max-w-0">
+                        <span className="block truncate" title={user.email}>{user.email}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${TIER_BADGE[user.subscriptionTier] ?? 'bg-zinc-100 text-zinc-600'}`}>
+                          {TIER_LABELS[user.subscriptionTier] ?? user.subscriptionTier}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={user.displayStatus} />
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500">
+                        {user.lastActiveDate
+                          ? new Date(user.lastActiveDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500">
+                        {new Date(user.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3 min-w-20 text-right">
+                        <button
+                          onClick={() => router.push(`/super-admin/b2c-users/${user.id}`)}
+                          className="text-xs font-medium text-blue-700 border border-blue-200 rounded-md px-2.5 py-1 hover:bg-blue-50 transition-colors whitespace-nowrap"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination footer */}
+            <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100">
+              <p className="text-xs text-zinc-500">
+                {filtered.length === 0
+                  ? 'No users'
+                  : `Showing ${showingFrom}–${showingTo} of ${filtered.length} users`}
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentPage(safePage - 1)}
+                  disabled={safePage === 1}
+                  className="px-3 py-1.5 text-xs font-medium border border-zinc-200 rounded-md disabled:opacity-40 hover:bg-zinc-50 transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-zinc-500">Page {safePage} of {totalPages}</span>
+                <button
+                  onClick={() => setCurrentPage(safePage + 1)}
+                  disabled={safePage === totalPages}
+                  className="px-3 py-1.5 text-xs font-medium border border-zinc-200 rounded-md disabled:opacity-40 hover:bg-zinc-50 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
-
-      <p className="text-xs text-zinc-400">{filtered.length} of {users.length} users</p>
     </div>
+  )
+}
+
+// ─── Page export — wraps content in Suspense for useSearchParams ─────────────
+
+export default function B2CUsersPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-64 gap-2 text-sm text-zinc-400">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Loading…
+      </div>
+    }>
+      <B2CUsersContent />
+    </Suspense>
   )
 }
