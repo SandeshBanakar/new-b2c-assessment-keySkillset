@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 7.1 | Updated: March 30, 2026
+# Version: 7.2 | Updated: March 31, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # Single source of truth. Maintained by Claude Code sessions — never edit manually.
 
@@ -140,6 +140,13 @@ One row per subscription lifecycle. Multiple rows per user allowed (tracks histo
 In production: populated via Stripe webhook events (customer.subscription.created/updated/deleted).
 Access gate: WHERE user_id=X AND status='active' AND current_period_end > NOW().
 Seeded: 11 rows covering 10 of 16 demo users (Free users have no assessment subscription rows).
+
+### b2c_certificates (KSS-DB-XXX — March 31, 2026)
+id, user_id (FK→users), course_id (FK→courses), certificate_number (text UNIQUE),
+user_name (text), course_title (text), issued_at (timestamptz), created_at. RLS: OFF.
+Format: KSS-{shortCode}-{YYYYMMDD}-{seq}. shortCode = first letters of course title words (e.g. HIPAA Compliance Training → HCT).
+Created on course completion. In production: triggered by webhook or completion event.
+4 demo rows seeded for HIPAA Compliance Training completions (Premium, Priya, Basic, Siddharth).
 
 ### b2c_course_subscriptions (KSS-DB-XXX — March 30, 2026)
 id, user_id, plan_id (nullable — FK→plans.id SINGLE_COURSE_PLAN), course_id (nullable — FK→courses.id),
@@ -326,6 +333,36 @@ Also completed (March 27, 2026 — fix/formatCourseType + SINGLE_COURSE_PLAN enf
   - DB: 6 course rows corrected from DOCUMENT → VIDEO (JEE Mains Math ×2, Organic Chemistry ×2,
     English Grammar Fundamentals ×2).
 
+Also completed (March 31, 2026 — B2C user profile unified Subscriptions & Activity redesign):
+  - max_attempts_per_assessment updated to 6 (= 1 free + 5 paid) for all 8 B2C plans
+  - b2c_certificates table created (user_id FK→users, course_id FK→courses, certificate_number UNIQUE,
+    user_name, course_title, issued_at, created_at). RLS OFF. 4 demo rows seeded for HIPAA completions.
+    Certificate format: KSS-{shortCode}-{YYYYMMDD}-{seq} where shortCode = first letters of course title words.
+  - B2C user profile page fully rebuilt. Three separate sections (SubscriptionsHistory,
+    AssessmentPerformanceSection, CoursePerformanceSection) replaced with ONE unified
+    "Subscriptions & Activity" section containing:
+      (1) Assessment Plans: expandable rows, lazy-loaded per plan.
+          Expanded: "Attempted (N)" sub-section (open) with Assessment grid:
+          Title | Category | Attempts Used (X/6 or X/—) | Best Accuracy | Last Attempted | View Attempts.
+          "Not Yet Started (N)" sub-section (collapsed toggle), paginated 20/page.
+          Cancelled plan "Not Yet Started": muted + amber warning "Plan cancelled — no longer accessible."
+          Retired plan (plan_id=null): "Plan data unavailable" message.
+      (2) Course Plans: expandable rows, lazy-loaded. Expanded: 3-cell meta row
+          (Started | Next Renewal | Certificate: number + issued date via Award icon), then module breakdown.
+      (3) Free Access Activity: auto-shown if user has attempts on assessments not covered by any plan.
+          Ceiling display: X / 1. Label: "These assessments were accessed using the free attempt
+          entitlement. No plan subscription covers these."
+  - Attempt history: slide-over panel (AttemptHistorySlideOver). Single instance at page level,
+    opened via onViewAttempts callback. Columns: Attempt # (with "(free)" on #1) | Date | Accuracy |
+    Score | Time. Read-only — no pass/fail shown anywhere in SA view.
+  - Pass/fail concept removed from SA B2C profile UI only. DB column (attempts.passed) untouched.
+    Exam engine and student-facing views unchanged (locked behaviour).
+  - b2c-users.ts: removed fetchUserAttempts (flat), computeAssessmentSummary, UserAttempt,
+    AssessmentSummary types. Added: fetchPlanAssessments, fetchAssessmentAttempts,
+    fetchFreeAccessAttempts, fetchPlanCoveredAssessmentIds, fetchB2CCertificate.
+    AssessmentSubscription type now includes maxAttempts (from plans join, null if plan retired).
+  - recharts installed (was declared in package.json but missing from node_modules).
+
 Also completed (March 30, 2026 — B2C subscription tables + SA user list/profile upgrades):
   - DB: b2c_assessment_subscriptions table created (RLS OFF, 11 seeded rows, KSS-DB-XXX)
   - DB: b2c_course_subscriptions table created (RLS OFF, 11 seeded rows, KSS-DB-XXX)
@@ -492,7 +529,15 @@ Use MCP Atlassian updateConfluencePage after all code committed and build passes
 [ ] Global Toast via useToast() from @/components/ui/Toast — no local toast state in pages
 [ ] SA sidebar: "B2C Users" under "Master Organisation" nav group
 [ ] "Client Admin" used in SA tenants pages + nav (display/UI only — not in DB)
-[ ] B2C User Profile: no 4 info cards in Assessment section — stats shown inline
+[ ] B2C User Profile: single unified "Subscriptions & Activity" section — no separate Assessment/Course Performance sections
+[ ] B2C profile Assessment Plans: expandable rows, lazy-loaded. Attempted sub-section open, Not Yet Started collapsed (paginated 20/page)
+[ ] B2C profile Attempts Used column: "X / 6" (or "X / —" if plan retired). Never show pass/fail in SA view.
+[ ] B2C profile Attempt History: slide-over panel — Attempt # ("#1 (free)") | Date | Accuracy | Score | Time. Read-only.
+[ ] B2C profile Course Plans: meta row (Started | Next Renewal | Certificate) + module breakdown. Lazy-loaded.
+[ ] b2c_certificates: KSS-{shortCode}-{YYYYMMDD}-{seq}, shortCode = first letters of course title words. RLS OFF.
+[ ] Free Access Activity section: ceiling X/1. Label exact: "These assessments were accessed using the free attempt entitlement. No plan subscription covers these."
+[ ] max_attempts_per_assessment = 6 platform-wide (1 free + 5 paid). Never hardcode 5.
+[ ] Pass/fail removed from SA B2C profile UI only — DB and exam engine untouched.
 [ ] Course row in B2C profile: inline accordion showing modules + topics + progress %
 [ ] Module progress uses b2c_module_progress (progress_pct int, status text) — NOT completed/completed_at
 [ ] B2C Create Plan form Section 6: Assessment picker (LIVE B2C assessments, additive only)

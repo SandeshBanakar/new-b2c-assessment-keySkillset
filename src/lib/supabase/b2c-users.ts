@@ -18,23 +18,6 @@ export type B2CUser = {
   displayStatus: DisplayStatus
 }
 
-export type UserAttempt = {
-  id: string
-  assessmentId: string
-  assessmentTitle: string
-  examType: string
-  assessmentType: string
-  attemptNumber: number
-  accuracyPercent: number | null
-  correctCount: number | null
-  incorrectCount: number | null
-  skippedCount: number | null
-  totalQuestions: number | null
-  timeSpentSeconds: number | null
-  passed: boolean | null   // null = no pass/fail concept (full-test / CLAT)
-  completedAt: string | null
-}
-
 export type UserCourseProgress = {
   id: string
   courseId: string
@@ -46,12 +29,75 @@ export type UserCourseProgress = {
   completedAt: string | null
 }
 
-export type AssessmentSummary = {
-  totalAttempts: number
-  avgAccuracy: number | null
-  avgTimePerQuestion: number | null  // seconds
-  bestAccuracy: number | null
+// ─── Subscription Types ───────────────────────────────────────────────────────
+
+export type AssessmentSubscription = {
+  id: string
+  userId: string
+  planId: string | null
+  stripeSubscriptionId: string | null
+  stripeCustomerId: string | null
+  productName: string
+  priceUsd: number | null
+  currency: string
+  billingInterval: string
+  status: string
+  cancelAtPeriodEnd: boolean
+  currentPeriodStart: string | null
+  currentPeriodEnd: string | null
+  canceledAt: string | null
+  endedAt: string | null
+  createdAt: string
+  maxAttempts: number | null  // from plans.max_attempts_per_assessment; null if plan retired
 }
+
+export type CourseSubscription = {
+  id: string
+  userId: string
+  planId: string | null
+  courseId: string | null
+  stripeSubscriptionId: string | null
+  stripeCustomerId: string | null
+  productName: string
+  priceUsd: number | null
+  currency: string
+  billingInterval: string
+  status: string
+  cancelAtPeriodEnd: boolean
+  currentPeriodStart: string | null
+  currentPeriodEnd: string | null
+  canceledAt: string | null
+  endedAt: string | null
+  createdAt: string
+}
+
+// ─── Plan Assessment Types ────────────────────────────────────────────────────
+
+export type PlanAssessmentRow = {
+  assessmentId: string
+  title: string
+  category: string
+  attemptsUsed: number
+  bestAccuracy: number | null  // null = never attempted or no accuracy data
+  lastAttempted: string | null
+}
+
+export type AttemptRow = {
+  id: string
+  attemptNumber: number
+  accuracyPercent: number | null
+  correctCount: number | null
+  totalQuestions: number | null
+  timeSpentSeconds: number | null
+  completedAt: string | null
+}
+
+export type B2CCertificate = {
+  certificateNumber: string
+  issuedAt: string
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const INACTIVE_THRESHOLD_DAYS = 30
 
@@ -65,6 +111,8 @@ export function computeDisplayStatus(
   threshold.setDate(threshold.getDate() - INACTIVE_THRESHOLD_DAYS)
   return new Date(lastActiveDate) < threshold ? 'INACTIVE' : 'ACTIVE'
 }
+
+// ─── User Fetchers ────────────────────────────────────────────────────────────
 
 export async function fetchB2CUsers(): Promise<B2CUser[]> {
   const { data, error } = await supabase
@@ -115,56 +163,290 @@ export async function fetchB2CUser(id: string): Promise<B2CUser | null> {
   }
 }
 
-export async function fetchUserAttempts(userId: string): Promise<UserAttempt[]> {
+// ─── Subscription Fetchers ────────────────────────────────────────────────────
+
+export async function fetchUserAssessmentSubscriptions(userId: string): Promise<AssessmentSubscription[]> {
+  const { data, error } = await supabase
+    .from('b2c_assessment_subscriptions')
+    .select('*, plans(max_attempts_per_assessment)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((s) => {
+    const plan = Array.isArray(s.plans) ? s.plans[0] : s.plans
+    return {
+      id: s.id,
+      userId: s.user_id,
+      planId: s.plan_id,
+      stripeSubscriptionId: s.stripe_subscription_id,
+      stripeCustomerId: s.stripe_customer_id,
+      productName: s.product_name,
+      priceUsd: s.price_usd != null ? Number(s.price_usd) : null,
+      currency: s.currency,
+      billingInterval: s.billing_interval,
+      status: s.status,
+      cancelAtPeriodEnd: s.cancel_at_period_end,
+      currentPeriodStart: s.current_period_start,
+      currentPeriodEnd: s.current_period_end,
+      canceledAt: s.canceled_at,
+      endedAt: s.ended_at,
+      createdAt: s.created_at,
+      maxAttempts: (plan as { max_attempts_per_assessment: number } | null)?.max_attempts_per_assessment ?? null,
+    }
+  })
+}
+
+export async function fetchUserCourseSubscriptions(userId: string): Promise<CourseSubscription[]> {
+  const { data, error } = await supabase
+    .from('b2c_course_subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    userId: s.user_id,
+    planId: s.plan_id,
+    courseId: s.course_id,
+    stripeSubscriptionId: s.stripe_subscription_id,
+    stripeCustomerId: s.stripe_customer_id,
+    productName: s.product_name,
+    priceUsd: s.price_usd != null ? Number(s.price_usd) : null,
+    currency: s.currency,
+    billingInterval: s.billing_interval,
+    status: s.status,
+    cancelAtPeriodEnd: s.cancel_at_period_end,
+    currentPeriodStart: s.current_period_start,
+    currentPeriodEnd: s.current_period_end,
+    canceledAt: s.canceled_at,
+    endedAt: s.ended_at,
+    createdAt: s.created_at,
+  }))
+}
+
+// ─── Plan Assessment Fetchers ─────────────────────────────────────────────────
+
+/**
+ * Returns all assessments in a plan split into two groups:
+ * - attempted: user has at least 1 completed attempt, includes stats
+ * - notStarted: user has no attempts, title + category only
+ */
+export async function fetchPlanAssessments(
+  planId: string,
+  userId: string,
+): Promise<{ attempted: PlanAssessmentRow[]; notStarted: { assessmentId: string; title: string; category: string }[] }> {
+  const { data: mapRows, error: mapErr } = await supabase
+    .from('plan_content_map')
+    .select('content_item_id')
+    .eq('plan_id', planId)
+    .eq('content_type', 'ASSESSMENT')
+
+  if (mapErr) throw new Error(mapErr.message)
+  if (!mapRows || mapRows.length === 0) return { attempted: [], notStarted: [] }
+
+  const assessmentIds = mapRows.map((r: { content_item_id: string }) => r.content_item_id)
+
+  const [{ data: assessments, error: assErr }, { data: attempts, error: attErr }] = await Promise.all([
+    supabase
+      .from('content_items')
+      .select('id, title, exam_categories(name)')
+      .in('id', assessmentIds),
+    supabase
+      .from('attempts')
+      .select('assessment_id, accuracy_percent, completed_at')
+      .eq('user_id', userId)
+      .in('assessment_id', assessmentIds)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false }),
+  ])
+
+  if (assErr) throw new Error(assErr.message)
+  if (attErr) throw new Error(attErr.message)
+
+  // Group attempts by assessment_id — track count, bestAccuracy, lastAttempted
+  const attemptStats = new Map<string, { count: number; bestAccuracy: number | null; lastAttempted: string | null }>()
+  for (const a of (attempts ?? [])) {
+    const existing = attemptStats.get(a.assessment_id)
+    if (!existing) {
+      attemptStats.set(a.assessment_id, {
+        count: 1,
+        bestAccuracy: a.accuracy_percent,
+        lastAttempted: a.completed_at,
+      })
+    } else {
+      existing.count++
+      if (a.accuracy_percent != null && (existing.bestAccuracy == null || a.accuracy_percent > existing.bestAccuracy)) {
+        existing.bestAccuracy = a.accuracy_percent
+      }
+      // lastAttempted stays as first row (already ordered DESC)
+    }
+  }
+
+  const attempted: PlanAssessmentRow[] = []
+  const notStarted: { assessmentId: string; title: string; category: string }[] = []
+
+  for (const a of (assessments ?? [])) {
+    const catRaw = Array.isArray(a.exam_categories) ? a.exam_categories[0] : a.exam_categories
+    const category = (catRaw as { name: string } | null)?.name ?? '—'
+    const stats = attemptStats.get(a.id)
+
+    if (stats) {
+      attempted.push({
+        assessmentId: a.id,
+        title: a.title,
+        category,
+        attemptsUsed: stats.count,
+        bestAccuracy: stats.bestAccuracy,
+        lastAttempted: stats.lastAttempted,
+      })
+    } else {
+      notStarted.push({ assessmentId: a.id, title: a.title, category })
+    }
+  }
+
+  // Sort attempted by lastAttempted DESC, notStarted alphabetically
+  attempted.sort((a, b) => {
+    if (!a.lastAttempted) return 1
+    if (!b.lastAttempted) return -1
+    return new Date(b.lastAttempted).getTime() - new Date(a.lastAttempted).getTime()
+  })
+  notStarted.sort((a, b) => a.title.localeCompare(b.title))
+
+  return { attempted, notStarted }
+}
+
+/**
+ * Returns all attempts for a specific user + assessment (for the slide-over panel).
+ * Ordered by attempt_number ascending.
+ */
+export async function fetchAssessmentAttempts(userId: string, assessmentId: string): Promise<AttemptRow[]> {
   const { data, error } = await supabase
     .from('attempts')
-    .select('id, assessment_id, attempt_number, accuracy_percent, correct_count, incorrect_count, skipped_count, total_questions, time_spent_seconds, passed, completed_at, assessments(title, exam_type, assessment_type)')
+    .select('id, attempt_number, accuracy_percent, correct_count, total_questions, time_spent_seconds, completed_at')
+    .eq('user_id', userId)
+    .eq('assessment_id', assessmentId)
+    .eq('status', 'completed')
+    .order('attempt_number', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((a) => ({
+    id: a.id,
+    attemptNumber: a.attempt_number ?? 1,
+    accuracyPercent: a.accuracy_percent,
+    correctCount: a.correct_count,
+    totalQuestions: a.total_questions,
+    timeSpentSeconds: a.time_spent_seconds,
+    completedAt: a.completed_at,
+  }))
+}
+
+/**
+ * Returns attempts on assessments NOT covered by any of the user's plan subscriptions.
+ * These are "free access" attempts — 1 free attempt per assessment, no plan required.
+ */
+export async function fetchFreeAccessAttempts(
+  userId: string,
+  coveredAssessmentIds: string[],
+): Promise<PlanAssessmentRow[]> {
+  const { data, error } = await supabase
+    .from('attempts')
+    .select('assessment_id, accuracy_percent, completed_at, content_items(title, exam_categories(name))')
     .eq('user_id', userId)
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
 
   if (error) throw new Error(error.message)
 
-  return (data ?? []).map((a) => {
-    const assessment = Array.isArray(a.assessments) ? a.assessments[0] : a.assessments
-    return {
-      id: a.id,
-      assessmentId: a.assessment_id,
-      assessmentTitle: (assessment as { title: string } | null)?.title ?? 'Unknown',
-      examType: (assessment as { exam_type: string } | null)?.exam_type ?? '—',
-      assessmentType: (assessment as { assessment_type: string } | null)?.assessment_type ?? '',
-      attemptNumber: a.attempt_number,
-      accuracyPercent: a.accuracy_percent,
-      correctCount: a.correct_count,
-      incorrectCount: a.incorrect_count,
-      skippedCount: a.skipped_count,
-      totalQuestions: a.total_questions,
-      timeSpentSeconds: a.time_spent_seconds,
-      passed: a.passed,
-      completedAt: a.completed_at,
+  // Filter to only uncovered assessments client-side
+  const uncovered = (data ?? []).filter((a) => !coveredAssessmentIds.includes(a.assessment_id))
+
+  // Group by assessment_id
+  const grouped = new Map<string, {
+    title: string
+    category: string
+    count: number
+    bestAccuracy: number | null
+    lastAttempted: string | null
+  }>()
+
+  for (const a of uncovered) {
+    const ci = Array.isArray(a.content_items) ? a.content_items[0] : a.content_items
+    const catRaw = (ci as { exam_categories?: unknown } | null)?.exam_categories
+    const cat = Array.isArray(catRaw) ? catRaw[0] : catRaw
+    const title = (ci as { title: string } | null)?.title ?? 'Unknown Assessment'
+    const category = (cat as { name: string } | null)?.name ?? '—'
+
+    const existing = grouped.get(a.assessment_id)
+    if (!existing) {
+      grouped.set(a.assessment_id, { title, category, count: 1, bestAccuracy: a.accuracy_percent, lastAttempted: a.completed_at })
+    } else {
+      existing.count++
+      if (a.accuracy_percent != null && (existing.bestAccuracy == null || a.accuracy_percent > existing.bestAccuracy)) {
+        existing.bestAccuracy = a.accuracy_percent
+      }
     }
-  })
+  }
+
+  return Array.from(grouped.entries()).map(([assessmentId, stats]) => ({
+    assessmentId,
+    title: stats.title,
+    category: stats.category,
+    attemptsUsed: stats.count,
+    bestAccuracy: stats.bestAccuracy,
+    lastAttempted: stats.lastAttempted,
+  }))
 }
 
-export function computeAssessmentSummary(attempts: UserAttempt[]): AssessmentSummary {
-  if (attempts.length === 0) return { totalAttempts: 0, avgAccuracy: null, avgTimePerQuestion: null, bestAccuracy: null }
+/**
+ * Returns all assessment IDs covered by a set of plans.
+ * Used to determine which attempts are "free access" (not covered by any plan).
+ */
+export async function fetchPlanCoveredAssessmentIds(planIds: string[]): Promise<string[]> {
+  if (planIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('plan_content_map')
+    .select('content_item_id')
+    .in('plan_id', planIds)
+    .eq('content_type', 'ASSESSMENT')
+  if (error) return []
+  return (data ?? []).map((r: { content_item_id: string }) => r.content_item_id)
+}
 
-  const withAccuracy = attempts.filter((a) => a.accuracyPercent !== null)
-  const withTime = attempts.filter((a) => a.timeSpentSeconds !== null && a.totalQuestions !== null && a.totalQuestions > 0)
+// ─── Certificate Fetcher ──────────────────────────────────────────────────────
 
-  const avgAccuracy = withAccuracy.length > 0
-    ? withAccuracy.reduce((sum, a) => sum + (a.accuracyPercent ?? 0), 0) / withAccuracy.length
-    : null
+export async function fetchB2CCertificate(userId: string, courseId: string): Promise<B2CCertificate | null> {
+  const { data, error } = await supabase
+    .from('b2c_certificates')
+    .select('certificate_number, issued_at')
+    .eq('user_id', userId)
+    .eq('course_id', courseId)
+    .single()
 
-  const bestAccuracy = withAccuracy.length > 0
-    ? Math.max(...withAccuracy.map((a) => a.accuracyPercent ?? 0))
-    : null
+  if (error) return null
+  return { certificateNumber: data.certificate_number, issuedAt: data.issued_at }
+}
 
-  const avgTimePerQuestion = withTime.length > 0
-    ? withTime.reduce((sum, a) => sum + (a.timeSpentSeconds! / a.totalQuestions!), 0) / withTime.length
-    : null
+// ─── Course Module Progress ───────────────────────────────────────────────────
 
-  return { totalAttempts: attempts.length, avgAccuracy, avgTimePerQuestion, bestAccuracy }
+export type CourseTopic = {
+  id: string
+  title: string
+  orderIndex: number
+  completed: boolean
+}
+
+export type CourseModule = {
+  id: string
+  title: string
+  orderIndex: number
+  progressPct: number
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED'
+  topics: CourseTopic[]
 }
 
 export async function fetchUserCourseProgress(userId: string): Promise<UserCourseProgress[]> {
@@ -189,24 +471,6 @@ export async function fetchUserCourseProgress(userId: string): Promise<UserCours
       completedAt: p.completed_at,
     }
   })
-}
-
-// ─── Course Module Progress ───────────────────────────────────────────────────
-
-export type CourseTopic = {
-  id: string
-  title: string
-  orderIndex: number
-  completed: boolean
-}
-
-export type CourseModule = {
-  id: string
-  title: string
-  orderIndex: number
-  progressPct: number
-  status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED'
-  topics: CourseTopic[]
 }
 
 export async function fetchCourseModuleProgress(
@@ -275,6 +539,8 @@ export async function fetchCourseModuleProgress(
   })
 }
 
+// ─── User Actions ─────────────────────────────────────────────────────────────
+
 export async function suspendUser(id: string): Promise<void> {
   const { error } = await supabase
     .from('users')
@@ -291,104 +557,4 @@ export async function unsuspendUser(id: string): Promise<void> {
     .eq('id', id)
 
   if (error) throw new Error(error.message)
-}
-
-// ─── Subscription Types ───────────────────────────────────────────────────────
-
-export type AssessmentSubscription = {
-  id: string
-  userId: string
-  planId: string | null
-  stripeSubscriptionId: string | null
-  stripeCustomerId: string | null
-  productName: string
-  priceUsd: number | null
-  currency: string
-  billingInterval: string
-  status: string
-  cancelAtPeriodEnd: boolean
-  currentPeriodStart: string | null
-  currentPeriodEnd: string | null
-  canceledAt: string | null
-  endedAt: string | null
-  createdAt: string
-}
-
-export type CourseSubscription = {
-  id: string
-  userId: string
-  planId: string | null
-  courseId: string | null
-  stripeSubscriptionId: string | null
-  stripeCustomerId: string | null
-  productName: string
-  priceUsd: number | null
-  currency: string
-  billingInterval: string
-  status: string
-  cancelAtPeriodEnd: boolean
-  currentPeriodStart: string | null
-  currentPeriodEnd: string | null
-  canceledAt: string | null
-  endedAt: string | null
-  createdAt: string
-}
-
-export async function fetchUserAssessmentSubscriptions(userId: string): Promise<AssessmentSubscription[]> {
-  const { data, error } = await supabase
-    .from('b2c_assessment_subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-
-  if (error) throw new Error(error.message)
-
-  return (data ?? []).map((s) => ({
-    id: s.id,
-    userId: s.user_id,
-    planId: s.plan_id,
-    stripeSubscriptionId: s.stripe_subscription_id,
-    stripeCustomerId: s.stripe_customer_id,
-    productName: s.product_name,
-    priceUsd: s.price_usd != null ? Number(s.price_usd) : null,
-    currency: s.currency,
-    billingInterval: s.billing_interval,
-    status: s.status,
-    cancelAtPeriodEnd: s.cancel_at_period_end,
-    currentPeriodStart: s.current_period_start,
-    currentPeriodEnd: s.current_period_end,
-    canceledAt: s.canceled_at,
-    endedAt: s.ended_at,
-    createdAt: s.created_at,
-  }))
-}
-
-export async function fetchUserCourseSubscriptions(userId: string): Promise<CourseSubscription[]> {
-  const { data, error } = await supabase
-    .from('b2c_course_subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-
-  if (error) throw new Error(error.message)
-
-  return (data ?? []).map((s) => ({
-    id: s.id,
-    userId: s.user_id,
-    planId: s.plan_id,
-    courseId: s.course_id,
-    stripeSubscriptionId: s.stripe_subscription_id,
-    stripeCustomerId: s.stripe_customer_id,
-    productName: s.product_name,
-    priceUsd: s.price_usd != null ? Number(s.price_usd) : null,
-    currency: s.currency,
-    billingInterval: s.billing_interval,
-    status: s.status,
-    cancelAtPeriodEnd: s.cancel_at_period_end,
-    currentPeriodStart: s.current_period_start,
-    currentPeriodEnd: s.current_period_end,
-    canceledAt: s.canceled_at,
-    endedAt: s.ended_at,
-    createdAt: s.created_at,
-  }))
 }
