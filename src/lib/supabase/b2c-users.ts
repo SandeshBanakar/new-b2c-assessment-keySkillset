@@ -243,55 +243,75 @@ export async function fetchUserCourseSubscriptions(userId: string): Promise<Cour
 
 // ─── Plan Assessment Fetchers ─────────────────────────────────────────────────
 
+// Maps plan tier (SA) → assessments.tier values covered (cumulative)
+// Premium users access all tiers; Pro covers basic+professional; Basic covers basic only
+const PLAN_TIER_COVERAGE: Record<string, string[]> = {
+  BASIC: ['basic'],
+  PRO: ['basic', 'professional'],
+  PREMIUM: ['basic', 'professional', 'premium'],
+  ENTERPRISE: ['basic', 'professional', 'premium'],
+}
+
 /**
- * Returns all assessments in a plan split into two groups:
+ * Returns all assessments for a plan's tier split into two groups:
  * - attempted: user has at least 1 completed attempt, includes stats
  * - notStarted: user has no attempts, title + category only
+ *
+ * NOTE: attempts.assessment_id references the B2C `assessments` table (not content_items).
+ * plan_content_map uses content_items IDs — these are separate systems with no shared IDs.
+ * We resolve the plan's tier and query `assessments` by tier instead.
  */
 export async function fetchPlanAssessments(
   planId: string,
   userId: string,
 ): Promise<{ attempted: PlanAssessmentRow[]; notStarted: { assessmentId: string; title: string; category: string }[] }> {
-  const { data: mapRows, error: mapErr } = await supabase
-    .from('plan_content_map')
-    .select('content_item_id')
-    .eq('plan_id', planId)
-    .eq('content_type', 'ASSESSMENT')
+  // Resolve plan tier
+  const { data: plan } = await supabase
+    .from('plans')
+    .select('tier')
+    .eq('id', planId)
+    .single()
 
-  if (mapErr) throw new Error(mapErr.message)
-  if (!mapRows || mapRows.length === 0) return { attempted: [], notStarted: [] }
+  if (!plan) return { attempted: [], notStarted: [] }
 
-  const assessmentIds = mapRows.map((r: { content_item_id: string }) => r.content_item_id)
+  const tiers = PLAN_TIER_COVERAGE[plan.tier] ?? [plan.tier.toLowerCase()]
 
   const [{ data: assessments, error: assErr }, { data: attempts, error: attErr }] = await Promise.all([
     supabase
-      .from('content_items')
-      .select('id, title, exam_categories(name)')
-      .in('id', assessmentIds),
+      .from('assessments')
+      .select('id, title, exam_type')
+      .in('tier', tiers),
     supabase
       .from('attempts')
-      .select('assessment_id, accuracy_percent, completed_at')
+      .select('assessment_id, attempt_number, accuracy_percent, completed_at')
       .eq('user_id', userId)
-      .in('assessment_id', assessmentIds)
-      .eq('status', 'completed')
+      .ilike('status', 'completed')
       .order('completed_at', { ascending: false }),
   ])
 
   if (assErr) throw new Error(assErr.message)
   if (attErr) throw new Error(attErr.message)
 
-  // Group attempts by assessment_id — track count, bestAccuracy, lastAttempted
-  const attemptStats = new Map<string, { count: number; bestAccuracy: number | null; lastAttempted: string | null }>()
+  const assessmentIds = new Set((assessments ?? []).map((a: { id: string }) => a.id))
+
+  // Group by assessment_id — distinct attempt_number count to avoid inflation from duplicate rows
+  const attemptStats = new Map<string, {
+    attemptNumbers: Set<number>
+    bestAccuracy: number | null
+    lastAttempted: string | null
+  }>()
+
   for (const a of (attempts ?? [])) {
+    if (!assessmentIds.has(a.assessment_id)) continue
     const existing = attemptStats.get(a.assessment_id)
     if (!existing) {
       attemptStats.set(a.assessment_id, {
-        count: 1,
+        attemptNumbers: new Set([a.attempt_number]),
         bestAccuracy: a.accuracy_percent,
         lastAttempted: a.completed_at,
       })
     } else {
-      existing.count++
+      existing.attemptNumbers.add(a.attempt_number)
       if (a.accuracy_percent != null && (existing.bestAccuracy == null || a.accuracy_percent > existing.bestAccuracy)) {
         existing.bestAccuracy = a.accuracy_percent
       }
@@ -303,25 +323,21 @@ export async function fetchPlanAssessments(
   const notStarted: { assessmentId: string; title: string; category: string }[] = []
 
   for (const a of (assessments ?? [])) {
-    const catRaw = Array.isArray(a.exam_categories) ? a.exam_categories[0] : a.exam_categories
-    const category = (catRaw as { name: string } | null)?.name ?? '—'
     const stats = attemptStats.get(a.id)
-
     if (stats) {
       attempted.push({
         assessmentId: a.id,
         title: a.title,
-        category,
-        attemptsUsed: stats.count,
+        category: a.exam_type ?? '—',
+        attemptsUsed: stats.attemptNumbers.size,
         bestAccuracy: stats.bestAccuracy,
         lastAttempted: stats.lastAttempted,
       })
     } else {
-      notStarted.push({ assessmentId: a.id, title: a.title, category })
+      notStarted.push({ assessmentId: a.id, title: a.title, category: a.exam_type ?? '—' })
     }
   }
 
-  // Sort attempted by lastAttempted DESC, notStarted alphabetically
   attempted.sort((a, b) => {
     if (!a.lastAttempted) return 1
     if (!b.lastAttempted) return -1
@@ -342,7 +358,7 @@ export async function fetchAssessmentAttempts(userId: string, assessmentId: stri
     .select('id, attempt_number, accuracy_percent, correct_count, total_questions, time_spent_seconds, completed_at')
     .eq('user_id', userId)
     .eq('assessment_id', assessmentId)
-    .eq('status', 'completed')
+    .ilike('status', 'completed')
     .order('attempt_number', { ascending: true })
 
   if (error) throw new Error(error.message)
@@ -359,72 +375,68 @@ export async function fetchAssessmentAttempts(userId: string, assessmentId: stri
 }
 
 /**
- * Returns attempts on assessments NOT covered by any of the user's plan subscriptions.
- * These are "free access" attempts — 1 free attempt per assessment, no plan required.
+ * Returns free attempt activity not covered by any active plan subscription.
+ * Only rows where is_free_attempt=true are shown — max 1 free attempt per assessment ever.
+ * attemptsUsed is always 1. If the assessment is covered by an active plan, it is excluded
+ * (plan absorbs the free attempt — show under the plan's Attempted section instead).
  */
 export async function fetchFreeAccessAttempts(
   userId: string,
   coveredAssessmentIds: string[],
 ): Promise<PlanAssessmentRow[]> {
-  // attempts.assessment_id FK references the 'assessments' table (not content_items)
   const { data, error } = await supabase
     .from('attempts')
-    .select('assessment_id, accuracy_percent, completed_at, assessments(title)')
+    .select('assessment_id, accuracy_percent, completed_at, assessments(title, exam_type)')
     .eq('user_id', userId)
-    .eq('status', 'completed')
+    .eq('is_free_attempt', true)
+    .ilike('status', 'completed')
     .order('completed_at', { ascending: false })
 
   if (error) throw new Error(error.message)
 
-  // Filter to only uncovered assessments client-side
   const uncovered = (data ?? []).filter((a) => !coveredAssessmentIds.includes(a.assessment_id))
 
-  // Group by assessment_id
-  const grouped = new Map<string, {
-    title: string
-    count: number
-    bestAccuracy: number | null
-    lastAttempted: string | null
-  }>()
-
-  for (const a of uncovered) {
+  return uncovered.map((a) => {
     const assessment = Array.isArray(a.assessments) ? a.assessments[0] : a.assessments
-    const title = (assessment as { title: string } | null)?.title ?? 'Unknown Assessment'
-
-    const existing = grouped.get(a.assessment_id)
-    if (!existing) {
-      grouped.set(a.assessment_id, { title, count: 1, bestAccuracy: a.accuracy_percent, lastAttempted: a.completed_at })
-    } else {
-      existing.count++
-      if (a.accuracy_percent != null && (existing.bestAccuracy == null || a.accuracy_percent > existing.bestAccuracy)) {
-        existing.bestAccuracy = a.accuracy_percent
-      }
+    const title = (assessment as { title: string; exam_type: string } | null)?.title ?? 'Unknown Assessment'
+    const category = (assessment as { title: string; exam_type: string } | null)?.exam_type ?? '—'
+    return {
+      assessmentId: a.assessment_id,
+      title,
+      category,
+      attemptsUsed: 1,  // always 1 — max 1 free attempt per assessment
+      bestAccuracy: a.accuracy_percent,
+      lastAttempted: a.completed_at,
     }
-  }
-
-  return Array.from(grouped.entries()).map(([assessmentId, stats]) => ({
-    assessmentId,
-    title: stats.title,
-    category: '—',
-    attemptsUsed: stats.count,
-    bestAccuracy: stats.bestAccuracy,
-    lastAttempted: stats.lastAttempted,
-  }))
+  })
 }
 
 /**
  * Returns all assessment IDs covered by a set of plans.
- * Used to determine which attempts are "free access" (not covered by any plan).
+ * Uses the B2C `assessments` table filtered by plan tier — the same source
+ * as fetchPlanAssessments. Used to determine "free access" orphaned attempts.
  */
 export async function fetchPlanCoveredAssessmentIds(planIds: string[]): Promise<string[]> {
   if (planIds.length === 0) return []
-  const { data, error } = await supabase
-    .from('plan_content_map')
-    .select('content_item_id')
-    .in('plan_id', planIds)
-    .eq('content_type', 'ASSESSMENT')
-  if (error) return []
-  return (data ?? []).map((r: { content_item_id: string }) => r.content_item_id)
+  const { data: plans } = await supabase
+    .from('plans')
+    .select('tier')
+    .in('id', planIds)
+
+  const allTiers = new Set<string>()
+  for (const p of (plans ?? [])) {
+    const coverage = PLAN_TIER_COVERAGE[p.tier] ?? []
+    coverage.forEach((t: string) => allTiers.add(t))
+  }
+  const tiers = Array.from(allTiers)
+  if (tiers.length === 0) return []
+
+  const { data } = await supabase
+    .from('assessments')
+    .select('id')
+    .in('tier', tiers)
+
+  return (data ?? []).map((a: { id: string }) => a.id)
 }
 
 // ─── Certificate Fetcher ──────────────────────────────────────────────────────

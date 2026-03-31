@@ -369,24 +369,27 @@ function AssessmentGrid({
         )}
       </div>
 
-      {/* Not Yet Started sub-section */}
-      {notStarted.length > 0 && (
-        <div className="space-y-2">
-          <button
-            onClick={() => setNotStartedOpen((v) => !v)}
-            className="flex items-center gap-2 text-xs font-semibold text-zinc-400 uppercase tracking-wide hover:text-zinc-600 transition-colors"
-          >
-            {notStartedOpen
-              ? <ChevronDown className="w-3.5 h-3.5" />
-              : <ChevronRight className="w-3.5 h-3.5" />
-            }
-            Not Yet Started
-            <span className="text-xs font-medium bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-md">
-              {notStarted.length}
-            </span>
-          </button>
+      {/* Not Yet Started sub-section — always visible */}
+      <div className="space-y-2">
+        <button
+          onClick={() => setNotStartedOpen((v) => !v)}
+          className="flex items-center gap-2 text-xs font-semibold text-zinc-400 uppercase tracking-wide hover:text-zinc-600 transition-colors"
+        >
+          {notStartedOpen
+            ? <ChevronDown className="w-3.5 h-3.5" />
+            : <ChevronRight className="w-3.5 h-3.5" />
+          }
+          Not Yet Started
+          <span className="text-xs font-medium bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-md">
+            {notStarted.length}
+          </span>
+        </button>
 
-          {notStartedOpen && (
+        {notStartedOpen && (
+          <>
+            {notStarted.length === 0 ? (
+              <p className="text-xs text-zinc-400 py-1">All assessments in this plan have been attempted.</p>
+            ) : (
             <div className="space-y-2">
               {isCancelled && (
                 <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded-md">
@@ -445,9 +448,10 @@ function AssessmentGrid({
                 )}
               </div>
             </div>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -771,7 +775,7 @@ function FreeAccessActivity({
       <div>
         <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Free Access Activity</h3>
         <p className="text-xs text-zinc-400 mt-1">
-          These assessments were accessed using the free attempt entitlement. No plan subscription covers these.
+          One free attempt is available on every assessment. Attempts shown here are not covered by any active plan.
         </p>
       </div>
       <div className="border border-zinc-200 rounded-md overflow-hidden">

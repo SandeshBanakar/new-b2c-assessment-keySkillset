@@ -1,5 +1,5 @@
 # CLAUDE.md — keySkillset Platform
-# Version: 7.2 | Updated: March 31, 2026
+# Version: 7.3 | Updated: March 31, 2026
 # READ THIS ENTIRE FILE BEFORE TOUCHING ANY CODE.
 # Single source of truth. Maintained by Claude Code sessions — never edit manually.
 
