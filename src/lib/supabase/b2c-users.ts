@@ -166,36 +166,49 @@ export async function fetchB2CUser(id: string): Promise<B2CUser | null> {
 // ─── Subscription Fetchers ────────────────────────────────────────────────────
 
 export async function fetchUserAssessmentSubscriptions(userId: string): Promise<AssessmentSubscription[]> {
+  // plan_id has no FK constraint on b2c_assessment_subscriptions — fetch plans separately
   const { data, error } = await supabase
     .from('b2c_assessment_subscriptions')
-    .select('*, plans(max_attempts_per_assessment)')
+    .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
 
-  return (data ?? []).map((s) => {
-    const plan = Array.isArray(s.plans) ? s.plans[0] : s.plans
-    return {
-      id: s.id,
-      userId: s.user_id,
-      planId: s.plan_id,
-      stripeSubscriptionId: s.stripe_subscription_id,
-      stripeCustomerId: s.stripe_customer_id,
-      productName: s.product_name,
-      priceUsd: s.price_usd != null ? Number(s.price_usd) : null,
-      currency: s.currency,
-      billingInterval: s.billing_interval,
-      status: s.status,
-      cancelAtPeriodEnd: s.cancel_at_period_end,
-      currentPeriodStart: s.current_period_start,
-      currentPeriodEnd: s.current_period_end,
-      canceledAt: s.canceled_at,
-      endedAt: s.ended_at,
-      createdAt: s.created_at,
-      maxAttempts: (plan as { max_attempts_per_assessment: number } | null)?.max_attempts_per_assessment ?? null,
+  const rows = data ?? []
+
+  // Fetch max_attempts for each unique plan_id in a single query
+  const planIds = [...new Set(rows.map((s) => s.plan_id).filter(Boolean))] as string[]
+  const planMaxMap = new Map<string, number>()
+  if (planIds.length > 0) {
+    const { data: plans } = await supabase
+      .from('plans')
+      .select('id, max_attempts_per_assessment')
+      .in('id', planIds)
+    for (const p of plans ?? []) {
+      if (p.max_attempts_per_assessment != null) planMaxMap.set(p.id, p.max_attempts_per_assessment)
     }
-  })
+  }
+
+  return rows.map((s) => ({
+    id: s.id,
+    userId: s.user_id,
+    planId: s.plan_id,
+    stripeSubscriptionId: s.stripe_subscription_id,
+    stripeCustomerId: s.stripe_customer_id,
+    productName: s.product_name,
+    priceUsd: s.price_usd != null ? Number(s.price_usd) : null,
+    currency: s.currency,
+    billingInterval: s.billing_interval,
+    status: s.status,
+    cancelAtPeriodEnd: s.cancel_at_period_end,
+    currentPeriodStart: s.current_period_start,
+    currentPeriodEnd: s.current_period_end,
+    canceledAt: s.canceled_at,
+    endedAt: s.ended_at,
+    createdAt: s.created_at,
+    maxAttempts: s.plan_id ? (planMaxMap.get(s.plan_id) ?? null) : null,
+  }))
 }
 
 export async function fetchUserCourseSubscriptions(userId: string): Promise<CourseSubscription[]> {
@@ -353,9 +366,10 @@ export async function fetchFreeAccessAttempts(
   userId: string,
   coveredAssessmentIds: string[],
 ): Promise<PlanAssessmentRow[]> {
+  // attempts.assessment_id FK references the 'assessments' table (not content_items)
   const { data, error } = await supabase
     .from('attempts')
-    .select('assessment_id, accuracy_percent, completed_at, content_items(title, exam_categories(name))')
+    .select('assessment_id, accuracy_percent, completed_at, assessments(title)')
     .eq('user_id', userId)
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
@@ -368,22 +382,18 @@ export async function fetchFreeAccessAttempts(
   // Group by assessment_id
   const grouped = new Map<string, {
     title: string
-    category: string
     count: number
     bestAccuracy: number | null
     lastAttempted: string | null
   }>()
 
   for (const a of uncovered) {
-    const ci = Array.isArray(a.content_items) ? a.content_items[0] : a.content_items
-    const catRaw = (ci as { exam_categories?: unknown } | null)?.exam_categories
-    const cat = Array.isArray(catRaw) ? catRaw[0] : catRaw
-    const title = (ci as { title: string } | null)?.title ?? 'Unknown Assessment'
-    const category = (cat as { name: string } | null)?.name ?? '—'
+    const assessment = Array.isArray(a.assessments) ? a.assessments[0] : a.assessments
+    const title = (assessment as { title: string } | null)?.title ?? 'Unknown Assessment'
 
     const existing = grouped.get(a.assessment_id)
     if (!existing) {
-      grouped.set(a.assessment_id, { title, category, count: 1, bestAccuracy: a.accuracy_percent, lastAttempted: a.completed_at })
+      grouped.set(a.assessment_id, { title, count: 1, bestAccuracy: a.accuracy_percent, lastAttempted: a.completed_at })
     } else {
       existing.count++
       if (a.accuracy_percent != null && (existing.bestAccuracy == null || a.accuracy_percent > existing.bestAccuracy)) {
@@ -395,7 +405,7 @@ export async function fetchFreeAccessAttempts(
   return Array.from(grouped.entries()).map(([assessmentId, stats]) => ({
     assessmentId,
     title: stats.title,
-    category: stats.category,
+    category: '—',
     attemptsUsed: stats.count,
     bestAccuracy: stats.bestAccuracy,
     lastAttempted: stats.lastAttempted,
