@@ -76,7 +76,10 @@
       "mcp__ide__getDiagnostics",
       "mcp__atlassian__getConfluencePage",
       "mcp__atlassian__getAccessibleAtlassianResources",
-      "mcp__atlassian__updateConfluencePage"
+      "mcp__atlassian__updateConfluencePage",
+      "Bash(gh pr:*)",
+      "Bash(winget list:*)",
+      "Bash(where gh:*)"
     ]
   },
   "enabledMcpjsonServers": [
