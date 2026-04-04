@@ -68,20 +68,12 @@ These rules apply regardless of task type. Violating any of these is a blocking 
 - 🟡 KSS-SA-007 Marketing Config
 - 🟡 KSS-CA-007 CA Dashboard
 - 🟡 KSS-CA-009 Audit Log (CA)
-- 🔴 KSS-B2C-FIX-023 Back button + ChevronLeft on instructions page
-- 🔴 KSS-B2C-FIX-024 Previous cross-section NTA navigation
-- 🔴 KSS-B2C-FIX-025-FINAL Exam engine state machine
-- 🔴 KSS-B2C-FIX-026 Mobile hard block modal (< 768px)
-- 🔴 KSS-B2C-FIX-027 MCQ_MULTI + NUMERIC renderers
-- 🔴 KSS-B2C-FIX-028 Draggable on-screen calculator
-
-**Open bugs (deferred — do not touch):**
-- BUG-001 Analytics tab empty after results redirect
-- BUG-002 Upgrade banner not showing after free attempt
+- 🔴 KSS-SA-019 Contract mandatory on CA creation — contract must be created before/during invite; currently optional (Phase 2 item, pending enforcement)
+- 🔴 DB-TODO-001 Rename content_items → assessment_items (requires KSS-DB-XXX authorisation)
+- 🔴 DB-TODO-003 Create unified questions table schema (requires KSS-DB-XXX authorisation)
 
 **Open decisions (do not resolve without product owner confirmation):**
-1. B2C questions table vs SA content_items — merge or keep separate
-2. licensed_categories sync between tenants + contracts — single source TBD
+1. questions table schema — columns, relationships, options storage (JSONB vs separate table) — TBD
 
 ---
 

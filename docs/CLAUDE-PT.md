@@ -248,11 +248,19 @@ Course Performance 'Free' badge: show when no `b2c_course_subscriptions` row for
 
 NEVER modify without explicit "Override locked behaviour" instruction.
 
+**Fixes that require "Override locked behaviour" in the same message:**
+- KSS-B2C-FIX-025-FINAL (state machine) — touches core engine logic directly
+- KSS-B2C-FIX-027 (MCQ_MULTI + NUMERIC renderers) — adds new question type handling to engine
+
+**Fixes that do NOT require the override (UI/UX layer only):**
+- KSS-B2C-FIX-023 (back button + ChevronLeft), FIX-024 (cross-section navigation),
+  FIX-026 (mobile hard block modal), FIX-028 (draggable calculator)
+
 - 5 question states: `not_visited | answered | marked_for_review | visited_unanswered | answered_and_marked`
 - Previous: navigates only, no save. Disabled on Q1 Section 1 only.
 - Mark for Review: one-directional. Unmark only via Save & Next.
 - Timer: never pauses. Auto-submits at `00:00:00`.
-- Types: MCQ_SINGLE ✅ | MCQ_MULTI (FIX-027) | PASSAGE_SINGLE ✅ | PASSAGE_MULTI ✅ | NUMERIC (FIX-027)
+- Types: MCQ_SINGLE ✅ | MCQ_MULTI ✅ | PASSAGE_SINGLE ✅ | PASSAGE_MULTI ✅ | NUMERIC ✅
 
 ---
 
@@ -280,7 +288,15 @@ Tenant slugs: akash (FULL_CREATOR) | techcorp (RUN_ONLY) — IDs in CLAUDE-DB.md
 
 **CA Content Bank:** TENANT_PRIVATE items only. Make Live keeps `visibility_scope=TENANT_PRIVATE`. No `audience_type`.
 
-**Users & Roles:**
+**Users & Roles (SA view — tenant detail) — KSS-SA-018:**
+- Invite User slideover ALWAYS opens for both FULL_CREATOR and RUN_ONLY — never disable the button
+- If an active Client Admin already exists when SA submits → show inline error (rose text, locked copy):
+  "An active Client Admin already exists. Remove the current one before inviting a new one."
+- RUN_ONLY: role dropdown shows Client Admin only (no Content Creator option)
+- FULL_CREATOR: role dropdown shows Client Admin + Content Creator
+- Contract limit enforcement for Content Creators is Phase 2 (KSS-SA-019) — not in V1
+
+**CA Users & Roles (CA self-view):**
 - Section 1: My Profile (name editable, email read-only, role read-only)
 - Section 2: Content Creators (FULL_CREATOR only) — Add CC (Name+Email+Password), "Coming Soon" badge on interface
 

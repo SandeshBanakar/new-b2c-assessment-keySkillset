@@ -21,7 +21,7 @@ The column is `tenant_scope_id` — NOT `tenant_id`. These are different.
 - `tenant_scope_id IS NOT NULL` → TENANT_PRIVATE (tenant-owned)
 Never use `tenant_id` when querying content visibility scope.
 
-**`plan_content_map.content_id` is polymorphic — no FK**
+**`plan_content_map.content_item_id` is polymorphic — no FK**
 There is no foreign key. Always filter by `content_type` first:
 - `content_type = 'ASSESSMENT'` → resolves to `content_items.id`
 - `content_type = 'COURSE'` → resolves to `courses.id`
@@ -135,10 +135,10 @@ is_popular (boolean DEFAULT false), cta_label, max_attempts_per_assessment
 
 ### plan_content_map
 ```
-content_id (polymorphic — NO FK), content_type (ASSESSMENT|COURSE), plan_id
+content_item_id (polymorphic — NO FK), content_type (ASSESSMENT|COURSE), plan_id
 ```
 - ASSESSMENT rows → `content_items.id` | COURSE rows → `courses.id`
-- Always filter by `content_type` before resolving `content_id`
+- Always filter by `content_type` before resolving `content_item_id`
 
 ### plan_subscribers
 ```
@@ -271,7 +271,24 @@ client_audit_log — tenant_id, actor_id, actor_name,
 
 ## DEFERRED SCHEMA CHANGES (do not attempt without KSS-DB-XXX authorisation)
 
-- **DB-TODO-001**: Rename `content_items` → `assessments`. Full rename across all queries, FKs, constraints.
+- **DB-TODO-001**: Rename `content_items` → `assessment_items` (NOT `assessments` — updated April 4 2026).
+  Full rename across all queries, FKs, constraints, and `plan_content_map.content_item_id`.
+  Requires KSS-DB-XXX authorisation before execution.
+
+- **DB-TODO-003**: Create unified questions schema for Assessment Creation platform.
+  Decision resolved April 4 2026: SA/CC write, B2C/B2B read. Requires KSS-DB-XXX authorisation.
+  Confirmed design decisions:
+  - Questions belong to a SOURCE (not directly to an assessment_item)
+  - `sources` table: origin of questions (e.g. "UPSC 2024 Paper 1", "JEE 2023")
+  - `questions` table: id, source_id FK→sources, passage_id (nullable FK→passages),
+    type (single_correct|passage_based|mcq_multi|numeric), text, options JSONB,
+    correct_answer JSONB, explanation JSONB, concept_tag, marks, negative_marks, difficulty
+  - `passages` table: id, source_id FK→sources, text. Used for both PASSAGE_SINGLE (1 question)
+    and PASSAGE_MULTI (N questions). passage_id is nullable on questions — non-passage types = NULL.
+  - Options stored as JSONB on questions row — no separate question_options table
+  - Assessment Creation nav group pages (Sources & Questions, Question Bank,
+    Create Assessments, Bulk Upload) all depend on this schema being finalised first.
+
 - **DB-TODO-002**: `MAINTENANCE` status as first-class state in `content_items` + `courses`.
   Badge: `orange-50/orange-700`. Learners cannot access MAINTENANCE content.
 

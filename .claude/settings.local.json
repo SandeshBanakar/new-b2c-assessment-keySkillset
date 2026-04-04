@@ -73,7 +73,9 @@
       "Bash(find /c/Projects/new-b2c-assessment-keySkillset/src/app/super-admin/content-creators -name *.tsx)",
       "Bash(find /c/Projects/new-b2c-assessment-keySkillset/src/components/analytics -name *.tsx)",
       "mcp__supabase__execute_sql",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "mcp__atlassian__getConfluencePage",
+      "mcp__atlassian__getAccessibleAtlassianResources"
     ]
   },
   "enabledMcpjsonServers": [

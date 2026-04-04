@@ -6,6 +6,20 @@
 
 ## COMPLETED WORK LOG
 
+### April 4, 2026 — KSS-SA-018 Invite User smart update shipped
+- SA tenant detail → Users & Roles: Invite User slideover always opens (never disabled)
+- Inline rose error shown on submit if active Client Admin already exists:
+  "An active Client Admin already exists. Remove the current one before inviting a new one."
+- Applies to both FULL_CREATOR and RUN_ONLY tenants
+
+### April 2, 2026 — All B2C exam engine fixes shipped
+- KSS-B2C-FIX-023: Back button + ChevronLeft on instructions page
+- KSS-B2C-FIX-024: Previous cross-section NTA navigation
+- KSS-B2C-FIX-025-FINAL: Exam engine state machine (final resolution)
+- KSS-B2C-FIX-026: Mobile hard block modal (< 768px)
+- KSS-B2C-FIX-027: MCQ_MULTI + NUMERIC question type renderers
+- KSS-B2C-FIX-028: Draggable on-screen calculator
+
 ### March 31, 2026 — B2C user profile unified redesign
 - `max_attempts_per_assessment` updated to 6 (1 free + 5 paid) for all 8 B2C plans
 - `b2c_certificates` table created. RLS OFF. 4 demo rows seeded (HIPAA completions).
@@ -56,10 +70,27 @@
 
 ## RESOLVED DECISIONS
 
+**#1 (April 4, 2026):** Unified questions table — MERGE decision.
+One `questions` table shared across the platform. SA/Content Creators write. B2C + B2B read.
+`content_items` renamed to `assessment_items` (not `assessments` — corrects DB-TODO-001).
+Assessment Creation nav group (Sources & Questions, Question Bank, Create Assessments, Bulk Upload)
+will all be built on this unified schema. Schema design pending KSS-DB-XXX authorisation.
+
+**#2 (April 2, 2026):** `licensed_categories` on `tenants` + `contracts` is metadata only — informational display.
+Never use it to gate content access. Access control is via Plans only. No sync mechanism needed.
+Column stays on both tables independently. Single source of truth question is moot — it is never the authority.
+
 **#3 (March 30, 2026):** Assessment plan + individual course plan subscriptions coexist freely.
 A user may hold 1 assessment plan (PLATFORM_WIDE OR CATEGORY_BUNDLE — not both) AND N course plan
 subscriptions simultaneously. Independent Stripe subscriptions. Cancelling one does not affect the other.
 `subscription_tier` on users reflects assessment plan tier only.
+
+---
+
+## PHASE 2 ITEMS
+
+Doc: https://keyskillset-product-management.atlassian.net/wiki/x/AYCeBg (Atlassian MCP — reconnect if 401)
+Key Phase 2 item tracked here: KSS-SA-019 — contract mandatory on CA creation + CC seat enforcement per contract.
 
 ---
 
