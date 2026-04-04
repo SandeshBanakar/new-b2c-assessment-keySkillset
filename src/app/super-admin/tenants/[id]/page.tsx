@@ -12,6 +12,7 @@ import {
 import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
 import PlansTab from '@/components/tenant-detail/PlansTab'
 import { useToast } from '@/components/ui/Toast'
+import { PaginationBar } from '@/components/ui/PaginationBar'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -861,7 +862,7 @@ function TabLearners({
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE'>('all')
-  const [page, setPage] = useState(0)
+  const [page, setPage] = useState(1)
   const [showAdd, setShowAdd] = useState(false)
   const [toast, setToast] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -891,7 +892,7 @@ function TabLearners({
 
   const handleSearchChange = (v: string) => {
     setSearch(v)
-    setPage(0)
+    setPage(1)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => setDebouncedSearch(v), 300)
   }
@@ -906,11 +907,12 @@ function TabLearners({
     return true
   })
 
-  const totalPages = Math.ceil(filtered.length / LEARNERS_PAGE_SIZE)
-  const paginated = filtered.slice(page * LEARNERS_PAGE_SIZE, (page + 1) * LEARNERS_PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / LEARNERS_PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paginated = filtered.slice((safePage - 1) * LEARNERS_PAGE_SIZE, safePage * LEARNERS_PAGE_SIZE)
   const showing = {
-    from: filtered.length === 0 ? 0 : page * LEARNERS_PAGE_SIZE + 1,
-    to: Math.min((page + 1) * LEARNERS_PAGE_SIZE, filtered.length),
+    from: filtered.length === 0 ? 0 : (safePage - 1) * LEARNERS_PAGE_SIZE + 1,
+    to: Math.min(safePage * LEARNERS_PAGE_SIZE, filtered.length),
     total: filtered.length,
   }
 
@@ -953,7 +955,7 @@ function TabLearners({
         />
         <select
           value={deptFilter}
-          onChange={e => { setDeptFilter(e.target.value); setPage(0) }}
+          onChange={e => { setDeptFilter(e.target.value); setPage(1) }}
           className="text-sm border border-zinc-200 rounded-md px-3 py-1.5"
         >
           <option value="">All Departments</option>
@@ -963,7 +965,7 @@ function TabLearners({
         </select>
         <select
           value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(0) }}
+          onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1) }}
           className="text-sm border border-zinc-200 rounded-md px-3 py-1.5"
         >
           <option value="all">All Status</option>
@@ -1030,36 +1032,18 @@ function TabLearners({
       {/* Pagination + Export */}
       {!loading && (
         <div className="flex items-center justify-between mt-3">
-          <p className="text-sm text-zinc-500">
-            {filtered.length === 0
-              ? 'No learners'
-              : `Showing ${showing.from}–${showing.to} of ${showing.total} learners`}
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1">
-              <button
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-600 disabled:opacity-40 hover:bg-zinc-50"
-              >
-                Prev
-              </button>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-                className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-600 disabled:opacity-40 hover:bg-zinc-50"
-              >
-                Next
-              </button>
-            </div>
-            <button
-              onClick={() => exportLearnersCSV(learners, tenantSlug)}
-              className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center"
-            >
-              <Download className="w-4 h-4 mr-1.5" />
-              Export CSV
-            </button>
-          </div>
+          <button
+            onClick={() => exportLearnersCSV(learners, tenantSlug)}
+            className="border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            Export CSV
+          </button>
+          <PaginationBar
+            page={safePage}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
         </div>
       )}
 

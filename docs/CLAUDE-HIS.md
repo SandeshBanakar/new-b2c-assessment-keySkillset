@@ -6,6 +6,22 @@
 
 ## COMPLETED WORK LOG
 
+### April 2026 — KSS-SA-019 Plans & Pricing server-side pagination
+- `src/components/ui/PaginationBar.tsx` created — shared `← Prev X/Y Next →` component used platform-wide
+- `src/lib/supabase/plans.ts` — 6 new paginated functions added (originals untouched):
+  `fetchPlatformAssessmentPlansPaginated`, `fetchCategoryAssessmentPlansPaginated`,
+  `fetchSingleCoursePlansPaginated`, `fetchCourseBundlePlansPaginated`,
+  `fetchB2BPlansForGridPaginated`, `fetchAssessmentCountsForPlans`
+- `plans-pricing/page.tsx` rewritten: Suspense wrapper, URL state, `fetchPlans()` removed from parent,
+  MRR strip removed, all 4 tabs server-side paginated independently
+- Assessment Plans: Platform Plans + Category Plans each paginated separately (12 cards/page)
+- Single Course Plans + Course Bundle Plans: table pagination with 25/50/100 dropdown (default 25)
+- B2B Plans: card grid pagination (12/page, no dropdown)
+- Existing pagination updated to PaginationBar: B2C users list, Audit Log, Tenant Learners tab
+- Tenant Learners converted from 0-indexed to 1-indexed pagination
+- `docs/CLAUDE-ATLAS.md` created — canonical Confluence PRD link index
+- Sub-PRD 4 (Plans & Entitlements) updated in Confluence after build passed
+
 ### April 4, 2026 — KSS-SA-018 Invite User smart update shipped
 - SA tenant detail → Users & Roles: Invite User slideover always opens (never disabled)
 - Inline rose error shown on submit if active Client Admin already exists:

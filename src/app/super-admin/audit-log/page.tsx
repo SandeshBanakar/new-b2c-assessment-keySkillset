@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Search, ChevronDown, ClipboardList, X, Loader2 } from 'lucide-react'
+import { PaginationBar } from '@/components/ui/PaginationBar'
 import {
   fetchAuditLogs,
   ACTION_LABELS,
@@ -110,49 +111,6 @@ function ActionFilterDropdown({
 
 // ─── Pagination ──────────────────────────────────────────────────────────────
 
-function Pagination({
-  page,
-  total,
-  pageSize,
-  onChange,
-}: {
-  page: number
-  total: number
-  pageSize: number
-  onChange: (p: number) => void
-}) {
-  const totalPages = Math.ceil(total / pageSize)
-  if (totalPages <= 1) return null
-  const start = (page - 1) * pageSize + 1
-  const end   = Math.min(page * pageSize, total)
-
-  return (
-    <div className="flex items-center justify-between text-sm text-zinc-500">
-      <span>
-        {start}–{end} of {total} entries
-      </span>
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => onChange(page - 1)}
-          disabled={page === 1}
-          className="px-2.5 py-1.5 border border-zinc-200 rounded-md text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          Previous
-        </button>
-        <span className="px-3 py-1.5 text-zinc-700 font-medium">
-          {page} / {totalPages}
-        </span>
-        <button
-          onClick={() => onChange(page + 1)}
-          disabled={page === totalPages}
-          className="px-2.5 py-1.5 border border-zinc-200 rounded-md text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  )
-}
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -323,13 +281,11 @@ export default function AuditLogPage() {
         )}
       </div>
 
-      {/* Pagination */}
-      {!loading && filtered.length > 0 && (
-        <Pagination
+      {!loading && (
+        <PaginationBar
           page={page}
-          total={filtered.length}
-          pageSize={PAGE_SIZE}
-          onChange={setPage}
+          totalPages={Math.ceil(filtered.length / PAGE_SIZE)}
+          onPageChange={setPage}
         />
       )}
     </div>

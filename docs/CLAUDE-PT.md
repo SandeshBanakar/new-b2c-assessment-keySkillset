@@ -175,18 +175,32 @@ Route: `/super-admin/plans-pricing`
 Subtitle: "Manage B2C and B2B subscription plans and content entitlements"
 No global Create button — tab-scoped buttons only.
 
+**Pagination — KSS-SA-019 (applies platform-wide)**
+- All plan tables (Single Course Plans, Course Bundle Plans) paginate at 25 rows/page by default.
+  A 25 / 50 / 100 page-size `<select>` sits at the bottom-left of the pagination bar.
+- Card grids (Assessment Plans, B2B Plans) use a fixed 12 cards/page — no page-size dropdown.
+- Navigation bar: `← Prev X / Y Next →` — bottom-right of each section.
+- Bar hidden when total results = 0. Shown (Prev/Next disabled) when total pages = 1.
+- Page state and page size stored in URL via `useSearchParams` + `router.replace`. Requires `<Suspense>` wrapper.
+- URL params: `?tab=assessment-plans&platformPage=1&categoryPage=1` | `?tab=single-course-plan&page=1&pageSize=25`
+- Shared component: `src/components/ui/PaginationBar.tsx` — use for ALL pagination in the platform.
+- MRR strip removed in KSS-SA-019 (was Tab 1 only). TODO: add back as a dedicated aggregate query if needed.
+
 **Tab 1 — Assessment Plans:** Card grid. Platform Plans (PLATFORM_WIDE B2C) + Category Plans (CATEGORY_BUNDLE B2C).
-- MRR strip inside Tab 1 ONLY — not in page header or other tabs
+- Each section independently paginated (12 cards/page).
 - Edit via Pencil icon in card footer — no 3-dot menu
 
 **Tab 2 — Single Course Plan:** Table (Plan Name | Course Name | Price USD | Status | View/Edit).
 - View/Edit navigates to plan detail page
 - Editing via `SingleCoursePlanEditSlideOver` (plan detail page only — not from table)
+- Paginated 25/page default, 25/50/100 dropdown
 
 **Tab 3 — Course Bundle Plans:** Table. Create button top-right only.
 - B2C only, PLATFORM_WIDE, annual, no tier, no `is_popular`/`cta_label`
+- Paginated 25/page default, 25/50/100 dropdown
 
 **Tab 4 — B2B Plans:** Card grid. No price shown — "B2B plan pricing managed per-tenant via Contract tab."
+- Paginated 12 cards/page, no dropdown
 
 **Plan content rules:**
 - `ASSESSMENT` plans: hide Add Course in PlanContentTab

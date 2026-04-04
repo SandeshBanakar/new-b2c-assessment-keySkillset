@@ -33,6 +33,7 @@ Before starting any task, identify which files below apply and read them first.
 | `@docs/CLAUDE-DB.md` | Any DB query, schema change, or data model question |
 | `@docs/CLAUDE-PLATFORM.md` | Any UI, nav, roles, tenant, plan, or content question |
 | `@docs/CLAUDE-HISTORY.md` | Asked "what changed", debugging unexpected behaviour, or verifying completed work |
+| `@docs/CLAUDE-ATLAS.md` | Any Confluence PRD update, or to find the canonical PRD URL for a feature |
 
 ---
 

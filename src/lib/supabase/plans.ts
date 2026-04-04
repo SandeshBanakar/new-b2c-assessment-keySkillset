@@ -1385,3 +1385,245 @@ export async function fetchPlansContainingContent(
       }
     })
 }
+
+// ─── KSS-SA-019: Server-side paginated fetch functions ────────────────────────
+// All return { data, count }. Originals above are untouched.
+
+type Paginated<T> = { data: T[]; count: number }
+
+function range(page: number, pageSize: number): { from: number; to: number } {
+  const from = (page - 1) * pageSize
+  const to   = from + pageSize - 1
+  return { from, to }
+}
+
+function normalisePlanSubscribers<T extends { plan_subscribers: unknown }>(rows: T[]): T[] {
+  return rows.map((row) => ({
+    ...row,
+    allowed_assessment_types: [],
+    plan_subscribers: Array.isArray(row.plan_subscribers)
+      ? (row.plan_subscribers[0] ?? null)
+      : row.plan_subscribers,
+  }))
+}
+
+export async function fetchPlatformAssessmentPlansPaginated(
+  page: number,
+  pageSize: number
+): Promise<Paginated<PlanRow>> {
+  const { from, to } = range(page, pageSize)
+  const { data, count, error } = await supabase
+    .from('plans')
+    .select(`
+      id, name, display_name, description, price, billing_cycle,
+      audience_type, plan_audience, plan_category, status, scope, tier, category,
+      max_attempts_per_assessment, feature_bullets,
+      tagline, footnote, is_popular, cta_label, created_at,
+      plan_subscribers (subscriber_count)
+    `, { count: 'exact' })
+    .eq('plan_audience', 'B2C')
+    .eq('plan_category', 'ASSESSMENT')
+    .eq('scope', 'PLATFORM_WIDE')
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (error) throw new Error(error.message)
+  return { data: normalisePlanSubscribers(data ?? []) as unknown as PlanRow[], count: count ?? 0 }
+}
+
+export async function fetchCategoryAssessmentPlansPaginated(
+  page: number,
+  pageSize: number
+): Promise<Paginated<PlanRow>> {
+  const { from, to } = range(page, pageSize)
+  const { data, count, error } = await supabase
+    .from('plans')
+    .select(`
+      id, name, display_name, description, price, billing_cycle,
+      audience_type, plan_audience, plan_category, status, scope, tier, category,
+      max_attempts_per_assessment, feature_bullets,
+      tagline, footnote, is_popular, cta_label, created_at,
+      plan_subscribers (subscriber_count)
+    `, { count: 'exact' })
+    .eq('plan_audience', 'B2C')
+    .eq('plan_category', 'ASSESSMENT')
+    .eq('scope', 'CATEGORY_BUNDLE')
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (error) throw new Error(error.message)
+  return { data: normalisePlanSubscribers(data ?? []) as unknown as PlanRow[], count: count ?? 0 }
+}
+
+export async function fetchSingleCoursePlansPaginated(
+  page: number,
+  pageSize: number
+): Promise<Paginated<SingleCoursePlanRow>> {
+  const { from, to } = range(page, pageSize)
+  const { data: plans, count, error } = await supabase
+    .from('plans')
+    .select('id, name, display_name, price, price_usd, stripe_price_id, status', { count: 'exact' })
+    .eq('plan_category', 'SINGLE_COURSE_PLAN')
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (error) throw new Error(error.message)
+
+  const planList = (plans ?? []) as {
+    id: string; name: string; display_name: string | null
+    price: number | null; price_usd: number | null; stripe_price_id: string | null; status: string
+  }[]
+  if (planList.length === 0) return { data: [], count: count ?? 0 }
+
+  const planIds = planList.map((p) => p.id)
+  const { data: pcmRows } = await supabase
+    .from('plan_content_map')
+    .select('plan_id, content_item_id')
+    .in('plan_id', planIds)
+    .eq('content_type', 'COURSE')
+
+  const courseIdByPlan: Record<string, string> = {}
+  ;(pcmRows ?? []).forEach((r: { plan_id: string; content_item_id: string }) => {
+    courseIdByPlan[r.plan_id] = r.content_item_id
+  })
+
+  const courseIds = Object.values(courseIdByPlan)
+  const courseNameMap: Record<string, string> = {}
+  if (courseIds.length > 0) {
+    const { data: courseRows } = await supabase
+      .from('courses')
+      .select('id, title')
+      .in('id', courseIds)
+    ;(courseRows ?? []).forEach((c: { id: string; title: string }) => {
+      courseNameMap[c.id] = c.title
+    })
+  }
+
+  return {
+    data: planList.map((p) => {
+      const courseId = courseIdByPlan[p.id] ?? null
+      return {
+        id:              p.id,
+        name:            p.name,
+        display_name:    p.display_name,
+        price:           p.price,
+        price_usd:       p.price_usd,
+        stripe_price_id: p.stripe_price_id,
+        status:          p.status,
+        course_id:       courseId,
+        course_name:     courseId ? (courseNameMap[courseId] ?? null) : null,
+      }
+    }),
+    count: count ?? 0,
+  }
+}
+
+export async function fetchCourseBundlePlansPaginated(
+  page: number,
+  pageSize: number
+): Promise<Paginated<CourseBundlePlanRow>> {
+  const { from, to } = range(page, pageSize)
+  const { data: plans, count, error } = await supabase
+    .from('plans')
+    .select('id, name, display_name, price, status', { count: 'exact' })
+    .eq('plan_audience', 'B2C')
+    .eq('plan_category', 'COURSE_BUNDLE')
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (error) throw new Error(error.message)
+
+  const planList = (plans ?? []) as { id: string; name: string; display_name: string | null; price: number; status: string }[]
+  if (planList.length === 0) return { data: [], count: count ?? 0 }
+
+  const planIds = planList.map((p) => p.id)
+  const { data: pcmRows } = await supabase
+    .from('plan_content_map')
+    .select('plan_id')
+    .in('plan_id', planIds)
+
+  const countMap: Record<string, number> = {}
+  ;(pcmRows ?? []).forEach((r: { plan_id: string }) => {
+    countMap[r.plan_id] = (countMap[r.plan_id] ?? 0) + 1
+  })
+
+  return {
+    data: planList.map((p) => ({
+      id:           p.id,
+      name:         p.name,
+      display_name: p.display_name,
+      price:        p.price,
+      status:       p.status,
+      course_count: countMap[p.id] ?? 0,
+    })),
+    count: count ?? 0,
+  }
+}
+
+export async function fetchB2BPlansForGridPaginated(
+  page: number,
+  pageSize: number
+): Promise<Paginated<B2BPlanCard>> {
+  const { from, to } = range(page, pageSize)
+  const { data: plans, count, error } = await supabase
+    .from('plans')
+    .select('id, name, status', { count: 'exact' })
+    .eq('plan_audience', 'B2B')
+    .order('name', { ascending: true })
+    .range(from, to)
+
+  if (error) throw new Error(error.message)
+
+  const planList = (plans ?? []) as { id: string; name: string; status: string }[]
+  if (planList.length === 0) return { data: [], count: count ?? 0 }
+
+  const planIds = planList.map((p) => p.id)
+
+  const { data: tpmRows } = await supabase
+    .from('tenant_plan_map')
+    .select('plan_id')
+    .in('plan_id', planIds)
+  const tenantCountMap: Record<string, number> = {}
+  ;(tpmRows ?? []).forEach((r: { plan_id: string }) => {
+    tenantCountMap[r.plan_id] = (tenantCountMap[r.plan_id] ?? 0) + 1
+  })
+
+  const { data: pcmRows } = await supabase
+    .from('plan_content_map')
+    .select('plan_id')
+    .in('plan_id', planIds)
+  const contentCountMap: Record<string, number> = {}
+  ;(pcmRows ?? []).forEach((r: { plan_id: string }) => {
+    contentCountMap[r.plan_id] = (contentCountMap[r.plan_id] ?? 0) + 1
+  })
+
+  return {
+    data: planList.map((p) => ({
+      id:            p.id,
+      name:          p.name,
+      status:        p.status,
+      tenant_count:  tenantCountMap[p.id] ?? 0,
+      content_count: contentCountMap[p.id] ?? 0,
+    })),
+    count: count ?? 0,
+  }
+}
+
+export async function fetchAssessmentCountsForPlans(
+  planIds: string[]
+): Promise<Record<string, number>> {
+  if (planIds.length === 0) return {}
+
+  const { data } = await supabase
+    .from('plan_content_map')
+    .select('plan_id')
+    .in('plan_id', planIds)
+    .eq('content_type', 'ASSESSMENT')
+
+  const counts: Record<string, number> = {}
+  for (const row of data ?? []) {
+    const id = (row as { plan_id: string }).plan_id
+    counts[id] = (counts[id] ?? 0) + 1
+  }
+  return counts
+}

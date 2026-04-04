@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, Loader2 } from 'lucide-react'
 import { fetchB2CUsers, type B2CUser, type DisplayStatus } from '@/lib/supabase/b2c-users'
+import { PaginationBar } from '@/components/ui/PaginationBar'
 
 const PAGE_SIZE = 20
 
@@ -107,9 +108,6 @@ function B2CUsersContent() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(currentPage, totalPages)
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-
-  const showingFrom = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
-  const showingTo   = Math.min(safePage * PAGE_SIZE, filtered.length)
 
   return (
     <div className="p-6 space-y-6">
@@ -234,30 +232,12 @@ function B2CUsersContent() {
               </tbody>
             </table>
 
-            {/* Pagination footer */}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100">
-              <p className="text-xs text-zinc-500">
-                {filtered.length === 0
-                  ? 'No users'
-                  : `Showing ${showingFrom}–${showingTo} of ${filtered.length} users`}
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setCurrentPage(safePage - 1)}
-                  disabled={safePage === 1}
-                  className="px-3 py-1.5 text-xs font-medium border border-zinc-200 rounded-md disabled:opacity-40 hover:bg-zinc-50 transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-xs text-zinc-500">Page {safePage} of {totalPages}</span>
-                <button
-                  onClick={() => setCurrentPage(safePage + 1)}
-                  disabled={safePage === totalPages}
-                  className="px-3 py-1.5 text-xs font-medium border border-zinc-200 rounded-md disabled:opacity-40 hover:bg-zinc-50 transition-colors"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="px-4 pb-3">
+              <PaginationBar
+                page={safePage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
             </div>
           </>
         )}

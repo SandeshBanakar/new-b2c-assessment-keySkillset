@@ -1,29 +1,30 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { Plus, TrendingUp, LayoutGrid, Users, BookOpen, AlertTriangle, X, Loader2, FileText } from 'lucide-react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Plus, LayoutGrid, Users, BookOpen, AlertTriangle, X, Loader2, FileText } from 'lucide-react'
 import {
-  fetchPlans,
-  fetchAssessmentCountsByPlan,
-  fetchAssessmentsInPlan,
-  fetchB2BPlansForGrid,
-  fetchCourseBundlePlans,
-  fetchSingleCoursePlans,
+  fetchPlatformAssessmentPlansPaginated,
+  fetchCategoryAssessmentPlansPaginated,
+  fetchSingleCoursePlansPaginated,
+  fetchCourseBundlePlansPaginated,
+  fetchB2BPlansForGridPaginated,
+  fetchAssessmentCountsForPlans,
   updatePlan,
   type PlanRow,
   type B2BPlanCard,
   type CourseBundlePlanRow,
   type SingleCoursePlanRow,
   type AssessmentInPlan,
+  fetchAssessmentsInPlan,
 } from '@/lib/supabase/plans'
 import { PlanStatusBadge } from '@/components/plans/PlanStatusBadge'
+import { PaginationBar } from '@/components/ui/PaginationBar'
 
 type Tab = 'assessment-plans' | 'single-course-plan' | 'course-bundle-plans' | 'b2b-plans'
 
-function formatINR(value: number): string {
-  return `₹${value.toLocaleString('en-IN')}`
-}
+const PAGE_SIZE_OPTIONS = [25, 50, 100]
+const CARD_PAGE_SIZE    = 12
 
 // ─── Archive Warning Modal ────────────────────────────────────────────────────
 function ArchivePlanModal({
@@ -89,8 +90,7 @@ function ArchivePlanModal({
   )
 }
 
-
-// ─── Plan Assessments Slide-Over ─────────────────────────────────────────────
+// ─── Plan Assessments Slide-Over ──────────────────────────────────────────────
 function PlanAssessmentsSlideOver({
   planId,
   planName,
@@ -220,7 +220,7 @@ function AssessmentPlanCard({
   )
 }
 
-// ─── Assessment Plan Card Grid ────────────────────────────────────────────────
+// ─── Assessment Plan Card Grid (with pagination) ──────────────────────────────
 function AssessmentPlanCardGrid({
   plans,
   counts,
@@ -263,54 +263,98 @@ function AssessmentPlanCardGrid({
   )
 }
 
-// ─── Tab 1: Assessment Plans ──────────────────────────────────────────────────
-function AssessmentPlansTab({
-  plans,
-  onCreateB2C,
-  onPlanArchived,
+// ─── Assessment Plan Section (one per scope) ──────────────────────────────────
+function AssessmentPlanSection({
+  title,
+  fetchFn,
+  page,
+  onPageChange,
+  onArchive,
 }: {
-  plans: PlanRow[]
-  onCreateB2C: () => void
-  onPlanArchived: () => void
+  title: string
+  fetchFn: (page: number, pageSize: number) => Promise<{ data: PlanRow[]; count: number }>
+  page: number
+  onPageChange: (p: number) => void
+  onArchive: (plan: PlanRow) => void
 }) {
   const router = useRouter()
-  const [archivingPlan, setArchivingPlan] = useState<PlanRow | null>(null)
-  const [counts, setCounts] = useState<Record<string, number>>({})
+  const [plans, setPlans]     = useState<PlanRow[]>([])
+  const [counts, setCounts]   = useState<Record<string, number>>({})
+  const [total, setTotal]     = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchAssessmentCountsByPlan().then(setCounts)
-  }, [])
+  const totalPages = Math.max(1, Math.ceil(total / CARD_PAGE_SIZE))
 
-  const b2cPlans = plans.filter((p) => p.plan_audience === 'B2C' && p.plan_category === 'ASSESSMENT')
-  const platformPlans = b2cPlans.filter((p) => p.scope === 'PLATFORM_WIDE')
-  const categoryPlans = b2cPlans.filter((p) => p.scope === 'CATEGORY_BUNDLE')
+  const load = useCallback(() => {
+    setLoading(true)
+    fetchFn(page, CARD_PAGE_SIZE)
+      .then(async ({ data, count }) => {
+        setPlans(data)
+        setTotal(count)
+        const ids = data.map((p) => p.id)
+        const c = await fetchAssessmentCountsForPlans(ids)
+        setCounts(c)
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [fetchFn, page])
 
-  const b2cMRR = b2cPlans.reduce(
-    (sum, p) => sum + (p.price ?? 0) * (p.plan_subscribers?.subscriber_count ?? 0),
-    0
+  useEffect(() => { load() }, [load])
+
+  if (loading) return (
+    <div className="grid grid-cols-3 gap-4">
+      {[0, 1, 2].map((i) => <div key={i} className="h-36 rounded-md bg-zinc-100 animate-pulse" />)}
+    </div>
   )
+  if (error) return <p className="text-sm text-rose-600 py-4">{error}</p>
+
+  return (
+    <div>
+      <h2 className="text-sm font-semibold text-zinc-700 mb-4">{title}</h2>
+      <AssessmentPlanCardGrid
+        plans={plans}
+        counts={counts}
+        onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
+        onArchive={onArchive}
+      />
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+      />
+    </div>
+  )
+}
+
+// ─── Tab 1: Assessment Plans ──────────────────────────────────────────────────
+function AssessmentPlansTab({
+  platformPage,
+  categoryPage,
+  onPlatformPageChange,
+  onCategoryPageChange,
+  onCreateB2C,
+}: {
+  platformPage: number
+  categoryPage: number
+  onPlatformPageChange: (p: number) => void
+  onCategoryPageChange: (p: number) => void
+  onCreateB2C: () => void
+}) {
+  const [archivingPlan, setArchivingPlan] = useState<PlanRow | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   async function handleArchive(plan: PlanRow) {
     await updatePlan(plan.id, { status: 'ARCHIVED' })
     setArchivingPlan(null)
-    onPlanArchived()
+    setRefreshKey((k) => k + 1)
   }
 
   return (
     <div>
-      {/* MRR strip — inside Tab 1 only */}
-      <div className="bg-white border border-zinc-200 rounded-md px-5 py-4 mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-zinc-400" />
-          <span className="text-sm font-medium text-zinc-700">B2C Platform MRR</span>
-          <span className="text-sm font-semibold text-zinc-900">{formatINR(b2cMRR)}</span>
-        </div>
-        <span className="text-xs text-zinc-400">Demo data — live figures in production</span>
-      </div>
-
       {/* Platform Plans */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-zinc-700">Platform Plans</h2>
+        <span />
         <button
           onClick={onCreateB2C}
           className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors"
@@ -319,25 +363,27 @@ function AssessmentPlansTab({
           Create Assessment Plan
         </button>
       </div>
-      <div className="mb-10">
-        <AssessmentPlanCardGrid
-          plans={platformPlans}
-          counts={counts}
-          onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
+
+      <div key={`platform-${refreshKey}`} className="mb-10">
+        <AssessmentPlanSection
+          title="Platform Plans"
+          fetchFn={fetchPlatformAssessmentPlansPaginated}
+          page={platformPage}
+          onPageChange={onPlatformPageChange}
           onArchive={setArchivingPlan}
         />
       </div>
 
-      {/* Category Plans */}
-      <h2 className="text-sm font-semibold text-zinc-700 mb-4">Category Plans</h2>
-      <AssessmentPlanCardGrid
-        plans={categoryPlans}
-        counts={counts}
-        onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
-        onArchive={setArchivingPlan}
-      />
+      <div key={`category-${refreshKey}`}>
+        <AssessmentPlanSection
+          title="Category Plans"
+          fetchFn={fetchCategoryAssessmentPlansPaginated}
+          page={categoryPage}
+          onPageChange={onCategoryPageChange}
+          onArchive={setArchivingPlan}
+        />
+      </div>
 
-      {/* Archive modal */}
       {archivingPlan && (
         <ArchivePlanModal
           plan={archivingPlan}
@@ -349,139 +395,36 @@ function AssessmentPlansTab({
   )
 }
 
-// ─── Tab 2: Course Plans ──────────────────────────────────────────────────────
-
-
-function CourseBundlePlansSection() {
-  const router = useRouter()
-  const [bundles, setBundles] = useState<CourseBundlePlanRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetchCourseBundlePlans()
-      .then(setBundles)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
-
-  if (loading) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
-  if (error) return <div className="h-20 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
-  if (bundles.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-28 gap-1">
-      <LayoutGrid className="w-6 h-6 text-zinc-300" />
-      <p className="text-sm text-zinc-500">No bundle plans yet.</p>
-      <p className="text-xs text-zinc-400">Use the &quot;Create Bundle Plan&quot; button above to add one.</p>
-    </div>
-  )
-
-  return (
-    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 bg-zinc-50">
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Display Name</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹/year)</th>
-            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Courses</th>
-            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
-            <th className="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-100">
-          {bundles.map((bundle) => (
-            <tr key={bundle.id} className="hover:bg-zinc-50 transition-colors">
-              <td className="px-4 py-3 font-medium text-zinc-900">{bundle.name}</td>
-              <td className="px-4 py-3 text-zinc-600">{bundle.display_name ?? <span className="text-zinc-400">—</span>}</td>
-              <td className="px-4 py-3 text-right text-zinc-700 font-medium">{formatINR(bundle.price)}</td>
-              <td className="px-4 py-3 text-center text-zinc-600">{bundle.course_count}</td>
-              <td className="px-4 py-3 text-center">
-                <PlanStatusBadge status={bundle.status} />
-              </td>
-              <td className="px-4 py-3 text-right">
-                <button
-                  onClick={() => router.push(`/super-admin/plans-pricing/${bundle.id}`)}
-                  className="text-xs text-blue-700 hover:text-blue-800 font-medium"
-                >
-                  View
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 // ─── Tab 2: Single Course Plan ────────────────────────────────────────────────
-
-function SingleCoursePlansSection() {
+function SingleCoursePlanTab({
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  onCreateSingleCoursePlan,
+}: {
+  page: number
+  pageSize: number
+  onPageChange: (p: number) => void
+  onPageSizeChange: (s: number) => void
+  onCreateSingleCoursePlan: () => void
+}) {
   const router = useRouter()
-  const [plans, setPlans] = useState<SingleCoursePlanRow[]>([])
+  const [plans, setPlans]     = useState<SingleCoursePlanRow[]>([])
+  const [total, setTotal]     = useState(0)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   useEffect(() => {
     setLoading(true)
-    fetchSingleCoursePlans()
-      .then(setPlans)
+    fetchSingleCoursePlansPaginated(page, pageSize)
+      .then(({ data, count }) => { setPlans(data); setTotal(count) })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [page, pageSize])
 
-  if (loading) return <div className="h-16 flex items-center justify-center"><p className="text-sm text-zinc-400">Loading...</p></div>
-  if (error) return <div className="h-16 flex items-center justify-center"><p className="text-sm text-rose-600">{error}</p></div>
-  if (plans.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-24 gap-1">
-      <BookOpen className="w-5 h-5 text-zinc-300" />
-      <p className="text-sm text-zinc-500">No single course plans yet.</p>
-      <p className="text-xs text-zinc-400">Use the &quot;Create Single Course Plan&quot; button above to add one.</p>
-    </div>
-  )
-
-  return (
-    <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 bg-zinc-50">
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course Name</th>
-            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (USD)</th>
-            <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
-            <th className="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-100">
-          {plans.map((plan) => (
-            <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
-              <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
-              <td className="px-4 py-3 text-zinc-600">
-                {plan.course_name ?? <span className="text-zinc-400">—</span>}
-              </td>
-              <td className="px-4 py-3 text-right text-zinc-700 font-medium">
-                {plan.price_usd != null ? `$${Number(plan.price_usd).toFixed(2)}` : <span className="text-zinc-400">—</span>}
-              </td>
-              <td className="px-4 py-3 text-center">
-                <PlanStatusBadge status={plan.status} />
-              </td>
-              <td className="px-4 py-3 text-right">
-                <button
-                  onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
-                  className="text-xs text-blue-700 hover:text-blue-800 font-medium"
-                >
-                  View / Edit
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function SingleCoursePlanTab({ onCreateSingleCoursePlan }: { onCreateSingleCoursePlan: () => void }) {
   return (
     <div>
       <div className="flex items-start justify-between mb-6">
@@ -494,13 +437,104 @@ function SingleCoursePlanTab({ onCreateSingleCoursePlan }: { onCreateSingleCours
           Create Single Course Plan
         </button>
       </div>
-      <SingleCoursePlansSection />
+
+      {loading ? (
+        <div className="h-16 flex items-center justify-center">
+          <p className="text-sm text-zinc-400">Loading...</p>
+        </div>
+      ) : error ? (
+        <div className="h-16 flex items-center justify-center">
+          <p className="text-sm text-rose-600">{error}</p>
+        </div>
+      ) : plans.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-24 gap-1">
+          <BookOpen className="w-5 h-5 text-zinc-300" />
+          <p className="text-sm text-zinc-500">No single course plans yet.</p>
+          <p className="text-xs text-zinc-400">Use the &quot;Create Single Course Plan&quot; button above to add one.</p>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 bg-zinc-50">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course Name</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (USD)</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {plans.map((plan) => (
+                  <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
+                    <td className="px-4 py-3 text-zinc-600">
+                      {plan.course_name ?? <span className="text-zinc-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right text-zinc-700 font-medium">
+                      {plan.price_usd != null ? `$${Number(plan.price_usd).toFixed(2)}` : <span className="text-zinc-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <PlanStatusBadge status={plan.status} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
+                        className="text-xs text-blue-700 hover:text-blue-800 font-medium"
+                      >
+                        View / Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onPageSizeChange={onPageSizeChange}
+          />
+        </>
+      )}
     </div>
   )
 }
 
 // ─── Tab 3: Course Bundle Plans ───────────────────────────────────────────────
-function CourseBundlePlansTab({ onCreateBundlePlan }: { onCreateBundlePlan: () => void }) {
+function CourseBundlePlansTab({
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  onCreateBundlePlan,
+}: {
+  page: number
+  pageSize: number
+  onPageChange: (p: number) => void
+  onPageSizeChange: (s: number) => void
+  onCreateBundlePlan: () => void
+}) {
+  const router = useRouter()
+  const [bundles, setBundles] = useState<CourseBundlePlanRow[]>([])
+  const [total, setTotal]     = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  useEffect(() => {
+    setLoading(true)
+    fetchCourseBundlePlansPaginated(page, pageSize)
+      .then(({ data, count }) => { setBundles(data); setTotal(count) })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [page, pageSize])
+
   return (
     <div>
       <div className="flex items-start justify-between mb-4">
@@ -516,41 +550,100 @@ function CourseBundlePlansTab({ onCreateBundlePlan }: { onCreateBundlePlan: () =
           Create Bundle Plan
         </button>
       </div>
-      <CourseBundlePlansSection />
+
+      {loading ? (
+        <div className="h-20 flex items-center justify-center">
+          <p className="text-sm text-zinc-400">Loading...</p>
+        </div>
+      ) : error ? (
+        <div className="h-20 flex items-center justify-center">
+          <p className="text-sm text-rose-600">{error}</p>
+        </div>
+      ) : bundles.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-28 gap-1">
+          <LayoutGrid className="w-6 h-6 text-zinc-300" />
+          <p className="text-sm text-zinc-500">No bundle plans yet.</p>
+          <p className="text-xs text-zinc-400">Use the &quot;Create Bundle Plan&quot; button above to add one.</p>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 bg-zinc-50">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Display Name</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (₹/year)</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Courses</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {bundles.map((bundle) => (
+                  <tr key={bundle.id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-zinc-900">{bundle.name}</td>
+                    <td className="px-4 py-3 text-zinc-600">{bundle.display_name ?? <span className="text-zinc-400">—</span>}</td>
+                    <td className="px-4 py-3 text-right text-zinc-700 font-medium">₹{bundle.price.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-3 text-center text-zinc-600">{bundle.course_count}</td>
+                    <td className="px-4 py-3 text-center">
+                      <PlanStatusBadge status={bundle.status} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => router.push(`/super-admin/plans-pricing/${bundle.id}`)}
+                        className="text-xs text-blue-700 hover:text-blue-800 font-medium"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onPageSizeChange={onPageSizeChange}
+          />
+        </>
+      )}
     </div>
   )
 }
 
-// ─── Tab 3: B2B Plans card grid ───────────────────────────────────────────────
-function B2BPlansTab({ onCreateB2B }: { onCreateB2B: () => void }) {
+// ─── Tab 4: B2B Plans ─────────────────────────────────────────────────────────
+function B2BPlansTab({
+  page,
+  onPageChange,
+  onCreateB2B,
+}: {
+  page: number
+  onPageChange: (p: number) => void
+  onCreateB2B: () => void
+}) {
   const router = useRouter()
-  const [cards, setCards] = useState<B2BPlanCard[]>([])
+  const [cards, setCards]     = useState<B2BPlanCard[]>([])
+  const [total, setTotal]     = useState(0)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+
+  const totalPages = Math.max(1, Math.ceil(total / CARD_PAGE_SIZE))
 
   useEffect(() => {
-    fetchB2BPlansForGrid()
-      .then(setCards)
+    setLoading(true)
+    fetchB2BPlansForGridPaginated(page, CARD_PAGE_SIZE)
+      .then(({ data, count }) => { setCards(data); setTotal(count) })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
-
-  if (loading) return (
-    <div className="grid grid-cols-3 gap-4">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="h-36 rounded-md bg-zinc-100 animate-pulse" />
-      ))}
-    </div>
-  )
-  if (error) return (
-    <div className="flex items-center justify-center h-40">
-      <p className="text-sm text-rose-600">{error}</p>
-    </div>
-  )
+  }, [page])
 
   return (
     <div>
-      {/* Info strip + Create button */}
       <div className="bg-zinc-50 border border-zinc-200 rounded-md px-4 py-3 mb-6 flex items-center justify-between">
         <p className="text-sm text-zinc-600">
           B2B plan pricing is managed per-tenant via the Contract tab.
@@ -564,81 +657,94 @@ function B2BPlansTab({ onCreateB2B }: { onCreateB2B: () => void }) {
         </button>
       </div>
 
-      {cards.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-3 gap-4">
+          {[0, 1, 2].map((i) => <div key={i} className="h-36 rounded-md bg-zinc-100 animate-pulse" />)}
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center h-40">
+          <p className="text-sm text-rose-600">{error}</p>
+        </div>
+      ) : cards.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-40 gap-2">
           <LayoutGrid className="w-8 h-8 text-zinc-300" />
           <p className="text-sm text-zinc-500">No B2B plans yet.</p>
           <p className="text-xs text-zinc-400">Create a plan to assign to tenants.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
-          {cards.map((card) => (
-            <button
-              key={card.id}
-              onClick={() => router.push(`/super-admin/plans-pricing/${card.id}`)}
-              className="bg-white border border-zinc-200 rounded-md p-5 text-left hover:border-zinc-300 hover:shadow-sm transition-all"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-semibold text-zinc-900 leading-snug">{card.name}</p>
-                <PlanStatusBadge status={card.status} />
-              </div>
-              <div className="flex items-center gap-4 text-xs text-zinc-500">
-                <span className="flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5" />
-                  {card.tenant_count} tenant{card.tenant_count !== 1 ? 's' : ''}
-                </span>
-                <span className="flex items-center gap-1">
-                  <BookOpen className="w-3.5 h-3.5" />
-                  {card.content_count} item{card.content_count !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <p className="mt-3 text-xs text-zinc-400">Via tenant contract</p>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            {cards.map((card) => (
+              <button
+                key={card.id}
+                onClick={() => router.push(`/super-admin/plans-pricing/${card.id}`)}
+                className="bg-white border border-zinc-200 rounded-md p-5 text-left hover:border-zinc-300 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-sm font-semibold text-zinc-900 leading-snug">{card.name}</p>
+                  <PlanStatusBadge status={card.status} />
+                </div>
+                <div className="flex items-center gap-4 text-xs text-zinc-500">
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" />
+                    {card.tenant_count} tenant{card.tenant_count !== 1 ? 's' : ''}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    {card.content_count} item{card.content_count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <p className="mt-3 text-xs text-zinc-400">Via tenant contract</p>
+              </button>
+            ))}
+          </div>
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
+        </>
       )}
     </div>
   )
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
-export default function PlansPage() {
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState<Tab>('assessment-plans')
-  const [plans, setPlans] = useState<PlanRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const loadPlans = useCallback(() => {
-    setLoading(true)
-    fetchPlans()
-      .then(setPlans)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
+// ─── Inner page (needs useSearchParams — must be inside Suspense) ─────────────
+function PlansPageInner() {
+  const router       = useRouter()
+  const searchParams = useSearchParams()
 
-  useEffect(() => { loadPlans() }, [loadPlans])
+  const activeTab = (searchParams.get('tab') as Tab | null) ?? 'assessment-plans'
+
+  const platformPage   = Math.max(1, parseInt(searchParams.get('platformPage') ?? '1'))
+  const categoryPage   = Math.max(1, parseInt(searchParams.get('categoryPage') ?? '1'))
+  const scPage         = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+  const scPageSize     = PAGE_SIZE_OPTIONS.includes(parseInt(searchParams.get('pageSize') ?? ''))
+    ? parseInt(searchParams.get('pageSize')!)
+    : 25
 
   const TABS: { id: Tab; label: string }[] = [
-    { id: 'assessment-plans',   label: 'Assessment Plans' },
-    { id: 'single-course-plan', label: 'Single Course Plan' },
+    { id: 'assessment-plans',    label: 'Assessment Plans' },
+    { id: 'single-course-plan',  label: 'Single Course Plan' },
     { id: 'course-bundle-plans', label: 'Course Bundle Plans' },
-    { id: 'b2b-plans',          label: 'B2B Plans' },
+    { id: 'b2b-plans',           label: 'B2B Plans' },
   ]
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <p className="text-zinc-400 text-sm">Loading plans...</p>
-    </div>
-  )
-  if (error) return (
-    <div className="flex items-center justify-center h-64">
-      <p className="text-rose-600 text-sm">Error: {error}</p>
-    </div>
-  )
+  function updateParams(updates: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString())
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null) params.delete(key)
+      else params.set(key, value)
+    }
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
+
+  function setTab(tab: Tab) {
+    updateParams({ tab, platformPage: null, categoryPage: null, page: null, pageSize: null })
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      {/* Page header — no global Create button */}
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-zinc-900">Plans &amp; Pricing</h1>
         <p className="text-sm text-zinc-500 mt-0.5">
@@ -646,12 +752,11 @@ export default function PlansPage() {
         </p>
       </div>
 
-      {/* Tab bar */}
       <div className="flex gap-1 border-b border-zinc-200 mb-6">
         {TABS.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setTab(tab.id)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === tab.id
                 ? 'border-blue-700 text-blue-700'
@@ -665,27 +770,51 @@ export default function PlansPage() {
 
       {activeTab === 'assessment-plans' && (
         <AssessmentPlansTab
-          plans={plans}
+          platformPage={platformPage}
+          categoryPage={categoryPage}
+          onPlatformPageChange={(p) => updateParams({ platformPage: String(p) })}
+          onCategoryPageChange={(p) => updateParams({ categoryPage: String(p) })}
           onCreateB2C={() => router.push('/super-admin/plans-pricing/new?audience=B2C')}
-          onPlanArchived={loadPlans}
         />
       )}
       {activeTab === 'single-course-plan' && (
         <SingleCoursePlanTab
+          page={scPage}
+          pageSize={scPageSize}
+          onPageChange={(p) => updateParams({ page: String(p) })}
+          onPageSizeChange={(s) => updateParams({ pageSize: String(s), page: '1' })}
           onCreateSingleCoursePlan={() => router.push('/super-admin/plans-pricing/new?audience=B2C&category=SINGLE_COURSE_PLAN')}
         />
       )}
       {activeTab === 'course-bundle-plans' && (
         <CourseBundlePlansTab
+          page={scPage}
+          pageSize={scPageSize}
+          onPageChange={(p) => updateParams({ page: String(p) })}
+          onPageSizeChange={(s) => updateParams({ pageSize: String(s), page: '1' })}
           onCreateBundlePlan={() => router.push('/super-admin/plans-pricing/new?audience=B2C&category=COURSE_BUNDLE')}
         />
       )}
       {activeTab === 'b2b-plans' && (
         <B2BPlansTab
+          page={scPage}
+          onPageChange={(p) => updateParams({ page: String(p) })}
           onCreateB2B={() => router.push('/super-admin/plans-pricing/new?audience=B2B')}
         />
       )}
-
     </div>
+  )
+}
+
+// ─── Page export — Suspense required for useSearchParams ─────────────────────
+export default function PlansPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-64">
+        <p className="text-zinc-400 text-sm">Loading plans...</p>
+      </div>
+    }>
+      <PlansPageInner />
+    </Suspense>
   )
 }
