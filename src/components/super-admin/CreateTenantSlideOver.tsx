@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation'
 import {
   X,
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   CheckCircle,
   Loader2,
   Upload,
@@ -35,13 +33,11 @@ interface FormState {
   state: string
   country: string
   zipCode: string
-  // Section 4 (contract)
-  contractExpanded: boolean
+  // Section 4 (contract) — mandatory
   seatCount: string
-  arrUsd: string
+  contentCreatorSeats: string
   startDate: string
   endDate: string
-  stripeCustomerId: string
   notes: string
   // Control
   isDirty: boolean
@@ -66,12 +62,10 @@ const INITIAL_FORM: FormState = {
   state: '',
   country: '',
   zipCode: '',
-  contractExpanded: false,
   seatCount: '',
-  arrUsd: '',
+  contentCreatorSeats: '',
   startDate: '',
   endDate: '',
-  stripeCustomerId: '',
   notes: '',
   isDirty: false,
   isSubmitting: false,
@@ -321,8 +315,19 @@ export default function CreateTenantSlideOver({
     if (!form.state.trim()) e.state = 'State is required.'
     if (!form.country.trim()) e.country = 'Country is required.'
     if (!form.zipCode.trim()) e.zipCode = 'Zip code is required.'
+    // Contract — mandatory
+    if (!form.seatCount || parseInt(form.seatCount) <= 0) e.seatCount = 'Learner seats must be greater than 0.'
+    if (!form.startDate) e.startDate = 'Start date is required.'
+    if (!form.endDate) e.endDate = 'End date is required.'
     if (form.startDate && form.endDate && form.endDate <= form.startDate)
       e.endDate = 'End date must be after start date.'
+    if (form.featureMode === 'FULL_CREATOR') {
+      const ccNum = parseInt(form.contentCreatorSeats)
+      if (!form.contentCreatorSeats || isNaN(ccNum) || ccNum <= 0)
+        e.contentCreatorSeats = 'Must be greater than 0.'
+      else if (ccNum > 10)
+        e.contentCreatorSeats = 'Must be 10 or less.'
+    }
     return e
   }
 
@@ -331,6 +336,7 @@ export default function CreateTenantSlideOver({
       'name', 'inviteAdminName', 'inviteAdminEmail',
       'contactName', 'contactEmail', 'contactPhone', 'timezone', 'dateFormat',
       'addressLine1', 'city', 'state', 'country', 'zipCode',
+      'seatCount', 'startDate', 'endDate', 'contentCreatorSeats',
     ]
     const first = order.find(k => errors[k])
     if (!first) return
@@ -443,19 +449,15 @@ export default function CreateTenantSlideOver({
 
       setForm(f => ({ ...f, phase1Complete: true, newTenantId: newId }))
 
-      // Phase 2 — contract (non-blocking)
-      const hasContract =
-        form.seatCount || form.arrUsd || form.startDate || form.endDate || form.stripeCustomerId || form.notes
-
-      if (hasContract) {
+      // Phase 2 — contract (mandatory)
+      {
         const { error: cErr } = await supabase.from('contracts').insert({
           tenant_id: newId,
-          seat_count: form.seatCount ? parseInt(form.seatCount) : null,
-          arr_usd_cents: form.arrUsd ? parseFloat(form.arrUsd) * 100 : null,
-          start_date: form.startDate || null,
-          end_date: form.endDate || null,
-          stripe_customer_id: form.stripeCustomerId.trim() || null,
+          seat_count: parseInt(form.seatCount),
+          start_date: form.startDate,
+          end_date: form.endDate,
           notes: form.notes.trim() || null,
+          content_creator_seats: form.featureMode === 'FULL_CREATOR' ? parseInt(form.contentCreatorSeats) : 0,
         })
 
         if (cErr) {
@@ -472,10 +474,9 @@ export default function CreateTenantSlideOver({
           entity_id: newId,
           actor_name: 'Super Admin',
           after_state: {
-            seat_count: form.seatCount || null,
-            arr_usd_cents: form.arrUsd ? parseFloat(form.arrUsd) * 100 : null,
-            start_date: form.startDate || null,
-            end_date: form.endDate || null,
+            seat_count: parseInt(form.seatCount),
+            start_date: form.startDate,
+            end_date: form.endDate,
           },
         })
       }
@@ -510,12 +511,11 @@ export default function CreateTenantSlideOver({
     setForm(f => ({ ...f, isSubmitting: true }))
     const { error: cErr } = await supabase.from('contracts').insert({
       tenant_id: form.newTenantId,
-      seat_count: form.seatCount ? parseInt(form.seatCount) : null,
-      arr_usd_cents: form.arrUsd ? parseFloat(form.arrUsd) * 100 : null,
-      start_date: form.startDate || null,
-      end_date: form.endDate || null,
-      stripe_customer_id: form.stripeCustomerId.trim() || null,
+      seat_count: parseInt(form.seatCount),
+      start_date: form.startDate,
+      end_date: form.endDate,
       notes: form.notes.trim() || null,
+      content_creator_seats: form.featureMode === 'FULL_CREATOR' ? parseInt(form.contentCreatorSeats) : 0,
     })
     if (!cErr) {
       setContractError(false)
@@ -812,14 +812,14 @@ export default function CreateTenantSlideOver({
             </div>
           </div>
 
-          {/* ── SECTION 4: CONTRACT DETAILS ── */}
+          {/* ── SECTION 4: CONTRACT TERMS ── */}
           <div className="border-t border-zinc-200 my-6" data-section="contract" />
 
           <div className="flex justify-between items-center mb-4">
             <p className="text-sm font-semibold text-zinc-900 uppercase tracking-wide">
-              Contract Details
+              Contract Terms
             </p>
-            <p className="text-xs text-zinc-400">Optional — can be added later</p>
+            <p className="text-xs text-rose-500">Required</p>
           </div>
 
           {/* Phase 1 success banner when contract failed */}
@@ -830,103 +830,90 @@ export default function CreateTenantSlideOver({
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setForm(f => ({ ...f, contractExpanded: !f.contractExpanded, isDirty: true }))
-            }}
-            className="flex items-center gap-1.5 text-sm text-blue-700 font-medium mb-2 w-full text-left"
-          >
-            {form.contractExpanded ? (
-              <>
-                <ChevronUp className="w-4 h-4" />
-                Hide contract details
-              </>
-            ) : (
-              <>
-                <ChevronDown className="w-4 h-4" />
-                Add contract details
-              </>
-            )}
-          </button>
+          <div className="grid grid-cols-2 gap-4">
+            <div data-field="seatCount">
+              <FieldLabel required>Learner Seats</FieldLabel>
+              <input
+                type="number"
+                min={1}
+                value={form.seatCount}
+                onChange={e => { setForm(f => ({ ...f, seatCount: e.target.value, isDirty: true, errors: { ...f.errors, seatCount: '' } })) }}
+                placeholder="e.g. 50"
+                className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700 ${
+                  form.errors.seatCount ? 'border-rose-400' : 'border-zinc-200'
+                }`}
+              />
+              <FieldError msg={form.errors.seatCount} />
+            </div>
 
-          {form.contractExpanded && (
-            <div className="grid grid-cols-2 gap-4 mt-3">
-              <div>
-                <FieldLabel>Seat Count</FieldLabel>
+            {form.featureMode === 'FULL_CREATOR' && (
+              <div data-field="contentCreatorSeats">
+                <FieldLabel required>Content Creator Seats</FieldLabel>
                 <input
                   type="number"
                   min={1}
-                  value={form.seatCount}
-                  onChange={e => { setForm(f => ({ ...f, seatCount: e.target.value, isDirty: true })) }}
-                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700"
-                />
-              </div>
-
-              <div>
-                <FieldLabel>ARR (USD)</FieldLabel>
-                <input
-                  type="number"
-                  value={form.arrUsd}
-                  onChange={e => { setForm(f => ({ ...f, arrUsd: e.target.value, isDirty: true })) }}
-                  placeholder="e.g. 12000"
-                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700"
-                />
-                <p className="text-xs text-zinc-400 mt-1">Stored in cents × 100</p>
-              </div>
-
-              <div>
-                <FieldLabel>Start Date</FieldLabel>
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={e => { setForm(f => ({ ...f, startDate: e.target.value, isDirty: true, errors: { ...f.errors, endDate: '' } })) }}
-                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700"
-                />
-              </div>
-
-              <div>
-                <FieldLabel>End Date</FieldLabel>
-                <input
-                  type="date"
-                  value={form.endDate}
-                  onChange={e => { setForm(f => ({ ...f, endDate: e.target.value, isDirty: true, errors: { ...f.errors, endDate: '' } })) }}
+                  max={10}
+                  value={form.contentCreatorSeats}
+                  onChange={e => {
+                    const val = e.target.value
+                    const num = parseInt(val)
+                    let ccErr = ''
+                    if (val !== '' && (isNaN(num) || num <= 0)) ccErr = 'Must be greater than 0.'
+                    else if (!isNaN(num) && num > 10) ccErr = 'Must be 10 or less.'
+                    setForm(f => ({ ...f, contentCreatorSeats: val, isDirty: true, errors: { ...f.errors, contentCreatorSeats: ccErr } }))
+                  }}
+                  placeholder="1 – 10"
                   className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700 ${
-                    form.errors.endDate ? 'border-rose-400' : 'border-zinc-200'
+                    form.errors.contentCreatorSeats ? 'border-rose-400' : 'border-zinc-200'
                   }`}
                 />
-                <FieldError msg={form.errors.endDate} />
+                <FieldError msg={form.errors.contentCreatorSeats} />
               </div>
+            )}
 
-              <div className="col-span-2">
-                <FieldLabel>Stripe Customer ID</FieldLabel>
-                <input
-                  type="text"
-                  value={form.stripeCustomerId}
-                  onChange={e => { setForm(f => ({ ...f, stripeCustomerId: e.target.value, isDirty: true })) }}
-                  placeholder="cus_..."
-                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700"
-                />
-              </div>
-
-              <div className="col-span-2">
-                <FieldLabel>Notes</FieldLabel>
-                <textarea
-                  rows={3}
-                  value={form.notes}
-                  onChange={e => { setForm(f => ({ ...f, notes: e.target.value, isDirty: true })) }}
-                  placeholder="Internal notes about this contract"
-                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700 resize-none"
-                />
-              </div>
-
-              {contractError && (
-                <p className="col-span-2 text-sm text-rose-600 mt-2">
-                  Contract could not be saved. Retry or add from the tenant page.
-                </p>
-              )}
+            <div data-field="startDate">
+              <FieldLabel required>Start Date</FieldLabel>
+              <input
+                type="date"
+                value={form.startDate}
+                onChange={e => { setForm(f => ({ ...f, startDate: e.target.value, isDirty: true, errors: { ...f.errors, startDate: '', endDate: '' } })) }}
+                className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700 ${
+                  form.errors.startDate ? 'border-rose-400' : 'border-zinc-200'
+                }`}
+              />
+              <FieldError msg={form.errors.startDate} />
             </div>
-          )}
+
+            <div data-field="endDate">
+              <FieldLabel required>End Date</FieldLabel>
+              <input
+                type="date"
+                value={form.endDate}
+                onChange={e => { setForm(f => ({ ...f, endDate: e.target.value, isDirty: true, errors: { ...f.errors, endDate: '' } })) }}
+                className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700 ${
+                  form.errors.endDate ? 'border-rose-400' : 'border-zinc-200'
+                }`}
+              />
+              <FieldError msg={form.errors.endDate} />
+            </div>
+
+            <div className="col-span-2">
+              <FieldLabel>Notes</FieldLabel>
+              <textarea
+                rows={3}
+                value={form.notes}
+                onChange={e => { setForm(f => ({ ...f, notes: e.target.value, isDirty: true })) }}
+                placeholder="Internal notes about this contract"
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700 resize-none"
+              />
+            </div>
+
+            {contractError && (
+              <p className="col-span-2 text-sm text-rose-600 mt-2">
+                Contract could not be saved. Retry or add from the tenant page.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Footer */}

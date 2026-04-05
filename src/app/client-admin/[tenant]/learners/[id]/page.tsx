@@ -28,6 +28,7 @@ interface LearnerDetail {
   full_name: string
   email: string
   phone: string | null
+  phone_country_code: string | null
   status: 'ACTIVE' | 'INACTIVE'
   employee_roll_number: string | null
   notes: string | null
@@ -113,7 +114,7 @@ export default function LearnerProfilePage() {
       // Learner data
       const { data: l } = await supabase
         .from('learners')
-        .select('id, full_name, email, phone, status, employee_roll_number, notes, created_at, department_id, team_id')
+        .select('id, full_name, email, phone, phone_country_code, status, employee_roll_number, notes, created_at, department_id, team_id')
         .eq('id', learnerId)
         .eq('tenant_id', tenantId)
         .single()
@@ -313,7 +314,13 @@ export default function LearnerProfilePage() {
           <InfoRow
             icon={Phone}
             label="Phone"
-            value={learner.phone ?? <span className="text-zinc-400 font-normal">—</span>}
+            value={
+              learner.phone
+                ? learner.phone_country_code
+                  ? `${learner.phone_country_code} ${learner.phone}`
+                  : learner.phone
+                : <span className="text-zinc-400 font-normal">—</span>
+            }
           />
           <InfoRow
             icon={Hash}

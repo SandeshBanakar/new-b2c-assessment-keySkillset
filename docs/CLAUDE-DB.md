@@ -230,10 +230,14 @@ progress_pct (int), status (COMPLETED|IN_PROGRESS|NOT_STARTED), updated_at
 
 ### learners
 ```
-id, tenant_id, full_name, email, phone, department_id, team_id,
-status (ACTIVE|INACTIVE), employee_roll_number, notes, created_by,
-created_at, last_active_at
+id, tenant_id, full_name, email, phone, phone_country_code (text nullable),
+department_id, team_id, status (ACTIVE|INACTIVE), employee_roll_number,
+notes, created_by, created_at, last_active_at
 ```
+- `phone` stores subscriber digits only (e.g. `9876543210`) — no country code prefix
+- `phone_country_code` stores dial code (e.g. `+91`) — added KSS-DB-004 (Apr 5 2026)
+- Display: concatenate `phone_country_code + ' ' + phone` wherever shown
+- Both nullable — phone is optional; if phone_country_code is set, phone must also be set (enforced in UI)
 
 ### departments / teams
 ```

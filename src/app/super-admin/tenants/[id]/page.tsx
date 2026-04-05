@@ -7,8 +7,9 @@ import { supabase } from '@/lib/supabase/client'
 import {
   ChevronRight, CheckCircle, X, Loader2,
   UploadCloud, Plus, Users, Download,
-  Pencil, PowerOff, Power, AlertTriangle,
+  Pencil, PowerOff, Power, AlertTriangle, Info,
 } from 'lucide-react'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
 import PlansTab from '@/components/tenant-detail/PlansTab'
 import { useToast } from '@/components/ui/Toast'
@@ -19,6 +20,7 @@ import { PaginationBar } from '@/components/ui/PaginationBar'
 // TenantDetail extends TenantRow with all DB columns
 type TenantDetail = TenantRow & {
   licensed_categories: string[]
+  stripe_customer_id?: string | null
 }
 
 interface Contract {
@@ -194,11 +196,17 @@ function Toast({
 function InviteUserSlideOver({
   tenantId,
   featureToggleMode,
+  contract,
+  activeCCCount,
+  activeCACount,
   onClose,
   onInvited,
 }: {
   tenantId: string
   featureToggleMode: string
+  contract: Contract | null
+  activeCCCount: number
+  activeCACount: number
   onClose: () => void
   onInvited: () => void
 }) {
@@ -208,10 +216,29 @@ function InviteUserSlideOver({
   const isRunOnly = featureToggleMode === 'RUN_ONLY'
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const [ccLimitErr, setCcLimitErr] = useState('')
+
+  const ccSeatsAllowed = contract?.content_creator_seats ?? 0
+  const ccAtLimit = activeCCCount >= ccSeatsAllowed && ccSeatsAllowed > 0
+
+  const handleRoleChange = (newRole: 'CLIENT_ADMIN' | 'CONTENT_CREATOR') => {
+    setRole(newRole)
+    if (newRole === 'CONTENT_CREATOR' && ccAtLimit) {
+      setCcLimitErr(`All Content Creator seats are filled (${activeCCCount}/${ccSeatsAllowed}). Remove an existing Content Creator to continue.`)
+    } else {
+      setCcLimitErr('')
+    }
+  }
 
   const save = async () => {
     if (!name.trim()) { setErr('Name is required.'); return }
     if (!email.trim()) { setErr('Email is required.'); return }
+    if (ccLimitErr) return
+    // Locked rule: check for existing active CA on submit
+    if (role === 'CLIENT_ADMIN' && activeCACount > 0) {
+      setErr('An active Client Admin already exists. Use the Replace button to assign a new Client Admin.')
+      return
+    }
     setErr('')
     setSaving(true)
     try {
@@ -251,6 +278,21 @@ function InviteUserSlideOver({
           </button>
         </div>
         <div className="flex-1 px-6 py-5 space-y-4">
+          {/* CC seat info banner — FULL_CREATOR only */}
+          {!isRunOnly && contract && (
+            <div className={`flex items-start gap-2 rounded-md px-3 py-2.5 text-sm ${
+              ccAtLimit
+                ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                : 'bg-blue-50 border border-blue-100 text-blue-700'
+            }`}>
+              <Info className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                Content Creator seats:{' '}
+                <span className="font-medium">{activeCCCount} of {ccSeatsAllowed} used</span>
+                {ccAtLimit && ' — all seats filled.'}
+              </span>
+            </div>
+          )}
           {err && <p className="text-sm text-rose-600">{err}</p>}
           <div>
             <label className="text-sm font-medium text-zinc-700 block mb-1">
@@ -278,12 +320,13 @@ function InviteUserSlideOver({
             <label className="text-sm font-medium text-zinc-700 block mb-1">Role</label>
             <select
               value={role}
-              onChange={e => setRole(e.target.value as typeof role)}
+              onChange={e => handleRoleChange(e.target.value as typeof role)}
               className="text-sm border border-zinc-200 rounded-md px-3 py-1.5 w-full focus:ring-1 focus:ring-blue-700 outline-none"
             >
               <option value="CLIENT_ADMIN">Client Admin</option>
               {!isRunOnly && <option value="CONTENT_CREATOR">Content Creator</option>}
             </select>
+            {ccLimitErr && <p className="text-sm text-rose-600 mt-1">{ccLimitErr}</p>}
           </div>
         </div>
         <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-3">
@@ -295,7 +338,7 @@ function InviteUserSlideOver({
           </button>
           <button
             onClick={save}
-            disabled={saving}
+            disabled={saving || !!ccLimitErr}
             className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -304,6 +347,238 @@ function InviteUserSlideOver({
         </div>
       </div>
     </>
+  )
+}
+
+// ─── Replace Client Admin Modal ───────────────────────────────────────────────
+
+function ReplaceClientAdminModal({
+  tenantId,
+  existingAdmin,
+  onClose,
+  onReplaced,
+}: {
+  tenantId: string
+  existingAdmin: AdminUser
+  onClose: () => void
+  onReplaced: () => void
+}) {
+  const { showToast } = useToast()
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const canSubmit = name.trim().length > 0 && email.trim().length > 0
+
+  const save = async () => {
+    if (!canSubmit) return
+    if (!emailRegex.test(email.trim())) { setErr('Enter a valid email address.'); return }
+    setErr('')
+    setSaving(true)
+    try {
+      // Check if this email already exists in admin_users
+      const { data: existing } = await supabase
+        .from('admin_users')
+        .select('id, role, is_active, tenant_id')
+        .eq('email', email.trim())
+        .maybeSingle()
+
+      let newAdminId: string | null = null
+
+      if (existing) {
+        if (existing.is_active) {
+          setErr('This email belongs to an active admin. Use a different email.')
+          return
+        }
+        if (existing.role !== 'CLIENT_ADMIN' || existing.tenant_id !== tenantId) {
+          setErr('This email is already registered with a different role or tenant.')
+          return
+        }
+        // Reactivate existing inactive CA for this tenant
+        const { error: reactivateErr } = await supabase
+          .from('admin_users')
+          .update({ is_active: true, name: name.trim() })
+          .eq('id', existing.id)
+        if (reactivateErr) throw reactivateErr
+        newAdminId = existing.id
+      } else {
+        // Step 1: INSERT new CA first — prevents orphan if this fails
+        const { data: inserted, error: insertErr } = await supabase
+          .from('admin_users')
+          .insert({
+            tenant_id: tenantId,
+            name: name.trim(),
+            email: email.trim(),
+            role: 'CLIENT_ADMIN',
+            is_active: true,
+          })
+          .select('id')
+          .single()
+        if (insertErr) {
+          if (insertErr.code === '23505') { setErr('This email is already registered. Use a different email.'); return }
+          throw insertErr
+        }
+        newAdminId = inserted.id
+      }
+
+      // Step 2: Deactivate old CA — only if step 1 succeeded
+      const { error: deactivateErr } = await supabase
+        .from('admin_users')
+        .update({ is_active: false })
+        .eq('id', existingAdmin.id)
+      await supabase.from('audit_logs').insert({
+        tenant_id: tenantId,
+        actor_name: 'Super Admin',
+        action: 'ROLE_REPLACED',
+        entity_type: 'AdminUser',
+        entity_id: existingAdmin.id,
+        before_state: { email: existingAdmin.email, is_active: true },
+        after_state: { replaced_by_email: email.trim(), new_admin_id: newAdminId, is_active: false },
+      })
+      if (deactivateErr) {
+        showToast('New admin activated. Previous admin could not be deactivated. Please remove them manually from the table.', 'error')
+      } else {
+        showToast('Client Admin replaced successfully.')
+      }
+      onReplaced()
+    } catch {
+      setErr('Something went wrong. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-md border border-zinc-200 w-full max-w-md mx-4 shadow-xl">
+        {/* Top section — warning */}
+        <div className="px-6 py-5 border-b border-zinc-100">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-zinc-900">Replace Client Admin</p>
+              <p className="text-sm text-zinc-500 mt-1">
+                The current admin will lose access immediately. Enter the new admin&apos;s details below. You can re-add a previously deactivated admin by entering their email.
+              </p>
+            </div>
+          </div>
+        </div>
+        {/* Bottom section — replacement form */}
+        <div className="px-6 py-5 space-y-4">
+          {err && <p className="text-sm text-rose-600">{err}</p>}
+          <div>
+            <label className="text-sm font-medium text-zinc-700 block mb-1">
+              Name <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full border border-zinc-200 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-700 outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-zinc-700 block mb-1">
+              Email <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full border border-zinc-200 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-700 outline-none"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={!canSubmit || saving}
+            className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Replace Admin
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Deactivate Content Creator Modal ────────────────────────────────────────
+
+function DeactivateContentCreatorModal({
+  tenantId,
+  user,
+  onClose,
+  onDeactivated,
+}: {
+  tenantId: string
+  user: AdminUser
+  onClose: () => void
+  onDeactivated: () => void
+}) {
+  const { showToast } = useToast()
+  const [saving, setSaving] = useState(false)
+
+  const deactivate = async () => {
+    setSaving(true)
+    try {
+      await supabase.from('admin_users').update({ is_active: false }).eq('id', user.id)
+      await supabase.from('audit_logs').insert({
+        tenant_id: tenantId,
+        actor_name: 'Super Admin',
+        action: 'ROLE_REMOVED',
+        entity_type: 'AdminUser',
+        entity_id: user.id,
+        before_state: { is_active: true },
+        after_state: { is_active: false },
+      })
+      showToast(`${user.name} has been deactivated.`)
+      onDeactivated()
+    } catch {
+      showToast('Failed to deactivate user.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-md border border-zinc-200 w-full max-w-sm mx-4 shadow-xl">
+        <div className="px-6 py-5">
+          <p className="text-sm font-semibold text-zinc-900 mb-2">Deactivate {user.name}?</p>
+          <p className="text-sm text-zinc-500">
+            This will immediately revoke their access to the client admin panel. Their content and work will be preserved. You can reactivate them from this tab at any time.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={deactivate}
+            disabled={saving}
+            className="bg-zinc-800 hover:bg-zinc-900 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Deactivate
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -316,6 +591,7 @@ function TabOverview({
   clientAdmin,
   onEditDetails,
   onToggleActive,
+  onSwitchToUsersRoles,
 }: {
   tenant: TenantDetail
   contract: Contract | null
@@ -323,6 +599,7 @@ function TabOverview({
   clientAdmin: { name: string; email: string } | null
   onEditDetails: () => void
   onToggleActive: () => void
+  onSwitchToUsersRoles: () => void
 }) {
   const seatCount = contract?.seat_count ?? 0
   const fillPct = seatCount > 0 ? Math.min((learnerCount / seatCount) * 100, 100) : 0
@@ -338,6 +615,23 @@ function TabOverview({
 
   return (
     <div>
+      {/* No-CA safety banner — edge case / legacy data guard */}
+      {!clientAdmin && (
+        <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-sm text-amber-700">
+            This client has no Client Admin.{' '}
+            <button
+              onClick={onSwitchToUsersRoles}
+              className="font-medium underline hover:no-underline"
+            >
+              Go to Users &amp; Roles
+            </button>
+            {' '}→ Invite User to assign one.
+          </p>
+        </div>
+      )}
+
       {/* Quick Actions bar — OVERVIEW TAB ONLY */}
       <div className="flex items-center gap-2 mb-6">
         <button
@@ -497,38 +791,90 @@ function TabUsersRoles({
   adminUsers,
   onRefresh,
   featureToggleMode,
+  contract,
+  onSwitchToContract,
 }: {
   tenantId: string
   adminUsers: AdminUser[]
   onRefresh: () => void
   featureToggleMode: string
+  contract: Contract | null
+  onSwitchToContract: () => void
 }) {
+  const { showToast } = useToast()
   const [showInvite, setShowInvite] = useState(false)
-  const [removing, setRemoving] = useState<string | null>(null)
-  const [removeModal, setRemoveModal] = useState<{ id: string; name: string } | null>(null)
+  const [replaceModal, setReplaceModal] = useState<AdminUser | null>(null)
+  const [deactivateModal, setDeactivateModal] = useState<AdminUser | null>(null)
+  const [reactivating, setReactivating] = useState<string | null>(null)
 
-  const removeUser = async (userId: string) => {
-    setRemoving(userId)
+  const isRunOnly = featureToggleMode === 'RUN_ONLY'
+  const activeCACount = adminUsers.filter(u => u.role === 'CLIENT_ADMIN' && u.is_active).length
+  const activeCCCount = adminUsers.filter(u => u.role === 'CONTENT_CREATOR' && u.is_active).length
+  const ccSeatsAllowed = contract?.content_creator_seats ?? 0
+  const hasContract = contract !== null
+
+  const reactivateUser = async (user: AdminUser) => {
+    if (user.role === 'CLIENT_ADMIN' && activeCACount >= 1) {
+      showToast('Cannot reactivate. This tenant already has an active Client Admin. Replace the current one first.', 'error')
+      return
+    }
+    if (user.role === 'CONTENT_CREATOR' && activeCCCount >= ccSeatsAllowed) {
+      showToast(`Cannot reactivate. All ${ccSeatsAllowed} Content Creator seat${ccSeatsAllowed !== 1 ? 's' : ''} are in use.`, 'error')
+      return
+    }
+    setReactivating(user.id)
     try {
-      await supabase.from('admin_users').update({ is_active: false }).eq('id', userId)
+      await supabase.from('admin_users').update({ is_active: true }).eq('id', user.id)
       await supabase.from('audit_logs').insert({
         tenant_id: tenantId,
         actor_name: 'Super Admin',
-        action: 'ROLE_REMOVED',
+        action: 'ROLE_REACTIVATED',
         entity_type: 'AdminUser',
-        entity_id: userId,
-        before_state: { is_active: true },
-        after_state: { is_active: false },
+        entity_id: user.id,
+        before_state: { is_active: false },
+        after_state: { is_active: true },
       })
-      setRemoveModal(null)
+      showToast(`${user.name} has been reactivated.`)
       onRefresh()
+    } catch {
+      showToast('Failed to reactivate user.', 'error')
     } finally {
-      setRemoving(null)
+      setReactivating(null)
     }
   }
 
   return (
     <div>
+      {/* Instructions panel — always visible */}
+      <div className={`mb-4 rounded-md px-4 py-3 border ${
+        !hasContract && !isRunOnly
+          ? 'bg-amber-50 border-amber-200'
+          : 'bg-blue-50 border-blue-100'
+      }`}>
+        {!hasContract && !isRunOnly ? (
+          <p className="text-sm text-amber-700">
+            No contract set up. Seat limits cannot be enforced.{' '}
+            <button
+              onClick={onSwitchToContract}
+              className="font-medium underline hover:no-underline"
+            >
+              Add a contract in the Contract tab.
+            </button>
+          </p>
+        ) : isRunOnly ? (
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Run Only client:</span> 1 Client Admin permitted. Content Creators are not supported.
+          </p>
+        ) : (
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Full Creator client:</span> 1 Client Admin permitted.{' '}
+            {hasContract
+              ? `${activeCCCount} of ${ccSeatsAllowed} Content Creator seat${ccSeatsAllowed !== 1 ? 's' : ''} used.`
+              : ''}
+          </p>
+        )}
+      </div>
+
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm font-semibold text-zinc-900">Users &amp; Roles</p>
         <button
@@ -566,34 +912,58 @@ function TabUsersRoles({
                   <td className="px-4 py-3 text-sm font-medium text-zinc-900">{u.name}</td>
                   <td className="px-4 py-3 text-sm text-zinc-600">{u.email}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`text-xs font-medium rounded-md px-2 py-0.5 ${
-                        u.role === 'CLIENT_ADMIN'
-                          ? 'bg-blue-50 text-blue-700'
-                          : u.role === 'SUPER_ADMIN'
-                          ? 'bg-zinc-100 text-zinc-600'
-                          : 'bg-violet-50 text-violet-700'
-                      }`}
-                    >
+                    <span className={`text-xs font-medium rounded-md px-2 py-0.5 ${
+                      u.role === 'CLIENT_ADMIN'
+                        ? 'bg-blue-50 text-blue-700'
+                        : u.role === 'SUPER_ADMIN'
+                        ? 'bg-zinc-100 text-zinc-600'
+                        : 'bg-violet-50 text-violet-700'
+                    }`}>
                       {u.role === 'CLIENT_ADMIN' ? 'Client Admin' : u.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Content Creator'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`text-xs font-medium rounded-md px-2 py-0.5 ${
-                        u.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
-                      }`}
-                    >
+                    <span className={`text-xs font-medium rounded-md px-2 py-0.5 ${
+                      u.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
+                    }`}>
                       {u.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    {u.is_active && (
+                  <td className="px-4 py-3 flex items-center gap-3">
+                    {u.role === 'CLIENT_ADMIN' && u.is_active && (
                       <button
-                        onClick={() => setRemoveModal({ id: u.id, name: u.name })}
-                        className="text-sm text-rose-600 hover:text-rose-700"
+                        onClick={() => setReplaceModal(u)}
+                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
                       >
-                        Remove
+                        Replace
+                      </button>
+                    )}
+                    {u.role === 'CLIENT_ADMIN' && !u.is_active && (
+                      <button
+                        onClick={() => reactivateUser(u)}
+                        disabled={reactivating === u.id}
+                        className="text-sm font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {reactivating === u.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                        Reactivate
+                      </button>
+                    )}
+                    {u.role === 'CONTENT_CREATOR' && u.is_active && (
+                      <button
+                        onClick={() => setDeactivateModal(u)}
+                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                      >
+                        Deactivate
+                      </button>
+                    )}
+                    {u.role === 'CONTENT_CREATOR' && !u.is_active && (
+                      <button
+                        onClick={() => reactivateUser(u)}
+                        disabled={reactivating === u.id}
+                        className="text-sm font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {reactivating === u.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                        Reactivate
                       </button>
                     )}
                   </td>
@@ -608,6 +978,9 @@ function TabUsersRoles({
         <InviteUserSlideOver
           tenantId={tenantId}
           featureToggleMode={featureToggleMode}
+          contract={contract}
+          activeCCCount={activeCCCount}
+          activeCACount={activeCACount}
           onClose={() => setShowInvite(false)}
           onInvited={() => {
             setShowInvite(false)
@@ -616,40 +989,28 @@ function TabUsersRoles({
         />
       )}
 
-      {/* Remove user confirmation modal */}
-      {removeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-md border border-zinc-200 w-full max-w-sm mx-4 shadow-xl">
-            <div className="px-6 py-5">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 w-8 h-8 rounded-md bg-rose-50 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-zinc-900">Remove {removeModal.name}?</p>
-                  <p className="text-sm text-zinc-500 mt-1">
-                    This is a destructive action. If you remove this user, they will lose access to their role immediately. Are you sure you want to continue?
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100">
-              <button
-                onClick={() => setRemoveModal(null)}
-                className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => removeUser(removeModal.id)}
-                disabled={removing === removeModal.id}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-md transition-colors disabled:opacity-50"
-              >
-                {removing === removeModal.id ? 'Removing…' : 'Remove'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {replaceModal && (
+        <ReplaceClientAdminModal
+          tenantId={tenantId}
+          existingAdmin={replaceModal}
+          onClose={() => setReplaceModal(null)}
+          onReplaced={() => {
+            setReplaceModal(null)
+            onRefresh()
+          }}
+        />
+      )}
+
+      {deactivateModal && (
+        <DeactivateContentCreatorModal
+          tenantId={tenantId}
+          user={deactivateModal}
+          onClose={() => setDeactivateModal(null)}
+          onDeactivated={() => {
+            setDeactivateModal(null)
+            onRefresh()
+          }}
+        />
       )}
     </div>
   )
@@ -1075,88 +1436,198 @@ function TabContract({
   contract,
   onSaved,
   featureToggleMode,
+  tenantStripeCustomerId,
+  onTenantStripeSaved,
+  activeCCCount,
+  activeLearnerCount,
 }: {
   tenantId: string
   contract: Contract | null
   onSaved: (c: Contract) => void
   featureToggleMode: string
+  tenantStripeCustomerId: string | null
+  onTenantStripeSaved: (customerId: string) => void
+  activeCCCount: number
+  activeLearnerCount: number
 }) {
   const { showToast } = useToast()
   const isFullCreator = featureToggleMode === 'FULL_CREATOR'
 
-  const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState<Omit<Contract, 'tenant_id' | 'id' | 'updated_at'>>({
-    seat_count: contract?.seat_count ?? 0,
-    content_creator_seats: contract?.content_creator_seats ?? 0,
-    arr: Math.max(0, Number(contract?.arr) || 0) / 100,
+  // Contract Terms edit state
+  const [editingContract, setEditingContract] = useState(false)
+  const [contractForm, setContractForm] = useState({
+    seat_count: Math.max(1, contract?.seat_count ?? 1),
+    content_creator_seats: Math.max(1, contract?.content_creator_seats ?? 1),
     start_date: contract?.start_date?.split('T')[0] ?? '',
     end_date: contract?.end_date?.split('T')[0] ?? '',
-    stripe_subscription_id: contract?.stripe_subscription_id ?? '',
     notes: contract?.notes ?? '',
-    plan_id: contract?.plan_id ?? null,
+    ccSeatsErr: '',
+    seatCountErr: '',
+    endDateErr: '',
   })
-  const [saving, setSaving] = useState(false)
-  const [arrError, setArrError] = useState('')
+  const [savingContract, setSavingContract] = useState(false)
 
-  function startEdit() {
-    setForm({
-      seat_count: contract?.seat_count ?? 0,
-      content_creator_seats: contract?.content_creator_seats ?? 0,
-      arr: Math.max(0, Number(contract?.arr) || 0) / 100,
+  // Stripe edit state
+  const [editingStripe, setEditingStripe] = useState(false)
+  const [stripeForm, setStripeForm] = useState({
+    stripe_customer_id: tenantStripeCustomerId ?? '',
+    stripe_subscription_id: contract?.stripe_subscription_id ?? '',
+  })
+  const [savingStripe, setSavingStripe] = useState(false)
+
+  function startEditContract() {
+    setContractForm({
+      seat_count: Math.max(1, contract?.seat_count ?? 1),
+      content_creator_seats: Math.max(1, contract?.content_creator_seats ?? 1),
       start_date: contract?.start_date?.split('T')[0] ?? '',
       end_date: contract?.end_date?.split('T')[0] ?? '',
-      stripe_subscription_id: contract?.stripe_subscription_id ?? '',
       notes: contract?.notes ?? '',
-      plan_id: contract?.plan_id ?? null,
+      ccSeatsErr: '',
+      seatCountErr: '',
+      endDateErr: '',
     })
-    setArrError('')
-    setEditing(true)
+    setEditingContract(true)
   }
 
-  const set = (key: keyof typeof form, val: string | number | null) =>
-    setForm(prev => ({ ...prev, [key]: val }))
+  function startEditStripe() {
+    setStripeForm({
+      stripe_customer_id: tenantStripeCustomerId ?? '',
+      stripe_subscription_id: contract?.stripe_subscription_id ?? '',
+    })
+    setEditingStripe(true)
+  }
 
-  const save = async () => {
-    const arrValue = parseFloat(String(form.arr))
-    if (isNaN(arrValue) || arrValue < 0) {
-      setArrError('ARR must be a valid positive number.')
+  const saveContract = async () => {
+    // Full validation pass before any DB write
+    const seatNum = Number(contractForm.seat_count)
+    const ccNum = Number(contractForm.content_creator_seats)
+    let hasErr = false
+    let newSeatCountErr = ''
+    let newCcSeatsErr = ''
+    let newEndDateErr = ''
+
+    if (seatNum <= 0) {
+      newSeatCountErr = 'Must be greater than 0.'
+      hasErr = true
+    } else if (seatNum < activeLearnerCount) {
+      newSeatCountErr = `Cannot reduce below ${activeLearnerCount} active learner(s). Archive learners from the Learners tab first.`
+      hasErr = true
+    }
+
+    if (isFullCreator) {
+      if (ccNum <= 0) {
+        newCcSeatsErr = 'Must be greater than 0.'
+        hasErr = true
+      } else if (ccNum > 10) {
+        newCcSeatsErr = 'Must be 10 or less.'
+        hasErr = true
+      } else if (ccNum < activeCCCount) {
+        newCcSeatsErr = `Cannot reduce below ${activeCCCount} active Content Creator(s). Deactivate them first.`
+        hasErr = true
+      }
+    }
+
+    if (!contractForm.start_date) {
+      hasErr = true
+    }
+    if (!contractForm.end_date) {
+      newEndDateErr = 'End date is required.'
+      hasErr = true
+    } else if (contractForm.start_date && contractForm.end_date <= contractForm.start_date) {
+      newEndDateErr = 'End date must be after start date.'
+      hasErr = true
+    }
+
+    if (hasErr) {
+      setContractForm(f => ({ ...f, seatCountErr: newSeatCountErr, ccSeatsErr: newCcSeatsErr, endDateErr: newEndDateErr }))
       return
     }
-    setArrError('')
-    setSaving(true)
+
+    setSavingContract(true)
     try {
       const payload = {
         tenant_id: tenantId,
-        seat_count: Number(form.seat_count),
-        content_creator_seats: isFullCreator ? Number(form.content_creator_seats ?? 0) : 0,
-        arr: Math.round(Number(form.arr) * 100),
-        start_date: form.start_date || null,
-        end_date: form.end_date || null,
-        stripe_subscription_id: form.stripe_subscription_id,
-        notes: form.notes,
+        seat_count: seatNum,
+        content_creator_seats: isFullCreator ? ccNum : 0,
+        arr: contract?.arr ?? 0,
+        start_date: contractForm.start_date,
+        end_date: contractForm.end_date,
+        stripe_subscription_id: contract?.stripe_subscription_id ?? '',
+        notes: contractForm.notes,
         updated_at: new Date().toISOString(),
       }
+
+      let savedId = contract?.id
       if (contract?.id) {
-        await supabase.from('contracts').update(payload).eq('id', contract.id)
+        const { error: updateErr } = await supabase.from('contracts').update(payload).eq('id', contract.id)
+        if (updateErr) throw updateErr
       } else {
-        await supabase.from('contracts').insert(payload)
+        const { data: inserted, error: insertErr } = await supabase.from('contracts').insert(payload).select('id').single()
+        if (insertErr) throw insertErr
+        savedId = inserted.id
       }
+
       await supabase.from('audit_logs').insert({
         tenant_id: tenantId,
         actor_name: 'Super Admin',
         action: 'CONTRACT_UPDATED',
         entity_type: 'Contract',
         entity_id: tenantId,
-        before_state: contract ? { seat_count: contract.seat_count, arr: contract.arr } : null,
-        after_state: { seat_count: payload.seat_count, arr: payload.arr },
+        before_state: contract ? {
+          seat_count: contract.seat_count,
+          content_creator_seats: contract.content_creator_seats,
+          start_date: contract.start_date,
+          end_date: contract.end_date,
+          notes: contract.notes,
+        } : null,
+        after_state: {
+          seat_count: payload.seat_count,
+          content_creator_seats: payload.content_creator_seats,
+          start_date: payload.start_date,
+          end_date: payload.end_date,
+          notes: payload.notes,
+        },
       })
-      onSaved({ ...payload, id: contract?.id } as Contract)
-      setEditing(false)
+
+      onSaved({ ...payload, id: savedId } as Contract)
+      setEditingContract(false)
       showToast('Contract saved successfully.')
     } catch {
       showToast('Failed to save contract.', 'error')
     } finally {
-      setSaving(false)
+      setSavingContract(false)
+    }
+  }
+
+  const saveStripe = async () => {
+    setSavingStripe(true)
+    try {
+      if (contract?.id) {
+        await supabase.from('contracts').update({
+          stripe_subscription_id: stripeForm.stripe_subscription_id,
+          updated_at: new Date().toISOString(),
+        }).eq('id', contract.id)
+      }
+      await supabase.from('tenants').update({
+        stripe_customer_id: stripeForm.stripe_customer_id || null,
+      }).eq('id', tenantId)
+      await supabase.from('audit_logs').insert({
+        tenant_id: tenantId,
+        actor_name: 'Super Admin',
+        action: 'CONTRACT_UPDATED',
+        entity_type: 'Contract',
+        entity_id: tenantId,
+        before_state: { stripe_subscription_id: contract?.stripe_subscription_id },
+        after_state: { stripe_subscription_id: stripeForm.stripe_subscription_id },
+      })
+      onSaved({ ...contract!, stripe_subscription_id: stripeForm.stripe_subscription_id, updated_at: new Date().toISOString() })
+      onTenantStripeSaved(stripeForm.stripe_customer_id)
+      setEditingStripe(false)
+      showToast('Stripe details saved.')
+    } catch {
+      showToast('Failed to save Stripe details.', 'error')
+    } finally {
+      setSavingStripe(false)
     }
   }
 
@@ -1164,190 +1635,287 @@ function TabContract({
   const readVal = (v: string | number | null | undefined) =>
     v != null && v !== '' ? String(v) : <span className="text-zinc-400">—</span>
 
-  return (
-    <div className="bg-white rounded-md border border-zinc-200 p-5">
+  const arrDisplay = contract?.arr != null && contract.arr > 0
+    ? `$${(contract.arr / 100).toFixed(2)} / year`
+    : null
 
-      {/* Section 1 — Contract Details */}
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-semibold text-zinc-900">Contract Details</p>
-        {!editing && (
-          <button
-            onClick={startEdit}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800 border border-blue-200 rounded-md px-3 py-1.5 hover:bg-blue-50 transition-colors"
-          >
-            <Pencil className="w-3 h-3" />
-            Edit
-          </button>
+  return (
+    <div className="space-y-4">
+
+      {/* Section 1 — Contract Terms */}
+      <div className="bg-white rounded-md border border-zinc-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-semibold text-zinc-900">Contract Terms</p>
+          {!editingContract && (
+            <button
+              onClick={startEditContract}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800 border border-blue-200 rounded-md px-3 py-1.5 hover:bg-blue-50 transition-colors"
+            >
+              <Pencil className="w-3 h-3" />
+              Edit
+            </button>
+          )}
+        </div>
+
+        {editingContract ? (
+          <div className="space-y-4">
+            <div className={`grid gap-4 ${isFullCreator ? 'grid-cols-2' : 'grid-cols-1 max-w-xs'}`}>
+              {/* Learner Seats */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1.5">Learner Seats</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={contractForm.seat_count}
+                  onChange={e => {
+                    const num = Number(e.target.value)
+                    let seatCountErr = ''
+                    if (num <= 0) seatCountErr = 'Must be greater than 0.'
+                    else if (num < activeLearnerCount) seatCountErr = `Cannot reduce below ${activeLearnerCount} active learner(s). Archive learners from the Learners tab first.`
+                    setContractForm(f => ({ ...f, seat_count: num, seatCountErr }))
+                  }}
+                  className={`${inputCls} ${contractForm.seatCountErr ? 'border-rose-400' : ''}`}
+                />
+                <p className="text-xs text-zinc-400 mt-1">{activeLearnerCount} currently active</p>
+                {contractForm.seatCountErr && (
+                  <p className="text-xs text-rose-600 mt-0.5">{contractForm.seatCountErr}</p>
+                )}
+              </div>
+              {/* CC Seats — FULL_CREATOR only */}
+              {isFullCreator && (
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 mb-1.5">Content Creator Seats</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={contractForm.content_creator_seats}
+                    onChange={e => {
+                      const num = Number(e.target.value)
+                      let ccSeatsErr = ''
+                      if (num <= 0) ccSeatsErr = 'Must be greater than 0.'
+                      else if (num > 10) ccSeatsErr = 'Must be 10 or less.'
+                      else if (num < activeCCCount) ccSeatsErr = `Cannot reduce below ${activeCCCount} active Content Creator(s). Deactivate them first.`
+                      setContractForm(f => ({ ...f, content_creator_seats: num, ccSeatsErr }))
+                    }}
+                    className={`${inputCls} ${contractForm.ccSeatsErr ? 'border-rose-400' : ''}`}
+                  />
+                  <p className="text-xs text-zinc-400 mt-1">{activeCCCount} currently active</p>
+                  {contractForm.ccSeatsErr && (
+                    <p className="text-xs text-rose-600 mt-0.5">{contractForm.ccSeatsErr}</p>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1.5">Start Date <span className="text-rose-500">*</span></label>
+                <input
+                  type="date"
+                  value={contractForm.start_date}
+                  onChange={e => {
+                    const newStart = e.target.value
+                    const endDateErr = newStart && contractForm.end_date && contractForm.end_date <= newStart
+                      ? 'End date must be after start date.'
+                      : contractForm.endDateErr === 'End date must be after start date.' ? '' : contractForm.endDateErr
+                    setContractForm(f => ({ ...f, start_date: newStart, endDateErr }))
+                  }}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1.5">End Date <span className="text-rose-500">*</span></label>
+                <input
+                  type="date"
+                  value={contractForm.end_date}
+                  onChange={e => {
+                    const newEnd = e.target.value
+                    const endDateErr = contractForm.start_date && newEnd && newEnd <= contractForm.start_date
+                      ? 'End date must be after start date.'
+                      : ''
+                    setContractForm(f => ({ ...f, end_date: newEnd, endDateErr }))
+                  }}
+                  className={`${inputCls} ${contractForm.endDateErr ? 'border-rose-400' : ''}`}
+                />
+                {contractForm.endDateErr && (
+                  <p className="text-xs text-rose-600 mt-1">{contractForm.endDateErr}</p>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Notes</label>
+              <textarea rows={3} value={contractForm.notes}
+                onChange={e => setContractForm(f => ({ ...f, notes: e.target.value }))}
+                className={`${inputCls} resize-none`} />
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={saveContract}
+                disabled={savingContract || !!(contractForm.ccSeatsErr || contractForm.seatCountErr || contractForm.endDateErr)}
+                className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {savingContract && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Changes
+              </button>
+              <button onClick={() => setEditingContract(false)}
+                className="text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md px-4 py-2 hover:bg-zinc-50">
+                Cancel
+              </button>
+              {contract?.updated_at && (
+                <p className="text-xs text-zinc-400 ml-auto">Last updated {formatDate(contract.updated_at)}</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {/* Over-limit warnings — view mode only */}
+            {contract && activeLearnerCount > (contract.seat_count ?? 0) && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{activeLearnerCount} learners are active but only {contract.seat_count} seat{contract.seat_count !== 1 ? 's' : ''} are contracted. Archive learners to resolve.</span>
+              </div>
+            )}
+            {isFullCreator && contract && activeCCCount > (contract.content_creator_seats ?? 0) && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{activeCCCount} Content Creator{activeCCCount !== 1 ? 's' : ''} are active but only {contract.content_creator_seats} seat{(contract.content_creator_seats ?? 0) !== 1 ? 's' : ''} are contracted. Deactivate them to resolve.</span>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+              <div>
+                <p className="text-xs text-zinc-400">Learner Seats</p>
+                <p className="text-sm font-medium text-zinc-900 mt-0.5">{readVal(contract?.seat_count)}</p>
+                {contract?.seat_count != null && (
+                  <p className="text-xs text-zinc-400 mt-0.5">{activeLearnerCount} of {contract.seat_count} in use</p>
+                )}
+              </div>
+              {isFullCreator && (
+                <div>
+                  <p className="text-xs text-zinc-400">Content Creator Seats</p>
+                  <p className="text-sm font-medium text-zinc-900 mt-0.5">{readVal(contract?.content_creator_seats)}</p>
+                  {contract?.content_creator_seats != null && contract.content_creator_seats > 0 && (
+                    <p className="text-xs text-zinc-400 mt-0.5">{activeCCCount} of {contract.content_creator_seats} in use</p>
+                  )}
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-zinc-400">Start Date</p>
+                <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.start_date ? formatDate(contract.start_date) : '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-zinc-400">End Date</p>
+                <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.end_date ? formatDate(contract.end_date) : '—'}</p>
+              </div>
+            </div>
+            {contract?.notes && (
+              <div>
+                <p className="text-xs text-zinc-400">Notes</p>
+                <p className="text-sm text-zinc-700 mt-0.5">{contract.notes}</p>
+              </div>
+            )}
+            {contract?.updated_at && (
+              <p className="text-xs text-zinc-400 pt-1">Last updated {formatDate(contract.updated_at)}</p>
+            )}
+          </div>
         )}
       </div>
 
-      {editing ? (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1.5">Stripe Subscription ID</label>
-            <input type="text" value={form.stripe_subscription_id} onChange={e => set('stripe_subscription_id', e.target.value)} className={inputCls} />
-          </div>
-
-          <div className={`grid gap-4 ${isFullCreator ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            <div>
-              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Learner Seats</label>
-              <input type="number" value={form.seat_count} onChange={e => set('seat_count', e.target.value)} className={inputCls} />
-            </div>
-            {isFullCreator && (
-              <div>
-                <label className="block text-xs font-medium text-zinc-600 mb-1.5">Creator Seats</label>
-                <input type="number" value={form.content_creator_seats ?? 0} onChange={e => set('content_creator_seats', e.target.value)} className={inputCls} />
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium text-zinc-600 mb-1.5">ARR ($)</label>
-              <input
-                type="text" value={form.arr}
-                onChange={e => { set('arr', e.target.value); setArrError('') }}
-                placeholder="0.00"
-                className={`${inputCls} ${arrError ? 'border-rose-400' : ''}`}
-              />
-              {arrError && <p className="text-xs text-rose-600 mt-1">{arrError}</p>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Start Date</label>
-              <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-600 mb-1.5">End Date</label>
-              <input type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} className={inputCls} />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1.5">Notes</label>
-            <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} className={`${inputCls} resize-none`} />
-          </div>
-
-          <div className="flex items-center gap-3 pt-1">
+      {/* Section 2 — Payment & Billing */}
+      <div className="bg-white rounded-md border border-zinc-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-semibold text-zinc-900">Payment &amp; Billing</p>
+          {!editingStripe && (
             <button
-              onClick={save}
-              disabled={saving}
-              className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70"
+              onClick={startEditStripe}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800 border border-blue-200 rounded-md px-3 py-1.5 hover:bg-blue-50 transition-colors"
             >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              Save Contract
+              <Pencil className="w-3 h-3" />
+              Edit Stripe
             </button>
-            <button
-              onClick={() => { setEditing(false); setArrError('') }}
-              className="text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md px-4 py-2 hover:bg-zinc-50"
-            >
-              Cancel
-            </button>
-            {contract?.updated_at && (
-              <p className="text-xs text-zinc-400 ml-auto">Last updated {formatDate(contract.updated_at)}</p>
-            )}
-          </div>
+          )}
         </div>
-      ) : (
-        // Read-only view
-        <div className="space-y-3">
+
+        {editingStripe ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Stripe Customer ID</label>
+              <input type="text" value={stripeForm.stripe_customer_id}
+                onChange={e => setStripeForm(f => ({ ...f, stripe_customer_id: e.target.value }))}
+                placeholder="cus_..."
+                className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Subscription ID</label>
+              <input type="text" value={stripeForm.stripe_subscription_id}
+                onChange={e => setStripeForm(f => ({ ...f, stripe_subscription_id: e.target.value }))}
+                placeholder="sub_..."
+                className={inputCls} />
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <button onClick={saveStripe} disabled={savingStripe}
+                className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-md px-4 py-2 flex items-center gap-2 disabled:opacity-70">
+                {savingStripe && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Stripe Details
+              </button>
+              <button onClick={() => setEditingStripe(false)}
+                className="text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md px-4 py-2 hover:bg-zinc-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
           <div className="grid grid-cols-2 gap-x-8 gap-y-3">
             <div>
-              <p className="text-xs text-zinc-400">Stripe Subscription ID</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5 font-mono text-xs">{readVal(contract?.stripe_subscription_id)}</p>
+              <p className="text-xs text-zinc-400">Stripe Customer ID</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5 font-mono text-xs">
+                {readVal(tenantStripeCustomerId)}
+              </p>
             </div>
             <div>
+              <p className="text-xs text-zinc-400">Subscription ID</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5 font-mono text-xs">
+                {readVal(contract?.stripe_subscription_id)}
+              </p>
+            </div>
+            <div className="col-span-2">
               <p className="text-xs text-zinc-400">ARR</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.arr != null ? `$${(contract.arr / 100).toFixed(2)}` : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-400">Learner Seats</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5">{readVal(contract?.seat_count)}</p>
-            </div>
-            {isFullCreator && (
-              <div>
-                <p className="text-xs text-zinc-400">Creator Seats</p>
-                <p className="text-sm font-medium text-zinc-900 mt-0.5">{readVal(contract?.content_creator_seats)}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs text-zinc-400">Start Date</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.start_date ? formatDate(contract.start_date) : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-400">End Date</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.end_date ? formatDate(contract.end_date) : '—'}</p>
+              {arrDisplay ? (
+                <>
+                  <p className="text-sm font-medium text-zinc-900 mt-0.5">{arrDisplay}</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">Calculated from Stripe</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-zinc-400 mt-0.5">—</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">Calculated from Stripe</p>
+                </>
+              )}
             </div>
           </div>
-          {contract?.notes && (
-            <div>
-              <p className="text-xs text-zinc-400">Notes</p>
-              <p className="text-sm text-zinc-700 mt-0.5">{contract.notes}</p>
-            </div>
-          )}
-          {contract?.updated_at && (
-            <p className="text-xs text-zinc-400 pt-1">Last updated {formatDate(contract.updated_at)}</p>
-          )}
-        </div>
-      )}
-
-      {/* Section 2 — Payment Overview */}
-      {contract?.stripe_subscription_id ? (
-        <div className="mt-6 pt-6 border-t border-zinc-100">
-          <p className="text-sm font-semibold text-zinc-900 mb-4">Payment Overview</p>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-            {[
-              ['Stripe Customer ID', 'cus_demo_placeholder'],
-              ['Subscription Status', 'Active'],
-              ['Latest Invoice Status', 'Paid'],
-              ['Latest Invoice Amount', '$4,200.00'],
-              ['Renewal Date', '01-01-2027'],
-              ['MRR', contract?.arr != null ? `$${((contract.arr / 100) / 12).toFixed(2)}` : '—'],
-            ].map(([label, value]) => (
-              <div key={label} className="flex">
-                <p className="text-xs text-zinc-500 w-44 shrink-0">{label}</p>
-                <p className="text-xs font-medium text-zinc-900">{value}</p>
-              </div>
-            ))}
-          </div>
-          <a href="#" className="inline-block mt-3 text-xs font-medium text-blue-700 hover:underline">
-            View in Stripe Dashboard →
-          </a>
-        </div>
-      ) : (
-        <div className="mt-6 pt-6 border-t border-zinc-100">
-          <div className="rounded-md bg-zinc-50 border border-zinc-200 px-4 py-3">
-            <p className="text-sm text-zinc-500">
-              No Stripe subscription linked. Add a Stripe Subscription ID in the Contract Details section above to enable payment tracking.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Section 3 — Storage & Hosting (SA only) */}
-      <div className="mt-6 pt-6 border-t border-zinc-100">
-        <p className="text-sm font-semibold text-zinc-900 mb-1">Storage &amp; Hosting</p>
-        {featureToggleMode === 'RUN_ONLY' ? (
-          <p className="text-sm text-zinc-400">Storage &amp; Hosting is not tracked for Run-Only tenants.</p>
-        ) : (
-          <>
-            <p className="text-xs text-zinc-400 mb-4">Daily snapshot · Super Admin only</p>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <p className="text-xs text-zinc-500 mb-1">Total Storage Used</p>
-                <p className="text-sm font-semibold text-zinc-900">12.4 GB</p>
-              </div>
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <p className="text-xs text-zinc-500 mb-1">Est. Hosting Cost</p>
-                <p className="text-sm font-semibold text-zinc-900">$18.60 / mo</p>
-              </div>
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <p className="text-xs text-zinc-500 mb-1">Last Snapshot</p>
-                <p className="text-sm font-semibold text-zinc-900">Mar 18, 2026</p>
-              </div>
-            </div>
-          </>
         )}
       </div>
+
+      {/* Section 3 — Storage & Hosting (FULL_CREATOR only) */}
+      {isFullCreator && (
+        <div className="bg-white rounded-md border border-zinc-200 p-5">
+          <p className="text-sm font-semibold text-zinc-900 mb-1">Storage &amp; Hosting</p>
+          <p className="text-xs text-zinc-400 mb-4">Daily snapshot · Super Admin only</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <p className="text-xs text-zinc-500 mb-1">Total Storage Used</p>
+              <p className="text-sm font-semibold text-zinc-900">12.4 GB</p>
+            </div>
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <p className="text-xs text-zinc-500 mb-1">Est. Hosting Cost</p>
+              <p className="text-sm font-semibold text-zinc-900">$18.60 / mo</p>
+            </div>
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <p className="text-xs text-zinc-500 mb-1">Last Snapshot</p>
+              <p className="text-sm font-semibold text-zinc-900">Mar 18, 2026</p>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
@@ -1633,6 +2201,7 @@ export default function TenantDetailPage() {
           clientAdmin={clientAdmin}
           onEditDetails={() => setShowEditDetails(true)}
           onToggleActive={toggleActive}
+          onSwitchToUsersRoles={() => setActiveTab('Users & Roles')}
         />
       )}
       {activeTab === 'Plans' && (
@@ -1644,6 +2213,8 @@ export default function TenantDetailPage() {
           adminUsers={adminUsers}
           onRefresh={refreshUsers}
           featureToggleMode={tenant.feature_toggle_mode ?? 'RUN_ONLY'}
+          contract={contract}
+          onSwitchToContract={() => setActiveTab('Contract')}
         />
       )}
       {activeTab === 'Learners' && (
@@ -1659,6 +2230,10 @@ export default function TenantDetailPage() {
           contract={contract}
           onSaved={c => setContract(c)}
           featureToggleMode={tenant.feature_toggle_mode ?? ''}
+          tenantStripeCustomerId={tenant.stripe_customer_id ?? null}
+          onTenantStripeSaved={customerId => setTenant(prev => prev ? { ...prev, stripe_customer_id: customerId } : prev)}
+          activeCCCount={adminUsers.filter(u => u.role === 'CONTENT_CREATOR' && u.is_active).length}
+          activeLearnerCount={learnerCount}
         />
       )}
       {activeTab === 'Audit History' && (
