@@ -44,7 +44,8 @@ Course plan subscriptions live in `b2c_course_subscriptions`. Never conflate.
 ```
 id, name, type, feature_toggle_mode, licensed_categories (ARRAY),
 stripe_customer_id, is_active, created_at, contact_name, contact_email,
-contact_phone, timezone (DEFAULT 'Asia/Kolkata'),
+contact_phone, contact_phone_country_code (text, nullable — ISO 3166-1 alpha-2 e.g. "IN"; KSS-DB-005),
+timezone (DEFAULT 'Asia/Kolkata'),
 date_format (DEFAULT 'DD/MM/YYYY'), address_line1, address_line2,
 city, state, country, zip_code, logo_url (text nullable)
 ```
@@ -235,8 +236,8 @@ department_id, team_id, status (ACTIVE|INACTIVE), employee_roll_number,
 notes, created_by, created_at, last_active_at
 ```
 - `phone` stores subscriber digits only (e.g. `9876543210`) — no country code prefix
-- `phone_country_code` stores dial code (e.g. `+91`) — added KSS-DB-004 (Apr 5 2026)
-- Display: concatenate `phone_country_code + ' ' + phone` wherever shown
+- `phone_country_code` stores ISO 3166-1 alpha-2 code (e.g. `IN`, `US`) — NOT dial code — added KSS-DB-004 (Apr 5 2026)
+- Display: derive dial code via `getDialCode(iso)` from `PhoneInputField.tsx`, then show `dialCode + ' ' + phone`
 - Both nullable — phone is optional; if phone_country_code is set, phone must also be set (enforced in UI)
 
 ### departments / teams

@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId } from '@/lib/client-admin/tenants'
+import { PhoneInputField, getDialCode } from '@/components/PhoneInputField'
+import { validateEmail } from '@/components/validateEmail'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -163,30 +165,6 @@ function ConfirmModal({
   )
 }
 
-// ─── Country codes (curated list) ─────────────────────────────────────────────
-
-const COUNTRY_CODES = [
-  { code: '+91', name: 'India' },
-  { code: '+1', name: 'USA' },
-  { code: '+1', name: 'Canada' },
-  { code: '+44', name: 'UK' },
-  { code: '+971', name: 'UAE' },
-  { code: '+65', name: 'Singapore' },
-  { code: '+61', name: 'Australia' },
-  { code: '+63', name: 'Philippines' },
-]
-
-// Subscriber digit count per dial code (E.164, excluding country code)
-const COUNTRY_PHONE_LENGTHS: Record<string, number> = {
-  '+91': 10,  // India
-  '+1': 10,   // USA, Canada (NANP)
-  '+44': 10,  // UK mobile
-  '+971': 9,  // UAE
-  '+65': 8,   // Singapore
-  '+61': 9,   // Australia
-  '+63': 10,  // Philippines
-}
-
 // ─── Learner form (Add / Edit) — right slide-over ─────────────────────────────
 
 function LearnerSlideOver({
@@ -206,8 +184,11 @@ function LearnerSlideOver({
 }) {
   const [fullName, setFullName] = useState(editing?.full_name ?? '')
   const [email, setEmail] = useState(editing?.email ?? '')
-  const [countryCode, setCountryCode] = useState(editing?.phone_country_code ?? '')
-  const [phoneNumber, setPhoneNumber] = useState(editing?.phone ?? '')
+  const [emailTouched, setEmailTouched] = useState(false)
+  // Phone — managed via PhoneInputField; parent tracks latest values for save
+  const [phoneCode, setPhoneCode] = useState(editing?.phone_country_code ?? '')
+  const [phoneNum, setPhoneNum] = useState(editing?.phone ?? '')
+  const [phoneSubmitError, setPhoneSubmitError] = useState<string | undefined>()
   const [departmentId, setDepartmentId] = useState(editing?.department_id ?? '')
   const [teamId, setTeamId] = useState(editing?.team_id ?? '')
   const [rollNumber, setRollNumber] = useState(editing?.employee_roll_number ?? '')
@@ -222,6 +203,9 @@ function LearnerSlideOver({
     (t) => t.department_id === departmentId && t.status === 'ACTIVE'
   )
 
+  // D3/5B — email error: nothing until first blur, then live
+  const emailFormatError = emailTouched ? validateEmail(email) : null
+
   function handleDeptChange(val: string) {
     setDepartmentId(val)
     setTeamId('')
@@ -235,29 +219,24 @@ function LearnerSlideOver({
 
   async function handleSave() {
     if (!fullName.trim()) { setError('Full name is required.'); return }
-    if (!editing && !email.trim()) { setError('Email is required.'); return }
 
-    // Phone validation
-    const strippedPhone = phoneNumber.replace(/\s+/g, '')
-    if (!countryCode && strippedPhone) {
-      setError('Please select a country code for the phone number.')
+    // Email validation (add mode only — edit mode email is locked)
+    if (!editing) {
+      if (!email.trim()) { setError('Email is required.'); return }
+      const emailErr = validateEmail(email)
+      if (emailErr) { setError(emailErr); return }
+    }
+
+    // Phone validation (submit-level)
+    if (!phoneCode && phoneNum) {
+      setPhoneSubmitError('Select a country code.')
       return
     }
-    if (countryCode && !strippedPhone) {
-      setError('Please enter the phone number.')
+    if (phoneCode && !phoneNum) {
+      setPhoneSubmitError('Please enter the phone number.')
       return
     }
-    if (countryCode && strippedPhone) {
-      if (!/^\d+$/.test(strippedPhone)) {
-        setError('Phone number must contain digits only.')
-        return
-      }
-      const expected = COUNTRY_PHONE_LENGTHS[countryCode]
-      if (strippedPhone.length !== expected) {
-        setError(`Phone number must be exactly ${expected} digits for the selected country.`)
-        return
-      }
-    }
+    setPhoneSubmitError(undefined)
 
     setSaving(true)
     setError(null)
@@ -265,8 +244,8 @@ function LearnerSlideOver({
     const payload = {
       full_name: fullName.trim(),
       ...(editing ? {} : { email: email.trim() }),
-      phone: strippedPhone || null,
-      phone_country_code: countryCode || null,
+      phone: phoneNum || null,
+      phone_country_code: phoneCode || null,
       department_id: departmentId || null,
       team_id: teamId || null,
       employee_roll_number: rollNumber.trim() || null,
@@ -289,8 +268,6 @@ function LearnerSlideOver({
     setSaving(false)
     onSaved()
   }
-
-  const expectedDigits = countryCode ? COUNTRY_PHONE_LENGTHS[countryCode] : null
 
   return (
     <>
@@ -336,47 +313,28 @@ function LearnerSlideOver({
                     <p className="text-xs text-zinc-400 mt-1">Email cannot be changed after creation.</p>
                   </>
                 ) : (
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => { setEmail(e.target.value); setDirty(true) }}
-                    placeholder="e.g. arjun@example.com"
-                    className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                  />
+                  <>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => { setEmail(e.target.value); setDirty(true) }}
+                      onBlur={() => setEmailTouched(true)}
+                      placeholder="e.g. arjun@example.com"
+                      className={`w-full border rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent ${emailFormatError ? 'border-rose-400' : 'border-zinc-200'}`}
+                    />
+                    {emailFormatError && (
+                      <p className="text-xs text-rose-600 mt-1">{emailFormatError}</p>
+                    )}
+                  </>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Phone</label>
-                <div className="flex gap-2">
-                  {/* Country code dropdown */}
-                  <div className="relative w-36 shrink-0">
-                    <select
-                      value={countryCode}
-                      onChange={(e) => { setCountryCode(e.target.value); setDirty(true) }}
-                      className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 appearance-none focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent bg-white"
-                    >
-                      <option value="">Country</option>
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={`${c.name}-${c.code}`} value={c.code}>
-                          {c.name} ({c.code})
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
-                  </div>
-                  {/* Number input */}
-                  <input
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => { setPhoneNumber(e.target.value); setDirty(true) }}
-                    placeholder="Phone number"
-                    className="flex-1 border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                  />
-                </div>
-                {expectedDigits !== null && (
-                  <p className="text-xs text-zinc-400 mt-1">{expectedDigits} digits required</p>
-                )}
-              </div>
+              <PhoneInputField
+                key={editing?.id ?? 'new'}
+                defaultCode={editing?.phone_country_code ?? ''}
+                defaultNumber={editing?.phone ?? ''}
+                onChange={(iso, num) => { setPhoneCode(iso); setPhoneNum(num); setPhoneSubmitError(undefined); setDirty(true) }}
+                submitError={phoneSubmitError}
+              />
             </div>
           </div>
 

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId } from '@/lib/client-admin/tenants'
+import { getDialCode } from '@/components/PhoneInputField'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -317,7 +318,7 @@ export default function LearnerProfilePage() {
             value={
               learner.phone
                 ? learner.phone_country_code
-                  ? `${learner.phone_country_code} ${learner.phone}`
+                  ? `${getDialCode(learner.phone_country_code)} ${learner.phone}`
                   : learner.phone
                 : <span className="text-zinc-400 font-normal">—</span>
             }

@@ -14,6 +14,8 @@ import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/Edit
 import PlansTab from '@/components/tenant-detail/PlansTab'
 import { useToast } from '@/components/ui/Toast'
 import { PaginationBar } from '@/components/ui/PaginationBar'
+import { PhoneInputField, getDialCode } from '@/components/PhoneInputField'
+import { validateEmail } from '@/components/validateEmail'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -212,6 +214,7 @@ function InviteUserSlideOver({
 }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
   const [role, setRole] = useState<'CLIENT_ADMIN' | 'CONTENT_CREATOR'>('CLIENT_ADMIN')
   const isRunOnly = featureToggleMode === 'RUN_ONLY'
   const [saving, setSaving] = useState(false)
@@ -233,6 +236,8 @@ function InviteUserSlideOver({
   const save = async () => {
     if (!name.trim()) { setErr('Name is required.'); return }
     if (!email.trim()) { setErr('Email is required.'); return }
+    const fmtErr = validateEmail(email)
+    if (fmtErr) { setErr(fmtErr); return }
     if (ccLimitErr) return
     // Locked rule: check for existing active CA on submit
     if (role === 'CLIENT_ADMIN' && activeCACount > 0) {
@@ -309,12 +314,18 @@ function InviteUserSlideOver({
             <label className="text-sm font-medium text-zinc-700 block mb-1">
               Email <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="text-sm border border-zinc-200 rounded-md px-3 py-1.5 w-full focus:ring-1 focus:ring-blue-700 outline-none"
-            />
+            {(() => { const liveErr = emailTouched ? validateEmail(email) : null; return (
+              <>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); if (emailTouched) setErr('') }}
+                  onBlur={() => setEmailTouched(true)}
+                  className={`text-sm border rounded-md px-3 py-1.5 w-full focus:ring-1 focus:ring-blue-700 outline-none ${liveErr ? 'border-rose-400' : 'border-zinc-200'}`}
+                />
+                {liveErr && <p className="text-sm text-rose-600 mt-1">{liveErr}</p>}
+              </>
+            )})()}
           </div>
           <div>
             <label className="text-sm font-medium text-zinc-700 block mb-1">Role</label>
@@ -366,15 +377,16 @@ function ReplaceClientAdminModal({
   const { showToast } = useToast()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   const canSubmit = name.trim().length > 0 && email.trim().length > 0
 
   const save = async () => {
     if (!canSubmit) return
-    if (!emailRegex.test(email.trim())) { setErr('Enter a valid email address.'); return }
+    const fmtErr = validateEmail(email.trim())
+    if (fmtErr) { setErr(fmtErr); return }
     setErr('')
     setSaving(true)
     try {
@@ -485,12 +497,18 @@ function ReplaceClientAdminModal({
             <label className="text-sm font-medium text-zinc-700 block mb-1">
               Email <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full border border-zinc-200 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-700 outline-none"
-            />
+            {(() => { const liveErr = emailTouched ? validateEmail(email) : null; return (
+              <>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); if (emailTouched) setErr('') }}
+                  onBlur={() => setEmailTouched(true)}
+                  className={`w-full border rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-700 outline-none ${liveErr ? 'border-rose-400' : 'border-zinc-200'}`}
+                />
+                {liveErr && <p className="text-sm text-rose-600 mt-1">{liveErr}</p>}
+              </>
+            )})()}
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100">
@@ -747,7 +765,11 @@ function TabOverview({
               [
                 ['Contact Name', tenant.contact_name],
                 ['Contact Email', tenant.contact_email],
-                ['Contact Phone', tenant.contact_phone],
+                ['Contact Phone', tenant.contact_phone
+                  ? (tenant.contact_phone_country_code
+                      ? getDialCode(tenant.contact_phone_country_code) + ' ' + tenant.contact_phone
+                      : tenant.contact_phone)
+                  : null],
                 ['Timezone', tenant.timezone],
                 ['Date Format', tenant.date_format],
               ] as [string, string | null | undefined][]
@@ -1029,7 +1051,10 @@ function AddLearnerSlideOver({
 }) {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
+  const [phoneCode, setPhoneCode] = useState('')
+  const [phoneNum, setPhoneNum] = useState('')
+  const [phoneSubmitErr, setPhoneSubmitErr] = useState<string | undefined>()
   const [deptId, setDeptId] = useState('')
   const [teamId, setTeamId] = useState('')
   const [departments, setDepartments] = useState<Department[]>([])
@@ -1059,8 +1084,13 @@ function AddLearnerSlideOver({
   const save = async () => {
     if (!fullName.trim()) { setErr('Full name is required.'); return }
     if (!email.trim()) { setEmailErr('Email is required.'); return }
+    const fmtErr = validateEmail(email)
+    if (fmtErr) { setEmailErr(fmtErr); return }
+    if (!phoneCode && phoneNum) { setPhoneSubmitErr('Select a country code.'); return }
+    if (phoneCode && !phoneNum) { setPhoneSubmitErr('Please enter the phone number.'); return }
     setErr('')
     setEmailErr('')
+    setPhoneSubmitErr(undefined)
     setSaving(true)
     try {
       const { data: newLearner, error: insertErr } = await supabase
@@ -1069,7 +1099,8 @@ function AddLearnerSlideOver({
           tenant_id: tenantId,
           full_name: fullName.trim(),
           email: email.trim(),
-          phone: phone.trim() || null,
+          phone: phoneNum || null,
+          phone_country_code: phoneCode || null,
           department_id: deptId || null,
           team_id: teamId || null,
           status: 'ACTIVE',
@@ -1135,24 +1166,27 @@ function AddLearnerSlideOver({
             <label className="text-sm font-medium text-zinc-700 block mb-1">
               Email Address <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => { setEmail(e.target.value); setEmailErr('') }}
-              placeholder="learner@organisation.com"
-              className={`${inputCls} ${emailErr ? 'border-rose-400' : ''}`}
-            />
-            {emailErr && <p className="text-sm text-rose-600 mt-1">{emailErr}</p>}
+            {(() => { const liveErr = emailTouched ? validateEmail(email) : null; const displayErr = emailErr || liveErr; return (
+              <>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setEmailErr(''); }}
+                  onBlur={() => setEmailTouched(true)}
+                  placeholder="learner@organisation.com"
+                  className={`${inputCls} ${displayErr ? 'border-rose-400' : ''}`}
+                />
+                {displayErr && <p className="text-sm text-rose-600 mt-1">{displayErr}</p>}
+              </>
+            )})()}
           </div>
 
           <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1">Phone</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              placeholder="+91 XXXXX XXXXX"
-              className={inputCls}
+            <PhoneInputField
+              defaultCode={phoneCode}
+              defaultNumber={phoneNum}
+              onChange={(iso, num) => { setPhoneCode(iso); setPhoneNum(num); setPhoneSubmitErr(undefined) }}
+              submitError={phoneSubmitErr}
             />
           </div>
 

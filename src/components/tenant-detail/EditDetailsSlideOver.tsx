@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Loader2, Search, Plus, UserCircle, Upload, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import { PhoneInputField } from '@/components/PhoneInputField'
+import { validateEmail } from '@/components/validateEmail'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,6 +19,7 @@ export interface TenantRow {
   contact_name?: string | null
   contact_email?: string | null
   contact_phone?: string | null
+  contact_phone_country_code?: string | null
   address_line1?: string | null
   address_line2?: string | null
   city?: string | null
@@ -199,6 +202,12 @@ export function EditDetailsSlideOver({
   const [nameErr, setNameErr] = useState('')
   const [dirty, setDirty] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // Contact email — D3/5B validation
+  const [contactEmailTouched, setContactEmailTouched] = useState(false)
+  // Contact phone — self-contained via PhoneInputField; track latest values for save
+  const [contactPhoneCode, setContactPhoneCode] = useState('')
+  const [contactPhoneNum, setContactPhoneNum] = useState('')
+  const [phoneSubmitError, setPhoneSubmitError] = useState<string | undefined>()
 
   // Logo state
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -212,6 +221,7 @@ export function EditDetailsSlideOver({
   const [showAddCA, setShowAddCA] = useState(false)
   const [caName, setCaName] = useState('')
   const [caEmail, setCaEmail] = useState('')
+  const [caEmailTouched, setCaEmailTouched] = useState(false)
   const [caNameErr, setCaNameErr] = useState('')
   const [caEmailErr, setCaEmailErr] = useState('')
   const [savingCA, setSavingCA] = useState(false)
@@ -234,6 +244,10 @@ export function EditDetailsSlideOver({
         timezone: tenant.timezone ?? 'Asia/Kolkata',
         date_format: tenant.date_format ?? 'DD/MM/YYYY',
       })
+      setContactEmailTouched(false)
+      setContactPhoneCode(tenant.contact_phone_country_code ?? '')
+      setContactPhoneNum(tenant.contact_phone ?? '')
+      setPhoneSubmitError(undefined)
       setDirty(false)
       setConfirmDiscard(false)
       setNameErr('')
@@ -241,6 +255,7 @@ export function EditDetailsSlideOver({
       setShowAddCA(false)
       setCaName('')
       setCaEmail('')
+      setCaEmailTouched(false)
       setCaSuccess(false)
       setLogoFile(null)
       setLogoPreview(null)
@@ -287,11 +302,28 @@ export function EditDetailsSlideOver({
     onClose()
   }
 
+  const contactEmailFormatError = contactEmailTouched ? validateEmail(form.contact_email) : null
+
   const save = async () => {
     if (!form.name.trim()) {
       setNameErr('Client name is required.')
       return
     }
+    // Contact email format check on submit
+    if (form.contact_email.trim() && validateEmail(form.contact_email)) {
+      setNameErr('Contact email is invalid.')
+      return
+    }
+    // Phone submit-level check
+    if (!contactPhoneCode && contactPhoneNum) {
+      setPhoneSubmitError('Select a country code.')
+      return
+    }
+    if (contactPhoneCode && !contactPhoneNum) {
+      setPhoneSubmitError('Please enter the phone number.')
+      return
+    }
+    setPhoneSubmitError(undefined)
     setNameErr('')
     setSaving(true)
     try {
@@ -300,7 +332,8 @@ export function EditDetailsSlideOver({
         feature_toggle_mode: form.feature_toggle_mode,
         contact_name: form.contact_name.trim() || null,
         contact_email: form.contact_email.trim() || null,
-        contact_phone: form.contact_phone.trim() || null,
+        contact_phone: contactPhoneNum || null,
+        contact_phone_country_code: contactPhoneCode || null,
         address_line1: form.address_line1.trim() || null,
         address_line2: form.address_line2.trim() || null,
         city: form.city.trim() || null,
@@ -355,7 +388,13 @@ export function EditDetailsSlideOver({
   async function handleAddCA() {
     let hasErr = false
     if (!caName.trim()) { setCaNameErr('Name is required.'); hasErr = true } else setCaNameErr('')
-    if (!caEmail.trim()) { setCaEmailErr('Email is required.'); hasErr = true } else setCaEmailErr('')
+    if (!caEmail.trim()) {
+      setCaEmailErr('Email is required.')
+      hasErr = true
+    } else {
+      const fmtErr = validateEmail(caEmail)
+      if (fmtErr) { setCaEmailErr(fmtErr); hasErr = true } else setCaEmailErr('')
+    }
     if (hasErr) return
 
     setSavingCA(true)
@@ -554,11 +593,24 @@ export function EditDetailsSlideOver({
             </div>
             <div>
               <label className={labelCls}>Contact Email</label>
-              <input type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} className={inputCls} />
+              <input
+                type="email"
+                value={form.contact_email}
+                onChange={(e) => set('contact_email', e.target.value)}
+                onBlur={() => setContactEmailTouched(true)}
+                className={`${inputCls} ${contactEmailFormatError ? 'border-rose-400' : ''}`}
+              />
+              {contactEmailFormatError && <p className="text-xs text-rose-600 mt-1">{contactEmailFormatError}</p>}
             </div>
             <div>
-              <label className={labelCls}>Contact Phone</label>
-              <input type="text" value={form.contact_phone} onChange={(e) => set('contact_phone', e.target.value)} className={inputCls} />
+              <PhoneInputField
+                key={tenant.id}
+                defaultCode={contactPhoneCode}
+                defaultNumber={contactPhoneNum}
+                onChange={(iso, num) => { setContactPhoneCode(iso); setContactPhoneNum(num); setDirty(true) }}
+                submitError={phoneSubmitError}
+                label="Contact Phone"
+              />
             </div>
 
             {/* Client Admin display / add */}
@@ -597,7 +649,8 @@ export function EditDetailsSlideOver({
                     <input
                       type="email"
                       value={caEmail}
-                      onChange={(e) => setCaEmail(e.target.value)}
+                      onChange={(e) => { setCaEmail(e.target.value); if (caEmailTouched) setCaEmailErr(validateEmail(e.target.value) ?? '') }}
+                      onBlur={() => { setCaEmailTouched(true); setCaEmailErr(validateEmail(caEmail) ?? '') }}
                       className={`${inputCls} text-xs py-1.5 ${caEmailErr ? 'border-rose-400' : ''}`}
                       placeholder="admin@example.com"
                     />

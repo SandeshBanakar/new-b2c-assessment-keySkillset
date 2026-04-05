@@ -9,6 +9,7 @@ import {
   type ContentCreatorRow,
 } from '@/lib/supabase/content-creators'
 import { useToast } from '@/components/ui/Toast'
+import { validateEmail } from '@/components/validateEmail'
 
 // ─── Create Slide-Over ────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ function CreateCCSlideOver({
   const { showToast } = useToast()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -31,6 +33,7 @@ function CreateCCSlideOver({
     const e: Record<string, string> = {}
     if (!name.trim()) e.name = 'Name is required.'
     if (!email.trim()) e.email = 'Email is required.'
+    else { const fmtErr = validateEmail(email); if (fmtErr) e.email = fmtErr }
     if (!password) e.password = 'Password is required.'
     else if (password.length < 6) e.password = 'Minimum 6 characters.'
     if (password !== confirm) e.confirm = 'Passwords do not match.'
@@ -85,14 +88,19 @@ function CreateCCSlideOver({
           </div>
           <div>
             <label className={labelCls}>Email <span className="text-rose-500">*</span></label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="creator@keyskillset.com"
-              className={inputCls(errors.email)}
-            />
-            {errors.email && <p className="text-xs text-rose-600 mt-1">{errors.email}</p>}
+            {(() => { const liveErr = emailTouched ? validateEmail(email) : null; const displayErr = errors.email || liveErr || undefined; return (
+              <>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: '' })) }}
+                  onBlur={() => setEmailTouched(true)}
+                  placeholder="creator@keyskillset.com"
+                  className={inputCls(displayErr)}
+                />
+                {displayErr && <p className="text-xs text-rose-600 mt-1">{displayErr}</p>}
+              </>
+            )})()}
           </div>
           <div>
             <label className={labelCls}>Password <span className="text-rose-500">*</span></label>
