@@ -6,6 +6,18 @@
 
 ## COMPLETED WORK LOG
 
+### April 6, 2026 — KSS-SA-026 Free plan support for Single Course Plan
+- KSS-DB-006: `plans.is_free BOOLEAN DEFAULT false` added. `tier` CHECK expanded to include `'FREE'`. `NOT NULL` dropped from `tier`. Existing SINGLE_COURSE_PLAN rows migrated to `tier=NULL`.
+- Pricing Mode toggle (`Paid Plan` / `Free Plan`) added to create form (Section 3) and `SingleCoursePlanEditSlideOver`.
+- Free mode: price fields hidden, green callout shown, `price=0 / price_usd=0 / stripe_price_id=NULL / tier='FREE'` enforced in lib layer.
+- Paid → Free switch on edit: warning modal ("This will set prices to ₹0 / $0...") required before applying.
+- One-active-plan-per-course guard: `checkCourseHasActivePlan(courseId)` called before create submit; inline error if DRAFT/PUBLISHED plan exists.
+- `SingleCoursePlanEditSlideOver` wired to plan detail page (`PlanOverviewTab`) — was dead code before; generic `EditPlanSlideOver` still used for all other plan types.
+- `fetchPlanById` extended to select `price_usd`, `stripe_price_id`, `is_free`.
+- Green **Free** badge in Single Course Plan list table Price (USD) column when `is_free=true`.
+- `CLAUDE-DB.md` + `CLAUDE-PT.md` updated with all new rules.
+- Sub-PRD 4 (Plans & Entitlements) updated to v4.4 in Confluence.
+
 ### April 2026 — KSS-SA-019 Plans & Pricing server-side pagination
 - `src/components/ui/PaginationBar.tsx` created — shared `← Prev X/Y Next →` component used platform-wide
 - `src/lib/supabase/plans.ts` — 6 new paginated functions added (originals untouched):
