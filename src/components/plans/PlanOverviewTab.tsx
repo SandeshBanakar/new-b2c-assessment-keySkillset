@@ -78,6 +78,11 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
               Course Bundle
             </span>
           )}
+          {plan.plan_category === 'SINGLE_COURSE_PLAN' && plan.is_free && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+              Free
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -143,27 +148,35 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
       )}
 
       {/* Summary strip — B2C and bundle plans only */}
-      {!isB2B && (
-        <div className="grid grid-cols-3 gap-4">
-          {(plan.plan_category === 'COURSE_BUNDLE'
-            ? [
-                { label: 'Subscribers',    value: plan.plan_subscribers?.subscriber_count ?? 0 },
-                { label: 'Annual Revenue', value: `₹${((plan.plan_subscribers?.subscriber_count ?? 0) * plan.price).toLocaleString('en-IN')}` },
-                { label: 'Price (₹/year)', value: plan.price === 0 ? 'Free' : `₹${plan.price.toLocaleString('en-IN')}` },
-              ]
-            : [
-                { label: 'Subscribers', value: plan.plan_subscribers?.subscriber_count ?? 0 },
-                { label: 'MRR',         value: `₹${((plan.plan_subscribers?.subscriber_count ?? 0) * plan.price).toLocaleString('en-IN')}` },
-                { label: 'Price',       value: plan.price === 0 ? 'Free' : `₹${plan.price}/mo` },
-              ]
-          ).map((item) => (
-            <div key={item.label} className="bg-white border border-zinc-200 rounded-md px-4 py-3">
-              <p className="text-xs text-zinc-400">{item.label}</p>
-              <p className="text-lg font-semibold text-zinc-900 mt-0.5">{item.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {!isB2B && (() => {
+        const isFreeCoursePlan = plan.plan_category === 'SINGLE_COURSE_PLAN' && plan.is_free
+        const cards = plan.plan_category === 'COURSE_BUNDLE'
+          ? [
+              { label: 'Subscribers',    value: plan.plan_subscribers?.subscriber_count ?? 0 },
+              { label: 'Annual Revenue', value: `₹${((plan.plan_subscribers?.subscriber_count ?? 0) * plan.price).toLocaleString('en-IN')}` },
+              { label: 'Price (₹/year)', value: plan.price === 0 ? 'Free' : `₹${plan.price.toLocaleString('en-IN')}` },
+            ]
+          : isFreeCoursePlan
+          ? [
+              { label: 'Subscribers', value: plan.plan_subscribers?.subscriber_count ?? 0 },
+              { label: 'Price',       value: 'Free' },
+            ]
+          : [
+              { label: 'Subscribers', value: plan.plan_subscribers?.subscriber_count ?? 0 },
+              { label: 'MRR',         value: `₹${((plan.plan_subscribers?.subscriber_count ?? 0) * plan.price).toLocaleString('en-IN')}` },
+              { label: 'Price',       value: plan.price === 0 ? 'Free' : `₹${plan.price}/mo` },
+            ]
+        return (
+          <div className={`grid gap-4 ${cards.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            {cards.map((item) => (
+              <div key={item.label} className="bg-white border border-zinc-200 rounded-md px-4 py-3">
+                <p className="text-xs text-zinc-400">{item.label}</p>
+                <p className="text-lg font-semibold text-zinc-900 mt-0.5">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Details grid — B2C plans */}
       {!isB2B && (
