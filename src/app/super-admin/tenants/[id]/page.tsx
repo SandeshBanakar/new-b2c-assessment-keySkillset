@@ -30,7 +30,7 @@ interface Contract {
   tenant_id: string
   seat_count: number
   content_creator_seats?: number | null
-  arr: number
+  arr_usd_cents: number
   start_date: string
   end_date: string
   stripe_subscription_id: string
@@ -1895,7 +1895,7 @@ function TabContract({
         tenant_id: tenantId,
         seat_count: seatNum,
         content_creator_seats: isFullCreator ? ccNum : 0,
-        arr: contract?.arr ?? 0,
+        arr_usd_cents: contract?.arr_usd_cents ?? 0,
         start_date: contractForm.start_date,
         end_date: contractForm.end_date,
         stripe_subscription_id: contract?.stripe_subscription_id ?? '',
@@ -1981,8 +1981,8 @@ function TabContract({
   const readVal = (v: string | number | null | undefined) =>
     v != null && v !== '' ? String(v) : <span className="text-zinc-400">—</span>
 
-  const arrDisplay = contract?.arr != null && contract.arr > 0
-    ? `$${(contract.arr / 100).toFixed(2)} / year`
+  const arrDisplay = contract?.arr_usd_cents != null && contract.arr_usd_cents > 0
+    ? `$${(contract.arr_usd_cents / 100).toFixed(2)} / year`
     : null
 
   return (
