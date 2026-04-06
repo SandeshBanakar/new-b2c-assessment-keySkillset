@@ -14,6 +14,7 @@ import {
   fetchAllLiveB2BCourses,
   fetchAllLiveB2CAssessments,
   fetchAllLiveB2CCoursesForBundle,
+  checkCourseHasActivePlan,
   type B2CCourseBundlePickerItem,
 } from '@/lib/supabase/plans'
 
@@ -1203,6 +1204,7 @@ function SingleCoursePlanForm() {
 
   const [name, setName]               = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [pricingMode, setPricingMode] = useState<'paid' | 'free'>('paid')
   const [price, setPrice]             = useState<number | ''>('')
   const [priceUsd, setPriceUsd]       = useState<number | ''>('')
   const [stripePriceId, setStripePriceId] = useState('')
@@ -1214,6 +1216,8 @@ function SingleCoursePlanForm() {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]           = useState<string | null>(null)
+
+  const isFree = pricingMode === 'free'
 
   useEffect(() => {
     fetchAllLiveB2CCoursesForBundle()
@@ -1227,34 +1231,49 @@ function SingleCoursePlanForm() {
 
   function validate(): string | null {
     if (!name.trim()) return 'Plan name is required.'
-    if (price === '' || Number(price) < 0) return 'Price (₹) must be 0 or a positive number.'
-    if (priceUsd === '' || Number(priceUsd) < 0) return 'Price (USD) must be 0 or a positive number.'
+    if (!isFree) {
+      if (price === '' || Number(price) < 0) return 'Price (₹) must be 0 or a positive number.'
+      if (priceUsd === '' || Number(priceUsd) < 0) return 'Price (USD) must be 0 or a positive number.'
+    }
     return null
   }
 
   async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
     const err = validate()
     if (err) { setError(err); return }
+
+    if (selectedCourse) {
+      const hasActivePlan = await checkCourseHasActivePlan(selectedCourse)
+      if (hasActivePlan) {
+        setError('This course already has an active (Draft or Published) single course plan. Archive the existing plan before creating a new one.')
+        return
+      }
+    }
+
     setError(null)
     setSubmitting(true)
     try {
+      const effectivePrice    = isFree ? 0 : price as number
+      const effectivePriceUsd = isFree ? 0 : priceUsd as number
+      const effectiveStripeId = isFree ? null : (stripePriceId.trim() || null)
+
       const planId = await createSingleCoursePlan({
         name:            name.trim(),
         display_name:    displayName.trim() || null,
-        price:           price as number,
-        price_usd:       priceUsd as number,
-        stripe_price_id: stripePriceId.trim() || null,
+        price:           effectivePrice,
+        price_usd:       effectivePriceUsd,
+        stripe_price_id: effectiveStripeId,
         status,
+        is_free:         isFree,
       })
       if (selectedCourse) {
         await addContentToPlan(planId, selectedCourse, 'COURSE')
-        // Sync purchasable flag + prices to course when publishing
         if (status === 'PUBLISHED') {
           const { syncCourseFromPlan } = await import('@/lib/supabase/plans')
           await syncCourseFromPlan(selectedCourse, {
-            price:           price as number,
-            price_usd:       priceUsd as number,
-            stripe_price_id: stripePriceId.trim() || null,
+            price:           effectivePrice,
+            price_usd:       effectivePriceUsd,
+            stripe_price_id: effectiveStripeId,
             status,
           })
         }
@@ -1338,42 +1357,72 @@ function SingleCoursePlanForm() {
 
       {/* SECTION 3 — Pricing */}
       <div className="bg-white border border-zinc-200 rounded-md p-6">
-        <SectionHeading number="3" title="Pricing" subtitle="Set the INR and USD prices and Stripe Price ID for this individual course plan." />
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <FieldLabel label="Price (₹)" required />
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
-              <input
-                type="number" min={0} value={price}
-                onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="999"
-                className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-              />
-            </div>
-          </div>
-          <div>
-            <FieldLabel label="Price (USD)" required />
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
-              <input
-                type="number" min={0} step="0.01" value={priceUsd}
-                onChange={(e) => setPriceUsd(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="12.99"
-                className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-              />
-            </div>
-          </div>
+        <SectionHeading number="3" title="Pricing" subtitle="Set the pricing mode and price details for this individual course plan." />
+
+        {/* Pricing Mode toggle */}
+        <div className="flex gap-2 mb-5">
+          {(['paid', 'free'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setPricingMode(mode)}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md border transition-colors ${
+                pricingMode === mode
+                  ? 'bg-blue-700 text-white border-blue-700'
+                  : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+              }`}
+            >
+              {mode === 'paid' ? 'Paid Plan' : 'Free Plan'}
+            </button>
+          ))}
         </div>
-        <div>
-          <FieldLabel label="Stripe Price ID" />
-          <input
-            type="text" value={stripePriceId} onChange={(e) => setStripePriceId(e.target.value)}
-            placeholder="price_annual_..."
-            className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-          />
-          <p className="text-xs text-zinc-400 mt-1">Auto-synced to the course record on Publish.</p>
-        </div>
+
+        {isFree ? (
+          <div className="rounded-md bg-green-50 border border-green-200 px-4 py-3">
+            <p className="text-sm font-medium text-green-800">Free access — no payment required</p>
+            <p className="text-xs text-green-700 mt-0.5">
+              Prices will be set to ₹0 / $0. No Stripe product will be linked. The course will be individually accessible at no charge.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <FieldLabel label="Price (₹)" required />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
+                  <input
+                    type="number" min={0} value={price}
+                    onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="999"
+                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div>
+                <FieldLabel label="Price (USD)" required />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+                  <input
+                    type="number" min={0} step="0.01" value={priceUsd}
+                    onChange={(e) => setPriceUsd(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="12.99"
+                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+            <div>
+              <FieldLabel label="Stripe Price ID" />
+              <input
+                type="text" value={stripePriceId} onChange={(e) => setStripePriceId(e.target.value)}
+                placeholder="price_annual_..."
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              />
+              <p className="text-xs text-zinc-400 mt-1">Auto-synced to the course record on Publish.</p>
+            </div>
+          </>
+        )}
       </div>
 
       {error && (

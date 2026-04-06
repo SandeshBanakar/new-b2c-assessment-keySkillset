@@ -18,11 +18,19 @@ Icons:       lucide-react ONLY
 Colors:      Tailwind tokens ONLY — zero custom hex, zero inline styles
 ```
 
-Plan tier badge colours:
+Plan tier badge colours (Assessment plans only — BASIC/PRO/PREMIUM/ENTERPRISE never apply to course plans):
 - `BASIC` = zinc-100/zinc-600
 - `PRO` = blue-50/blue-700
 - `PREMIUM` = amber-50/amber-700
 - `ENTERPRISE` = violet-50/violet-700
+- `FREE` (SINGLE_COURSE_PLAN only) = green-50/green-700
+
+Single Course Plan rules (KSS-SA-026):
+- `is_free=true` → Pricing Mode = "Free Plan". Price fields hidden. tier='FREE', price=0, price_usd=0, stripe_price_id=NULL.
+- `is_free=false` → Pricing Mode = "Paid Plan". tier=NULL (never BASIC/PRO/PREMIUM for courses).
+- One active (DRAFT or PUBLISHED) plan per course — enforced in create form via `checkCourseHasActivePlan()`. Error shown inline.
+- Switching paid→free on edit triggers a warning modal before applying.
+- `syncCourseFromPlan` is unchanged — free plans sync price=0, price_usd=0, stripe_price_id=NULL + is_individually_purchasable=true.
 
 Feature Mode chips (Tenant detail header):
 - `FULL_CREATOR` = amber chip

@@ -473,7 +473,10 @@ function SingleCoursePlanTab({
                       {plan.course_name ?? <span className="text-zinc-400">—</span>}
                     </td>
                     <td className="px-4 py-3 text-right text-zinc-700 font-medium">
-                      {plan.price_usd != null ? `$${Number(plan.price_usd).toFixed(2)}` : <span className="text-zinc-400">—</span>}
+                      {plan.is_free
+                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">Free</span>
+                        : plan.price_usd != null ? `$${Number(plan.price_usd).toFixed(2)}` : <span className="text-zinc-400">—</span>
+                      }
                     </td>
                     <td className="px-4 py-3 text-center">
                       <PlanStatusBadge status={plan.status} />

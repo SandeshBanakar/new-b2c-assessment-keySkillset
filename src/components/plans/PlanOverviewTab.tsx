@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { Copy, Pencil } from 'lucide-react'
 import { PlanStatusBadge } from './PlanStatusBadge'
 import { PlanTypeBadge } from './PlanTypeBadge'
-import { EditPlanSlideOver } from './EditPlanSlideOver'
+import { EditPlanSlideOver, SingleCoursePlanEditSlideOver } from './EditPlanSlideOver'
 import { updatePlan, writePlanAuditLog, derivePlanType } from '@/lib/supabase/plans'
-import type { PlanDetail } from '@/lib/supabase/plans'
+import type { PlanDetail, SingleCoursePlanRow } from '@/lib/supabase/plans'
 
 type Props = {
   plan: PlanDetail
@@ -253,8 +253,26 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
         </div>
       )}
 
-      {/* Edit slide-over */}
-      {showEdit && (
+      {/* Edit slide-over — Single Course Plans use a dedicated slide-over */}
+      {showEdit && plan.plan_category === 'SINGLE_COURSE_PLAN' && (
+        <SingleCoursePlanEditSlideOver
+          plan={{
+            id:              plan.id,
+            name:            plan.name,
+            display_name:    plan.display_name,
+            price:           plan.price,
+            price_usd:       (plan as PlanDetail & { price_usd?: number }).price_usd ?? null,
+            stripe_price_id: (plan as PlanDetail & { stripe_price_id?: string }).stripe_price_id ?? null,
+            status:          plan.status,
+            course_id:       null,
+            course_name:     null,
+            is_free:         (plan as PlanDetail & { is_free?: boolean }).is_free ?? false,
+          } as SingleCoursePlanRow}
+          onClose={() => setShowEdit(false)}
+          onSaved={onRefresh}
+        />
+      )}
+      {showEdit && plan.plan_category !== 'SINGLE_COURSE_PLAN' && (
         <EditPlanSlideOver
           plan={plan}
           onClose={() => setShowEdit(false)}

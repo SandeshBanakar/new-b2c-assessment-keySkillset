@@ -824,19 +824,42 @@ export function SingleCoursePlanEditSlideOver({
 }) {
   const [name, setName]               = useState(plan.name)
   const [displayName, setDisplayName] = useState(plan.display_name ?? '')
+  const [pricingMode, setPricingMode] = useState<'paid' | 'free'>(plan.is_free ? 'free' : 'paid')
   const [price, setPrice]             = useState<number | ''>(plan.price ?? '')
   const [priceUsd, setPriceUsd]       = useState<number | ''>(plan.price_usd ?? '')
   const [stripeId, setStripeId]       = useState(plan.stripe_price_id ?? '')
   const [status, setStatus]           = useState<'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>(
     plan.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   )
-  const [saving, setSaving]   = useState(false)
-  const [error, setError]     = useState<string | null>(null)
+  const [saving, setSaving]             = useState(false)
+  const [error, setError]               = useState<string | null>(null)
+  const [showFreeWarning, setShowFreeWarning] = useState(false)
+  const [pendingFreeSwitch, setPendingFreeSwitch] = useState(false)
+
+  const isFree = pricingMode === 'free'
+
+  function handlePricingModeChange(mode: 'paid' | 'free') {
+    if (mode === 'free' && pricingMode === 'paid') {
+      // Warn before switching a paid plan to free
+      setPendingFreeSwitch(true)
+      setShowFreeWarning(true)
+    } else {
+      setPricingMode(mode)
+    }
+  }
+
+  function confirmFreeSwitch() {
+    setPricingMode('free')
+    setShowFreeWarning(false)
+    setPendingFreeSwitch(false)
+  }
 
   function validate(): string | null {
     if (!name.trim()) return 'Plan name is required.'
-    if (price === '' || Number(price) < 0) return 'Price (₹) must be a valid number.'
-    if (priceUsd === '' || Number(priceUsd) < 0) return 'Price (USD) must be a valid number.'
+    if (!isFree) {
+      if (price === '' || Number(price) < 0) return 'Price (₹) must be a valid number.'
+      if (priceUsd === '' || Number(priceUsd) < 0) return 'Price (USD) must be a valid number.'
+    }
     return null
   }
 
@@ -849,10 +872,11 @@ export function SingleCoursePlanEditSlideOver({
       await updateSingleCoursePlan(plan.id, {
         name:            name.trim(),
         display_name:    displayName.trim() || null,
-        price:           price as number,
-        price_usd:       priceUsd as number,
-        stripe_price_id: stripeId.trim() || null,
+        price:           isFree ? 0 : price as number,
+        price_usd:       isFree ? 0 : priceUsd as number,
+        stripe_price_id: isFree ? null : (stripeId.trim() || null),
         status,
+        is_free:         isFree,
       })
       onSaved()
     } catch (e: unknown) {
@@ -911,39 +935,68 @@ export function SingleCoursePlanEditSlideOver({
           {/* Pricing */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Pricing</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-zinc-700 mb-1">Price (₹) <span className="text-rose-500">*</span></label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
-                  <input
-                    type="number" min={0} value={price}
-                    onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-700 mb-1">Price (USD) <span className="text-rose-500">*</span></label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
-                  <input
-                    type="number" min={0} step="0.01" value={priceUsd}
-                    onChange={(e) => setPriceUsd(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  />
-                </div>
-              </div>
+
+            {/* Pricing Mode toggle */}
+            <div className="flex gap-2">
+              {(['paid', 'free'] as const).map((mode) => (
+                <button
+                  key={mode} type="button"
+                  onClick={() => handlePricingModeChange(mode)}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md border transition-colors ${
+                    pricingMode === mode
+                      ? 'bg-blue-700 text-white border-blue-700'
+                      : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                  }`}
+                >
+                  {mode === 'paid' ? 'Paid Plan' : 'Free Plan'}
+                </button>
+              ))}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 mb-1">Stripe Price ID</label>
-              <input
-                type="text" value={stripeId} onChange={(e) => setStripeId(e.target.value)}
-                placeholder="price_annual_..."
-                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-              />
-              <p className="text-xs text-zinc-400 mt-1">Auto-synced to course record on save.</p>
-            </div>
+
+            {isFree ? (
+              <div className="rounded-md bg-green-50 border border-green-200 px-4 py-3">
+                <p className="text-sm font-medium text-green-800">Free access — no payment required</p>
+                <p className="text-xs text-green-700 mt-0.5">
+                  Prices will be set to ₹0 / $0. No Stripe product will be linked. The course will be individually accessible at no charge.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">Price (₹) <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
+                      <input
+                        type="number" min={0} value={price}
+                        onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">Price (USD) <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+                      <input
+                        type="number" min={0} step="0.01" value={priceUsd}
+                        onChange={(e) => setPriceUsd(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">Stripe Price ID</label>
+                  <input
+                    type="text" value={stripeId} onChange={(e) => setStripeId(e.target.value)}
+                    placeholder="price_annual_..."
+                    className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                  <p className="text-xs text-zinc-400 mt-1">Auto-synced to course record on save.</p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Status */}
@@ -992,6 +1045,39 @@ export function SingleCoursePlanEditSlideOver({
           </button>
         </div>
       </div>
+
+      {/* Paid → Free warning modal */}
+      {showFreeWarning && pendingFreeSwitch && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-[60]" />
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-md border border-zinc-200 shadow-xl w-full max-w-md">
+              <div className="px-6 py-4 border-b border-zinc-100">
+                <h2 className="text-sm font-semibold text-zinc-900">Switch to Free Plan?</h2>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-sm text-zinc-700">
+                  This will set prices to <span className="font-medium">₹0 / $0</span> and remove the Stripe link on the course. Are you sure?
+                </p>
+              </div>
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-100">
+                <button
+                  onClick={() => { setShowFreeWarning(false); setPendingFreeSwitch(false) }}
+                  className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmFreeSwitch}
+                  className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors"
+                >
+                  Yes, switch to Free
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   )
 }

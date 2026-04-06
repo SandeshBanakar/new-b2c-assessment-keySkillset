@@ -121,16 +121,21 @@ last_modified_by (uuid nullable)
 
 ### plans
 ```
-plan_type, tier (BASIC|PRO|PREMIUM|ENTERPRISE), plan_audience ('B2C'|'B2B'),
+plan_type, tier (BASIC|PRO|PREMIUM|ENTERPRISE|FREE|null), plan_audience ('B2C'|'B2B'),
 plan_category ('ASSESSMENT'|'COURSE_BUNDLE'|'SINGLE_COURSE_PLAN' DEFAULT 'ASSESSMENT'),
 scope ('PLATFORM_WIDE'|'CATEGORY_BUNDLE'), price (INR DEFAULT 0),
 price_usd (numeric), status (DRAFT|PUBLISHED|ARCHIVED),
 display_name, tagline, feature_bullets (jsonb DEFAULT '[]'), footnote,
-is_popular (boolean DEFAULT false), cta_label, max_attempts_per_assessment
+is_popular (boolean DEFAULT false), cta_label, max_attempts_per_assessment,
+is_free (boolean DEFAULT false)
 ```
 - B2B plans: `price=0` always, `scope=PLATFORM_WIDE` always
 - B2B plans have NO: `display_name`, `tagline`, `feature_bullets`, `is_popular`, `cta_label`
-- B2C tiers: `BASIC/PRO/PREMIUM`. B2B tier: `ENTERPRISE`
+- B2C Assessment tiers: `BASIC/PRO/PREMIUM`. B2B tier: `ENTERPRISE`. Tiers are ASSESSMENT-only.
+- SINGLE_COURSE_PLAN tier: `FREE` when `is_free=true`, `NULL` when paid. Never use BASIC/PRO/PREMIUM for course plans.
+- `is_free=true` → `price=0`, `price_usd=0`, `stripe_price_id=NULL`, `tier='FREE'`
+- `is_free=false` (paid SINGLE_COURSE_PLAN) → `tier=NULL`
+- One active (DRAFT or PUBLISHED) SINGLE_COURSE_PLAN per course enforced at UI level (KSS-SA-026)
 - `max_attempts_per_assessment = 6` platform-wide (1 free + 5 paid) — never hardcode 5
 - 9 plans: 6 B2C + 3 B2B (all `PLATFORM_WIDE/PUBLISHED`)
 
