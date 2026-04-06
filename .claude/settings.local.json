@@ -100,7 +100,8 @@
       "WebFetch(domain:uxmovement.com)",
       "WebFetch(domain:uxplanet.org)",
       "WebFetch(domain:www.zuko.io)",
-      "WebFetch(domain:uxpro.cc)"
+      "WebFetch(domain:uxpro.cc)",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\" && git show {} -- \"src/app/super-admin/tenants/[id]/page.tsx\" | grep -i \"password\" | head -10')"
     ]
   },
   "enabledMcpjsonServers": [

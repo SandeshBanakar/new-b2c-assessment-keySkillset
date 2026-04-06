@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase/client'
 import {
   ChevronRight, CheckCircle, X, Loader2,
   UploadCloud, Plus, Users, Download,
-  Pencil, PowerOff, Power, AlertTriangle, Info,
+  Pencil, PowerOff, Power, AlertTriangle, Info, KeyRound, Shield, Calendar,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { EditDetailsSlideOver, TenantRow } from '@/components/tenant-detail/EditDetailsSlideOver'
@@ -44,8 +44,9 @@ interface AdminUser {
   tenant_id: string
   name: string
   email: string
-  role: 'CLIENT_ADMIN' | 'CONTENT_CREATOR' | 'SUPER_ADMIN'
+  role: 'CLIENT_ADMIN' | 'CONTENT_CREATOR'
   is_active: boolean
+  created_at: string
 }
 
 interface AuditLog {
@@ -88,6 +89,10 @@ interface Team {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function getInitials(name: string) {
+  return name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 }
 
 function formatTimestamp(iso: string) {
@@ -806,6 +811,284 @@ function TabOverview({
 
 // TabPlans is rendered via PlansTab component (see import above)
 
+// ─── Edit User Slide-over ─────────────────────────────────────────────────────
+
+function EditUserSlideOver({
+  user,
+  tenantId,
+  onClose,
+  onSaved,
+}: {
+  user: AdminUser
+  tenantId: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const { showToast } = useToast()
+  const [name, setName] = useState(user.name)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [showPasswordWarning, setShowPasswordWarning] = useState(false)
+
+  const passwordFilled = newPassword.length > 0 || confirmPassword.length > 0
+
+  function validate(): string | null {
+    if (!name.trim()) return 'Name is required.'
+    if (passwordFilled) {
+      if (newPassword.length < 8) return 'Password must be at least 8 characters.'
+      if (newPassword !== confirmPassword) return 'Passwords do not match.'
+    }
+    return null
+  }
+
+  function handleSaveClick() {
+    setError(null)
+    const err = validate()
+    if (err) { setError(err); return }
+    if (passwordFilled) {
+      setShowPasswordWarning(true)
+    } else {
+      void doSave()
+    }
+  }
+
+  async function doSave() {
+    setSaving(true)
+    setShowPasswordWarning(false)
+    try {
+      const nameChanged = name.trim() !== user.name
+      const update: Record<string, string> = { name: name.trim() }
+      if (passwordFilled) update.password_hash = newPassword
+
+      const { error: updateErr } = await supabase
+        .from('admin_users')
+        .update(update)
+        .eq('id', user.id)
+      if (updateErr) { setError(updateErr.message); setSaving(false); return }
+
+      if (nameChanged) {
+        await supabase.from('audit_logs').insert({
+          tenant_id: tenantId,
+          actor_name: 'Super Admin',
+          action: 'NAME_UPDATED',
+          entity_type: 'AdminUser',
+          entity_id: user.id,
+          before_state: { name: user.name },
+          after_state: { name: name.trim() },
+        })
+      }
+      if (passwordFilled) {
+        await supabase.from('audit_logs').insert({
+          tenant_id: tenantId,
+          actor_name: 'Super Admin',
+          action: 'PASSWORD_RESET',
+          entity_type: 'AdminUser',
+          entity_id: user.id,
+          before_state: null,
+          after_state: { password_changed: true },
+        })
+      }
+
+      showToast(`${name.trim()} has been updated.`)
+      onSaved()
+    } catch {
+      setError('Failed to save changes.')
+      setSaving(false)
+    }
+  }
+
+  const roleLabel = user.role === 'CLIENT_ADMIN' ? 'Client Admin' : 'Content Creator'
+  const roleBadgeCls = user.role === 'CLIENT_ADMIN'
+    ? 'bg-blue-50 text-blue-700'
+    : 'bg-violet-50 text-violet-700'
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-[480px] z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-4 border-b border-zinc-200">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">Edit User</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">{user.email}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 mt-0.5">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          {/* Avatar block */}
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-md bg-zinc-100 flex items-center justify-center text-lg font-semibold text-zinc-600 shrink-0">
+              {getInitials(user.name)}
+            </div>
+            <div>
+              <p className="text-base font-semibold text-zinc-900">{user.name}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${roleBadgeCls}`}>
+                  <Shield className="w-3 h-3" />
+                  {roleLabel}
+                </span>
+                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
+                  user.is_active ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-400'
+                }`}>
+                  {user.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Read-only info */}
+          <div className="space-y-4 rounded-md bg-zinc-50 border border-zinc-100 px-4 py-4">
+            <div>
+              <p className="text-xs font-medium text-zinc-400 mb-1">Email</p>
+              <p className="text-sm text-zinc-900">{user.email}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-zinc-400 mb-1">Role</p>
+              <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${roleBadgeCls}`}>
+                {roleLabel}
+              </span>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-zinc-400 mb-1">Added</p>
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <p className="text-sm text-zinc-900">{formatDate(user.created_at)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Editable: Full Name */}
+          <div>
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">
+              Profile
+            </p>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">
+              Full Name <span className="text-rose-600">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Reset Password */}
+          <div className="pt-2 border-t border-zinc-100">
+            <div className="flex items-center gap-2 mb-3">
+              <KeyRound className="w-4 h-4 text-zinc-400" />
+              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+                Reset Password
+              </p>
+            </div>
+            <p className="text-xs text-zinc-400 mb-3">
+              Leave blank to keep the current password. Filling these fields will reset the
+              user&apos;s password on save.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Min. 8 characters"
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            {passwordFilled && (
+              <div className="flex items-start gap-2 mt-3 p-3 rounded-md bg-amber-50 border border-amber-200">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800">
+                  Saving will reset this user&apos;s password. You will need to share the new
+                  password with them directly.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {error && <p className="text-xs text-rose-600">{error}</p>}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveClick}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+
+      {/* Password reset confirmation modal */}
+      {showPasswordWarning && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-md border border-zinc-200 w-full max-w-sm mx-4 shadow-xl">
+            <div className="px-6 py-5">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900">Reset password?</p>
+                  <p className="text-sm text-zinc-500 mt-1">
+                    You are about to reset{' '}
+                    <span className="font-medium text-zinc-700">{user.name}</span>&apos;s
+                    password. They will need to log in with the new password immediately.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100">
+              <button
+                onClick={() => setShowPasswordWarning(false)}
+                className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void doSave()}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700"
+              >
+                Reset &amp; Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── Tab: Users & Roles ───────────────────────────────────────────────────────
 
 function TabUsersRoles({
@@ -825,6 +1108,7 @@ function TabUsersRoles({
 }) {
   const { showToast } = useToast()
   const [showInvite, setShowInvite] = useState(false)
+  const [editUser, setEditUser] = useState<AdminUser | null>(null)
   const [replaceModal, setReplaceModal] = useState<AdminUser | null>(null)
   const [deactivateModal, setDeactivateModal] = useState<AdminUser | null>(null)
   const [reactivating, setReactivating] = useState<string | null>(null)
@@ -937,11 +1221,9 @@ function TabUsersRoles({
                     <span className={`text-xs font-medium rounded-md px-2 py-0.5 ${
                       u.role === 'CLIENT_ADMIN'
                         ? 'bg-blue-50 text-blue-700'
-                        : u.role === 'SUPER_ADMIN'
-                        ? 'bg-zinc-100 text-zinc-600'
                         : 'bg-violet-50 text-violet-700'
                     }`}>
-                      {u.role === 'CLIENT_ADMIN' ? 'Client Admin' : u.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Content Creator'}
+                      {u.role === 'CLIENT_ADMIN' ? 'Client Admin' : 'Content Creator'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -952,41 +1234,59 @@ function TabUsersRoles({
                     </span>
                   </td>
                   <td className="px-4 py-3 flex items-center gap-3">
+                    <button
+                      onClick={() => setEditUser(u)}
+                      className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                    >
+                      Edit
+                    </button>
                     {u.role === 'CLIENT_ADMIN' && u.is_active && (
-                      <button
-                        onClick={() => setReplaceModal(u)}
-                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-                      >
-                        Replace
-                      </button>
+                      <>
+                        <span className="text-zinc-300">·</span>
+                        <button
+                          onClick={() => setReplaceModal(u)}
+                          className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                        >
+                          Replace
+                        </button>
+                      </>
                     )}
                     {u.role === 'CLIENT_ADMIN' && !u.is_active && (
-                      <button
-                        onClick={() => reactivateUser(u)}
-                        disabled={reactivating === u.id}
-                        className="text-sm font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
-                      >
-                        {reactivating === u.id && <Loader2 className="w-3 h-3 animate-spin" />}
-                        Reactivate
-                      </button>
+                      <>
+                        <span className="text-zinc-300">·</span>
+                        <button
+                          onClick={() => reactivateUser(u)}
+                          disabled={reactivating === u.id}
+                          className="text-sm font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {reactivating === u.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                          Reactivate
+                        </button>
+                      </>
                     )}
                     {u.role === 'CONTENT_CREATOR' && u.is_active && (
-                      <button
-                        onClick={() => setDeactivateModal(u)}
-                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-                      >
-                        Deactivate
-                      </button>
+                      <>
+                        <span className="text-zinc-300">·</span>
+                        <button
+                          onClick={() => setDeactivateModal(u)}
+                          className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                        >
+                          Deactivate
+                        </button>
+                      </>
                     )}
                     {u.role === 'CONTENT_CREATOR' && !u.is_active && (
-                      <button
-                        onClick={() => reactivateUser(u)}
-                        disabled={reactivating === u.id}
-                        className="text-sm font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
-                      >
-                        {reactivating === u.id && <Loader2 className="w-3 h-3 animate-spin" />}
-                        Reactivate
-                      </button>
+                      <>
+                        <span className="text-zinc-300">·</span>
+                        <button
+                          onClick={() => reactivateUser(u)}
+                          disabled={reactivating === u.id}
+                          className="text-sm font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {reactivating === u.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                          Reactivate
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>
@@ -1006,6 +1306,18 @@ function TabUsersRoles({
           onClose={() => setShowInvite(false)}
           onInvited={() => {
             setShowInvite(false)
+            onRefresh()
+          }}
+        />
+      )}
+
+      {editUser && (
+        <EditUserSlideOver
+          user={editUser}
+          tenantId={tenantId}
+          onClose={() => setEditUser(null)}
+          onSaved={() => {
+            setEditUser(null)
             onRefresh()
           }}
         />
