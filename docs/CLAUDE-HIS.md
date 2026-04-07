@@ -6,6 +6,12 @@
 
 ## COMPLETED WORK LOG
 
+### April 7, 2026 — KEYS-485 / KEYS-501 Plan restore + delete — spec locked, not yet built
+- KEYS-485: Restore archived plan (to PUBLISHED or DRAFT) from plan detail Overview tab. Full modal spec, audit log (RESTORED_TO_LIVE / RESTORED_TO_DRAFT / RESTORE_FAILED), syncCourseFromPlan reverse logic for Single Course Plans. Dead code removal (ArchivePlanModal + onArchive from list page).
+- KEYS-501: Hard delete plan (ARCHIVED + zero subscribers) from plan detail Overview tab. Type-to-confirm modal, cascade delete of all dependent rows. Separate story — not built in KEYS-485.
+- CLAUDE-PT.md updated with full Plan Status Actions spec for both tickets.
+- Jira: KEYS-485 (restore), KEYS-501 (delete) created in keySkillset Engineering project.
+
 ### April 6, 2026 — KSS-SA-026 Free plan support for Single Course Plan
 - KSS-DB-006: `plans.is_free BOOLEAN DEFAULT false` added. `tier` CHECK expanded to include `'FREE'`. `NOT NULL` dropped from `tier`. Existing SINGLE_COURSE_PLAN rows migrated to `tier=NULL`.
 - Pricing Mode toggle (`Paid Plan` / `Free Plan`) added to create form (Section 3) and `SingleCoursePlanEditSlideOver`.

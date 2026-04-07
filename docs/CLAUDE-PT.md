@@ -233,6 +233,54 @@ No global Create button — tab-scoped buttons only.
 - Greyed out in `AddContentSlideOver` with tooltip
 - ALLOWED in course bundles — no gate for bundles
 
+**Plan Status Actions — detail page Overview tab ONLY (KEYS-485 / KEYS-501)**
+
+Status strip buttons per status:
+- `DRAFT`:     [Edit Details] [Publish Plan — blue filled] [Archive Plan — rose ghost]
+- `PUBLISHED`: [Edit Details] [Archive Plan — rose ghost]
+- `ARCHIVED`:  [Edit Details] [Restore Plan — blue filled] [Delete Plan — rose ghost]*
+  *Delete Plan only shown when `plan_subscribers.subscriber_count = 0`
+   AND for B2B plans: also zero rows in `tenant_plan_map`
+
+Archive modal — copy differs by plan status:
+- `DRAFT`: rose-50 block (plan name only, no subscriber count).
+  Copy: "This plan is in draft. Archiving will remove it from the draft list." No Salesforce warning.
+- `PUBLISHED`: rose-50 block (plan name + subscriber count, always shown even if 0).
+  Copy: "This action is destructive. Make sure you inform the users via Salesforce about this action."
+  Salesforce warning always shown for PUBLISHED regardless of subscriber count.
+
+Restore Plan modal (ARCHIVED plans — KEYS-485):
+- Trigger: "Restore Plan" (blue-700 filled) — replaces static "Archived — duplicate to create a new version" text
+- Body:
+  1. blue-50/blue-100 border block: plan name + tier/category badge + subscriber count (always shown, even 0)
+  2. B2B plans only (separate line below block): "Tenants assigned to this plan will regain access if restored to Live."
+  3. `border-t border-zinc-100` divider
+  4. Neutral grey line: "The plan will be saved as a draft and will not be visible to learners until published."
+- Footer: Cancel (text-link far-left) | right side flex-col:
+  - Caption: "This plan will immediately become available to Learners" (text-xs text-zinc-500)
+  - [Restore to Draft — ghost border] [Restore to Live — blue-700 filled]
+- Loading: clicked button → "Restoring to Draft…" / "Restoring to Live…"; other button disables
+- After confirm: stay on detail page, refresh in place
+- Audit log: `RESTORED_TO_LIVE` / `RESTORED_TO_DRAFT` via `writePlanAuditLog`
+
+Single Course Plan restore rules (KEYS-485):
+- Restore to PUBLISHED: call `syncCourseFromPlan(courseId, { ...plan, status: 'PUBLISHED' })` FIRST
+  Only call `updatePlan(id, { status: 'PUBLISHED' })` if sync succeeds
+- Restore to DRAFT: call `updatePlan(id, { status: 'DRAFT' })` only — do NOT call syncCourseFromPlan
+- Sync failure: write `RESTORE_FAILED` audit log `{ reason: 'Course sync failed', error }`, show error toast, plan stays ARCHIVED
+- No course linked (empty plan_content_map): "Restore to Live" disabled (`opacity-50 cursor-not-allowed`); "Restore to Draft" still enabled
+
+Delete Plan modal (ARCHIVED + zero subscribers — KEYS-501, separate story):
+- Trigger: "Delete Plan" (rose ghost) in status strip — only when ARCHIVED + subscribers = 0 + (B2B: tenant_plan_map rows = 0)
+- Body: rose-50 block (plan name + tier/category badge) + "This action is permanent and cannot be undone."
+  Input field: SA must type `plan.name` exactly (case-sensitive) to enable confirm button
+- Footer: Cancel | Delete Plan (rose filled — disabled until name matches exactly)
+- Cascade on hard DELETE: `plan_content_map`, `plan_subscribers`, `tenant_plan_map`,
+  `b2c_assessment_subscriptions`, `b2c_course_subscriptions`, `plan_audit_logs`
+- Single Course Plan: set `is_individually_purchasable = false` on linked course before deleting plan row
+- Post-deletion: redirect to `/super-admin/plans-pricing` + toast "Plan deleted successfully"
+- No audit log (no global SA audit log table exists)
+
 ---
 
 ## B2C USER PROFILE SPEC
