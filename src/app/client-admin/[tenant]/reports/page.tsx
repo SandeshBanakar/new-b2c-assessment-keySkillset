@@ -311,6 +311,7 @@ function LearnerPerformanceTab({ tenantId }: { tenantId: string }) {
         {loading ? <TableLoading /> : filtered.length === 0 ? (
           <TableEmpty message="No results match your filters." />
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
@@ -343,6 +344,7 @@ function LearnerPerformanceTab({ tenantId }: { tenantId: string }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       {!loading && filtered.length > 0 && <RowCount shown={filtered.length} total={rows.length} unit="row" />}
@@ -473,6 +475,7 @@ function ContentPerformanceTab({ tenantId }: { tenantId: string }) {
         {loading ? <TableLoading /> : filtered.length === 0 ? (
           <TableEmpty message="No content data available." />
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
@@ -513,6 +516,7 @@ function ContentPerformanceTab({ tenantId }: { tenantId: string }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       {!loading && filtered.length > 0 && <RowCount shown={filtered.length} total={rows.length} unit="item" />}
@@ -603,6 +607,7 @@ function CertificatesTab({ tenantId }: { tenantId: string }) {
             sub="Certificates are issued when learners complete a course."
           />
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
@@ -625,6 +630,7 @@ function CertificatesTab({ tenantId }: { tenantId: string }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       {!loading && filtered.length > 0 && <RowCount shown={filtered.length} total={rows.length} unit="certificate" />}
@@ -740,6 +746,7 @@ function LearnerActivityTab({ tenantId }: { tenantId: string }) {
         {loading ? <TableLoading /> : filtered.length === 0 ? (
           <TableEmpty message="No learners match your filters." />
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
@@ -774,6 +781,7 @@ function LearnerActivityTab({ tenantId }: { tenantId: string }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       {!loading && filtered.length > 0 && <RowCount shown={filtered.length} total={rows.length} unit="learner" />}

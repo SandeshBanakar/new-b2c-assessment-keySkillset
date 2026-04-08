@@ -104,7 +104,8 @@
       "Bash(xargs -I{} sh -c 'echo \"=== {} ===\" && git show {} -- \"src/app/super-admin/tenants/[id]/page.tsx\" | grep -i \"password\" | head -10')",
       "mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql",
       "mcp__claude_ai_Atlassian__getVisibleJiraProjects",
-      "mcp__claude_ai_Atlassian__createJiraIssue"
+      "mcp__claude_ai_Atlassian__createJiraIssue",
+      "mcp__atlassian__getVisibleJiraProjects"
     ]
   },
   "enabledMcpjsonServers": [
