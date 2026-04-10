@@ -14,8 +14,15 @@ export type B2CUser = {
   status: 'ACTIVE' | 'SUSPENDED'
   lastActiveDate: string | null
   createdAt: string
+  // suspension audit fields
+  suspensionReason: string | null
+  suspendedAt: string | null
+  suspendedByName: string | null
+  unsuspendReason: string | null
+  unsuspendedAt: string | null
   // computed
   displayStatus: DisplayStatus
+  courseCount: number
 }
 
 export type UserCourseProgress = {
@@ -115,12 +122,44 @@ export function computeDisplayStatus(
 // ─── User Fetchers ────────────────────────────────────────────────────────────
 
 export async function fetchB2CUsers(): Promise<B2CUser[]> {
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, email, display_name, subscription_tier, subscription_status, stripe_subscription_id, subscription_start_date, subscription_end_date, status, last_active_date, created_at')
-    .order('created_at', { ascending: false })
+  const now = new Date().toISOString()
+
+  const [{ data, error }, { data: activeSubs }, { data: progress }] = await Promise.all([
+    supabase
+      .from('users')
+      .select('id, email, display_name, subscription_tier, subscription_status, stripe_subscription_id, subscription_start_date, subscription_end_date, status, last_active_date, created_at')
+      .order('created_at', { ascending: false }),
+    // Active entitlement: status active|trialing AND period not yet expired AND course_id present.
+    // Mirrors the platform access gate (CLAUDE-DB: status='active' AND current_period_end > NOW())
+    // extended to include trialing — trialing users have full course access in Stripe's model.
+    // current_period_end nulls excluded by .gt() SQL semantics (consistent with access gate).
+    supabase
+      .from('b2c_course_subscriptions')
+      .select('user_id, course_id')
+      .in('status', ['active', 'trialing'])
+      .gt('current_period_end', now)
+      .not('course_id', 'is', null),
+    // Engagement: any course the user has started or completed (IN_PROGRESS or COMPLETED).
+    // Captures free course access once a user opens the course — no subscription row exists for free.
+    // "A completed course is still a course they engaged with."
+    supabase
+      .from('b2c_course_progress')
+      .select('user_id, course_id'),
+  ])
 
   if (error) throw new Error(error.message)
+
+  // Union active entitlements + engagement, deduplicated by course_id per user.
+  const courseMap = new Map<string, Set<string>>()
+
+  for (const s of (activeSubs ?? [])) {
+    if (!courseMap.has(s.user_id)) courseMap.set(s.user_id, new Set())
+    courseMap.get(s.user_id)!.add(s.course_id as string)
+  }
+  for (const p of (progress ?? [])) {
+    if (!courseMap.has(p.user_id)) courseMap.set(p.user_id, new Set())
+    courseMap.get(p.user_id)!.add(p.course_id)
+  }
 
   return (data ?? []).map((u) => ({
     id: u.id,
@@ -134,18 +173,34 @@ export async function fetchB2CUsers(): Promise<B2CUser[]> {
     status: u.status as 'ACTIVE' | 'SUSPENDED',
     lastActiveDate: u.last_active_date,
     createdAt: u.created_at,
+    suspensionReason: null,
+    suspendedAt: null,
+    suspendedByName: null,
+    unsuspendReason: null,
+    unsuspendedAt: null,
     displayStatus: computeDisplayStatus(u.status as 'ACTIVE' | 'SUSPENDED', u.last_active_date),
+    courseCount: courseMap.get(u.id)?.size ?? 0,
   }))
 }
 
 export async function fetchB2CUser(id: string): Promise<B2CUser | null> {
   const { data, error } = await supabase
     .from('users')
-    .select('id, email, display_name, subscription_tier, subscription_status, stripe_subscription_id, subscription_start_date, subscription_end_date, status, last_active_date, created_at')
+    .select('id, email, display_name, subscription_tier, subscription_status, stripe_subscription_id, subscription_start_date, subscription_end_date, status, last_active_date, created_at, suspension_reason, suspended_at, suspended_by, unsuspend_reason, unsuspended_at')
     .eq('id', id)
     .single()
 
   if (error) return null
+
+  let suspendedByName: string | null = null
+  if (data.suspended_by) {
+    const { data: admin } = await supabase
+      .from('admin_users')
+      .select('name')
+      .eq('id', data.suspended_by)
+      .single()
+    suspendedByName = admin?.name ?? null
+  }
 
   return {
     id: data.id,
@@ -159,7 +214,13 @@ export async function fetchB2CUser(id: string): Promise<B2CUser | null> {
     status: data.status as 'ACTIVE' | 'SUSPENDED',
     lastActiveDate: data.last_active_date,
     createdAt: data.created_at,
+    suspensionReason: data.suspension_reason ?? null,
+    suspendedAt: data.suspended_at ?? null,
+    suspendedByName,
+    unsuspendReason: data.unsuspend_reason ?? null,
+    unsuspendedAt: data.unsuspended_at ?? null,
     displayStatus: computeDisplayStatus(data.status as 'ACTIVE' | 'SUSPENDED', data.last_active_date),
+    courseCount: 0,
   }
 }
 
@@ -563,19 +624,32 @@ export async function fetchCourseModuleProgress(
 
 // ─── User Actions ─────────────────────────────────────────────────────────────
 
-export async function suspendUser(id: string): Promise<void> {
+// Demo: hardcoded Super Admin UUID until auth session is implemented
+const DEMO_SA_ID = '3bd6101b-1fb9-4c96-a9a5-c958a3deb54a'
+
+export async function suspendUser(id: string, reason: string): Promise<void> {
   const { error } = await supabase
     .from('users')
-    .update({ status: 'SUSPENDED' })
+    .update({
+      status: 'SUSPENDED',
+      suspension_reason: reason,
+      suspended_at: new Date().toISOString(),
+      suspended_by: DEMO_SA_ID,
+    })
     .eq('id', id)
 
   if (error) throw new Error(error.message)
 }
 
-export async function unsuspendUser(id: string): Promise<void> {
+export async function unsuspendUser(id: string, reason: string | null): Promise<void> {
   const { error } = await supabase
     .from('users')
-    .update({ status: 'ACTIVE' })
+    .update({
+      status: 'ACTIVE',
+      unsuspend_reason: reason || null,
+      unsuspended_at: new Date().toISOString(),
+      unsuspended_by: DEMO_SA_ID,
+    })
     .eq('id', id)
 
   if (error) throw new Error(error.message)

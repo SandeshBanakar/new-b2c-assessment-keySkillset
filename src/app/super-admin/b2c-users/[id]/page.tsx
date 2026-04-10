@@ -168,11 +168,81 @@ function SuspendModal({
             </button>
             <button
               onClick={handleConfirm}
-              disabled={saving}
+              disabled={saving || !reason.trim()}
               className="px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {saving ? 'Suspending…' : 'Suspend User'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── Unsuspend Modal ──────────────────────────────────────────────────────────
+
+function UnsuspendModal({
+  user, onClose, onConfirm,
+}: { user: B2CUser; onClose: () => void; onConfirm: (reason: string | null) => Promise<void> }) {
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleConfirm() {
+    setSaving(true)
+    setError(null)
+    try { await onConfirm(reason.trim() || null) } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to remove suspension.')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-md border border-zinc-200 shadow-xl w-full max-w-md">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+            <h2 className="text-sm font-semibold text-zinc-900">Remove Suspension</h2>
+            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="flex items-start gap-3 p-3 rounded-md bg-blue-50 border border-blue-100">
+              <CheckCircle2 className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-blue-700">{user.displayName ?? user.email}</p>
+                <p className="text-xs text-blue-600 mt-0.5">Suspension will be lifted immediately. The user will regain access to the platform.</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-900 mb-1.5">
+                Reason for lifting suspension <span className="text-zinc-400 font-normal">(optional)</span>
+              </label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. Issue resolved, false positive…"
+                rows={3}
+                className="w-full text-sm border border-zinc-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-700 resize-none"
+              />
+            </div>
+            {error && <p className="text-sm text-rose-600">{error}</p>}
+          </div>
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-100">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={saving}
+              className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {saving ? 'Removing…' : 'Remove Suspension'}
             </button>
           </div>
         </div>
@@ -837,7 +907,7 @@ export default function B2CUserProfilePage() {
   const [courseSubs, setCourseSubs] = useState<CourseSubscription[]>([])
   const [loading, setLoading] = useState(true)
   const [showSuspendModal, setShowSuspendModal] = useState(false)
-  const [actionLoading, setActionLoading] = useState(false)
+  const [showUnsuspendModal, setShowUnsuspendModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Attempt history slide-over state — single instance at page level
@@ -865,22 +935,15 @@ export default function B2CUserProfilePage() {
   useEffect(() => { loadUser() }, [id])
 
   async function handleSuspend(reason: string) {
-    await suspendUser(id)
+    await suspendUser(id, reason)
     setShowSuspendModal(false)
     await loadUser()
   }
 
-  async function handleUnsuspend() {
-    setActionLoading(true)
-    setError(null)
-    try {
-      await unsuspendUser(id)
-      await loadUser()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to remove suspension.')
-    } finally {
-      setActionLoading(false)
-    }
+  async function handleUnsuspend(reason: string | null) {
+    await unsuspendUser(id, reason)
+    setShowUnsuspendModal(false)
+    await loadUser()
   }
 
   if (loading) {
@@ -934,6 +997,22 @@ export default function B2CUserProfilePage() {
                 )}
               </div>
               <p className="text-sm text-zinc-500 mt-0.5">{user.email}</p>
+              {isSuspended && (user.suspensionReason || user.suspendedAt || user.suspendedByName) && (
+                <div className="mt-2 space-y-0.5">
+                  {user.suspensionReason && (
+                    <p className="text-xs text-rose-700">
+                      <span className="font-medium">Reason:</span> {user.suspensionReason}
+                    </p>
+                  )}
+                  <p className="text-xs text-zinc-500">
+                    {user.suspendedAt && (
+                      <span>Suspended on {new Date(user.suspendedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    )}
+                    {user.suspendedAt && user.suspendedByName && <span> · </span>}
+                    {user.suspendedByName && <span>by {user.suspendedByName}</span>}
+                  </p>
+                </div>
+              )}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${TIER_BADGE[user.subscriptionTier] ?? 'bg-zinc-100 text-zinc-600'}`}>
                   {TIER_LABELS[user.subscriptionTier] ?? user.subscriptionTier}
@@ -946,12 +1025,10 @@ export default function B2CUserProfilePage() {
           {/* Action button */}
           {isSuspended ? (
             <button
-              onClick={handleUnsuspend}
-              disabled={actionLoading}
-              className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 flex items-center gap-2 shrink-0"
+              onClick={() => setShowUnsuspendModal(true)}
+              className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors shrink-0"
             >
-              {actionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {actionLoading ? 'Removing…' : 'Remove Suspension'}
+              Remove Suspension
             </button>
           ) : (
             <button
@@ -1067,6 +1144,15 @@ export default function B2CUserProfilePage() {
           user={user}
           onClose={() => setShowSuspendModal(false)}
           onConfirm={handleSuspend}
+        />
+      )}
+
+      {/* Unsuspend Modal */}
+      {showUnsuspendModal && (
+        <UnsuspendModal
+          user={user}
+          onClose={() => setShowUnsuspendModal(false)}
+          onConfirm={handleUnsuspend}
         />
       )}
 

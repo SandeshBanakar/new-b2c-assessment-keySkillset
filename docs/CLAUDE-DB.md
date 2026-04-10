@@ -71,11 +71,19 @@ subscription_tier ('free'|'basic'|'professional'|'premium'),
 subscription_status, subscription_start_date, subscription_end_date,
 stripe_subscription_id, status ('ACTIVE'|'SUSPENDED'),
 last_active_date, user_onboarded, selected_exams, goal, xp, streak, role,
-free_attempt_used, organization_id, created_at, updated_at
+free_attempt_used, organization_id, created_at, updated_at,
+suspension_reason (text nullable), suspended_at (timestamptz nullable),
+suspended_by (uuid nullable → admin_users.id),
+unsuspend_reason (text nullable), unsuspended_at (timestamptz nullable),
+unsuspended_by (uuid nullable → admin_users.id)
 ```
 - `INACTIVE` = UI-computed only (see footguns above)
 - `subscription_tier` = assessment plan tier only
 - Free tier = no assessment plan subscription row (default unsubscribed state)
+- `suspension_reason` required at app level (confirm disabled until typed)
+- `suspended_by` / `unsuspended_by` hardcoded to demo SA UUID until auth is implemented
+- Multiple suspension cycles overwrite columns — full history deferred to V3
+- KSS-DB-SA-012 added 6 suspension columns — April 9, 2026 (KEYS-553)
 - Demo UUIDs (locked):
   - Free: `9a3b56a5-31f6-4a58-81fa-66157c68d4f0`
   - Basic: `a0c16137-7fd5-44f5-96e6-60e4617d9230`
@@ -100,10 +108,15 @@ audience_type (nullable until LIVE),
 visibility_scope ('GLOBAL'|'TENANT_PRIVATE'|'PENDING_PROMOTION' DEFAULT 'GLOBAL'),
 tenant_scope_id (uuid nullable — NOT tenant_id),
 created_by (never changes), last_modified_by (uuid nullable),
-created_at, updated_at
+created_at, updated_at,
+description (TEXT nullable — KSS-DB-007),
+display_config (JSONB DEFAULT '{}' — KSS-DB-007),
+assessment_type (TEXT DEFAULT 'LINEAR' CHECK IN ('LINEAR','ADAPTIVE') — KSS-DB-007)
 ```
-- NO description column
 - `tenant_scope_id IS NULL` = GLOBAL | NOT NULL = TENANT_PRIVATE
+- `display_config` shape: `{ what_youll_get: string[], syllabus: string[] }`
+- `assessment_type`: `LINEAR` (default) | `ADAPTIVE` (SAT only — engine deferred)
+- KSS-DB-007 applied April 9 2026
 
 ### courses
 ```
@@ -253,6 +266,21 @@ teams:       id, department_id (FK), tenant_id, name,
              status (ACTIVE|INACTIVE), created_at
 ```
 - Dept deactivation cascade: child teams → INACTIVE, learner dept/team assignments → NULL
+
+### learner_course_progress (B2B only)
+```
+id (uuid PK), learner_id (FK→learners ON DELETE CASCADE),
+tenant_id (FK→tenants ON DELETE CASCADE),
+course_id (FK→courses ON DELETE CASCADE),
+status TEXT CHECK ('NOT_STARTED'|'IN_PROGRESS'|'COMPLETED') DEFAULT 'NOT_STARTED',
+progress_pct INTEGER CHECK (0–100) DEFAULT 0,
+started_at (timestamptz nullable), completed_at (timestamptz nullable),
+updated_at (timestamptz DEFAULT NOW())
+UNIQUE (learner_id, course_id, tenant_id)
+```
+- B2B course progress tracking — one row per learner+course+tenant
+- Fallback derivation (if no row): `score_pct ≥ 100 → COMPLETED`, `score_pct > 0 → IN_PROGRESS`, else `NOT_STARTED`
+- KSS-DB-008 applied April 9 2026
 
 ### learner_attempts (B2B only)
 ```

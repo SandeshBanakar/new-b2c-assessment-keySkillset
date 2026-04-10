@@ -6,6 +6,40 @@
 
 ## COMPLETED WORK LOG
 
+### April 10, 2026 — SA B2C Users list — Courses column (final implementation)
+- **B2C Users list** (`super-admin/b2c-users/page.tsx`): **Courses** column added after Tier. Display-only, left-aligned, uniform styling, zero shows as `0`. Not sortable, not clickable.
+- `B2CUser` type: `courseCount: number` field.
+- `fetchB2CUser` (single-user detail): `courseCount: 0` hardcoded — detail page has full subscription tabs; this field unused there. Known compromise, not a bug.
+- **`courseCount` source — locked spec (union, deduplicated by course_id per user):**
+  - (1) `b2c_course_subscriptions WHERE status IN ('active','trialing') AND current_period_end > NOW() AND course_id IS NOT NULL` — active paid entitlement, including trialing (full Stripe access). Mirrors platform access gate (CLAUDE-DB) but extends to trialing. `current_period_end` nulls excluded by SQL `.gt()` semantics — matches platform gate.
+  - (2) `b2c_course_progress` (all rows, any status) — courses the user has started or completed, free or paid. "A completed course is still a course they engaged with."
+  - Three parallel queries in `fetchB2CUsers`: users + activeSubs + progress. `Promise.all`.
+  - null `course_id` filtered in query (`.not('course_id', 'is', null)`), not client-side.
+- Sub-PRD 7 updated to v2.2 in Confluence (§3.3, §3.6, §10.1).
+
+### April 9, 2026 — CA Catalog restructure + CA Learner Profile rebuild + SA Create Assessments
+- **CA Catalog** (`client-admin/[tenant]/catalog/page.tsx`): replaced flat ALL/ASSESSMENT/COURSE filter with Courses | Assessments tabs (count badges). Added `CourseModuleAccordion` (module→topic expand). Added `ContentDetailSlideOver` (unified detail + assign in one slide-over — Option B). Courses tab shows module hierarchy; Assessments tab shows tenant attempt count from `learner_attempts`. TENANT_PRIVATE content appears in both tabs with "Your Organisation" badge. Tailwind: `w-120` (not `w-[480px]`).
+- **CA Learner Profile** (`client-admin/[tenant]/learners/[id]/page.tsx`): full rebuild matching SA B2C profile style. Identity 2×2 InfoGrid, Organisation card, Assessment Performance table (Title | Category | Attempts | Best Score | Last Attempted — no pass/fail), Course Performance table (Title | Type | Progress bar | Status | Completed | Certificate). Queries: `learner_attempts`, `learner_course_progress`, `exam_categories`, `content_items`, `courses`, `certificates`.
+- **CA Reports** scroll fix: all 4 tab tables (`<table>`) wrapped in `<div className="overflow-x-auto">` to prevent page-level horizontal scroll on small screens.
+- **SA Create Assessments list** (`super-admin/create-assessments/page.tsx`): replaced Coming Soon with full table (Title | Type badge | Length | Category | Status | Created by | Last edited | 3-dot Actions). "Create Linear" (blue) + "Create Adaptive" (disabled, hover tooltip — coming soon) buttons top-right. Filter dropdowns for Type / Category / Status.
+- **SA Create Linear Assessment form** (`super-admin/create-assessments/linear/page.tsx`): new page at `/super-admin/create-assessments/linear`. Basic Info (title, exam category, test type, duration, navigation policy) + Display Config (description, What You'll Get bullets, Syllabus bullets → saved to `display_config` JSONB) + Sections & Question Pools Coming Soon stub. Saves to `content_items` as `assessment_type='LINEAR'`, `status='INACTIVE'`, `source='PLATFORM'`.
+- **KSS-DB-007** (applied April 9 2026): `ALTER TABLE content_items ADD COLUMN description TEXT, ADD COLUMN display_config JSONB DEFAULT '{}', ADD COLUMN assessment_type TEXT DEFAULT 'LINEAR' CHECK IN ('LINEAR','ADAPTIVE')`.
+- **KSS-DB-008** (applied April 9 2026): `CREATE TABLE learner_course_progress` — B2B learner course progress (learner_id, tenant_id, course_id, status NOT_STARTED/IN_PROGRESS/COMPLETED, progress_pct 0–100, started_at, completed_at). UNIQUE (learner_id, course_id, tenant_id). Fallback derivation from `learner_attempts.score_pct` if no row exists.
+- `CLAUDE-DB.md` updated: content_items section + new `learner_course_progress` table documented.
+- Build: `npm run build` passed clean (35 routes).
+
+### April 9, 2026 — KEYS-553 SA B2C Users — Suspend/Unsuspend V2
+- KSS-DB-SA-012: 6 new columns on `users`: `suspension_reason`, `suspended_at`, `suspended_by`, `unsuspend_reason`, `unsuspended_at`, `unsuspended_by`
+- Radhika Anand (`radhika@keyskillset.com`, `6046c2f4`) updated to SUPER_ADMIN in `admin_users`
+- Meera Krishnan (`a1f52fe9`) backfilled with suspension seed data (suspended by Radhika Anand, reason + date)
+- `suspendUser(id, reason)` writes audit fields; `unsuspendUser(id, reason|null)` writes audit fields; both use hardcoded demo SA UUID until auth is built
+- `B2CUser` type extended with suspension fields; `fetchB2CUser` secondary-queries `admin_users` for `suspendedByName`
+- `SuspendModal`: confirm disabled until reason typed (required)
+- `UnsuspendModal`: new lightweight modal, optional reason, blue callout
+- Profile header: shows reason, suspended-on date, "by [name]" when SUSPENDED
+- `src/app/suspended/page.tsx` created — access-gate page (ShieldOff icon + contact@keyskillset.com)
+- Sub-PRD 7 updated to v2.0 in Confluence — §4.3–4.6 added, §7.1 + §8.2 updated
+
 ### April 7, 2026 — KEYS-485 / KEYS-501 Plan restore + delete — spec locked, not yet built
 - KEYS-485: Restore archived plan (to PUBLISHED or DRAFT) from plan detail Overview tab. Full modal spec, audit log (RESTORED_TO_LIVE / RESTORED_TO_DRAFT / RESTORE_FAILED), syncCourseFromPlan reverse logic for Single Course Plans. Dead code removal (ArchivePlanModal + onArchive from list page).
 - KEYS-501: Hard delete plan (ARCHIVED + zero subscribers) from plan detail Overview tab. Type-to-confirm modal, cascade delete of all dependent rows. Separate story — not built in KEYS-485.
