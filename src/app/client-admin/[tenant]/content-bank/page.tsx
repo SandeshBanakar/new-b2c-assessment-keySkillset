@@ -194,9 +194,9 @@ export default function ContentBankPage() {
     if (!tenantId) return
     setLoading(true)
 
-    // Fetch TENANT_PRIVATE content_items for this tenant (all non-DRAFT statuses)
+    // Fetch TENANT_PRIVATE assessment_items for this tenant (all non-DRAFT statuses)
     const { data: contentData } = await supabase
-      .from('content_items')
+      .from('assessment_items')
       .select('id, title, test_type, status, exam_category_id, created_at')
       .eq('tenant_scope_id', tenantId)
       .in('status', ['INACTIVE', 'LIVE', 'ARCHIVED'])
@@ -256,7 +256,7 @@ export default function ContentBankPage() {
     if (!makeLiveTarget) return
     setSaving(true)
     await supabase
-      .from('content_items')
+      .from('assessment_items')
       .update({ status: 'LIVE', updated_at: new Date().toISOString() })
       .eq('id', makeLiveTarget.id)
     setSaving(false)
@@ -268,7 +268,7 @@ export default function ContentBankPage() {
     if (!archiveTarget) return
     setSaving(true)
     await supabase
-      .from('content_items')
+      .from('assessment_items')
       .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
       .eq('id', archiveTarget.id)
     setSaving(false)

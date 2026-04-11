@@ -48,7 +48,7 @@ export async function fetchContentCreators(): Promise<ContentCreatorRow[]> {
   const ccIds = ccs.map((cc: { id: string }) => cc.id)
 
   const [{ data: aRows }, { data: cRows }] = await Promise.all([
-    supabase.from('content_items').select('created_by').in('created_by', ccIds),
+    supabase.from('assessment_items').select('created_by').in('created_by', ccIds),
     supabase.from('courses').select('created_by').in('created_by', ccIds),
   ])
 
@@ -85,7 +85,7 @@ export async function fetchContentCreatorById(id: string): Promise<ContentCreato
 
 export async function fetchCCAssessments(createdBy: string): Promise<CCAssessment[]> {
   const { data, error } = await supabase
-    .from('content_items')
+    .from('assessment_items')
     .select('id, title, test_type, status, created_at, exam_categories(name)')
     .eq('created_by', createdBy)
     .order('created_at', { ascending: false })

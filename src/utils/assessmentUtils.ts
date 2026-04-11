@@ -88,10 +88,60 @@ export async function getAssessments(): Promise<Assessment[]> {
 }
 
 // -------------------------------------------------------
-// Single-assessment Supabase query — fetch by slug
+// Single-assessment Supabase query — Path C (KSS-SA-030)
+// Strategy: try content_items by UUID first (SA-created),
+// then fall back to assessments table by slug/id.
 // -------------------------------------------------------
 
+/** Map DB test_type → AssessmentType used by the frontend */
+function mapTestType(testType: string): AssessmentType {
+  switch (testType) {
+    case 'FULL_TEST':    return 'full-test';
+    case 'SUBJECT_TEST': return 'subject-test';
+    case 'CHAPTER_TEST': return 'chapter-test';
+    default:             return 'full-test';
+  }
+}
+
 export async function getAssessmentBySlug(slug: string): Promise<Assessment | null> {
+  // ── 1. Try content_items by UUID (SA-created assessments have no slug) ──
+  const { data: ciData } = await supabase
+    .from('assessment_items')
+    .select(`
+      id, title, description,
+      test_type, assessment_type,
+      display_config, assessment_config,
+      exam_categories ( name )
+    `)
+    .eq('id', slug)
+    .eq('status', 'INACTIVE')
+    .maybeSingle();
+
+  if (ciData) {
+    const ac = (ciData.assessment_config as Record<string, unknown> | null) ?? {};
+    const dc = (ciData.display_config   as Record<string, unknown> | null) ?? {};
+    const examName = (ciData.exam_categories as { name?: string } | null)?.name ?? 'Unknown';
+
+    return {
+      id:           ciData.id as string,
+      title:        ciData.title as string,
+      slug:         ciData.id as string,
+      exam:         examName as Exam,
+      type:         mapTestType(ciData.test_type as string),
+      subject:      null,
+      difficulty:   'medium',
+      questionCount: (ac.total_questions as number | null) ?? 0,
+      duration:     (ac.duration_minutes as number | null) ?? 0,
+      tier:         'basic',
+      isPuzzleMode: false,
+      description:  (ciData.description as string | undefined) ?? undefined,
+      display_config:    dc as import('@/types').DisplayConfig,
+      assessment_config: ac as import('@/types').AssessmentConfig,
+      _source:      'assessment_items',
+    };
+  }
+
+  // ── 2. Fall back to legacy assessments table (existing demo assessments) ──
   const { data, error } = await supabase
     .from('assessments')
     .select(
@@ -106,20 +156,21 @@ export async function getAssessmentBySlug(slug: string): Promise<Assessment | nu
   }
 
   return {
-    id: data.id as string,
-    title: data.title as string,
-    slug: (data.slug as string | undefined) ?? undefined,
-    exam: data.exam_type as Exam,
-    type: data.assessment_type as AssessmentType,
-    subject: (data.subject as string | null) ?? null,
-    difficulty: data.difficulty as Difficulty,
+    id:           data.id as string,
+    title:        data.title as string,
+    slug:         (data.slug as string | undefined) ?? undefined,
+    exam:         data.exam_type as Exam,
+    type:         data.assessment_type as AssessmentType,
+    subject:      (data.subject as string | null) ?? null,
+    difficulty:   data.difficulty as Difficulty,
     questionCount: data.total_questions as number,
-    duration: data.duration_minutes as number,
-    tier: data.min_tier as Tier,
+    duration:     data.duration_minutes as number,
+    tier:         data.min_tier as Tier,
     isPuzzleMode: (data.is_puzzle_mode as boolean) ?? false,
-    description: (data.description as string | undefined) ?? undefined,
-    rating: data.rating != null ? Number(data.rating) : undefined,
-    totalUsers: (data.total_users as number | undefined) ?? undefined,
+    description:  (data.description as string | undefined) ?? undefined,
+    rating:       data.rating != null ? Number(data.rating) : undefined,
+    totalUsers:   (data.total_users as number | undefined) ?? undefined,
+    _source:      'assessments',
   };
 }
 

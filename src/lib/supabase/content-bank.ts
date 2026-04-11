@@ -22,7 +22,7 @@ export type ExamCategory = {
 export async function fetchContentBank(): Promise<ContentBankItem[]> {
   // Fetch assessments with exam category name
   const { data: assessments, error: aErr } = await supabase
-    .from('content_items')
+    .from('assessment_items')
     .select('id, title, test_type, status, audience_type, source, created_at, exam_categories(name)')
     .order('created_at', { ascending: false })
 
@@ -154,7 +154,7 @@ export async function makeLive(
   contentType: 'ASSESSMENT' | 'COURSE',
   audienceType: string,
 ): Promise<void> {
-  const table = contentType === 'ASSESSMENT' ? 'content_items' : 'courses'
+  const table = contentType === 'ASSESSMENT' ? 'assessment_items' : 'courses'
   const { error } = await supabase
     .from(table)
     .update({ status: 'LIVE', audience_type: audienceType })
@@ -174,7 +174,7 @@ export async function archiveContent(
     .eq('content_item_id', id)
     .eq('content_type', contentType)
 
-  const table = contentType === 'ASSESSMENT' ? 'content_items' : 'courses'
+  const table = contentType === 'ASSESSMENT' ? 'assessment_items' : 'courses'
   const { error } = await supabase
     .from(table)
     .update({ status: 'ARCHIVED' })
@@ -187,7 +187,7 @@ export async function makeInactive(
   id: string,
   contentType: 'ASSESSMENT' | 'COURSE',
 ): Promise<void> {
-  const table = contentType === 'ASSESSMENT' ? 'content_items' : 'courses'
+  const table = contentType === 'ASSESSMENT' ? 'assessment_items' : 'courses'
   const { error } = await supabase
     .from(table)
     .update({ status: 'INACTIVE' })
@@ -199,7 +199,7 @@ export async function restoreContent(
   id: string,
   contentType: 'ASSESSMENT' | 'COURSE',
 ): Promise<void> {
-  const table = contentType === 'ASSESSMENT' ? 'content_items' : 'courses'
+  const table = contentType === 'ASSESSMENT' ? 'assessment_items' : 'courses'
   const { error } = await supabase
     .from(table)
     .update({ status: 'INACTIVE' })
@@ -217,7 +217,7 @@ export async function reclassifyAudience(
     await supabase.from('plan_content_map').delete().in('id', incompatiblePcmIds)
   }
 
-  const table = contentType === 'ASSESSMENT' ? 'content_items' : 'courses'
+  const table = contentType === 'ASSESSMENT' ? 'assessment_items' : 'courses'
   const { error } = await supabase
     .from(table)
     .update({ audience_type: newAudienceType })

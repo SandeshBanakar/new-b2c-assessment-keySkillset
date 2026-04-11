@@ -318,8 +318,8 @@ const PLAN_TIER_COVERAGE: Record<string, string[]> = {
  * - attempted: user has at least 1 completed attempt, includes stats
  * - notStarted: user has no attempts, title + category only
  *
- * NOTE: attempts.assessment_id references the B2C `assessments` table (not content_items).
- * plan_content_map uses content_items IDs — these are separate systems with no shared IDs.
+ * NOTE: attempts.assessment_id references the B2C `assessments` table (not assessment_items).
+ * plan_content_map uses assessment_items IDs — these are separate systems with no shared IDs.
  * We resolve the plan's tier and query `assessments` by tier instead.
  */
 export async function fetchPlanAssessments(

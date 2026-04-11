@@ -139,7 +139,7 @@ export async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
   const [tenants, plans, contentItems, adminUsers, users] = await Promise.all([
     tenantIds.length  ? supabase.from('tenants').select('id, name').in('id', unique(tenantIds))              : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     planIds.length    ? supabase.from('plans').select('id, name').in('id', unique(planIds))                   : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    contentIds.length ? supabase.from('content_items').select('id, title').in('id', unique(contentIds))       : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+    contentIds.length ? supabase.from('assessment_items').select('id, title').in('id', unique(contentIds))       : Promise.resolve({ data: [] as { id: string; title: string }[] }),
     adminIds.length   ? supabase.from('admin_users').select('id, name').in('id', unique(adminIds))            : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     userIds.length    ? supabase.from('users').select('id, display_name, email').in('id', unique(userIds))    : Promise.resolve({ data: [] as { id: string; display_name: string | null; email: string }[] }),
   ])

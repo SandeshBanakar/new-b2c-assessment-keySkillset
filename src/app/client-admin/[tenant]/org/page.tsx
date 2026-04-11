@@ -685,7 +685,7 @@ function TeamDetailSlideOver({
 
       const [{ data: ciRows }, { data: courseRows }] = await Promise.all([
         assessmentIds.length > 0
-          ? supabase.from('content_items').select('id, title').in('id', assessmentIds)
+          ? supabase.from('assessment_items').select('id, title').in('id', assessmentIds)
           : Promise.resolve({ data: [] }),
         courseIds.length > 0
           ? supabase.from('courses').select('id, title').in('id', courseIds)

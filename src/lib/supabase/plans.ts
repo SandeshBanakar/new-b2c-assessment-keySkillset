@@ -117,7 +117,7 @@ export async function fetchAssessmentsInPlan(planId: string): Promise<Assessment
   if (ids.length === 0) return []
 
   const { data: items } = await supabase
-    .from('content_items')
+    .from('assessment_items')
     .select('id, title, test_type, audience_type, exam_categories(name)')
     .in('id', ids)
 
@@ -413,11 +413,11 @@ export async function fetchTenantPlansWithContent(
 
   const contentIds = (pcmRows as { content_item_id: string }[]).map((r) => r.content_item_id)
 
-  // Step 4: content_items details (DB columns: test_type, exam_category_id — no exam_type/assessment_type)
+  // Step 4: assessment_items details (DB columns: test_type, exam_category_id — no exam_type/assessment_type)
   let contentMap: Record<string, { title: string; test_type: string; status: string }> = {}
   if (contentIds.length > 0) {
     const { data: ciRows, error: ciError } = await supabase
-      .from('content_items')
+      .from('assessment_items')
       .select('id, title, test_type, status')
       .in('id', contentIds)
 
@@ -497,7 +497,7 @@ export async function fetchPlanAssignedAssessments(
 
   // DB columns: test_type (not assessment_type), exam_category_id UUID FK (not exam_type string)
   const { data: ciRows, error: ciError } = await supabase
-    .from('content_items')
+    .from('assessment_items')
     .select('id, title, test_type, status')
     .in('id', contentIds)
 
@@ -589,7 +589,7 @@ export async function fetchAvailableAssessmentsForPlan(
 
   // DB columns: test_type (not assessment_type) — exam_category_id is UUID FK, not returned as string
   let query = supabase
-    .from('content_items')
+    .from('assessment_items')
     .select('id, title, test_type, audience_type')
     .eq('status', 'LIVE')
     .or(`audience_type.eq.${compatibleType},audience_type.eq.BOTH,audience_type.is.null`)
@@ -647,7 +647,7 @@ export async function fetchAllLiveB2BAssessments(): Promise<
   { id: string; title: string; assessmentType: string }[]
 > {
   const { data, error } = await supabase
-    .from('content_items')
+    .from('assessment_items')
     .select('id, title, test_type')
     .eq('status', 'LIVE')
     .or('audience_type.eq.B2B_ONLY,audience_type.eq.BOTH')
@@ -749,11 +749,11 @@ export async function fetchTenantAssignedPlansWithContent(
   const typedPcm = (pcmRows ?? []) as { id: string; plan_id: string; content_item_id: string }[]
   const contentIds = typedPcm.map((r) => r.content_item_id)
 
-  // Step 4: content_items details (DB columns: test_type, exam_category_id UUID FK)
+  // Step 4: assessment_items details (DB columns: test_type, exam_category_id UUID FK)
   let contentMap: Record<string, { title: string; test_type: string; status: string }> = {}
   if (contentIds.length > 0) {
     const { data: ciRows, error: ciError } = await supabase
-      .from('content_items')
+      .from('assessment_items')
       .select('id, title, test_type, status')
       .in('id', contentIds)
 
@@ -1144,7 +1144,7 @@ export async function fetchAllLiveB2CAssessments(): Promise<
   { id: string; title: string; assessmentType: string }[]
 > {
   const { data, error } = await supabase
-    .from('content_items')
+    .from('assessment_items')
     .select('id, title, test_type')
     .eq('status', 'LIVE')
     .or('audience_type.eq.B2C_ONLY,audience_type.eq.BOTH')

@@ -30,6 +30,10 @@ export interface Assessment {
   rating?: number;
   totalUsers?: number;
   slug?: string;
+  // SA-authored assessment_items fields
+  _source?: 'assessment_items' | 'assessments'
+  assessment_config?: AssessmentConfig
+  display_config?: DisplayConfig
 }
 
 // -------------------------------------------------------
@@ -166,4 +170,34 @@ export interface User {
   streak: number;                         // consecutive days active
   createdAt: string;                      // created_at (ISO 8601)
   updatedAt: string;                      // updated_at (ISO 8601)
+}
+
+// ─── Assessment Creation (SA) ─────────────────────────────────────────────────
+
+export interface TopicEntry {
+  id: string
+  label: string
+  children?: TopicEntry[]
+}
+
+export interface DisplayConfig {
+  what_youll_get?: string[]
+  syllabus?: string[]
+  topics_covered?: TopicEntry[]
+  language?: string
+}
+
+export interface AssessmentConfig {
+  duration_minutes?: number | null
+  navigation_policy?: 'FREE' | 'LINEAR' | 'SECTION_LOCKED' | null
+  total_questions?: number | null
+  total_marks?: number | null
+  sections?: Array<{
+    id: string
+    name: string
+    questionCount: number
+    durationMinutes?: number
+    topics?: TopicEntry[]
+  }>
+  [key: string]: unknown
 }

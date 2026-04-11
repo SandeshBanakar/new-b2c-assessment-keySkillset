@@ -649,7 +649,7 @@ export default function CatalogPage() {
       const contentIds = [...new Set((pcmRows ?? []).map(r => r.content_item_id))]
       if (contentIds.length > 0) {
         const { data: ciRows } = await supabase
-          .from('content_items').select('id, title, test_type, audience_type, visibility_scope, exam_categories(name)')
+          .from('assessment_items').select('id, title, test_type, audience_type, visibility_scope, exam_categories(name)')
           .in('id', contentIds).eq('status', 'LIVE').eq('visibility_scope', 'GLOBAL')
         for (const ci of ciRows ?? []) {
           globalAssessments.push({
@@ -663,7 +663,7 @@ export default function CatalogPage() {
 
     const privateAssessments: CatalogItem[] = []
     const { data: privateRows } = await supabase
-      .from('content_items').select('id, title, test_type, audience_type, exam_categories(name)')
+      .from('assessment_items').select('id, title, test_type, audience_type, exam_categories(name)')
       .eq('tenant_scope_id', tenantId).eq('status', 'LIVE').eq('visibility_scope', 'TENANT_PRIVATE')
     for (const ci of privateRows ?? []) {
       privateAssessments.push({
