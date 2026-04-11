@@ -118,10 +118,11 @@ created_at, updated_at,
 description (TEXT nullable — KSS-DB-007),
 display_config (JSONB DEFAULT '{}' — KSS-DB-007),
 assessment_type (TEXT DEFAULT 'LINEAR' CHECK IN ('LINEAR','ADAPTIVE') — KSS-DB-007),
-assessments_id (uuid nullable FK→assessments.id — set at Make Live step, KSS-DB-001)
+assessments_id (uuid nullable FK→assessments.id — set at Make Live step, KSS-DB-001),
+assessment_config (JSONB DEFAULT '{}' — KSS-DB-015)
 ```
 - `tenant_scope_id IS NULL` = GLOBAL | NOT NULL = TENANT_PRIVATE
-- `display_config` shape: `{ what_youll_get: string[], syllabus: string[] }`
+- `display_config` shape: `{ what_youll_get: string[], topics_covered: TopicEntry[], language: string }` — `TopicEntry = { id, label, children?: TopicEntry[] }` (recursive tree; depth varies by test_type: FULL=3, SUBJECT=2, CHAPTER=1)
 - `assessment_type`: `LINEAR` (default) | `ADAPTIVE` (SAT only — engine deferred)
 - `assessments_id`: links to engine table when assessment is published LIVE
 - KSS-DB-007 applied April 9 2026 | KSS-DB-001 rename applied April 11 2026
@@ -150,9 +151,11 @@ target_exam (text optional), created_by (FK→admin_users),
 last_modified_by (FK→admin_users), created_at, updated_at
 ```
 
-### chapters (Assessment Creation — KSS-DB-011, Apr 11 2026)
+### chapters (Assessment Creation — KSS-DB-011, Apr 11 2026; KSS-DB-015 Apr 11 2026)
 ```
 id, source_id (FK→sources ON DELETE CASCADE), name,
+description (text nullable — KSS-DB-015),
+order_index (int DEFAULT 0 — KSS-DB-015, controls display order within source),
 difficulty ('easy'|'medium'|'hard'|'mixed' DEFAULT 'medium'),
 status ('DRAFT'|'ACTIVE' DEFAULT 'DRAFT'),
 created_by (FK→admin_users), last_modified_by (FK→admin_users),
@@ -171,6 +174,7 @@ acceptable_answers (jsonb nullable — for NUMERIC type, array of strings),
 explanation (text), explanation_steps (jsonb), video_url (text),
 marks (numeric DEFAULT 1), negative_marks (numeric DEFAULT 0),
 categories (jsonb DEFAULT '[]' — array of exam category names),
+concept_tag (text nullable — KSS-DB-016, single skill/concept label e.g. "sp3 Hybridization"),
 status ('DRAFT'|'ACTIVE'|'FLAGGED' DEFAULT 'ACTIVE'),
 difficulty ('easy'|'medium'|'hard'|'mixed' DEFAULT 'medium'),
 section_name (text — CLAT section mapping),
@@ -396,6 +400,7 @@ client_audit_log — tenant_id, actor_id, actor_name,
 ## COMPLETED SCHEMA CHANGES (April 11 2026)
 
 - **KSS-DB-001 (DB-TODO-001 ✅)**: Renamed `content_items` → `assessment_items`. All code updated.
+- **KSS-DB-015 ✅**: Added `assessment_config JSONB DEFAULT '{}'` to `assessment_items`. Shape: `{ duration_minutes, navigation_policy, total_questions, total_marks, sections?: [{ id, name, questionCount, durationMinutes?, topics?: TopicEntry[] }] }`.
 - **KSS-DB-009 ✅**: Altered `questions` table — added marks, negative_marks, categories, source_id, chapter_id, status, correct_answer→jsonb, created_by, last_modified_by, updated_at, section_name, randomize_options, acceptable_answers.
 - **KSS-DB-010 ✅**: Created `sources` table.
 - **KSS-DB-011 ✅**: Created `chapters` table.

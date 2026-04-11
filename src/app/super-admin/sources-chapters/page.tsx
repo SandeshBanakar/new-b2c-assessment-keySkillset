@@ -18,12 +18,17 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ExamCategory = 'SAT' | 'JEE' | 'NEET' | 'PMP' | 'CLAT' | 'GENERAL'
+interface ExamCategory {
+  id: string
+  name: string
+  slug: string
+}
 
 interface Source {
   id: string
   name: string
-  exam_category: ExamCategory
+  exam_category_id: string | null
+  exam_category_name: string | null
   description: string | null
   chapter_count: number
   question_count: number
@@ -33,11 +38,9 @@ interface Source {
 
 interface SourceFormData {
   name: string
-  exam_category: ExamCategory
+  exam_category_id: string
   description: string
 }
-
-const EXAM_CATEGORIES: ExamCategory[] = ['SAT', 'JEE', 'NEET', 'PMP', 'CLAT', 'GENERAL']
 
 const DEMO_SA_ID = '3bd6101b-1fb9-4c96-a9a5-c958a3deb54a'
 
@@ -51,18 +54,11 @@ function formatDateTime(iso: string) {
   })
 }
 
-function CategoryBadge({ category }: { category: ExamCategory }) {
-  const colours: Record<ExamCategory, string> = {
-    SAT: 'bg-blue-50 text-blue-700',
-    JEE: 'bg-orange-50 text-orange-700',
-    NEET: 'bg-green-50 text-green-700',
-    PMP: 'bg-purple-50 text-purple-700',
-    CLAT: 'bg-pink-50 text-pink-700',
-    GENERAL: 'bg-zinc-100 text-zinc-600',
-  }
+function CategoryBadge({ name }: { name: string | null }) {
+  if (!name) return <span className="text-xs text-zinc-400">—</span>
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colours[category]}`}>
-      {category}
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+      {name}
     </span>
   )
 }
@@ -119,18 +115,20 @@ function SourceFormModal({
   open,
   onClose,
   onSaved,
+  examCategories,
   initial,
 }: {
   open: boolean
   onClose: () => void
   onSaved: () => void
+  examCategories: ExamCategory[]
   initial?: Source
 }) {
   const isEdit = !!initial
 
   const [form, setForm] = useState<SourceFormData>({
     name: initial?.name ?? '',
-    exam_category: initial?.exam_category ?? 'GENERAL',
+    exam_category_id: initial?.exam_category_id ?? '',
     description: initial?.description ?? '',
   })
   const [saving, setSaving] = useState(false)
@@ -140,7 +138,7 @@ function SourceFormModal({
     if (open) {
       setForm({
         name: initial?.name ?? '',
-        exam_category: initial?.exam_category ?? 'GENERAL',
+        exam_category_id: initial?.exam_category_id ?? '',
         description: initial?.description ?? '',
       })
       setError(null)
@@ -158,7 +156,7 @@ function SourceFormModal({
           .from('sources')
           .update({
             name: form.name.trim(),
-            exam_category: form.exam_category,
+            exam_category_id: form.exam_category_id || null,
             description: form.description.trim() || null,
             last_modified_by: DEMO_SA_ID,
             updated_at: new Date().toISOString(),
@@ -170,7 +168,7 @@ function SourceFormModal({
           .from('sources')
           .insert({
             name: form.name.trim(),
-            exam_category: form.exam_category,
+            exam_category_id: form.exam_category_id || null,
             description: form.description.trim() || null,
             created_by: DEMO_SA_ID,
             last_modified_by: DEMO_SA_ID,
@@ -206,14 +204,15 @@ function SourceFormModal({
         </div>
 
         <div>
-          <FieldLabel label="Exam Category" required />
+          <FieldLabel label="Exam Category" />
           <select
             className={inputCls}
-            value={form.exam_category}
-            onChange={(e) => setForm((f) => ({ ...f, exam_category: e.target.value as ExamCategory }))}
+            value={form.exam_category_id}
+            onChange={(e) => setForm((f) => ({ ...f, exam_category_id: e.target.value }))}
           >
-            {EXAM_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
+            <option value="">Select exam category…</option>
+            {examCategories.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
           </select>
         </div>
@@ -272,7 +271,7 @@ function ViewSourceModal({
           </div>
           <div>
             <p className="text-xs text-zinc-500 mb-0.5">Exam Category</p>
-            <CategoryBadge category={source.exam_category} />
+            <CategoryBadge name={source.exam_category_name} />
           </div>
           <div>
             <p className="text-xs text-zinc-500 mb-0.5">Chapters</p>
@@ -365,15 +364,28 @@ export default function SourcesChaptersPage() {
   const router = useRouter()
 
   const [sources, setSources] = useState<Source[]>([])
+  const [examCategories, setExamCategories] = useState<ExamCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<ExamCategory | 'ALL'>('ALL')
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL')
 
   const [createOpen, setCreateOpen] = useState(false)
   const [viewSource, setViewSource] = useState<Source | null>(null)
   const [editSource, setEditSource] = useState<Source | null>(null)
   const [deleteSource, setDeleteSource] = useState<Source | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Load exam categories once
+  useEffect(() => {
+    supabase
+      .from('exam_categories')
+      .select('id, name, slug')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => {
+        if (data) setExamCategories(data as ExamCategory[])
+      })
+  }, [])
 
   const fetchSources = useCallback(async () => {
     setLoading(true)
@@ -382,14 +394,12 @@ export default function SourcesChaptersPage() {
       .select(`
         id,
         name,
-        exam_category,
+        exam_category_id,
         description,
         created_at,
         updated_at,
-        chapters(count),
-        chapters!inner(
-          questions(count)
-        )
+        exam_categories(name),
+        chapters(id, questions(count))
       `)
       .order('created_at', { ascending: false })
 
@@ -399,14 +409,10 @@ export default function SourcesChaptersPage() {
       return
     }
 
-    // Map to flat Source shape with counts
     const mapped: Source[] = (data ?? []).map((row: Record<string, unknown>) => {
       const chaptersArr = Array.isArray(row.chapters) ? row.chapters : []
-      const chapterCount = chaptersArr.length > 0 && typeof chaptersArr[0] === 'object' && chaptersArr[0] !== null
-        ? (chaptersArr[0] as { count?: number }).count ?? chaptersArr.length
-        : chaptersArr.length
+      const chapterCount = chaptersArr.length
 
-      // Sum questions across all chapters
       let questionCount = 0
       for (const ch of chaptersArr) {
         if (typeof ch === 'object' && ch !== null && 'questions' in ch) {
@@ -417,10 +423,13 @@ export default function SourcesChaptersPage() {
         }
       }
 
+      const examCat = row.exam_categories as { name?: string } | null
+
       return {
         id: row.id as string,
         name: row.name as string,
-        exam_category: row.exam_category as ExamCategory,
+        exam_category_id: (row.exam_category_id as string | null) ?? null,
+        exam_category_name: examCat?.name ?? null,
         description: (row.description as string | null) ?? null,
         chapter_count: chapterCount,
         question_count: questionCount,
@@ -431,7 +440,7 @@ export default function SourcesChaptersPage() {
 
     setSources(mapped)
     setLoading(false)
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     fetchSources()
@@ -452,7 +461,8 @@ export default function SourcesChaptersPage() {
     const matchSearch =
       search.trim() === '' ||
       s.name.toLowerCase().includes(search.toLowerCase())
-    const matchCategory = categoryFilter === 'ALL' || s.exam_category === categoryFilter
+    const matchCategory =
+      categoryFilter === 'ALL' || s.exam_category_id === categoryFilter
     return matchSearch && matchCategory
   })
 
@@ -492,11 +502,11 @@ export default function SourcesChaptersPage() {
         <select
           className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value as ExamCategory | 'ALL')}
+          onChange={(e) => setCategoryFilter(e.target.value)}
         >
           <option value="ALL">All Exams</option>
-          {EXAM_CATEGORIES.map((cat) => (
-            <option key={cat} value={cat}>{cat}</option>
+          {examCategories.map((cat) => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </select>
       </div>
@@ -557,7 +567,7 @@ export default function SourcesChaptersPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <CategoryBadge category={source.exam_category} />
+                    <CategoryBadge name={source.exam_category_name} />
                   </td>
                   <td className="px-4 py-3 text-zinc-700">{source.chapter_count}</td>
                   <td className="px-4 py-3 text-zinc-700">{source.question_count}</td>
@@ -607,11 +617,13 @@ export default function SourcesChaptersPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSaved={fetchSources}
+        examCategories={examCategories}
       />
       <SourceFormModal
         open={!!editSource}
         onClose={() => setEditSource(null)}
         onSaved={fetchSources}
+        examCategories={examCategories}
         initial={editSource ?? undefined}
       />
       <ViewSourceModal
