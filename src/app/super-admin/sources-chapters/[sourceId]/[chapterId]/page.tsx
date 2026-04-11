@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import {
+  Plus,
   Search,
   Eye,
   Pencil,
-  BookMarked,
-  Filter,
+  ArrowLeft,
+  BookOpen,
   X,
 } from 'lucide-react'
 
@@ -31,8 +32,17 @@ interface Question {
   negative_marks: number
   concept_tag: string | null
   created_at: string
-  source_name: string | null
-  chapter_name: string | null
+}
+
+interface Source {
+  id: string
+  name: string
+}
+
+interface Chapter {
+  id: string
+  name: string
+  source_id: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,18 +83,6 @@ function TypeBadge({ type }: { type: QuestionType }) {
   )
 }
 
-function StatusBadge({ status }: { status: QuestionStatus }) {
-  return status === 'ACTIVE' ? (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700">
-      Active
-    </span>
-  ) : (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-500">
-      Archived
-    </span>
-  )
-}
-
 // ─── View Question Modal ──────────────────────────────────────────────────────
 
 function ViewQuestionModal({
@@ -110,31 +108,19 @@ function ViewQuestionModal({
           </button>
         </div>
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-          {/* Meta row */}
           <div className="flex items-center gap-2 flex-wrap">
             <TypeBadge type={question.question_type} />
             <DifficultyBadge difficulty={question.difficulty} />
-            <StatusBadge status={question.status} />
             {question.concept_tag && (
               <span className="text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded">
                 {question.concept_tag}
               </span>
             )}
             <span className="text-xs text-zinc-400 ml-auto">
-              +{question.marks}m / -{question.negative_marks}m
+              +{question.marks}m / {question.negative_marks}m
             </span>
           </div>
 
-          {/* Source / Chapter */}
-          {(question.source_name || question.chapter_name) && (
-            <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-              {question.source_name && <span>{question.source_name}</span>}
-              {question.source_name && question.chapter_name && <span>›</span>}
-              {question.chapter_name && <span>{question.chapter_name}</span>}
-            </div>
-          )}
-
-          {/* Passage */}
           {question.passage_text && (
             <div>
               <p className="text-xs font-medium text-zinc-500 mb-1">Passage</p>
@@ -144,7 +130,6 @@ function ViewQuestionModal({
             </div>
           )}
 
-          {/* Question text */}
           <div>
             <p className="text-xs font-medium text-zinc-500 mb-1">Question</p>
             <div className="text-sm text-zinc-900 bg-zinc-50 rounded-md px-3 py-2 border border-zinc-200 whitespace-pre-wrap">
@@ -163,168 +148,150 @@ function ViewQuestionModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 50
-
-export default function QuestionBankPage() {
+export default function ChapterQuestionsPage() {
   const router = useRouter()
+  const params = useParams()
+  const sourceId = params.sourceId as string
+  const chapterId = params.chapterId as string
 
+  const [source, setSource] = useState<Source | null>(null)
+  const [chapter, setChapter] = useState<Chapter | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
-
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<QuestionType | 'ALL'>('ALL')
   const [diffFilter, setDiffFilter] = useState<Difficulty | 'ALL'>('ALL')
-  const [statusFilter, setStatusFilter] = useState<QuestionStatus | 'ALL'>('ACTIVE')
-
   const [viewQuestion, setViewQuestion] = useState<Question | null>(null)
 
-  const fetchQuestions = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
+    const [sourceRes, chapterRes, questionsRes] = await Promise.all([
+      supabase.from('sources').select('id, name').eq('id', sourceId).single(),
+      supabase.from('chapters').select('id, name, source_id').eq('id', chapterId).single(),
+      supabase
+        .from('questions')
+        .select(`
+          id,
+          chapter_id,
+          source_id,
+          question_type,
+          difficulty,
+          status,
+          question_text,
+          passage_text,
+          marks,
+          negative_marks,
+          concept_tag,
+          created_at
+        `)
+        .eq('chapter_id', chapterId)
+        .order('created_at', { ascending: false }),
+    ])
 
-    let query = supabase
-      .from('questions')
-      .select(`
-        id,
-        chapter_id,
-        source_id,
-        question_type,
-        difficulty,
-        status,
-        question_text,
-        passage_text,
-        marks,
-        negative_marks,
-        concept_tag,
-        created_at,
-        chapters(name, sources(name))
-      `, { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
-
-    if (typeFilter !== 'ALL') query = query.eq('question_type', typeFilter)
-    if (diffFilter !== 'ALL') query = query.eq('difficulty', diffFilter)
-    if (statusFilter !== 'ALL') query = query.eq('status', statusFilter)
-    if (search.trim()) query = query.ilike('question_text', `%${search.trim()}%`)
-
-    const { data, count, error } = await query
-
-    if (!error && data) {
-      const mapped: Question[] = data.map((row: Record<string, unknown>) => {
-        const ch = row.chapters as Record<string, unknown> | null
-        const src = ch?.sources as Record<string, unknown> | null
-        return {
-          id: row.id as string,
-          chapter_id: row.chapter_id as string,
-          source_id: row.source_id as string,
-          question_type: row.question_type as QuestionType,
-          difficulty: row.difficulty as Difficulty,
-          status: row.status as QuestionStatus,
-          question_text: row.question_text as string,
-          passage_text: (row.passage_text as string | null) ?? null,
-          marks: row.marks as number,
-          negative_marks: row.negative_marks as number,
-          concept_tag: (row.concept_tag as string | null) ?? null,
-          created_at: row.created_at as string,
-          chapter_name: (ch?.name as string | null) ?? null,
-          source_name: (src?.name as string | null) ?? null,
-        }
-      })
-      setQuestions(mapped)
-      setTotal(count ?? 0)
-    }
+    if (sourceRes.data) setSource(sourceRes.data as Source)
+    if (chapterRes.data) setChapter(chapterRes.data as Chapter)
+    if (questionsRes.data) setQuestions(questionsRes.data as Question[])
     setLoading(false)
-  }, [supabase, page, typeFilter, diffFilter, statusFilter, search])
+  }, [supabase, sourceId, chapterId])
 
   useEffect(() => {
-    setPage(0)
-  }, [typeFilter, diffFilter, statusFilter, search])
+    fetchData()
+  }, [fetchData])
 
-  useEffect(() => {
-    fetchQuestions()
-  }, [fetchQuestions])
+  const filtered = questions.filter((q) => {
+    const matchSearch =
+      search.trim() === '' ||
+      q.question_text.toLowerCase().includes(search.toLowerCase()) ||
+      (q.concept_tag ?? '').toLowerCase().includes(search.toLowerCase())
+    const matchType = typeFilter === 'ALL' || q.question_type === typeFilter
+    const matchDiff = diffFilter === 'ALL' || q.difficulty === diffFilter
+    return matchSearch && matchType && matchDiff
+  })
 
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const createUrl = `/super-admin/question-bank/new?chapterId=${chapterId}&sourceId=${sourceId}`
 
   return (
     <div className="px-6 py-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-1.5 mb-1 text-xs text-zinc-400">
+        <button
+          onClick={() => router.push('/super-admin/sources-chapters')}
+          className="hover:text-zinc-700 transition-colors"
+        >
+          Sources &amp; Chapters
+        </button>
+        <span>/</span>
+        <button
+          onClick={() => router.push(`/super-admin/sources-chapters/${sourceId}`)}
+          className="hover:text-zinc-700 transition-colors"
+        >
+          {source?.name ?? '…'}
+        </button>
+        <span>/</span>
+        <span className="text-zinc-600">{chapter?.name ?? '…'}</span>
+      </div>
+
+      {/* Back button */}
+      <button
+        onClick={() => router.push(`/super-admin/sources-chapters/${sourceId}`)}
+        className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 transition-colors mb-4"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Back to {source?.name ?? 'Source'}
+      </button>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2.5">
-          <BookMarked className="w-5 h-5 text-zinc-400" />
-          <div>
-            <h1 className="text-base font-semibold text-zinc-900">Question Bank</h1>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              {total} question{total !== 1 ? 's' : ''} across all sources
-            </p>
-          </div>
+        <div>
+          <h1 className="text-base font-semibold text-zinc-900">
+            {chapter?.name ?? 'Loading…'}
+          </h1>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            {questions.length} question{questions.length !== 1 ? 's' : ''}
+          </p>
         </div>
+        <button
+          onClick={() => router.push(createUrl)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Create Question
+        </button>
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative w-72">
+        <div className="relative w-64">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
           <input
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-zinc-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Search question text…"
+            placeholder="Search questions…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-
-        <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-zinc-400" />
-          <select
-            className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as QuestionType | 'ALL')}
-          >
-            <option value="ALL">All Types</option>
-            <option value="MCQ_SINGLE">MCQ Single</option>
-            <option value="MCQ_MULTI">MCQ Multi</option>
-            <option value="PASSAGE_SINGLE">Passage Single</option>
-            <option value="PASSAGE_MULTI">Passage Multi</option>
-            <option value="NUMERIC">Numeric</option>
-          </select>
-
-          <select
-            className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
-            value={diffFilter}
-            onChange={(e) => setDiffFilter(e.target.value as Difficulty | 'ALL')}
-          >
-            <option value="ALL">All Difficulties</option>
-            <option value="EASY">Easy</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HARD">Hard</option>
-          </select>
-
-          <select
-            className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as QuestionStatus | 'ALL')}
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="ARCHIVED">Archived</option>
-          </select>
-        </div>
-
-        {(typeFilter !== 'ALL' || diffFilter !== 'ALL' || statusFilter !== 'ACTIVE' || search) && (
-          <button
-            onClick={() => {
-              setTypeFilter('ALL')
-              setDiffFilter('ALL')
-              setStatusFilter('ACTIVE')
-              setSearch('')
-            }}
-            className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 transition-colors"
-          >
-            <X className="w-3 h-3" />
-            Clear filters
-          </button>
-        )}
+        <select
+          className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as QuestionType | 'ALL')}
+        >
+          <option value="ALL">All Types</option>
+          <option value="MCQ_SINGLE">MCQ Single</option>
+          <option value="MCQ_MULTI">MCQ Multi</option>
+          <option value="PASSAGE_SINGLE">Passage Single</option>
+          <option value="PASSAGE_MULTI">Passage Multi</option>
+          <option value="NUMERIC">Numeric</option>
+        </select>
+        <select
+          className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
+          value={diffFilter}
+          onChange={(e) => setDiffFilter(e.target.value as Difficulty | 'ALL')}
+        >
+          <option value="ALL">All Difficulties</option>
+          <option value="EASY">Easy</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HARD">Hard</option>
+        </select>
       </div>
 
       {/* Table */}
@@ -336,19 +303,16 @@ export default function QuestionBankPage() {
                 Question
               </th>
               <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                Source / Chapter
-              </th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                 Type
               </th>
               <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                 Difficulty
               </th>
               <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                Status
+                Marks
               </th>
               <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                Marks
+                Concept
               </th>
               <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                 Added
@@ -361,34 +325,38 @@ export default function QuestionBankPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-sm text-zinc-400">
+                <td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-400">
                   Loading questions…
                 </td>
               </tr>
-            ) : questions.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center">
-                  <BookMarked className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
+                <td colSpan={7} className="px-4 py-10 text-center">
+                  <BookOpen className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
                   <p className="text-sm text-zinc-500">
-                    No questions match your filters.
+                    {search || typeFilter !== 'ALL' || diffFilter !== 'ALL'
+                      ? 'No questions match your filters.'
+                      : 'No questions yet. Create the first question for this chapter.'}
                   </p>
+                  {!search && typeFilter === 'ALL' && diffFilter === 'ALL' && (
+                    <button
+                      onClick={() => router.push(createUrl)}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Create Question
+                    </button>
+                  )}
                 </td>
               </tr>
             ) : (
-              questions.map((q) => (
+              filtered.map((q) => (
                 <tr
                   key={q.id}
                   className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors"
                 >
                   <td className="px-4 py-3 max-w-xs">
                     <p className="text-zinc-900 line-clamp-2 text-sm">{q.question_text}</p>
-                    {q.concept_tag && (
-                      <span className="text-xs text-zinc-400 mt-0.5">{q.concept_tag}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs text-zinc-600">{q.source_name ?? '—'}</p>
-                    <p className="text-xs text-zinc-400">{q.chapter_name ?? '—'}</p>
                   </td>
                   <td className="px-4 py-3">
                     <TypeBadge type={q.question_type} />
@@ -396,11 +364,17 @@ export default function QuestionBankPage() {
                   <td className="px-4 py-3">
                     <DifficultyBadge difficulty={q.difficulty} />
                   </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={q.status} />
-                  </td>
                   <td className="px-4 py-3 text-zinc-700 text-xs">
                     +{q.marks} / -{q.negative_marks}
+                  </td>
+                  <td className="px-4 py-3">
+                    {q.concept_tag ? (
+                      <span className="text-xs text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded">
+                        {q.concept_tag}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-zinc-300">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-zinc-500 text-xs">{formatDateTime(q.created_at)}</td>
                   <td className="px-4 py-3">
@@ -426,31 +400,6 @@ export default function QuestionBankPage() {
             )}
           </tbody>
         </table>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-200">
-            <p className="text-xs text-zinc-500">
-              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                disabled={page === 0}
-                onClick={() => setPage((p) => p - 1)}
-                className="px-2.5 py-1 text-xs font-medium text-zinc-700 border border-zinc-200 rounded-md hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Previous
-              </button>
-              <button
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
-                className="px-2.5 py-1 text-xs font-medium text-zinc-700 border border-zinc-200 rounded-md hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <ViewQuestionModal

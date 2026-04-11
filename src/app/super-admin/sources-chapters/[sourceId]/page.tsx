@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import {
   Plus,
@@ -11,33 +11,35 @@ import {
   Trash2,
   ChevronRight,
   BookOpen,
-  GitBranch,
+  ArrowLeft,
   X,
   AlertTriangle,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ExamCategory = 'SAT' | 'JEE' | 'NEET' | 'PMP' | 'CLAT' | 'GENERAL'
-
 interface Source {
   id: string
   name: string
-  exam_category: ExamCategory
+  exam_category: string
+}
+
+interface Chapter {
+  id: string
+  source_id: string
+  name: string
   description: string | null
-  chapter_count: number
+  order_index: number
   question_count: number
   created_at: string
   updated_at: string
 }
 
-interface SourceFormData {
+interface ChapterFormData {
   name: string
-  exam_category: ExamCategory
   description: string
+  order_index: number
 }
-
-const EXAM_CATEGORIES: ExamCategory[] = ['SAT', 'JEE', 'NEET', 'PMP', 'CLAT', 'GENERAL']
 
 const DEMO_SA_ID = '3bd6101b-1fb9-4c96-a9a5-c958a3deb54a'
 
@@ -49,22 +51,6 @@ function formatDateTime(iso: string) {
     month: 'short',
     year: 'numeric',
   })
-}
-
-function CategoryBadge({ category }: { category: ExamCategory }) {
-  const colours: Record<ExamCategory, string> = {
-    SAT: 'bg-blue-50 text-blue-700',
-    JEE: 'bg-orange-50 text-orange-700',
-    NEET: 'bg-green-50 text-green-700',
-    PMP: 'bg-purple-50 text-purple-700',
-    CLAT: 'bg-pink-50 text-pink-700',
-    GENERAL: 'bg-zinc-100 text-zinc-600',
-  }
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colours[category]}`}>
-      {category}
-    </span>
-  )
 }
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
@@ -113,25 +99,29 @@ function Modal({
   )
 }
 
-// ─── Source Form Modal ────────────────────────────────────────────────────────
+// ─── Chapter Form Modal ───────────────────────────────────────────────────────
 
-function SourceFormModal({
+function ChapterFormModal({
   open,
   onClose,
   onSaved,
+  sourceId,
   initial,
+  nextOrderIndex,
 }: {
   open: boolean
   onClose: () => void
   onSaved: () => void
-  initial?: Source
+  sourceId: string
+  initial?: Chapter
+  nextOrderIndex: number
 }) {
   const isEdit = !!initial
 
-  const [form, setForm] = useState<SourceFormData>({
+  const [form, setForm] = useState<ChapterFormData>({
     name: initial?.name ?? '',
-    exam_category: initial?.exam_category ?? 'GENERAL',
     description: initial?.description ?? '',
+    order_index: initial?.order_index ?? nextOrderIndex,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -140,26 +130,26 @@ function SourceFormModal({
     if (open) {
       setForm({
         name: initial?.name ?? '',
-        exam_category: initial?.exam_category ?? 'GENERAL',
         description: initial?.description ?? '',
+        order_index: initial?.order_index ?? nextOrderIndex,
       })
       setError(null)
     }
-  }, [open, initial])
+  }, [open, initial, nextOrderIndex])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name.trim()) { setError('Name is required.'); return }
+    if (!form.name.trim()) { setError('Chapter name is required.'); return }
     setSaving(true)
     setError(null)
     try {
       if (isEdit && initial) {
         const { error: err } = await supabase
-          .from('sources')
+          .from('chapters')
           .update({
             name: form.name.trim(),
-            exam_category: form.exam_category,
             description: form.description.trim() || null,
+            order_index: form.order_index,
             last_modified_by: DEMO_SA_ID,
             updated_at: new Date().toISOString(),
           })
@@ -167,11 +157,12 @@ function SourceFormModal({
         if (err) throw err
       } else {
         const { error: err } = await supabase
-          .from('sources')
+          .from('chapters')
           .insert({
+            source_id: sourceId,
             name: form.name.trim(),
-            exam_category: form.exam_category,
             description: form.description.trim() || null,
+            order_index: form.order_index,
             created_by: DEMO_SA_ID,
             last_modified_by: DEMO_SA_ID,
           })
@@ -180,14 +171,14 @@ function SourceFormModal({
       onSaved()
       onClose()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save source.')
+      setError(err instanceof Error ? err.message : 'Failed to save chapter.')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Source' : 'Create Source'}>
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Chapter' : 'Add Chapter'}>
       <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
         {error && (
           <div className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-3 py-2">
@@ -196,26 +187,25 @@ function SourceFormModal({
         )}
 
         <div>
-          <FieldLabel label="Source Name" required />
+          <FieldLabel label="Chapter Name" required />
           <input
             className={inputCls}
-            placeholder="e.g. NCERT Chemistry Part 1"
+            placeholder="e.g. Chapter 1 — Atomic Structure"
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           />
         </div>
 
         <div>
-          <FieldLabel label="Exam Category" required />
-          <select
+          <FieldLabel label="Order Index" />
+          <input
+            type="number"
+            min={1}
             className={inputCls}
-            value={form.exam_category}
-            onChange={(e) => setForm((f) => ({ ...f, exam_category: e.target.value as ExamCategory }))}
-          >
-            {EXAM_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+            value={form.order_index}
+            onChange={(e) => setForm((f) => ({ ...f, order_index: parseInt(e.target.value) || 1 }))}
+          />
+          <p className="text-xs text-zinc-400 mt-1">Controls display order within the source</p>
         </div>
 
         <div>
@@ -223,7 +213,7 @@ function SourceFormModal({
           <textarea
             className={`${inputCls} resize-none`}
             rows={3}
-            placeholder="Optional description of this source"
+            placeholder="Optional description of this chapter"
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
@@ -242,7 +232,7 @@ function SourceFormModal({
             disabled={saving}
             className="px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors disabled:opacity-50"
           >
-            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Source'}
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Chapter'}
           </button>
         </div>
       </form>
@@ -250,51 +240,47 @@ function SourceFormModal({
   )
 }
 
-// ─── View Source Modal ────────────────────────────────────────────────────────
+// ─── View Chapter Modal ───────────────────────────────────────────────────────
 
-function ViewSourceModal({
+function ViewChapterModal({
   open,
   onClose,
-  source,
+  chapter,
 }: {
   open: boolean
   onClose: () => void
-  source: Source | null
+  chapter: Chapter | null
 }) {
-  if (!source) return null
+  if (!chapter) return null
   return (
-    <Modal open={open} onClose={onClose} title="View Source">
+    <Modal open={open} onClose={onClose} title="View Chapter">
       <div className="px-5 py-4 space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-zinc-500 mb-0.5">Source Name</p>
-            <p className="text-sm font-medium text-zinc-900">{source.name}</p>
+          <div className="col-span-2">
+            <p className="text-xs text-zinc-500 mb-0.5">Chapter Name</p>
+            <p className="text-sm font-medium text-zinc-900">{chapter.name}</p>
           </div>
           <div>
-            <p className="text-xs text-zinc-500 mb-0.5">Exam Category</p>
-            <CategoryBadge category={source.exam_category} />
-          </div>
-          <div>
-            <p className="text-xs text-zinc-500 mb-0.5">Chapters</p>
-            <p className="text-sm font-medium text-zinc-900">{source.chapter_count}</p>
+            <p className="text-xs text-zinc-500 mb-0.5">Order Index</p>
+            <p className="text-sm text-zinc-700">{chapter.order_index}</p>
           </div>
           <div>
             <p className="text-xs text-zinc-500 mb-0.5">Questions</p>
-            <p className="text-sm font-medium text-zinc-900">{source.question_count}</p>
+            <p className="text-sm font-medium text-zinc-900">{chapter.question_count}</p>
           </div>
           <div>
             <p className="text-xs text-zinc-500 mb-0.5">Created</p>
-            <p className="text-sm text-zinc-700">{formatDateTime(source.created_at)}</p>
+            <p className="text-sm text-zinc-700">{formatDateTime(chapter.created_at)}</p>
           </div>
           <div>
             <p className="text-xs text-zinc-500 mb-0.5">Last Updated</p>
-            <p className="text-sm text-zinc-700">{formatDateTime(source.updated_at)}</p>
+            <p className="text-sm text-zinc-700">{formatDateTime(chapter.updated_at)}</p>
           </div>
         </div>
-        {source.description && (
+        {chapter.description && (
           <div>
             <p className="text-xs text-zinc-500 mb-0.5">Description</p>
-            <p className="text-sm text-zinc-700">{source.description}</p>
+            <p className="text-sm text-zinc-700">{chapter.description}</p>
           </div>
         )}
       </div>
@@ -308,34 +294,32 @@ function DeleteModal({
   open,
   onClose,
   onConfirm,
-  sourceName,
-  hasContent,
+  chapterName,
+  hasQuestions,
   deleting,
 }: {
   open: boolean
   onClose: () => void
   onConfirm: () => void
-  sourceName: string
-  hasContent: boolean
+  chapterName: string
+  hasQuestions: boolean
   deleting: boolean
 }) {
   return (
-    <Modal open={open} onClose={onClose} title="Delete Source" width="max-w-sm">
+    <Modal open={open} onClose={onClose} title="Delete Chapter" width="max-w-sm">
       <div className="px-5 py-4 space-y-3">
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-zinc-900">
-              Delete &ldquo;{sourceName}&rdquo;?
+              Delete &ldquo;{chapterName}&rdquo;?
             </p>
-            {hasContent ? (
+            {hasQuestions ? (
               <p className="text-xs text-rose-600 mt-1">
-                This source has chapters or questions. Remove all content before deleting.
+                This chapter has questions. Remove all questions before deleting.
               </p>
             ) : (
-              <p className="text-xs text-zinc-500 mt-1">
-                This action cannot be undone.
-              </p>
+              <p className="text-xs text-zinc-500 mt-1">This action cannot be undone.</p>
             )}
           </div>
         </div>
@@ -348,7 +332,7 @@ function DeleteModal({
           </button>
           <button
             onClick={onConfirm}
-            disabled={deleting || hasContent}
+            disabled={deleting || hasQuestions}
             className="px-3 py-1.5 text-sm font-medium text-white bg-rose-600 rounded-md hover:bg-rose-700 transition-colors disabled:opacity-50"
           >
             {deleting ? 'Deleting…' : 'Delete'}
@@ -361,144 +345,141 @@ function DeleteModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function SourcesChaptersPage() {
+export default function SourceDetailPage() {
   const router = useRouter()
+  const params = useParams()
+  const sourceId = params.sourceId as string
 
-  const [sources, setSources] = useState<Source[]>([])
+  const [source, setSource] = useState<Source | null>(null)
+  const [chapters, setChapters] = useState<Chapter[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<ExamCategory | 'ALL'>('ALL')
 
   const [createOpen, setCreateOpen] = useState(false)
-  const [viewSource, setViewSource] = useState<Source | null>(null)
-  const [editSource, setEditSource] = useState<Source | null>(null)
-  const [deleteSource, setDeleteSource] = useState<Source | null>(null)
+  const [viewChapter, setViewChapter] = useState<Chapter | null>(null)
+  const [editChapter, setEditChapter] = useState<Chapter | null>(null)
+  const [deleteChapter, setDeleteChapter] = useState<Chapter | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const fetchSources = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('sources')
-      .select(`
-        id,
-        name,
-        exam_category,
-        description,
-        created_at,
-        updated_at,
-        chapters(count),
-        chapters!inner(
+    const [sourceRes, chaptersRes] = await Promise.all([
+      supabase
+        .from('sources')
+        .select('id, name, exam_category')
+        .eq('id', sourceId)
+        .single(),
+      supabase
+        .from('chapters')
+        .select(`
+          id,
+          source_id,
+          name,
+          description,
+          order_index,
+          created_at,
+          updated_at,
           questions(count)
-        )
-      `)
-      .order('created_at', { ascending: false })
+        `)
+        .eq('source_id', sourceId)
+        .order('order_index', { ascending: true }),
+    ])
 
-    if (error) {
-      console.error('Failed to fetch sources:', error)
-      setLoading(false)
-      return
+    if (sourceRes.data) setSource(sourceRes.data as Source)
+
+    if (chaptersRes.data) {
+      const mapped: Chapter[] = chaptersRes.data.map((row: Record<string, unknown>) => {
+        const qArr = Array.isArray(row.questions) ? row.questions : []
+        const questionCount =
+          qArr.length > 0 && typeof qArr[0] === 'object' && qArr[0] !== null
+            ? (qArr[0] as { count?: number }).count ?? 0
+            : 0
+        return {
+          id: row.id as string,
+          source_id: row.source_id as string,
+          name: row.name as string,
+          description: (row.description as string | null) ?? null,
+          order_index: row.order_index as number,
+          question_count: questionCount,
+          created_at: row.created_at as string,
+          updated_at: row.updated_at as string,
+        }
+      })
+      setChapters(mapped)
     }
 
-    // Map to flat Source shape with counts
-    const mapped: Source[] = (data ?? []).map((row: Record<string, unknown>) => {
-      const chaptersArr = Array.isArray(row.chapters) ? row.chapters : []
-      const chapterCount = chaptersArr.length > 0 && typeof chaptersArr[0] === 'object' && chaptersArr[0] !== null
-        ? (chaptersArr[0] as { count?: number }).count ?? chaptersArr.length
-        : chaptersArr.length
-
-      // Sum questions across all chapters
-      let questionCount = 0
-      for (const ch of chaptersArr) {
-        if (typeof ch === 'object' && ch !== null && 'questions' in ch) {
-          const qArr = (ch as { questions: unknown }).questions
-          if (Array.isArray(qArr) && qArr.length > 0 && typeof qArr[0] === 'object' && qArr[0] !== null) {
-            questionCount += (qArr[0] as { count?: number }).count ?? 0
-          }
-        }
-      }
-
-      return {
-        id: row.id as string,
-        name: row.name as string,
-        exam_category: row.exam_category as ExamCategory,
-        description: (row.description as string | null) ?? null,
-        chapter_count: chapterCount,
-        question_count: questionCount,
-        created_at: row.created_at as string,
-        updated_at: row.updated_at as string,
-      }
-    })
-
-    setSources(mapped)
     setLoading(false)
-  }, [supabase])
+  }, [supabase, sourceId])
 
   useEffect(() => {
-    fetchSources()
-  }, [fetchSources])
+    fetchData()
+  }, [fetchData])
 
   async function handleDelete() {
-    if (!deleteSource) return
+    if (!deleteChapter) return
     setDeleting(true)
-    const { error } = await supabase.from('sources').delete().eq('id', deleteSource.id)
+    const { error } = await supabase.from('chapters').delete().eq('id', deleteChapter.id)
     setDeleting(false)
     if (!error) {
-      setDeleteSource(null)
-      fetchSources()
+      setDeleteChapter(null)
+      fetchData()
     }
   }
 
-  const filtered = sources.filter((s) => {
-    const matchSearch =
+  const filtered = chapters.filter(
+    (c) =>
       search.trim() === '' ||
-      s.name.toLowerCase().includes(search.toLowerCase())
-    const matchCategory = categoryFilter === 'ALL' || s.exam_category === categoryFilter
-    return matchSearch && matchCategory
-  })
+      c.name.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  const nextOrderIndex = chapters.length > 0
+    ? Math.max(...chapters.map((c) => c.order_index)) + 1
+    : 1
 
   return (
     <div className="px-6 py-6">
-      {/* Header */}
+      {/* Back + Header */}
+      <div className="flex items-center gap-2 mb-1">
+        <button
+          onClick={() => router.push('/super-admin/sources-chapters')}
+          className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Sources &amp; Chapters
+        </button>
+      </div>
+
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2.5">
-          <GitBranch className="w-5 h-5 text-zinc-400" />
-          <div>
-            <h1 className="text-base font-semibold text-zinc-900">Sources &amp; Chapters</h1>
+        <div>
+          <h1 className="text-base font-semibold text-zinc-900">
+            {source ? source.name : 'Loading…'}
+          </h1>
+          {source && (
             <p className="text-xs text-zinc-500 mt-0.5">
-              Organise your question bank by source and chapter
+              {source.exam_category} · {chapters.length} chapter{chapters.length !== 1 ? 's' : ''}
             </p>
-          </div>
+          )}
         </div>
         <button
           onClick={() => setCreateOpen(true)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          New Source
+          Add Chapter
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Search */}
       <div className="flex items-center gap-3 mb-4">
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
           <input
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-zinc-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Search sources…"
+            placeholder="Search chapters…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select
-          className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value as ExamCategory | 'ALL')}
-        >
-          <option value="ALL">All Exams</option>
-          {EXAM_CATEGORIES.map((cat) => (
-            <option key={cat} value={cat}>{cat}</option>
-          ))}
-        </select>
       </div>
 
       {/* Table */}
@@ -506,14 +487,11 @@ export default function SourcesChaptersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50">
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                Source Name
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide w-10">
+                #
               </th>
               <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                Exam
-              </th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                Chapters
+                Chapter Name
               </th>
               <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                 Questions
@@ -529,68 +507,69 @@ export default function SourcesChaptersPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-sm text-zinc-400">
-                  Loading sources…
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-zinc-400">
+                  Loading chapters…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center">
+                <td colSpan={5} className="px-4 py-10 text-center">
                   <BookOpen className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
                   <p className="text-sm text-zinc-500">
-                    {search || categoryFilter !== 'ALL'
-                      ? 'No sources match your filters.'
-                      : 'No sources yet. Create your first source to get started.'}
+                    {search
+                      ? 'No chapters match your search.'
+                      : 'No chapters yet. Add the first chapter to this source.'}
                   </p>
                 </td>
               </tr>
             ) : (
-              filtered.map((source) => (
+              filtered.map((chapter) => (
                 <tr
-                  key={source.id}
+                  key={chapter.id}
                   className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors"
                 >
+                  <td className="px-4 py-3 text-zinc-400 text-xs">{chapter.order_index}</td>
                   <td className="px-4 py-3">
-                    <span className="font-medium text-zinc-900">{source.name}</span>
-                    {source.description && (
-                      <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{source.description}</p>
+                    <span className="font-medium text-zinc-900">{chapter.name}</span>
+                    {chapter.description && (
+                      <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{chapter.description}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <CategoryBadge category={source.exam_category} />
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">{source.chapter_count}</td>
-                  <td className="px-4 py-3 text-zinc-700">{source.question_count}</td>
-                  <td className="px-4 py-3 text-zinc-500">{formatDateTime(source.created_at)}</td>
+                  <td className="px-4 py-3 text-zinc-700">{chapter.question_count}</td>
+                  <td className="px-4 py-3 text-zinc-500">{formatDateTime(chapter.created_at)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => setViewSource(source)}
+                        onClick={() => setViewChapter(chapter)}
                         title="View"
                         className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => setEditSource(source)}
+                        onClick={() => setEditChapter(chapter)}
                         title="Edit"
                         className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => setDeleteSource(source)}
+                        onClick={() => setDeleteChapter(chapter)}
                         title="Delete"
                         className="p-1.5 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => router.push(`/super-admin/sources-chapters/${source.id}`)}
-                        title="View Chapters"
+                        onClick={() =>
+                          router.push(
+                            `/super-admin/sources-chapters/${sourceId}/${chapter.id}`,
+                          )
+                        }
+                        title="View Questions"
                         className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors ml-1"
                       >
-                        Chapters
+                        Questions
                         <ChevronRight className="w-3 h-3" />
                       </button>
                     </div>
@@ -603,28 +582,32 @@ export default function SourcesChaptersPage() {
       </div>
 
       {/* Modals */}
-      <SourceFormModal
+      <ChapterFormModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onSaved={fetchSources}
+        onSaved={fetchData}
+        sourceId={sourceId}
+        nextOrderIndex={nextOrderIndex}
       />
-      <SourceFormModal
-        open={!!editSource}
-        onClose={() => setEditSource(null)}
-        onSaved={fetchSources}
-        initial={editSource ?? undefined}
+      <ChapterFormModal
+        open={!!editChapter}
+        onClose={() => setEditChapter(null)}
+        onSaved={fetchData}
+        sourceId={sourceId}
+        initial={editChapter ?? undefined}
+        nextOrderIndex={nextOrderIndex}
       />
-      <ViewSourceModal
-        open={!!viewSource}
-        onClose={() => setViewSource(null)}
-        source={viewSource}
+      <ViewChapterModal
+        open={!!viewChapter}
+        onClose={() => setViewChapter(null)}
+        chapter={viewChapter}
       />
       <DeleteModal
-        open={!!deleteSource}
-        onClose={() => setDeleteSource(null)}
+        open={!!deleteChapter}
+        onClose={() => setDeleteChapter(null)}
         onConfirm={handleDelete}
-        sourceName={deleteSource?.name ?? ''}
-        hasContent={(deleteSource?.chapter_count ?? 0) > 0 || (deleteSource?.question_count ?? 0) > 0}
+        chapterName={deleteChapter?.name ?? ''}
+        hasQuestions={(deleteChapter?.question_count ?? 0) > 0}
         deleting={deleting}
       />
     </div>
