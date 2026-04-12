@@ -41,6 +41,17 @@ Sub-PRDs AAP-1 through AAP-5 to be created as children of this page. IDs to be a
 
 ---
 
+## Production Release Folders
+
+These are the canonical Confluence folder URLs for all production PRDs. New PRD pages are created as children inside these folders.
+
+| Release | Description | URL |
+|---------|-------------|-----|
+| Release 32 — Phase 1 | All Phase 1 production PRDs | https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/folder/91193345?atlOrigin=eyJpIjoiZDgwMmRlNjdiMzY3NDY0YmI4NjMwMzgyMjMwNzVkNDUiLCJwIjoiYyJ9 |
+| Release 32 — Phase 2 | All Phase 2 production PRDs | https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/folder/110952449?atlOrigin=eyJpIjoiNTNiMDhmZmY2YjdmNGNmYmI5MjBiYjIzZmI1MDY5ZDkiLCJwIjoiYyJ9 |
+
+---
+
 ## How to use
 
 - Before updating a PRD section: open the relevant page above first to read current content

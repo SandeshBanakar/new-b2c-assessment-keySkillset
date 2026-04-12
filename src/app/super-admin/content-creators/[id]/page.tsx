@@ -36,7 +36,8 @@ function EditCCSlideOver({
   async function handleSave() {
     const e: Record<string, string> = {}
     if (!name.trim()) e.name = 'Name is required.'
-    if (password && password.length < 6) e.password = 'Minimum 6 characters.'
+    // Platform standard: 4-char minimum for all admin password fields (product decision — matches production spec)
+    if (password && password.length < 4) e.password = 'At least 4 characters required.'
     if (password && password !== confirm) e.confirm = 'Passwords do not match.'
     if (Object.keys(e).length > 0) { setErrors(e); return }
 
@@ -100,7 +101,7 @@ function EditCCSlideOver({
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 6 characters"
+              placeholder="Minimum 4 characters"
               className={inputCls(errors.password)}
             />
             {errors.password && <p className="text-xs text-rose-600 mt-1">{errors.password}</p>}

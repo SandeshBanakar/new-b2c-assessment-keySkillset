@@ -79,6 +79,9 @@
 | KSS-SA-019 | Contract mandatory on CA creation (Phase 2 enforcement) | [CRITICAL] |
 | KEYS-485 | Restore archived plan | Spec locked Apr 7 2026, not yet built |
 | KEYS-501 | Hard delete plan (ARCHIVED + zero subscribers) | Spec locked Apr 7 2026, not yet built |
+| KSS-SA-[TBD] | Build Super Admin login + authentication flow | [PENDING] |
+| KSS-CA-[TBD] | Build Client Admin login + authentication flow | [PENDING] |
+| KSS-B2C-[TBD] | Build B2C user signup + onboarding flow | [PENDING] |
 
 ---
 
