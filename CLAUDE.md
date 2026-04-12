@@ -63,19 +63,6 @@ These rules apply regardless of task type. Violating any of these is a blocking 
 
 ---
 
-## TIER 2 — ACTIVE BUILD STATE
-
-**Currently pending (do not mark done without shipping):**
-- 🟡 KSS-SA-007 Marketing Config
-- 🟡 KSS-CA-007 CA Dashboard
-- 🟡 KSS-CA-009 Audit Log (CA)
-- 🔴 KSS-SA-019 Contract mandatory on CA creation — contract must be created before/during invite; currently optional (Phase 2 item, pending enforcement)
-- 🔴 DB-TODO-001 Rename content_items → assessment_items (requires KSS-DB-XXX authorisation)
-- 🔴 DB-TODO-003 Create unified questions table schema (requires KSS-DB-XXX authorisation)
-
-**Open decisions (do not resolve without product owner confirmation):**
-1. questions table schema — columns, relationships, options storage (JSONB vs separate table) — TBD
-
 ---
 
 ## DEVELOPMENT WORKFLOW

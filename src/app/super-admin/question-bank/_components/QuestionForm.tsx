@@ -4,24 +4,30 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import RichTextEditor, {
+  type JSONContent,
+  emptyDoc,
+  isDocEmpty,
+  ensureDoc,
+} from '@/components/ui/RichTextEditor'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type QuestionType = 'MCQ_SINGLE' | 'MCQ_MULTI' | 'PASSAGE_SINGLE' | 'PASSAGE_MULTI' | 'NUMERIC'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'mixed'
 
-// DB stores options as {key, text}[] JSONB
-interface OptionEntry { key: string; text: string }
+// DB stores options as {key, text}[] JSONB — text is now a TiptapDoc
+interface OptionEntry { key: string; text: JSONContent }
 
 interface Source { id: string; name: string; exam_category_name: string | null }
 interface Chapter { id: string; source_id: string; name: string; order_index: number }
 
 interface SubQuestionDraft {
   id?: string
-  question_text: string
-  options: OptionEntry[]   // always 4
+  question_text: JSONContent
+  options: OptionEntry[]
   correct_answer: string[]
-  explanation: string
+  explanation: JSONContent
   order_index: number
 }
 
@@ -30,12 +36,12 @@ interface FormState {
   chapter_id: string
   question_type: QuestionType
   difficulty: Difficulty
-  question_text: string
-  passage_text: string
-  options: OptionEntry[]        // 4 entries for MCQ types
-  correct_answer: string[]      // e.g. ["A"] or ["A","C"]
-  numeric_answer: string        // NUMERIC type
-  explanation: string
+  question_text: JSONContent
+  passage_text: JSONContent
+  options: OptionEntry[]
+  correct_answer: string[]
+  numeric_answer: string
+  explanation: JSONContent
   concept_tag: string
   marks: string
   negative_marks: string
@@ -46,11 +52,17 @@ const OPTION_KEYS = ['A', 'B', 'C', 'D']
 const DEMO_SA_ID = '3bd6101b-1fb9-4c96-a9a5-c958a3deb54a'
 
 function emptyOptions(): OptionEntry[] {
-  return OPTION_KEYS.map((key) => ({ key, text: '' }))
+  return OPTION_KEYS.map((key) => ({ key, text: emptyDoc() }))
 }
 
 function emptySubQuestion(orderIndex: number): SubQuestionDraft {
-  return { question_text: '', options: emptyOptions(), correct_answer: [], explanation: '', order_index: orderIndex }
+  return {
+    question_text: emptyDoc(),
+    options: emptyOptions(),
+    correct_answer: [],
+    explanation: emptyDoc(),
+    order_index: orderIndex,
+  }
 }
 
 function defaultForm(chapterId?: string, sourceId?: string): FormState {
@@ -59,12 +71,12 @@ function defaultForm(chapterId?: string, sourceId?: string): FormState {
     chapter_id: chapterId ?? '',
     question_type: 'MCQ_SINGLE',
     difficulty: 'medium',
-    question_text: '',
-    passage_text: '',
+    question_text: emptyDoc(),
+    passage_text: emptyDoc(),
     options: emptyOptions(),
     correct_answer: [],
     numeric_answer: '',
-    explanation: '',
+    explanation: emptyDoc(),
     concept_tag: '',
     marks: '4',
     negative_marks: '1',
@@ -83,7 +95,6 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
 }
 
 const inputCls = 'block w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-const textareaCls = `${inputCls} resize-none`
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">{children}</p>
@@ -92,9 +103,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ─── Sub-question editor ──────────────────────────────────────────────────────
 
 function SubQuestionEditor({ sub, index, onChange, onRemove, isMulti }: {
-  sub: SubQuestionDraft; index: number
+  sub: SubQuestionDraft
+  index: number
   onChange: (updated: SubQuestionDraft) => void
-  onRemove: () => void; isMulti: boolean
+  onRemove: () => void
+  isMulti: boolean
 }) {
   function toggleCorrect(key: string) {
     if (isMulti) {
@@ -116,33 +129,49 @@ function SubQuestionEditor({ sub, index, onChange, onRemove, isMulti }: {
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
+
       <div>
         <FieldLabel label="Question Text" required />
-        <textarea className={textareaCls} rows={2} value={sub.question_text} placeholder="Sub-question text…"
-          onChange={(e) => onChange({ ...sub, question_text: e.target.value })} />
+        <RichTextEditor
+          value={sub.question_text}
+          onChange={(doc) => onChange({ ...sub, question_text: doc })}
+          minHeight="60px"
+        />
       </div>
+
       <div className="space-y-2">
         <FieldLabel label={isMulti ? 'Options (check all correct)' : 'Options (select correct)'} required />
         {sub.options.map((opt, i) => (
-          <div key={opt.key} className="flex items-center gap-2">
-            {isMulti
-              ? <input type="checkbox" checked={sub.correct_answer.includes(opt.key)} onChange={() => toggleCorrect(opt.key)} className="accent-blue-700" />
-              : <input type="radio" name={`sub-correct-${index}`} checked={sub.correct_answer[0] === opt.key} onChange={() => toggleCorrect(opt.key)} className="accent-blue-700" />
-            }
-            <span className="text-xs font-medium text-zinc-500 w-4 shrink-0">{opt.key}.</span>
-            <input className={inputCls} placeholder={`Option ${opt.key}`} value={opt.text}
-              onChange={(e) => {
-                const opts = [...sub.options]
-                opts[i] = { ...opts[i], text: e.target.value }
-                onChange({ ...sub, options: opts })
-              }} />
+          <div key={opt.key} className="flex items-start gap-2">
+            <div className="pt-2.5 shrink-0">
+              {isMulti
+                ? <input type="checkbox" checked={sub.correct_answer.includes(opt.key)} onChange={() => toggleCorrect(opt.key)} className="accent-blue-700" />
+                : <input type="radio" name={`sub-correct-${index}`} checked={sub.correct_answer[0] === opt.key} onChange={() => toggleCorrect(opt.key)} className="accent-blue-700" />
+              }
+            </div>
+            <span className="text-xs font-medium text-zinc-500 w-4 shrink-0 pt-2.5">{opt.key}.</span>
+            <div className="flex-1 min-w-0">
+              <RichTextEditor
+                value={opt.text}
+                onChange={(doc) => {
+                  const opts = [...sub.options]
+                  opts[i] = { ...opts[i], text: doc }
+                  onChange({ ...sub, options: opts })
+                }}
+                minHeight="44px"
+              />
+            </div>
           </div>
         ))}
       </div>
+
       <div>
         <FieldLabel label="Explanation" />
-        <textarea className={textareaCls} rows={2} value={sub.explanation} placeholder="Explanation…"
-          onChange={(e) => onChange({ ...sub, explanation: e.target.value })} />
+        <RichTextEditor
+          value={sub.explanation}
+          onChange={(doc) => onChange({ ...sub, explanation: doc })}
+          minHeight="56px"
+        />
       </div>
     </div>
   )
@@ -208,11 +237,10 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
 
     const d = data as Record<string, unknown>
     const qType = d.question_type as QuestionType
-    const rawOptions = Array.isArray(d.options) ? d.options as OptionEntry[] : emptyOptions()
-    // Normalise options to always have 4 entries with key/text shape
+    const rawOptions = Array.isArray(d.options) ? d.options as { key: string; text: unknown }[] : []
     const normOptions: OptionEntry[] = OPTION_KEYS.map((key, i) => ({
       key,
-      text: (rawOptions[i] as OptionEntry)?.text ?? '',
+      text: ensureDoc(rawOptions[i]?.text),
     }))
 
     const correctAnswer = Array.isArray(d.correct_answer) ? d.correct_answer as string[] : []
@@ -220,17 +248,17 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
 
     const subQs: SubQuestionDraft[] = Array.isArray(d.passage_sub_questions)
       ? (d.passage_sub_questions as Record<string, unknown>[]).map((sq) => {
-          const sqOpts = Array.isArray(sq.options) ? sq.options as OptionEntry[] : []
+          const sqOpts = Array.isArray(sq.options) ? sq.options as { key: string; text: unknown }[] : []
           const normSqOpts: OptionEntry[] = OPTION_KEYS.map((key, i) => ({
             key,
-            text: (sqOpts[i] as OptionEntry)?.text ?? '',
+            text: ensureDoc(sqOpts[i]?.text),
           }))
           return {
             id: sq.id as string,
-            question_text: sq.question_text as string,
+            question_text: ensureDoc(sq.question_text),
             options: normSqOpts,
             correct_answer: Array.isArray(sq.correct_answer) ? sq.correct_answer as string[] : [],
-            explanation: (sq.explanation as string | null) ?? '',
+            explanation: ensureDoc(sq.explanation),
             order_index: sq.order_index as number,
           }
         })
@@ -241,12 +269,12 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
       chapter_id: (d.chapter_id as string) ?? '',
       question_type: qType,
       difficulty: (d.difficulty as Difficulty) ?? 'medium',
-      question_text: (d.question_text as string) ?? '',
-      passage_text: (d.passage_text as string | null) ?? '',
+      question_text: ensureDoc(d.question_text),
+      passage_text: ensureDoc(d.passage_text),
       options: normOptions,
       correct_answer: qType === 'NUMERIC' ? [] : correctAnswer,
       numeric_answer: qType === 'NUMERIC' ? (acceptableAnswers[0] ?? correctAnswer[0] ?? '') : '',
-      explanation: (d.explanation as string | null) ?? '',
+      explanation: ensureDoc(d.explanation),
       concept_tag: (d.concept_tag as string | null) ?? '',
       marks: String(d.marks ?? 4),
       negative_marks: String(d.negative_marks ?? 1),
@@ -298,10 +326,10 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
   function validate(): string | null {
     if (!form.source_id) return 'Select a source.'
     if (!form.chapter_id) return 'Select a chapter.'
-    if (!form.question_text.trim()) return 'Question text is required.'
-    if (isPassage && !form.passage_text.trim()) return 'Passage text is required.'
+    if (isDocEmpty(form.question_text)) return 'Question text is required.'
+    if (isPassage && isDocEmpty(form.passage_text)) return 'Passage text is required.'
     if (isMcq) {
-      if (form.options.some((o) => !o.text.trim())) return 'All 4 options must be filled.'
+      if (form.options.some((o) => isDocEmpty(o.text))) return 'All 4 options must be filled.'
       if (form.correct_answer.length === 0) return 'Select the correct answer(s).'
     }
     if (isNumeric && !form.numeric_answer.trim()) return 'Numeric answer is required.'
@@ -309,8 +337,8 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
     if (isPassage) {
       for (let i = 0; i < form.sub_questions.length; i++) {
         const sq = form.sub_questions[i]
-        if (!sq.question_text.trim()) return `Sub-question ${i + 1} needs question text.`
-        if (sq.options.some((o) => !o.text.trim())) return `Sub-question ${i + 1} needs all 4 options.`
+        if (isDocEmpty(sq.question_text)) return `Sub-question ${i + 1} needs question text.`
+        if (sq.options.some((o) => isDocEmpty(o.text))) return `Sub-question ${i + 1} needs all 4 options.`
         if (sq.correct_answer.length === 0) return `Sub-question ${i + 1} needs a correct answer.`
       }
     }
@@ -327,13 +355,10 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
     if (validationError) { setError(validationError); return }
     setSaving(true); setError(null)
 
-    // Correct answer: NUMERIC uses acceptable_answers, others use correct_answer
     const correctAnswerPayload = isNumeric ? null : form.correct_answer
     const acceptableAnswersPayload = isNumeric ? [form.numeric_answer.trim()] : null
-
-    // Options stored as {key, text}[] JSONB — only for MCQ types
     const optionsPayload = isMcq
-      ? form.options.map((o) => ({ key: o.key, text: o.text.trim() }))
+      ? form.options.map((o) => ({ key: o.key, text: o.text }))
       : null
 
     const questionPayload = {
@@ -341,12 +366,12 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
       chapter_id: form.chapter_id,
       question_type: form.question_type,
       difficulty: form.difficulty,
-      question_text: form.question_text.trim(),
-      passage_text: isPassage ? form.passage_text.trim() : null,
+      question_text: form.question_text,
+      passage_text: isPassage ? form.passage_text : null,
       options: optionsPayload,
       correct_answer: correctAnswerPayload,
       acceptable_answers: acceptableAnswersPayload,
-      explanation: (!isPassage && form.explanation.trim()) ? form.explanation.trim() : null,
+      explanation: (!isPassage && !isDocEmpty(form.explanation)) ? form.explanation : null,
       concept_tag: form.concept_tag.trim() || null,
       marks: parseFloat(form.marks),
       negative_marks: parseFloat(form.negative_marks),
@@ -388,10 +413,10 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
         for (const sq of form.sub_questions) {
           const sqPayload = {
             parent_question_id: qId,
-            question_text: sq.question_text.trim(),
-            options: sq.options.map((o) => ({ key: o.key, text: o.text.trim() })),
+            question_text: sq.question_text,
+            options: sq.options.map((o) => ({ key: o.key, text: o.text })),
             correct_answer: sq.correct_answer,
-            explanation: sq.explanation.trim() || null,
+            explanation: !isDocEmpty(sq.explanation) ? sq.explanation : null,
             order_index: sq.order_index,
           }
           if (sq.id) {
@@ -518,8 +543,11 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
           <div>
             <SectionLabel>Passage</SectionLabel>
             <FieldLabel label="Passage Text" required />
-            <textarea className={textareaCls} rows={6} placeholder="Enter the passage text…"
-              value={form.passage_text} onChange={(e) => setField('passage_text', e.target.value)} />
+            <RichTextEditor
+              value={form.passage_text}
+              onChange={(doc) => setField('passage_text', doc)}
+              minHeight="120px"
+            />
           </div>
         )}
 
@@ -530,27 +558,37 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
           {!isPassage && (
             <div className="mb-4">
               <FieldLabel label="Question Text" required />
-              <textarea className={textareaCls} rows={4} placeholder="Enter the question text…"
-                value={form.question_text} onChange={(e) => setField('question_text', e.target.value)} />
+              <RichTextEditor
+                value={form.question_text}
+                onChange={(doc) => setField('question_text', doc)}
+                minHeight="100px"
+              />
             </div>
           )}
 
           {isMcq && (
-            <div className="space-y-2 mb-4">
+            <div className="space-y-3 mb-4">
               <FieldLabel label={isMultiCorrect ? 'Options (check all correct)' : 'Options (select correct)'} required />
               {form.options.map((opt, i) => (
-                <div key={opt.key} className="flex items-center gap-2">
-                  {isMultiCorrect
-                    ? <input type="checkbox" checked={form.correct_answer.includes(opt.key)} onChange={() => toggleCorrect(opt.key)} className="accent-blue-700 shrink-0" />
-                    : <input type="radio" name="correct_answer" checked={form.correct_answer[0] === opt.key} onChange={() => toggleCorrect(opt.key)} className="accent-blue-700 shrink-0" />
-                  }
-                  <span className="text-xs font-medium text-zinc-500 w-4 shrink-0">{opt.key}.</span>
-                  <input className={inputCls} placeholder={`Option ${opt.key}`} value={opt.text}
-                    onChange={(e) => {
-                      const opts = [...form.options]
-                      opts[i] = { ...opts[i], text: e.target.value }
-                      setField('options', opts)
-                    }} />
+                <div key={opt.key} className="flex items-start gap-2">
+                  <div className="pt-2.5 shrink-0">
+                    {isMultiCorrect
+                      ? <input type="checkbox" checked={form.correct_answer.includes(opt.key)} onChange={() => toggleCorrect(opt.key)} className="accent-blue-700" />
+                      : <input type="radio" name="correct_answer" checked={form.correct_answer[0] === opt.key} onChange={() => toggleCorrect(opt.key)} className="accent-blue-700" />
+                    }
+                  </div>
+                  <span className="text-xs font-medium text-zinc-500 w-4 shrink-0 pt-2.5">{opt.key}.</span>
+                  <div className="flex-1 min-w-0">
+                    <RichTextEditor
+                      value={opt.text}
+                      onChange={(doc) => {
+                        const opts = [...form.options]
+                        opts[i] = { ...opts[i], text: doc }
+                        setField('options', opts)
+                      }}
+                      minHeight="44px"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -566,11 +604,13 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
 
           {isPassage && (
             <div className="space-y-4">
-              {/* Passage question text shown above sub-questions */}
               <div>
                 <FieldLabel label="Question Stem (optional — shown above sub-questions)" />
-                <textarea className={textareaCls} rows={2} placeholder="Optional stem for all sub-questions…"
-                  value={form.question_text} onChange={(e) => setField('question_text', e.target.value)} />
+                <RichTextEditor
+                  value={form.question_text}
+                  onChange={(doc) => setField('question_text', doc)}
+                  minHeight="60px"
+                />
               </div>
               {form.sub_questions.map((sq, i) => (
                 <SubQuestionEditor key={i} sub={sq} index={i} isMulti={form.question_type === 'PASSAGE_MULTI'}
@@ -595,8 +635,11 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
         {!isPassage && (
           <div>
             <FieldLabel label="Explanation" />
-            <textarea className={textareaCls} rows={3} placeholder="Explain the correct answer…"
-              value={form.explanation} onChange={(e) => setField('explanation', e.target.value)} />
+            <RichTextEditor
+              value={form.explanation}
+              onChange={(doc) => setField('explanation', doc)}
+              minHeight="80px"
+            />
           </div>
         )}
 

@@ -190,15 +190,28 @@ export interface DisplayConfig {
 export interface AssessmentConfig {
   duration_minutes?: number | null
   navigation_policy?: 'FREE' | 'LINEAR' | 'SECTION_LOCKED' | null
+  timer_mode?: 'FULL' | 'SECTIONAL' | null      // FULL = one timer; SECTIONAL = per-section timers
+  allow_back_navigation?: boolean               // default true for linear
+  allow_calculator?: boolean                    // default false; when false engine hides calculator
+  override_marks?: boolean                      // false = use per-question marks from bank; true = use marks_per_question for all
   total_questions?: number | null
   total_marks?: number | null
+  marks_per_question?: number | null            // only used when override_marks = true
+  negative_marks?: number | null               // only used when override_marks = true
   sections?: Array<{
     id: string
     name: string
-    questionCount: number
-    durationMinutes?: number
-    marksPerQuestion?: number
-    negativeMarks?: number
+    source_ids: string[]                        // selected source UUIDs for this section's pool
+    chapter_ids: string[]                       // selected chapter UUIDs (filtered by source_ids)
+    questions_per_attempt: number               // random draw count per attempt
+    question_type_distribution?: {
+      MCQ_SINGLE?: number
+      MCQ_MULTI?: number
+      PASSAGE_SINGLE?: number
+      PASSAGE_MULTI?: number
+      NUMERIC?: number
+    }
+    duration_minutes?: number                   // only set when timer_mode = 'SECTIONAL'
   }>
   [key: string]: unknown
 }

@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, ChevronDown, Plus, X, Construction,
-  GripVertical, ChevronRight,
+  ArrowLeft, ChevronDown, Plus, X, GripVertical, ChevronRight, AlertCircle,
 } from 'lucide-react'
 import {
   DndContext,
@@ -104,6 +103,36 @@ function sortChildren(
 }
 
 // ─── Design primitives ────────────────────────────────────────────────────────
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+        checked ? 'bg-blue-600' : 'bg-zinc-300'
+      }`}
+    >
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+        checked ? 'translate-x-4' : 'translate-x-0'
+      }`} />
+    </button>
+  )
+}
+
+function ToggleRow({ label, hint, checked, onChange }: {
+  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium text-zinc-700">{label}</p>
+        {hint && <p className="text-xs text-zinc-400 mt-0.5">{hint}</p>}
+      </div>
+      <Toggle checked={checked} onChange={onChange} />
+    </div>
+  )
+}
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -265,6 +294,177 @@ function SortableBulletList({
         <Plus className="w-3.5 h-3.5" />
         Add item
       </button>
+    </div>
+  )
+}
+
+// ─── Section entry ────────────────────────────────────────────────────────────
+
+interface SectionEntry {
+  id: string
+  name: string
+  questionCount: string
+  durationMinutes: string
+}
+
+// ─── Sortable section row ─────────────────────────────────────────────────────
+
+function SortableSectionRow({
+  entry, showDuration, onChange, onRemove,
+}: {
+  entry: SectionEntry
+  showDuration: boolean
+  onChange: (id: string, field: keyof SectionEntry, value: string) => void
+  onRemove: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: entry.id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      className="flex items-center gap-2"
+    >
+      <button type="button" className="cursor-grab text-zinc-300 hover:text-zinc-400 shrink-0 touch-none" {...attributes} {...listeners}>
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <input
+        type="text"
+        value={entry.name}
+        onChange={e => onChange(entry.id, 'name', e.target.value)}
+        placeholder="Section name, e.g. Biology"
+        className="flex-1 border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-blue-700 focus:border-transparent outline-none"
+      />
+      <input
+        type="number" min={1}
+        value={entry.questionCount}
+        onChange={e => onChange(entry.id, 'questionCount', e.target.value)}
+        placeholder="Qs"
+        title="Question count"
+        className="w-20 border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-blue-700 focus:border-transparent outline-none"
+      />
+      {showDuration && (
+        <input
+          type="number" min={1}
+          value={entry.durationMinutes}
+          onChange={e => onChange(entry.id, 'durationMinutes', e.target.value)}
+          placeholder="Min"
+          title="Duration in minutes"
+          className="w-16 border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-blue-700 focus:border-transparent outline-none"
+        />
+      )}
+      <button type="button" onClick={() => onRemove(entry.id)} className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-md transition-colors shrink-0">
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  )
+}
+
+// ─── Sections builder ─────────────────────────────────────────────────────────
+
+function SectionsBuilder({
+  sections, onChange,
+  timerMode, navigationPolicy,
+  overrideMarks, marksPerQuestion,
+  error,
+}: {
+  sections: SectionEntry[]
+  onChange: (s: SectionEntry[]) => void
+  timerMode: 'FULL' | 'SECTIONAL'
+  navigationPolicy: string
+  overrideMarks: boolean
+  marksPerQuestion: string
+  error?: string
+}) {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const showDuration = timerMode === 'SECTIONAL' || navigationPolicy === 'SECTION_LOCKED'
+
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const oi = sections.findIndex(s => s.id === active.id)
+    const ni = sections.findIndex(s => s.id === over.id)
+    onChange(arrayMove(sections, oi, ni))
+  }
+
+  function handleChange(id: string, field: keyof SectionEntry, value: string) {
+    onChange(sections.map(s => s.id === id ? { ...s, [field]: value } : s))
+  }
+
+  const computedQ = sections.reduce((sum, s) => sum + (Number(s.questionCount) || 0), 0)
+  const marksNum = Number(marksPerQuestion)
+  const computedM = overrideMarks && computedQ > 0 && marksNum > 0 ? computedQ * marksNum : null
+
+  return (
+    <div className="space-y-5">
+      {/* Column headers */}
+      {sections.length > 0 && (
+        <div className="flex items-center gap-2 px-0">
+          <div className="w-5 shrink-0" />
+          <p className="flex-1 text-xs font-medium text-zinc-400 uppercase tracking-wide">Section Name</p>
+          <p className="w-20 text-xs font-medium text-zinc-400 uppercase tracking-wide">Questions</p>
+          {showDuration && <p className="w-16 text-xs font-medium text-zinc-400 uppercase tracking-wide">Duration</p>}
+          <div className="w-8 shrink-0" />
+        </div>
+      )}
+
+      {/* Section rows */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-2">
+            {sections.map(s => (
+              <SortableSectionRow
+                key={s.id} entry={s}
+                showDuration={showDuration}
+                onChange={handleChange}
+                onRemove={id => onChange(sections.filter(x => x.id !== id))}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      {sections.length === 0 && (
+        <div className="border border-dashed border-zinc-200 rounded-md py-6 text-center">
+          <p className="text-sm text-zinc-400">No sections yet. Add a section to configure this assessment.</p>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => onChange([...sections, { id: crypto.randomUUID(), name: '', questionCount: '', durationMinutes: '' }])}
+        className="flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-800 transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        Add Section
+      </button>
+
+      {/* Computed summary */}
+      {computedQ > 0 && (
+        <div className="bg-zinc-50 border border-zinc-100 rounded-md px-4 py-3 flex items-center gap-8">
+          <div>
+            <p className="text-xs text-zinc-400">Total Questions</p>
+            <p className="text-sm font-semibold text-zinc-900">{computedQ}</p>
+          </div>
+          {computedM != null && (
+            <div>
+              <p className="text-xs text-zinc-400">Total Marks</p>
+              <p className="text-sm font-semibold text-zinc-900">{computedM}</p>
+            </div>
+          )}
+          <div>
+            <p className="text-xs text-zinc-400">Sections</p>
+            <p className="text-sm font-semibold text-zinc-900">{sections.filter(s => s.name.trim()).length}</p>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded-md px-3 py-2.5">
+          <AlertCircle className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-rose-700">{error}</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -709,12 +909,13 @@ function navLabel(policy: string) {
 
 function AssessmentPreviewPanel({
   title, examCategoryName, testType, durationMinutes, totalQuestions, totalMarks,
-  navigationPolicy, description, language, whatYoullGet, topicsCovered,
+  navigationPolicy, description, language, whatYoullGet, topicsCovered, sections,
 }: {
   title: string; examCategoryName: string; testType: string
-  durationMinutes: string; totalQuestions: string; totalMarks: string
+  durationMinutes: string; totalQuestions: string | number | null; totalMarks: string | number | null
   navigationPolicy: string; description: string; language: string
   whatYoullGet: string[]; topicsCovered: TopicEntry[]
+  sections: SectionEntry[]
 }) {
   function fmtDuration(mins: string) {
     const n = parseInt(mins)
@@ -726,12 +927,15 @@ function AssessmentPreviewPanel({
   }
 
   const testTypeLabel = TEST_TYPE_OPTIONS.find(o => o.value === testType)?.label ?? ''
+  const qDisplay = totalQuestions != null && totalQuestions !== '' ? String(totalQuestions) : '—'
+  const mDisplay = totalMarks != null && totalMarks !== '' ? String(totalMarks) : '—'
   const statCards = [
     { label: 'Duration',    value: fmtDuration(durationMinutes) },
-    { label: 'Questions',   value: totalQuestions || '—' },
-    { label: 'Total Marks', value: totalMarks || '—' },
+    { label: 'Questions',   value: qDisplay },
+    { label: 'Total Marks', value: mDisplay },
     { label: 'Navigation',  value: navigationPolicy ? navLabel(navigationPolicy) : '—' },
   ]
+  const namedSections = sections.filter(s => s.name.trim())
 
   return (
     <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
@@ -766,6 +970,20 @@ function AssessmentPreviewPanel({
           ))}
         </div>
 
+        {namedSections.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Sections</p>
+            <div className="flex flex-wrap gap-2">
+              {namedSections.map(s => (
+                <div key={s.id} className="bg-zinc-50 border border-zinc-100 rounded-md px-3 py-2 text-sm">
+                  <span className="font-medium text-zinc-800">{s.name}</span>
+                  {s.questionCount && <span className="text-zinc-400 ml-1.5 text-xs">{s.questionCount}Q</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <DisplayConfigPreview
           description={description || null}
           language={language || null}
@@ -784,13 +1002,13 @@ function AssessmentPreviewPanel({
 
 // ─── Test type change modal ───────────────────────────────────────────────────
 
-function TestTypeChangeModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+function TestTypeChangeModal({ onConfirm, onCancel, hasSections }: { onConfirm: () => void; onCancel: () => void; hasSections: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
         <h3 className="text-sm font-semibold text-zinc-900 mb-2">Change Assessment Length?</h3>
         <p className="text-sm text-zinc-600 mb-5">
-          Changing Assessment Length will clear your Topics Covered entries. This cannot be undone.
+          Changing Assessment Length will clear your Topics Covered{hasSections ? ' and Sections' : ''} configuration. This cannot be undone.
         </p>
         <div className="flex justify-end gap-3">
           <button
@@ -837,8 +1055,31 @@ export default function CreateLinearAssessmentPage() {
   const [whatYoullGet, setWhatYoullGet] = useState<string[]>([''])
   const [topicsCovered, setTopicsCovered] = useState<TopicEntry[]>([])
 
+  // Sections (FULL_TEST only)
+  const [sections, setSections] = useState<SectionEntry[]>([])
+
+  // Assessment config toggles
+  const [timerMode, setTimerMode] = useState<'FULL' | 'SECTIONAL'>('FULL')
+  const [allowBackNavigation, setAllowBackNavigation] = useState(true)
+  const [allowCalculator, setAllowCalculator] = useState(false)
+
+  // Marks config
+  const [overrideMarks, setOverrideMarks] = useState(false)
+  const [marksPerQuestion, setMarksPerQuestion] = useState('')
+  const [negativeMarks, setNegativeMarks] = useState('')
+
   // Test type change modal
   const [pendingTestType, setPendingTestType] = useState<string | null>(null)
+
+  // Derived — computed totals when sections are defined
+  const isFullTest = testType === 'FULL_TEST'
+  const hasSections = isFullTest && sections.some(s => s.name.trim())
+  const computedTotalQ = hasSections
+    ? sections.reduce((sum, s) => sum + (Number(s.questionCount) || 0), 0)
+    : null
+  const computedTotalM = hasSections && overrideMarks && Number(marksPerQuestion) > 0
+    ? (computedTotalQ ?? 0) * Number(marksPerQuestion)
+    : null
 
   useEffect(() => {
     supabase.from('exam_categories').select('id, name').order('name').then(({ data }) => {
@@ -849,10 +1090,13 @@ export default function CreateLinearAssessmentPage() {
   const examCategoryName = categories.find(c => c.id === examCategoryId)?.name ?? ''
 
   function handleTestTypeChange(val: string) {
-    if (topicsCovered.length > 0 && val !== testType) {
+    if (val === testType) return
+    const willClear = topicsCovered.length > 0 || (testType === 'FULL_TEST' && sections.length > 0)
+    if (willClear) {
       setPendingTestType(val)
     } else {
       setTestType(val)
+      if (val !== 'FULL_TEST') setSections([])
     }
   }
 
@@ -860,6 +1104,7 @@ export default function CreateLinearAssessmentPage() {
     if (pendingTestType) {
       setTestType(pendingTestType)
       setTopicsCovered([])
+      if (pendingTestType !== 'FULL_TEST') setSections([])
       setPendingTestType(null)
     }
   }
@@ -869,6 +1114,12 @@ export default function CreateLinearAssessmentPage() {
     if (!title.trim()) e.title = 'Assessment Title is required.'
     if (!testType) e.testType = 'Assessment Length is required.'
     if (!examCategoryId) e.examCategoryId = 'Category is required.'
+    if (navigationPolicy === 'SECTION_LOCKED' && isFullTest) {
+      const named = sections.filter(s => s.name.trim())
+      if (named.length < 2) {
+        e.sections = 'Section Lock requires at least 2 sections. Add another section below, or change Navigation Policy to Free Navigation or Adaptive.'
+      }
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -883,11 +1134,31 @@ export default function CreateLinearAssessmentPage() {
       language: language || 'English',
     }
 
+    const namedSections = sections.filter(s => s.name.trim())
+    const showSectionDuration = timerMode === 'SECTIONAL' || navigationPolicy === 'SECTION_LOCKED'
     const assessmentConfig: AssessmentConfig = {
-      duration_minutes:  duration        ? Number(duration)        : null,
-      navigation_policy: (navigationPolicy as AssessmentConfig['navigation_policy']) || null,
-      total_questions:   totalQuestions  ? Number(totalQuestions)  : null,
-      total_marks:       totalMarks      ? Number(totalMarks)      : null,
+      duration_minutes:      duration ? Number(duration) : null,
+      navigation_policy:     (navigationPolicy as AssessmentConfig['navigation_policy']) || null,
+      timer_mode:            timerMode,
+      allow_back_navigation: allowBackNavigation,
+      allow_calculator:      allowCalculator,
+      override_marks:        overrideMarks,
+      total_questions:       computedTotalQ ?? (totalQuestions ? Number(totalQuestions) : null),
+      total_marks:           computedTotalM ?? (totalMarks ? Number(totalMarks) : null),
+      marks_per_question:    overrideMarks && marksPerQuestion ? Number(marksPerQuestion) : null,
+      negative_marks:        overrideMarks && negativeMarks ? Number(negativeMarks) : null,
+      sections: isFullTest && namedSections.length > 0
+        ? namedSections.map(s => ({
+            id: s.id,
+            name: s.name.trim(),
+            source_ids: [],
+            chapter_ids: [],
+            questions_per_attempt: Number(s.questionCount) || 0,
+            ...(showSectionDuration && s.durationMinutes
+              ? { duration_minutes: Number(s.durationMinutes) }
+              : {}),
+          }))
+        : undefined,
     }
 
     try {
@@ -921,6 +1192,7 @@ export default function CreateLinearAssessmentPage() {
         <TestTypeChangeModal
           onConfirm={confirmTestTypeChange}
           onCancel={() => setPendingTestType(null)}
+          hasSections={sections.length > 0}
         />
       )}
 
@@ -963,13 +1235,14 @@ export default function CreateLinearAssessmentPage() {
           examCategoryName={examCategoryName}
           testType={testType}
           durationMinutes={duration}
-          totalQuestions={totalQuestions}
-          totalMarks={totalMarks}
+          totalQuestions={computedTotalQ ?? totalQuestions}
+          totalMarks={computedTotalM ?? totalMarks}
           navigationPolicy={navigationPolicy}
           description={description}
           language={language}
           whatYoullGet={whatYoullGet}
           topicsCovered={topicsCovered}
+          sections={sections}
         />
       ) : (
         <div className="space-y-6">
@@ -1035,26 +1308,100 @@ export default function CreateLinearAssessmentPage() {
               </div>
             </div>
 
+            <div className="border-t border-zinc-100 pt-5 space-y-4">
+              <ToggleRow
+                label="Sectional Timer"
+                hint="When on, each section has its own countdown timer. When off, one timer counts down for the entire assessment."
+                checked={timerMode === 'SECTIONAL'}
+                onChange={v => setTimerMode(v ? 'SECTIONAL' : 'FULL')}
+              />
+              <ToggleRow
+                label="Allow Back Navigation"
+                hint="When on, learners can revisit and change previous answers. Disable for strict forward-only flow."
+                checked={allowBackNavigation}
+                onChange={setAllowBackNavigation}
+              />
+              <ToggleRow
+                label="Allow Calculator"
+                hint="When off, the calculator tool is hidden for all learners on this assessment."
+                checked={allowCalculator}
+                onChange={setAllowCalculator}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Total Questions</Label>
-                <input
-                  type="number" min={1} value={totalQuestions}
-                  onChange={e => setTotalQuestions(e.target.value)}
-                  placeholder="e.g. 180" className={inputCls()}
-                />
-                <FieldHint>Will sync automatically once Sections & Question Pools are configured.</FieldHint>
+                {hasSections ? (
+                  <div className="border border-zinc-100 bg-zinc-50 rounded-md px-3 py-2 text-sm text-zinc-600">
+                    {computedTotalQ} <span className="text-xs text-zinc-400 ml-1">computed from sections</span>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="number" min={1} value={totalQuestions}
+                      onChange={e => setTotalQuestions(e.target.value)}
+                      placeholder="e.g. 180" className={inputCls()}
+                    />
+                    {isFullTest && <FieldHint>Auto-computed once sections are added below.</FieldHint>}
+                  </>
+                )}
               </div>
               <div>
                 <Label>Total Marks</Label>
-                <input
-                  type="number" min={1} value={totalMarks}
-                  onChange={e => setTotalMarks(e.target.value)}
-                  placeholder="e.g. 720" className={inputCls()}
-                />
-                <FieldHint>Will sync automatically once Sections & Question Pools are configured.</FieldHint>
+                {hasSections && computedTotalM != null ? (
+                  <div className="border border-zinc-100 bg-zinc-50 rounded-md px-3 py-2 text-sm text-zinc-600">
+                    {computedTotalM} <span className="text-xs text-zinc-400 ml-1">computed from sections × marks</span>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="number" min={1} value={totalMarks}
+                      onChange={e => setTotalMarks(e.target.value)}
+                      placeholder="e.g. 720" className={inputCls()}
+                    />
+                    {isFullTest && <FieldHint>Auto-computed once sections and marks per question are set.</FieldHint>}
+                  </>
+                )}
               </div>
             </div>
+          </SectionCard>
+
+          {/* Marks Configuration */}
+          <SectionCard
+            title="Marks Configuration"
+            description="Control how marks are calculated. By default the exam engine uses per-question marks from the question bank."
+          >
+            <ToggleRow
+              label="Override question bank marks"
+              hint="When on, all questions use the uniform marks and deduction values below, ignoring per-question marks set in the bank."
+              checked={overrideMarks}
+              onChange={setOverrideMarks}
+            />
+            {overrideMarks && (
+              <div className="grid grid-cols-2 gap-4 pt-1">
+                <div>
+                  <Label>Marks per Question</Label>
+                  <input
+                    type="number" min={0} step={0.25} value={marksPerQuestion}
+                    onChange={e => setMarksPerQuestion(e.target.value)}
+                    placeholder="e.g. 4"
+                    className={inputCls()}
+                  />
+                  <FieldHint>Applied uniformly to every question in this assessment.</FieldHint>
+                </div>
+                <div>
+                  <Label>Negative Marks</Label>
+                  <input
+                    type="number" min={0} step={0.25} value={negativeMarks}
+                    onChange={e => setNegativeMarks(e.target.value)}
+                    placeholder="e.g. 1"
+                    className={inputCls()}
+                  />
+                  <FieldHint>Deducted per wrong answer. Enter 0 for no penalty.</FieldHint>
+                </div>
+              </div>
+            )}
           </SectionCard>
 
           {/* Display Config */}
@@ -1106,19 +1453,36 @@ export default function CreateLinearAssessmentPage() {
             )}
           </SectionCard>
 
-          {/* Coming soon */}
-          <div className="bg-white border border-zinc-200 rounded-lg">
-            <div className="px-6 py-4 border-b border-zinc-100">
-              <p className="text-sm font-semibold text-zinc-900">Sections & Question Pools</p>
+          {/* Sections & Question Pools */}
+          {isFullTest ? (
+            <SectionCard
+              title="Sections & Question Pools"
+              description="Define the sections of this full test. Each section maps to a group of questions from your question bank."
+            >
+              <SectionsBuilder
+                sections={sections}
+                onChange={setSections}
+                timerMode={timerMode}
+                navigationPolicy={navigationPolicy}
+                overrideMarks={overrideMarks}
+                marksPerQuestion={marksPerQuestion}
+                error={errors.sections}
+              />
+            </SectionCard>
+          ) : testType ? (
+            <div className="bg-white border border-zinc-200 rounded-lg">
+              <div className="px-6 py-4 border-b border-zinc-100">
+                <p className="text-sm font-semibold text-zinc-900">Sections & Question Pools</p>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-sm text-zinc-500">
+                  {testType === 'SUBJECT_TEST'
+                    ? 'Subject tests have a single section. Configure question pools after saving this assessment.'
+                    : 'Chapter tests have a single section. Configure question pools after saving this assessment.'}
+                </p>
+              </div>
             </div>
-            <div className="px-6 py-10 flex flex-col items-center text-center">
-              <Construction className="w-8 h-8 text-zinc-200 mb-3" />
-              <p className="text-sm font-medium text-zinc-500">Coming Soon</p>
-              <p className="text-xs text-zinc-400 mt-1 max-w-xs">
-                Section & question pool configuration will be available in an upcoming release.
-              </p>
-            </div>
-          </div>
+          ) : null}
 
           {/* Action bar */}
           <div className="flex items-center justify-end gap-3 pt-2 pb-4">

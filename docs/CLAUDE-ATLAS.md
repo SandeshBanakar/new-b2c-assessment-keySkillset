@@ -4,6 +4,16 @@
 
 ---
 
+## Assessment Authoring Platform PRD
+
+| # | Title | URL |
+|---|-------|-----|
+| Master | Assessment Authoring Platform — Master PRD (v1.0 — April 12 2026) | https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/121831426/Assessment+Authoring+Platform+Master+PRD |
+
+Sub-PRDs AAP-1 through AAP-5 to be created as children of this page. IDs to be added here when created.
+
+---
+
 ## Super Admin PRDs
 
 | # | Title | URL |

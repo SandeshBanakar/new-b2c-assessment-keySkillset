@@ -6,6 +6,90 @@
 
 ## COMPLETED WORK LOG
 
+### April 12, 2026 — Tiptap Rich Text Integration — Question Bank (KSS-DB-018, KSS-DB-019)
+
+**Schema applied:**
+- **KSS-DB-018:** `ALTER TABLE questions ALTER COLUMN question_text TYPE JSONB USING ...`, `ALTER COLUMN explanation TYPE JSONB USING ...`, `ALTER COLUMN passage_text TYPE JSONB USING ...`. UPDATE to wrap existing text string in minimal Tiptap doc. UPDATE for `options` JSONB array to replace inner `text` string values with Tiptap doc objects via `jsonb_array_elements`.
+- **KSS-DB-019:** `ALTER TABLE passage_sub_questions ALTER COLUMN question_text TYPE JSONB USING ...`, `ALTER COLUMN explanation TYPE JSONB USING ...`. Same Tiptap doc wrapping applied.
+
+**RichTextEditor component** (`src/components/ui/RichTextEditor.tsx`) — NEW:
+- Tiptap v3.22.3: `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-mathematics` (KaTeX), `@tiptap/extension-underline`, `@tiptap/extension-subscript`, `@tiptap/extension-superscript`
+- Exports: `JSONContent` type, `emptyDoc()`, `isDocEmpty()`, `ensureDoc()` helpers
+- Toolbar: Bold | Italic | Underline | Subscript | Superscript | BulletList | OrderedList | Inline Math ($x$) | Block Math ($$x$$)
+- `onMouseDown + e.preventDefault()` on toolbar buttons to prevent editor blur
+- External value sync via `useEffect` comparing JSON strings — no circular onChange loop
+- Storage format: Tiptap JSON (`{ type: 'doc', content: [...] }`) stored as JSONB in PostgreSQL
+
+**QuestionForm rewrite** (`src/app/super-admin/question-bank/_components/QuestionForm.tsx`):
+- All text fields migrated: `question_text`, `explanation`, `passage_text` → `JSONContent`
+- `options[].text` → `JSONContent` (was `string`)
+- `SubQuestionDraft.question_text` and `.explanation` → `JSONContent`
+- All `<textarea>` and option `<input>` replaced with `<RichTextEditor>`
+- Option rows: `flex items-start gap-2`, radio/checkbox key label use `pt-2.5` for vertical alignment
+- `validate()` uses `isDocEmpty()` instead of `.trim()`
+- `loadQuestion()` uses `ensureDoc()` for backward compat with any legacy string rows
+- Exam player rendering of Tiptap JSONB → separate ticket (TIPTAP-001/002 in TODO-BACKLOG.md)
+
+**Assessment Authoring Platform — Master PRD** (Confluence page 121831426):
+- Created April 12 2026. Sections: Overview, Scope, Sub-PRD Index (AAP-1 to AAP-5), Data Architecture, Rich Text Editor Spec, Concept Tag, Key Routes, Open Items.
+- URL added to `docs/CLAUDE-ATLAS.md`.
+
+**Doc maintenance:**
+- All emojis removed from all docs (CLAUDE-PT.md, CLAUDE-DB.md, TODO-BACKLOG.md).
+- CLAUDE.md TIER 2 section removed — CLAUDE.md is rulebook only; all pending items in TODO-BACKLOG.md.
+
+---
+
+### April 11, 2026 — Assessment Bank — Sources & Chapters, Question Bank, Create Question (KSS-DB-015, KSS-DB-016)
+
+**Schema applied:**
+- **KSS-DB-015:** `ALTER TABLE chapters ADD COLUMN IF NOT EXISTS description TEXT, ADD COLUMN IF NOT EXISTS order_index INT DEFAULT 0`
+- **KSS-DB-016:** `ALTER TABLE questions ADD COLUMN IF NOT EXISTS concept_tag TEXT`
+
+**Sources & Chapters** (`super-admin/sources-chapters/page.tsx`) — full build from Coming Soon:
+- CRUD: Create / Edit / Delete sources. Exam category FK loaded from `exam_categories` table (UUID, not hardcoded text).
+- `exam_category_id UUID FK→exam_categories` — NOT legacy `exam_category TEXT` column (critical bug fix)
+- Source cards show chapter count; category filter uses UUID comparison.
+- "Chapters →" button navigates to `[sourceId]`
+
+**Chapter detail** (`super-admin/sources-chapters/[sourceId]/page.tsx`) — new page:
+- CRUD: Create / Edit / Delete chapters.
+- Fields: `name`, `description`, `order_index`, `difficulty` (`easy|medium|hard|mixed`), `status` (`DRAFT|ACTIVE`)
+- Ordered by `order_index ASC`. Source name/category shown in subtitle via join.
+
+**Chapter questions view** (`super-admin/sources-chapters/[sourceId]/[chapterId]/page.tsx`) — new page:
+- Read view of questions in a chapter. Edit links out to `/question-bank/[id]/edit`.
+- Type, difficulty, and concept_tag filters. Breadcrumb: Sources & Chapters → Source → Chapter.
+
+**Question Bank** (`super-admin/question-bank/page.tsx`) — full build from Coming Soon:
+- Two-row filter panel (matches production screenshot):
+  Row 1: Search | All Types | All Difficulty | All Status
+  Row 2: All Sources | All Creators | Created on (date) | Last edited (date) | Clear filters
+- `+ Create Question` button links to `/question-bank/new`. Status defaults to `ACTIVE`.
+- Sources from `sources` table; Creators from `admin_users` (CONTENT_CREATOR + SUPER_ADMIN, is_active=true).
+- Date filters: single-day match. Pagination 50/page.
+
+**QuestionForm** (`super-admin/question-bank/_components/QuestionForm.tsx`) — all 5 types:
+- `MCQ_SINGLE` | `MCQ_MULTI` | `NUMERIC` | `PASSAGE_SINGLE` | `PASSAGE_MULTI`
+- Options: `{key: string, text: TiptapDoc}[]` JSONB (keys A/B/C/D) — text migrated to Tiptap JSONB in KSS-DB-018
+- `correct_answer: ["A"]` for MCQ; `acceptable_answers: ["42"]` for NUMERIC (no `correct_answer`)
+- `passage_sub_questions` FK: `parent_question_id` (NOT `question_id`)
+- `concept_tag`: optional free-text, single tag, not required — CT-1/CT-2/CT-3 resolved
+- Difficulty: lowercase `easy|medium|hard` only. Status on create: always `ACTIVE`.
+
+**New/Edit wrappers:**
+- `super-admin/question-bank/new/page.tsx` — accepts `?chapterId` and `?sourceId` query params
+- `super-admin/question-bank/[questionId]/edit/page.tsx` — thin wrapper calling QuestionForm (edit mode)
+
+**CreateTenantSlideOver country/state (Issue 3):**
+- `country-state-city` library wired. ISO codes in form state; resolved to full names at DB insert.
+- State dropdown disabled until country selected. Audit log `after_state` uses full names.
+
+**concept_tag decisions (CT-1/CT-2/CT-3):**
+- Single tag per question | optional (not required) | free text (no vocabulary table in V1)
+
+---
+
 ### April 11, 2026 — KSS-SA-030 Create Linear Assessment — full rebuild + Path C OverviewTab wiring
 
 **Branch:** `feat/KSS-SA-030`

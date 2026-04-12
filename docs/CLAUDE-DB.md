@@ -162,16 +162,16 @@ created_by (FK→admin_users), last_modified_by (FK→admin_users),
 created_at, updated_at
 ```
 
-### questions (Assessment Creation — KSS-DB-009 extended Apr 11 2026)
+### questions (Assessment Creation — KSS-DB-009 extended Apr 11 2026; KSS-DB-018 Apr 12 2026)
 ```
 id, assessment_id (uuid nullable FK→assessments — legacy direct link),
 source_id (uuid nullable FK→sources), chapter_id (uuid nullable FK→chapters),
-question_type (text NOT NULL), question_text (text NOT NULL),
-passage_text (text nullable — for PASSAGE_SINGLE inline),
-options (jsonb — array of {key, text} objects),
+question_type (text NOT NULL), question_text (JSONB NOT NULL — KSS-DB-018, Tiptap doc),
+passage_text (JSONB nullable — KSS-DB-018, Tiptap doc, for PASSAGE_SINGLE inline),
+options (jsonb — array of {key: string, text: TiptapDoc} objects — KSS-DB-018),
 correct_answer (jsonb nullable — array e.g. ["A"] or ["A","C"]),
 acceptable_answers (jsonb nullable — for NUMERIC type, array of strings),
-explanation (text), explanation_steps (jsonb), video_url (text),
+explanation (JSONB nullable — KSS-DB-018, Tiptap doc), explanation_steps (jsonb), video_url (text),
 marks (numeric DEFAULT 1), negative_marks (numeric DEFAULT 0),
 categories (jsonb DEFAULT '[]' — array of exam category names),
 concept_tag (text nullable — KSS-DB-016, single skill/concept label e.g. "sp3 Hybridization"),
@@ -184,7 +184,8 @@ question_order (int DEFAULT 0 nullable),
 created_by (FK→admin_users), last_modified_by (FK→admin_users),
 created_at, updated_at
 ```
-- Rich text editor: Tiptap + KaTeX (authorized Apr 11 2026)
+- Rich text: question_text, explanation, passage_text, options[].text are all Tiptap JSONB (KSS-DB-018, Apr 12 2026)
+- Tiptap doc shape: `{ type: 'doc', content: [...] }` — use ensureDoc() when reading legacy rows
 - `correct_answer` is JSONB array: `["A"]` single, `["A","C"]` multi, null for NUMERIC
 - Bank model: questions are source/chapter-owned, pulled into assessments via assessment_question_map
 - Status on create: always ACTIVE (no draft cycle on create)
@@ -198,15 +199,17 @@ created_at
 UNIQUE(assessment_id, question_id)
 ```
 
-### passage_sub_questions (KSS-DB-014, Apr 11 2026)
+### passage_sub_questions (KSS-DB-014, Apr 11 2026; KSS-DB-019 Apr 12 2026)
 ```
 id, parent_question_id (FK→questions ON DELETE CASCADE),
-question_text (text NOT NULL), options (jsonb DEFAULT '[]'),
-correct_answer (jsonb nullable), explanation (text),
+question_text (JSONB NOT NULL — KSS-DB-019, Tiptap doc),
+options (jsonb DEFAULT '[]' — array of {key: string, text: TiptapDoc}),
+correct_answer (jsonb nullable), explanation (JSONB nullable — KSS-DB-019, Tiptap doc),
 video_url (text), order_index (int NOT NULL DEFAULT 0),
 created_at, updated_at
 ```
 - Used for PASSAGE_SINGLE (1 row) and PASSAGE_MULTI (N rows) under one parent question
+- question_text and explanation are Tiptap JSONB (KSS-DB-019, Apr 12 2026) — use ensureDoc() on read
 
 ### courses
 ```
@@ -399,14 +402,18 @@ client_audit_log — tenant_id, actor_id, actor_name,
 
 ## COMPLETED SCHEMA CHANGES (April 11 2026)
 
-- **KSS-DB-001 (DB-TODO-001 ✅)**: Renamed `content_items` → `assessment_items`. All code updated.
-- **KSS-DB-017 ✅**: Added `assessment_config JSONB DEFAULT '{}'` to `assessment_items`. Shape: `{ duration_minutes, navigation_policy, total_questions, total_marks, sections?: [{ id, name, questionCount, durationMinutes?, marks? }] }`.
-- **KSS-DB-009 ✅**: Altered `questions` table — added marks, negative_marks, categories, source_id, chapter_id, status, correct_answer→jsonb, created_by, last_modified_by, updated_at, section_name, randomize_options, acceptable_answers.
-- **KSS-DB-010 ✅**: Created `sources` table.
-- **KSS-DB-011 ✅**: Created `chapters` table.
-- **KSS-DB-012 ✅**: Created `assessment_question_map` table (bank model).
-- **KSS-DB-013 ✅**: Added override_marks fields to `assessments` table.
-- **KSS-DB-014 ✅**: Created `passage_sub_questions` table.
+- **KSS-DB-001 (DB-TODO-001 — DONE)**: Renamed `content_items` → `assessment_items`. All code updated.
+- **KSS-DB-017**: Added `assessment_config JSONB DEFAULT '{}'` to `assessment_items`. Shape: `{ duration_minutes, navigation_policy, total_questions, total_marks, sections?: [{ id, name, questionCount, durationMinutes?, marks? }] }`.
+- **KSS-DB-009**: Altered `questions` table — added marks, negative_marks, categories, source_id, chapter_id, status, correct_answer→jsonb, created_by, last_modified_by, updated_at, section_name, randomize_options, acceptable_answers.
+- **KSS-DB-010**: Created `sources` table.
+- **KSS-DB-011**: Created `chapters` table.
+- **KSS-DB-012**: Created `assessment_question_map` table (bank model).
+- **KSS-DB-013**: Added override_marks fields to `assessments` table.
+- **KSS-DB-014**: Created `passage_sub_questions` table.
+- **KSS-DB-015**: Added `description` (text nullable) and `order_index` (int DEFAULT 0) to `chapters` table.
+- **KSS-DB-016**: Added `concept_tag` (text nullable) to `questions` table.
+- **KSS-DB-018 (Apr 12 2026)**: Migrated `questions` rich-text columns from TEXT → JSONB: `question_text`, `explanation`, `passage_text`. Migrated `options[].text` from plain string to Tiptap doc inside JSONB array. Existing text rows wrapped in minimal `{ type:'doc', content:[{type:'paragraph',content:[{type:'text',text:'...'}]}] }` shape.
+- **KSS-DB-019 (Apr 12 2026)**: Migrated `passage_sub_questions` rich-text columns from TEXT → JSONB: `question_text`, `explanation`. Same Tiptap doc shape as KSS-DB-018.
 
 ## DEFERRED SCHEMA CHANGES (do not attempt without KSS-DB-XXX authorisation)
 

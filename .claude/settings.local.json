@@ -105,7 +105,13 @@
       "mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql",
       "mcp__claude_ai_Atlassian__getVisibleJiraProjects",
       "mcp__claude_ai_Atlassian__createJiraIssue",
-      "mcp__atlassian__getVisibleJiraProjects"
+      "mcp__atlassian__getVisibleJiraProjects",
+      "Bash(node:*)",
+      "Bash(grep -rn \"content_items\" /c/Projects/new-b2c-assessment-keySkillset/src echo \"---DOCS---\" grep -rn \"content_items\" /c/Projects/new-b2c-assessment-keySkillset/docs)",
+      "Bash(echo \"exit: $?\")",
+      "mcp__atlassian__createConfluencePage",
+      "Bash(npm ls:*)",
+      "Bash(taskkill /F /IM node.exe)"
     ]
   },
   "enabledMcpjsonServers": [
