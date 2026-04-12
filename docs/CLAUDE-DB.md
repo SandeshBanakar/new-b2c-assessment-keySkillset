@@ -119,7 +119,7 @@ description (TEXT nullable — KSS-DB-007),
 display_config (JSONB DEFAULT '{}' — KSS-DB-007),
 assessment_type (TEXT DEFAULT 'LINEAR' CHECK IN ('LINEAR','ADAPTIVE') — KSS-DB-007),
 assessments_id (uuid nullable FK→assessments.id — set at Make Live step, KSS-DB-001),
-assessment_config (JSONB DEFAULT '{}' — KSS-DB-015)
+assessment_config (JSONB DEFAULT '{}' — KSS-DB-017)
 ```
 - `tenant_scope_id IS NULL` = GLOBAL | NOT NULL = TENANT_PRIVATE
 - `display_config` shape: `{ what_youll_get: string[], topics_covered: TopicEntry[], language: string }` — `TopicEntry = { id, label, children?: TopicEntry[] }` (recursive tree; depth varies by test_type: FULL=3, SUBJECT=2, CHAPTER=1)
@@ -400,7 +400,7 @@ client_audit_log — tenant_id, actor_id, actor_name,
 ## COMPLETED SCHEMA CHANGES (April 11 2026)
 
 - **KSS-DB-001 (DB-TODO-001 ✅)**: Renamed `content_items` → `assessment_items`. All code updated.
-- **KSS-DB-015 ✅**: Added `assessment_config JSONB DEFAULT '{}'` to `assessment_items`. Shape: `{ duration_minutes, navigation_policy, total_questions, total_marks, sections?: [{ id, name, questionCount, durationMinutes?, topics?: TopicEntry[] }] }`.
+- **KSS-DB-017 ✅**: Added `assessment_config JSONB DEFAULT '{}'` to `assessment_items`. Shape: `{ duration_minutes, navigation_policy, total_questions, total_marks, sections?: [{ id, name, questionCount, durationMinutes?, marks? }] }`.
 - **KSS-DB-009 ✅**: Altered `questions` table — added marks, negative_marks, categories, source_id, chapter_id, status, correct_answer→jsonb, created_by, last_modified_by, updated_at, section_name, randomize_options, acceptable_answers.
 - **KSS-DB-010 ✅**: Created `sources` table.
 - **KSS-DB-011 ✅**: Created `chapters` table.

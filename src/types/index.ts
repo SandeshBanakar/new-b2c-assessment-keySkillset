@@ -197,7 +197,8 @@ export interface AssessmentConfig {
     name: string
     questionCount: number
     durationMinutes?: number
-    topics?: TopicEntry[]
+    marksPerQuestion?: number
+    negativeMarks?: number
   }>
   [key: string]: unknown
 }
