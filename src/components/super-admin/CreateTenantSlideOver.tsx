@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   X,
@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import { Country, State } from 'country-state-city'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -227,6 +228,41 @@ function TextInput({
   )
 }
 
+function SelectInput({
+  value,
+  onChange,
+  options,
+  placeholder,
+  error,
+  disabled,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  placeholder?: string
+  error?: string
+  disabled?: boolean
+}) {
+  return (
+    <>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700 bg-white disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed ${
+          error ? 'border-rose-400' : 'border-zinc-200'
+        }`}
+      >
+        <option value="">{placeholder ?? 'Select…'}</option>
+        {options.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <FieldError msg={error} />
+    </>
+  )
+}
+
 // ─── Section Header ───────────────────────────────────────────────────────────
 
 function SectionHeader({ title }: { title: string }) {
@@ -279,6 +315,40 @@ export default function CreateTenantSlideOver({
 
   const field = (key: keyof FormState) => (v: string) =>
     setForm(f => ({ ...f, [key]: v, isDirty: true, errors: { ...f.errors, [key]: '' } }))
+
+  // ─── Country / State cascading data ──────────────────────────────────────────
+
+  const allCountries = useMemo(() =>
+    Country.getAllCountries()
+      .map(c => ({ value: c.isoCode, label: c.name }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  , [])
+
+  const stateOptions = useMemo(() => {
+    if (!form.country) return []
+    return State.getStatesOfCountry(form.country)
+      .map(s => ({ value: s.isoCode, label: s.name }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [form.country])
+
+  const handleCountryChange = (isoCode: string) => {
+    setForm(f => ({
+      ...f,
+      country: isoCode,
+      state: '',          // reset state whenever country changes
+      isDirty: true,
+      errors: { ...f.errors, country: '', state: '' },
+    }))
+  }
+
+  const handleStateChange = (isoCode: string) => {
+    setForm(f => ({
+      ...f,
+      state: isoCode,
+      isDirty: true,
+      errors: { ...f.errors, state: '' },
+    }))
+  }
 
   const attemptClose = () => {
     if (form.isDirty) setShowDiscard(true)
@@ -386,8 +456,12 @@ export default function CreateTenantSlideOver({
           address_line1: form.addressLine1.trim(),
           address_line2: form.addressLine2.trim() || null,
           city: form.city.trim(),
-          state: form.state.trim(),
-          country: form.country.trim(),
+          state: form.state
+            ? (State.getStatesOfCountry(form.country).find(s => s.isoCode === form.state)?.name ?? form.state)
+            : '',
+          country: form.country
+            ? (Country.getCountryByCode(form.country)?.name ?? form.country)
+            : '',
           zip_code: form.zipCode.trim(),
         })
         .select('id')
@@ -443,7 +517,9 @@ export default function CreateTenantSlideOver({
           timezone: form.timezone,
           address_line1: form.addressLine1.trim(),
           city: form.city.trim(),
-          country: form.country.trim(),
+          country: form.country
+            ? (Country.getCountryByCode(form.country)?.name ?? form.country)
+            : '',
         },
       })
 
@@ -777,19 +853,24 @@ export default function CreateTenantSlideOver({
 
             <div data-field="country">
               <FieldLabel required>Country</FieldLabel>
-              <TextInput
+              <SelectInput
                 value={form.country}
-                onChange={field('country')}
+                onChange={handleCountryChange}
+                options={allCountries}
+                placeholder="Select country…"
                 error={form.errors.country}
               />
             </div>
 
             <div data-field="state">
-              <FieldLabel required>State</FieldLabel>
-              <TextInput
+              <FieldLabel required>State / Province</FieldLabel>
+              <SelectInput
                 value={form.state}
-                onChange={field('state')}
+                onChange={handleStateChange}
+                options={stateOptions}
+                placeholder={form.country ? 'Select state…' : 'Select country first'}
                 error={form.errors.state}
+                disabled={!form.country || stateOptions.length === 0}
               />
             </div>
 

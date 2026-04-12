@@ -219,7 +219,7 @@ export default function LearnerProfilePage() {
       // ── 3. Assessment performance ───────────────────────────────────────────
       if (assessmentIds.length > 0) {
         const [{ data: ciRows }, { data: catRows }] = await Promise.all([
-          supabase.from('content_items').select('id, title, exam_category_id').in('id', assessmentIds),
+          supabase.from('assessment_items').select('id, title, exam_category_id').in('id', assessmentIds),
           supabase.from('exam_categories').select('id, name'),
         ])
 
@@ -326,7 +326,7 @@ export default function LearnerProfilePage() {
         const cIds = accessRows.filter(r => r.content_type === 'COURSE').map(r => r.content_id)
 
         const [{ data: ciRows }, { data: cRows }] = await Promise.all([
-          aIds.length > 0 ? supabase.from('content_items').select('id, title').in('id', aIds) : Promise.resolve({ data: [] }),
+          aIds.length > 0 ? supabase.from('assessment_items').select('id, title').in('id', aIds) : Promise.resolve({ data: [] }),
           cIds.length > 0 ? supabase.from('courses').select('id, title').in('id', cIds) : Promise.resolve({ data: [] }),
         ])
 

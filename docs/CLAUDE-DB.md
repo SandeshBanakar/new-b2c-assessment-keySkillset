@@ -15,7 +15,7 @@
 
 ## CRITICAL FOOTGUNS — READ CAREFULLY
 
-**`tenant_scope_id` vs `tenant_id` on `content_items`**
+**`tenant_scope_id` vs `tenant_id` on `assessment_items`**
 The column is `tenant_scope_id` — NOT `tenant_id`. These are different.
 - `tenant_scope_id IS NULL` → GLOBAL content (SA-owned)
 - `tenant_scope_id IS NOT NULL` → TENANT_PRIVATE (tenant-owned)
@@ -23,8 +23,14 @@ Never use `tenant_id` when querying content visibility scope.
 
 **`plan_content_map.content_item_id` is polymorphic — no FK**
 There is no foreign key. Always filter by `content_type` first:
-- `content_type = 'ASSESSMENT'` → resolves to `content_items.id`
+- `content_type = 'ASSESSMENT'` → resolves to `assessment_items.id`
 - `content_type = 'COURSE'` → resolves to `courses.id`
+
+**Two assessment tables — never confuse them**
+- `assessment_items` = SA management table (lifecycle: DRAFT/INACTIVE/LIVE/ARCHIVED/MAINTENANCE, visibility, plan mapping)
+- `assessments` = exam engine operational table (slug, duration, questions count, sections — what the engine reads)
+- They are linked via `assessment_items.assessments_id FK→assessments.id` (set at "Make Live" step)
+- `questions` links to `assessments.id` — never to `assessment_items.id`
 
 **`price_usd` is always actual dollars (e.g. 29.99)**
 Never cents. Never rename to `price_usd_cents`. Applies to all tables.
@@ -100,7 +106,7 @@ passed (boolean nullable)
 - Accuracy: `correct / (correct + incorrect) * 100` (excludes skipped)
 - Avg time: `time_spent / total_questions`
 
-### content_items (assessments)
+### assessment_items (SA management — formerly content_items, renamed KSS-DB-001 Apr 11 2026)
 ```
 id, title, exam_category_id (FK→exam_categories), test_type, source,
 status (DRAFT/INACTIVE/LIVE/ARCHIVED/MAINTENANCE),
@@ -111,12 +117,96 @@ created_by (never changes), last_modified_by (uuid nullable),
 created_at, updated_at,
 description (TEXT nullable — KSS-DB-007),
 display_config (JSONB DEFAULT '{}' — KSS-DB-007),
-assessment_type (TEXT DEFAULT 'LINEAR' CHECK IN ('LINEAR','ADAPTIVE') — KSS-DB-007)
+assessment_type (TEXT DEFAULT 'LINEAR' CHECK IN ('LINEAR','ADAPTIVE') — KSS-DB-007),
+assessments_id (uuid nullable FK→assessments.id — set at Make Live step, KSS-DB-001),
+assessment_config (JSONB DEFAULT '{}' — KSS-DB-017)
 ```
 - `tenant_scope_id IS NULL` = GLOBAL | NOT NULL = TENANT_PRIVATE
-- `display_config` shape: `{ what_youll_get: string[], syllabus: string[] }`
+- `display_config` shape: `{ what_youll_get: string[], topics_covered: TopicEntry[], language: string }` — `TopicEntry = { id, label, children?: TopicEntry[] }` (recursive tree; depth varies by test_type: FULL=3, SUBJECT=2, CHAPTER=1)
 - `assessment_type`: `LINEAR` (default) | `ADAPTIVE` (SAT only — engine deferred)
-- KSS-DB-007 applied April 9 2026
+- `assessments_id`: links to engine table when assessment is published LIVE
+- KSS-DB-007 applied April 9 2026 | KSS-DB-001 rename applied April 11 2026
+
+### assessments (exam engine operational table)
+```
+id, title, description, exam_type, assessment_type, subject, difficulty,
+duration_minutes, total_questions, score_min (DEFAULT 0), score_max,
+architecture (DEFAULT 'linear'), min_tier (DEFAULT 'basic'),
+visibility (DEFAULT 'global'), org_id, is_active (DEFAULT true),
+created_at, thumbnail_url, tags (ARRAY), slug, exam, type,
+tier (DEFAULT 'basic'), is_puzzle_mode (DEFAULT false), rating, total_users (DEFAULT 0),
+override_marks (boolean DEFAULT false — KSS-DB-013),
+override_marks_correct (numeric DEFAULT 1 — KSS-DB-013),
+override_marks_negative (numeric DEFAULT 0 — KSS-DB-013)
+```
+- Read by exam engine (useExamEngine.ts) via `slug`
+- `override_marks=true` → engine uses override_marks_correct/negative for ALL questions, ignoring per-question marks
+- KSS-DB-013 applied April 11 2026
+
+### sources (Assessment Creation — KSS-DB-010, Apr 11 2026)
+```
+id, name, description, exam_category_id (FK→exam_categories),
+difficulty ('easy'|'medium'|'hard'|'mixed' DEFAULT 'mixed'),
+target_exam (text optional), created_by (FK→admin_users),
+last_modified_by (FK→admin_users), created_at, updated_at
+```
+
+### chapters (Assessment Creation — KSS-DB-011, Apr 11 2026; KSS-DB-015 Apr 11 2026)
+```
+id, source_id (FK→sources ON DELETE CASCADE), name,
+description (text nullable — KSS-DB-015),
+order_index (int DEFAULT 0 — KSS-DB-015, controls display order within source),
+difficulty ('easy'|'medium'|'hard'|'mixed' DEFAULT 'medium'),
+status ('DRAFT'|'ACTIVE' DEFAULT 'DRAFT'),
+created_by (FK→admin_users), last_modified_by (FK→admin_users),
+created_at, updated_at
+```
+
+### questions (Assessment Creation — KSS-DB-009 extended Apr 11 2026)
+```
+id, assessment_id (uuid nullable FK→assessments — legacy direct link),
+source_id (uuid nullable FK→sources), chapter_id (uuid nullable FK→chapters),
+question_type (text NOT NULL), question_text (text NOT NULL),
+passage_text (text nullable — for PASSAGE_SINGLE inline),
+options (jsonb — array of {key, text} objects),
+correct_answer (jsonb nullable — array e.g. ["A"] or ["A","C"]),
+acceptable_answers (jsonb nullable — for NUMERIC type, array of strings),
+explanation (text), explanation_steps (jsonb), video_url (text),
+marks (numeric DEFAULT 1), negative_marks (numeric DEFAULT 0),
+categories (jsonb DEFAULT '[]' — array of exam category names),
+concept_tag (text nullable — KSS-DB-016, single skill/concept label e.g. "sp3 Hybridization"),
+status ('DRAFT'|'ACTIVE'|'FLAGGED' DEFAULT 'ACTIVE'),
+difficulty ('easy'|'medium'|'hard'|'mixed' DEFAULT 'medium'),
+section_name (text — CLAT section mapping),
+randomize_options (boolean DEFAULT false — PASSAGE_MULTI only),
+module_name, subject, skill_group (text — legacy SAT fields),
+question_order (int DEFAULT 0 nullable),
+created_by (FK→admin_users), last_modified_by (FK→admin_users),
+created_at, updated_at
+```
+- Rich text editor: Tiptap + KaTeX (authorized Apr 11 2026)
+- `correct_answer` is JSONB array: `["A"]` single, `["A","C"]` multi, null for NUMERIC
+- Bank model: questions are source/chapter-owned, pulled into assessments via assessment_question_map
+- Status on create: always ACTIVE (no draft cycle on create)
+
+### assessment_question_map (bank model — KSS-DB-012, Apr 11 2026)
+```
+id, assessment_id (FK→assessments ON DELETE CASCADE),
+question_id (FK→questions ON DELETE CASCADE),
+section_name (text — CLAT section override), order_index (int DEFAULT 0),
+created_at
+UNIQUE(assessment_id, question_id)
+```
+
+### passage_sub_questions (KSS-DB-014, Apr 11 2026)
+```
+id, parent_question_id (FK→questions ON DELETE CASCADE),
+question_text (text NOT NULL), options (jsonb DEFAULT '[]'),
+correct_answer (jsonb nullable), explanation (text),
+video_url (text), order_index (int NOT NULL DEFAULT 0),
+created_at, updated_at
+```
+- Used for PASSAGE_SINGLE (1 row) and PASSAGE_MULTI (N rows) under one parent question
 
 ### courses
 ```
@@ -156,7 +246,7 @@ is_free (boolean DEFAULT false)
 ```
 content_item_id (polymorphic — NO FK), content_type (ASSESSMENT|COURSE), plan_id
 ```
-- ASSESSMENT rows → `content_items.id` | COURSE rows → `courses.id`
+- ASSESSMENT rows → `assessment_items.id` | COURSE rows → `courses.id`
 - Always filter by `content_type` before resolving `content_item_id`
 
 ### plan_subscribers
@@ -307,27 +397,20 @@ client_audit_log — tenant_id, actor_id, actor_name,
 
 ---
 
+## COMPLETED SCHEMA CHANGES (April 11 2026)
+
+- **KSS-DB-001 (DB-TODO-001 ✅)**: Renamed `content_items` → `assessment_items`. All code updated.
+- **KSS-DB-017 ✅**: Added `assessment_config JSONB DEFAULT '{}'` to `assessment_items`. Shape: `{ duration_minutes, navigation_policy, total_questions, total_marks, sections?: [{ id, name, questionCount, durationMinutes?, marks? }] }`.
+- **KSS-DB-009 ✅**: Altered `questions` table — added marks, negative_marks, categories, source_id, chapter_id, status, correct_answer→jsonb, created_by, last_modified_by, updated_at, section_name, randomize_options, acceptable_answers.
+- **KSS-DB-010 ✅**: Created `sources` table.
+- **KSS-DB-011 ✅**: Created `chapters` table.
+- **KSS-DB-012 ✅**: Created `assessment_question_map` table (bank model).
+- **KSS-DB-013 ✅**: Added override_marks fields to `assessments` table.
+- **KSS-DB-014 ✅**: Created `passage_sub_questions` table.
+
 ## DEFERRED SCHEMA CHANGES (do not attempt without KSS-DB-XXX authorisation)
 
-- **DB-TODO-001**: Rename `content_items` → `assessment_items` (NOT `assessments` — updated April 4 2026).
-  Full rename across all queries, FKs, constraints, and `plan_content_map.content_item_id`.
-  Requires KSS-DB-XXX authorisation before execution.
-
-- **DB-TODO-003**: Create unified questions schema for Assessment Creation platform.
-  Decision resolved April 4 2026: SA/CC write, B2C/B2B read. Requires KSS-DB-XXX authorisation.
-  Confirmed design decisions:
-  - Questions belong to a SOURCE (not directly to an assessment_item)
-  - `sources` table: origin of questions (e.g. "UPSC 2024 Paper 1", "JEE 2023")
-  - `questions` table: id, source_id FK→sources, passage_id (nullable FK→passages),
-    type (single_correct|passage_based|mcq_multi|numeric), text, options JSONB,
-    correct_answer JSONB, explanation JSONB, concept_tag, marks, negative_marks, difficulty
-  - `passages` table: id, source_id FK→sources, text. Used for both PASSAGE_SINGLE (1 question)
-    and PASSAGE_MULTI (N questions). passage_id is nullable on questions — non-passage types = NULL.
-  - Options stored as JSONB on questions row — no separate question_options table
-  - Assessment Creation nav group pages (Sources & Questions, Question Bank,
-    Create Assessments, Bulk Upload) all depend on this schema being finalised first.
-
-- **DB-TODO-002**: `MAINTENANCE` status as first-class state in `content_items` + `courses`.
+- **DB-TODO-002**: `MAINTENANCE` status as first-class state in `assessment_items` + `courses`.
   Badge: `orange-50/orange-700`. Learners cannot access MAINTENANCE content.
 
 ---

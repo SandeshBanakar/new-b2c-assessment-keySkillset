@@ -277,7 +277,7 @@ export default function CreateAssessmentsPage() {
     setLoading(true)
     const [{ data: assessments }, { data: cats }] = await Promise.all([
       supabase
-        .from('content_items')
+        .from('assessment_items')
         .select(`
           id, title, description, test_type, status, assessment_type, source,
           created_at, updated_at,
@@ -315,7 +315,7 @@ export default function CreateAssessmentsPage() {
 
   async function handleArchive(id: string) {
     setArchiving(true)
-    await supabase.from('content_items').update({ status: 'ARCHIVED', updated_at: new Date().toISOString() }).eq('id', id)
+    await supabase.from('assessment_items').update({ status: 'ARCHIVED', updated_at: new Date().toISOString() }).eq('id', id)
     setArchiving(false)
     setArchiveTarget(null)
     fetchData()

@@ -62,9 +62,9 @@ Master Org           B2C Users             ✅ built
 Master Org           Content Creators      ✅ built
 Organisations        Tenants               ✅ built
 Course Creation      Create Course         🟡 pending
-Assessment Creation  Sources & Questions   Coming Soon
-Assessment Creation  Question Bank         Coming Soon
-Assessment Creation  Create Assessments    Coming Soon
+Assessment Creation  Sources & Chapters    🟡 building (route: /super-admin/sources-chapters)
+Assessment Creation  Question Bank         🟡 building (route: /super-admin/question-bank)
+Assessment Creation  Create Assessments    ✅ built (list + archive)
 Assessment Creation  Bulk Upload           Coming Soon
 Configuration        Marketing Config      Coming Soon
 Compliance           Audit Log             ✅ built
@@ -116,10 +116,20 @@ src/lib/supabase/content-bank.ts
 src/app/super-admin/b2c-users/page.tsx
 src/app/super-admin/b2c-users/[id]/page.tsx
 src/app/super-admin/dashboard/page.tsx
+src/app/super-admin/sources-chapters/page.tsx      Sources & Chapters list
+src/app/super-admin/sources-chapters/[id]/page.tsx Source detail (chapters list)
+src/app/super-admin/sources-chapters/[id]/[chapterId]/page.tsx  Chapter detail (questions)
+src/app/super-admin/question-bank/page.tsx         Question Bank list
+src/app/super-admin/question-bank/new/page.tsx     Create Question (all 5 types)
+src/app/super-admin/question-bank/[id]/edit/page.tsx  Edit Question
 src/app/assessments/[id]/exam/page.tsx             LinearExamPlayer
 src/hooks/useExamEngine.ts
 src/data/demoUsers.ts | src/data/assessments.ts | src/lib/supabase/client.ts
 ```
+
+Rich text editor: **Tiptap + KaTeX** — authorized Apr 11 2026. Use for all question/explanation text fields.
+- Install: `@tiptap/react @tiptap/starter-kit @tiptap/extension-mathematics katex`
+- Never use plain `<textarea>` for question_text, explanation, or passage_text fields
 
 Utility: `formatCourseType()` in `src/lib/utils.ts` — use everywhere `course_type` is displayed.
 Never display raw DB values. Mappings:

@@ -15,7 +15,7 @@
 | Sub-PRD 4 | Super Admin — Plans & Entitlements (v4.4 — last updated KSS-SA-026) | https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93093890/Sub-PRD+4+Super+Admin+Plans+Entitlements?atlOrigin=eyJpIjoiNTJhYTg0MzRmOTgxNGJkZWJhNDcxOGMyMDM4OWYxYTEiLCJwIjoiYyJ9 |
 | Sub-PRD 5 | Super Admin — Marketing & Config | https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/93323269/Sub-PRD+5+Super+Admin+Marketing+Config?atlOrigin=eyJpIjoiMTdiM2Y4NmM5ZjMyNGQyN2I5NTBkNzRhZDAyNzAwYzYiLCJwIjoiYyJ9 |
 | Sub-PRD 6 | Super Admin — Analytics & Reporting | https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/94928898/Sub-PRD+6+Super+Admin+Analytics+Reporting?atlOrigin=eyJpIjoiYjNiZmU3N2Y2NWFkNGMzZmJkY2JlMTZjZGU2ODZjZDgiLCJwIjoiYyJ9 |
-| Sub-PRD 7 | Master Organisation: B2C Users | https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/106004483/Sub-PRD+7+Master+Organisation+B2C+Users?atlOrigin=eyJpIjoiMTE4MDYzYTRkZjRhNGUyNThjZmM1ODA1NTlmMTAzZTEiLCJwIjoiYyJ9 |
+| Sub-PRD 7 | Master Organisation: B2C Users (v2.3 — last updated Courses column shipped Apr 10 2026) | https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/pages/106004483/Sub-PRD+7+Master+Organisation+B2C+Users?atlOrigin=eyJpIjoiMTE4MDYzYTRkZjRhNGUyNThjZmM1ODA1NTlmMTAzZTEiLCJwIjoiYyJ9 |
 
 ---
 

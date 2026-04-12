@@ -6,6 +6,50 @@
 
 ## COMPLETED WORK LOG
 
+### April 11, 2026 — KSS-SA-030 Create Linear Assessment — full rebuild + Path C OverviewTab wiring
+
+**Branch:** `feat/KSS-SA-030`
+
+**Create Linear Assessment page** (`super-admin/create-assessments/linear/page.tsx`) — full rebuild:
+- Layout: `max-w-4xl`, Edit / Preview segmented tabs (no Radix — two styled buttons)
+- Section 1 — Basic Info: Assessment Title, Category (exam_categories), Test Type (FULL_TEST / SUBJECT_TEST / CHAPTER_TEST), Assessment Length (duration_minutes), Navigation Policy (FREE="Free Navigation" / LINEAR="Adaptive" / SECTION_LOCKED="Section Lock")
+- Section 2 — Display Config: Description, What You'll Get (bullet list, drag-to-reorder via dnd-kit), Topics Covered hierarchical builder (FULL_TEST = Subject→Chapter→Topic 3-level accordion; SUBJECT_TEST = Chapter→Topic 2-level; CHAPTER_TEST = flat list 1-level), Language dropdown (9 languages)
+- Test-type change warning modal: fires when test_type changes and topics_covered is non-empty; clears tree on confirm
+- Preview tab: full learner-facing preview via `DisplayConfigPreview` shared component
+- CTA: "Save as Draft" — upserts to `assessment_items` with `status='DRAFT'`, `source='PLATFORM'`, `assessment_type='LINEAR'`; saves both `display_config` and `assessment_config` JSONB
+- Subtitle: "Create assessments with fixed sections and also configure what gets displayed to end user in the Overview tab"
+
+**DisplayConfigPreview** (`src/components/assessment-detail/DisplayConfigPreview.tsx`) — NEW shared component:
+- Renders: description, What You'll Get checklist (CheckCircle2), Topics Covered accordion
+- `inferDepth()` helper infers accordion depth from data when testType not passed
+- Depth 1 (CHAPTER_TEST): flat bullet list. Depth 2 (SUBJECT_TEST): 2-level accordion. Depth 3 (FULL_TEST): 3-level accordion
+- Used by both Preview tab (SA form) and OverviewTab (learner-facing)
+
+**OverviewTab rebuild** (`src/components/assessment-detail/OverviewTab.tsx`):
+- Removed: hardcoded WHAT_YOULL_GET, mockSyllabus, SCORE_RANGES, SyllabusAccordion
+- Added: `StatCards` (4 cards — Duration / Questions / Total Marks / Navigation using Clock, FileText, Award, Navigation2 icons)
+- Reads from `assessment.display_config` and `assessment.assessment_config`
+- Discriminates on `assessment._source === 'assessment_items'` (SA-created) vs `'assessments'` (legacy)
+
+**Path C — dual-table getAssessmentBySlug** (`src/utils/assessmentUtils.ts`):
+- Tries `assessment_items` by UUID first (SA-created, no slug)
+- Falls back to `assessments` by slug (legacy demo data)
+- `mapTestType()` helper maps DB `test_type` → frontend `AssessmentType`
+- `_source` discriminator on returned Assessment object
+
+**Types** (`src/types/index.ts`):
+- Added: `TopicEntry`, `DisplayConfig`, `AssessmentConfig` interfaces
+- `Assessment` extended with `display_config?`, `assessment_config?`, `_source?`
+
+**DB changes:**
+- **KSS-DB-001** (another session, April 11): Renamed `content_items` → `assessment_items`
+- **KSS-DB-017** (this session): `ALTER TABLE assessment_items ADD COLUMN IF NOT EXISTS assessment_config JSONB DEFAULT '{}'`
+- `display_config` shape updated: `{ what_youll_get: string[], topics_covered: TopicEntry[], language: string }` (replaced old `syllabus: string[]`)
+
+**dnd-kit** installed: `@dnd-kit/core ^6.3.1`, `@dnd-kit/sortable ^10.0.0`, `@dnd-kit/utilities ^3.2.2` — see `docs/CLAUDE-PACKAGES.md`
+
+---
+
 ### April 10, 2026 — SA B2C Users list — Courses column (final implementation)
 - **B2C Users list** (`super-admin/b2c-users/page.tsx`): **Courses** column added after Tier. Display-only, left-aligned, uniform styling, zero shows as `0`. Not sortable, not clickable.
 - `B2CUser` type: `courseCount: number` field.

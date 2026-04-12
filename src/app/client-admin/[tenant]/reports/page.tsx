@@ -217,7 +217,7 @@ function LearnerPerformanceTab({ tenantId }: { tenantId: string }) {
       const cIds = [...new Set(attempts.filter(a => a.content_type === 'COURSE').map(a => a.content_id))]
       const titleMap: Record<string, string> = {}
       if (aIds.length) {
-        const { data } = await supabase.from('content_items').select('id, title').in('id', aIds)
+        const { data } = await supabase.from('assessment_items').select('id, title').in('id', aIds)
         ;(data ?? []).forEach(r => { titleMap[r.id] = r.title })
       }
       if (cIds.length) {
@@ -387,7 +387,7 @@ function ContentPerformanceTab({ tenantId }: { tenantId: string }) {
 
       if (aIds.length) {
         const { data: cis } = await supabase
-          .from('content_items')
+          .from('assessment_items')
           .select('id, title, exam_category_id')
           .in('id', aIds)
         const catIds = [...new Set((cis ?? []).map(c => c.exam_category_id).filter(Boolean))] as string[]

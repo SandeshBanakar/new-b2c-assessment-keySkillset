@@ -108,7 +108,7 @@ export default function SuperAdminLayout({
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Assessment Creation
           </p>
-          <NavItem href="/super-admin/sources-questions" icon={GitBranch} label="Sources & Questions" />
+          <NavItem href="/super-admin/sources-chapters" icon={GitBranch} label="Sources & Chapters" />
           <NavItem href="/super-admin/question-bank" icon={BookMarked} label="Question Bank" />
           <NavItem href="/super-admin/create-assessments" icon={FileEdit} label="Create Assessments" />
           <NavItem href="/super-admin/bulk-upload" icon={Upload} label="Bulk Upload" />
