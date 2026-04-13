@@ -8,6 +8,7 @@ import { BackButton } from '@/components/navigation/BackButton';
 import OverviewTab from '@/components/assessment-detail/OverviewTab';
 import AttemptsTab from '@/components/assessment-detail/AttemptsTab';
 import AnalyticsTab from '@/components/assessment-detail/AnalyticsTab';
+import SATAnalyticsTab from '@/components/assessment-detail/SATAnalyticsTab';
 import { useAppContext } from '@/context/AppContext';
 import { getAssessmentBySlug, isFreeAttemptExhausted } from '@/utils/assessmentUtils';
 import type { Assessment } from '@/types';
@@ -145,11 +146,18 @@ function AssessmentDetailPageInner() {
           <AttemptsTab attempts={attempts} assessmentId={assessment.id} />
         )}
         {activeTab === 'analytics' && (
-          <AnalyticsTab
-            assessment={assessment}
-            assessmentId={assessment.id}
-            onSwitchToAttempts={() => setActiveTab('attempts')}
-          />
+          assessment.exam === 'SAT' &&
+          (assessment.type === 'full-test' || assessment.type === 'subject-test')
+            ? <SATAnalyticsTab
+                assessment={assessment}
+                assessmentId={assessment.id}
+                onSwitchToAttempts={() => setActiveTab('attempts')}
+              />
+            : <AnalyticsTab
+                assessment={assessment}
+                assessmentId={assessment.id}
+                onSwitchToAttempts={() => setActiveTab('attempts')}
+              />
         )}
       </PageWrapper>
     </div>

@@ -469,6 +469,42 @@ model_used (text DEFAULT 'static_demo'), generated_at (timestamptz)
 
 ---
 
+## DEMO SEED DATA — ANALYTICS (Apr 13 2026)
+
+All seeding is data-only. No schema changes.
+
+### NEET/JEE/CLAT Analytics (seeded KSS-SA-031)
+- `attempts`: 5 demo attempts for premium user `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
+- `attempt_section_results`: section rows for those 5 attempts
+- `user_concept_mastery`: concept tag mastery rows for those 5 attempts
+- `attempt_ai_insights`: 5 static AI insight rows (model_used='static_demo')
+
+### SAT Analytics (seeded KSS-SA-031 extension, Apr 13 2026)
+Premium user: `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
+
+**Assessments seeded (3 SAT assessments — 2 attempts each = 6 attempt rows):**
+- SAT Full Test (full-test, score_max=1600): 2 attempts. Scores: 1150 → 1240. score_rw + score_math columns used.
+- SAT Math Subject Test (subject-test, score_max=800): 2 attempts. Scores: 560 → 620.
+- SAT R&W Subject Test (subject-test, score_max=800): 2 attempts. Scores: 580 → 630.
+
+**attempt_section_results:** 4 module rows per full-test attempt (rw_module_1, rw_module_2, math_module_1, math_module_2), 4 domain rows per subject-test attempt. Total: 24 rows.
+
+**user_concept_mastery:**
+- Math Subject Test: 25 sub-skills × 2 attempts = 50 rows
+- R&W Subject Test: 20 sub-skills × 2 attempts = 40 rows
+- Full Test: 45 sub-skills × 2 attempts = 90 rows
+- Total: 180 rows
+
+**attempt_ai_insights:** 6 rows (one per attempt, model_used='static_demo')
+
+**SATAnalyticsTab component:** `src/components/assessment-detail/SATAnalyticsTab.tsx`
+- Client-side domain grouping via `SAT_MATH_DOMAIN_MAP` (25 sub-skills, 4 domains) and `SAT_RW_DOMAIN_MAP` (20 sub-skills, 4 domains)
+- Blocks: Score Progression (static), Section Breakdown (filtered), Concept Mastery heatmap (all attempts), Where You Lost Points (mastery < 60%, filtered), AI Insight (filtered)
+- Full test: dual heatmap panels (R&W + Math side by side)
+- Wired into `/assessments/[id]/page.tsx` — used when `assessment.exam === 'SAT'` and `type === 'full-test' || 'subject-test'`
+
+---
+
 ## DEFERRED SCHEMA CHANGES (do not attempt without KSS-DB-XXX authorisation)
 
 - **DB-TODO-002**: `MAINTENANCE` status as first-class state in `assessment_items` + `courses`.

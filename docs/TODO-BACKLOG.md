@@ -29,6 +29,9 @@ Remaining production work:
 | ANA-004 | [DONE — demo] `user_concept_mastery` table created | KSS-DB-024 applied. Seeded. Production: compute from attempt_answers on submit. | — |
 | ANA-005 | Production analytics algorithm — rules engine | Panic detection (< 25% avg section time + wrong), guess detection, weak concept identification, improvement velocity. Spec in PRD §6 + §7. | Separate ticket |
 | ANA-006 | [DONE — demo] AnalyticsTab rebuilt DB-first | 5 output blocks live. Static AI insights seeded. Production: wire Claude API (see PRD §11). | — |
+| ANA-007 | [DONE — demo] SATAnalyticsTab built | `src/components/assessment-detail/SATAnalyticsTab.tsx`. SAT-specific scoring (400-1600 full, 200-800 subject), 4-module section breakdown, dual heatmap (R&W + Math side-by-side for full test), algorithmic "Where You Lost Points" from mastery < 60%, AI insight panel. Premium demo user seeded with 2 attempts for each SAT assessment (Full Test, Math subject, R&W subject). Production: same as ANA-001 to ANA-004. | — |
+| ANA-008 | SAT score equating not implemented | Scaled scores (200-800 per section) are seeded as static values. Real SAT equating depends on adaptive module routing and College Board tables. Production: compute approximate scaled score from raw correct count per module pair using CB lookup tables. | Separate ticket |
+| ANA-009 | SAT adaptive module routing not tracked | `attempt_section_results.section_id` currently stores module names. Production: track which module 2 variant (easy/hard) the learner received so analytics can flag routing outcome. | Separate ticket |
 
 ---
 
