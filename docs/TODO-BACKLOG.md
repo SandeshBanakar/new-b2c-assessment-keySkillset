@@ -1,5 +1,5 @@
 # TODO Backlog — keySkillset Platform
-# Updated Apr 12 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+# Updated Apr 13 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
 
 ---
 
@@ -14,16 +14,21 @@
 
 ---
 
-## [HIGH] Analytics — KSS-SA-031 (new ticket — not yet built)
+## [HIGH] Analytics — KSS-SA-031 — DEMO SHIPPED Apr 13 2026
+
+Demo analytics engine is live. All tables seeded. AnalyticsTab rebuilt DB-first.
+PRD: https://keyskillset-product-management.atlassian.net/wiki/x/CgBEBw
+
+Remaining production work:
 
 | # | Issue | Detail | Requires |
 |---|-------|--------|---------|
-| ANA-001 | Per-question timing data missing | `attempt_answers` needs `time_spent_seconds` column to power panic/guess detection. | KSS-DB-XXX |
+| ANA-001 | [DONE — demo] `attempt_answers` table created | KSS-DB-022 applied. `time_spent_seconds` column present. Production: wire `useExamEngine` to write per-question rows on submit. See PRD §12. | — |
 | ANA-002 | `assessment_question_map.section_name` is fragile for analytics | Text match can break if section renamed. Future: migrate to `section_id` UUID referencing assessment_config.sections[].id at "Make Live" time. | KSS-DB-XXX |
-| ANA-003 | Section-level results table needed | `attempt_section_results (id, attempt_id, section_id, section_name, correct_count, incorrect_count, skipped_count, total_marks, scored_marks, time_spent_seconds)` — required for section breakdown in analytics. | KSS-DB-XXX |
-| ANA-004 | Topic/concept mastery table needed | `user_concept_mastery (user_id, concept_tag, total_attempts, correct_count, last_attempted_at, mastery_pct)` — drives "Where to improve" and "Next steps" algorithm. | KSS-DB-XXX |
-| ANA-005 | Analytics algorithm spec needed | Rules-based (no AI): panic detection (< threshold time + wrong), guess detection (answer changed in last 10s), weak concept identification, improvement velocity across attempts, next-steps ranking by (frequency x recency x severity). | Spec + KSS-DB-XXX |
-| ANA-006 | End-user analytics dashboard not built | Post-attempt and historical: section breakdown, concept mastery heatmap, attempt comparison, panic/guess flags, "Focus on these topics next" recommendations. | After ANA-001–005 |
+| ANA-003 | [DONE — demo] `attempt_section_results` table created | KSS-DB-023 applied. Seeded with 5 demo attempts. Production: write on submit in `useExamEngine`. | — |
+| ANA-004 | [DONE — demo] `user_concept_mastery` table created | KSS-DB-024 applied. Seeded. Production: compute from attempt_answers on submit. | — |
+| ANA-005 | Production analytics algorithm — rules engine | Panic detection (< 25% avg section time + wrong), guess detection, weak concept identification, improvement velocity. Spec in PRD §6 + §7. | Separate ticket |
+| ANA-006 | [DONE — demo] AnalyticsTab rebuilt DB-first | 5 output blocks live. Static AI insights seeded. Production: wire Claude API (see PRD §11). | — |
 
 ---
 

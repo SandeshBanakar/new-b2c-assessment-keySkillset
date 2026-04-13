@@ -35,6 +35,30 @@ interface Creator { id: string; name: string }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Extracts plain text from a Tiptap JSONB doc (KSS-DB-018 format).
+ * Falls back gracefully if the value is already a plain string.
+ */
+function extractPlainText(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (!value || typeof value !== 'object') return ''
+
+  const node = value as Record<string, unknown>
+
+  // Leaf text node
+  if (node.type === 'text' && typeof node.text === 'string') return node.text
+
+  // Doc / paragraph / other container nodes
+  if (Array.isArray(node.content)) {
+    return (node.content as unknown[])
+      .map(extractPlainText)
+      .join('')
+      .trim()
+  }
+
+  return ''
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
@@ -174,7 +198,8 @@ export default function QuestionBankPage() {
     if (statusFilter !== 'ALL') query = query.eq('status', statusFilter)
     if (sourceFilter !== 'ALL') query = query.eq('source_id', sourceFilter)
     if (creatorFilter !== 'ALL') query = query.eq('created_by', creatorFilter)
-    if (search.trim()) query = query.ilike('question_text', `%${search.trim()}%`)
+    // question_text is JSONB (KSS-DB-018) — cast to text for search
+    if (search.trim()) query = query.filter('question_text::text', 'ilike', `%${search.trim()}%`)
     if (createdOn) {
       const day = new Date(createdOn)
       const next = new Date(day); next.setDate(next.getDate() + 1)
@@ -200,7 +225,7 @@ export default function QuestionBankPage() {
           question_type: row.question_type as QuestionType,
           difficulty: row.difficulty as Difficulty,
           status: row.status as QuestionStatus,
-          question_text: row.question_text as string,
+          question_text: extractPlainText(row.question_text),
           passage_text: (row.passage_text as string | null) ?? null,
           marks: row.marks as number,
           negative_marks: row.negative_marks as number,

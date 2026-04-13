@@ -6,6 +6,43 @@
 
 ## COMPLETED WORK LOG
 
+### April 13, 2026 — B2C Analytics Engine — Demo Build (KSS-DB-022 to KSS-DB-025)
+
+**Schema applied (project: uqweguyeaqkbxgtpkhez):**
+- KSS-DB-022: `attempt_answers` table (per-question answer data)
+- KSS-DB-023: `attempt_section_results` table (per-section aggregates)
+- KSS-DB-024: `user_concept_mastery` table (concept-tag mastery per attempt)
+- KSS-DB-025: `attempt_ai_insights` table (`what_went_well` + `next_steps`, two-column)
+
+**Seed data:**
+- 5 completed attempts seeded for Pro user `e150d59c-13c1-4db3-b6d7-4f30c29178e9` (Priya Sharma):
+  - NEET Full Test 1: attempts 1 (`989e2ece`) and 2 (`deed0002-...-0001`)
+  - CLAT Full Test 1: attempt 1 (`87ad5ef1`)
+  - NEET Biology subject test: attempt 1 (`abab13b1`)
+  - SAT Craft & Structure chapter test: attempt 1 (`deed0002-...-0002`)
+- Section results, concept mastery, and static AI insights seeded for all 5 attempts.
+
+**AnalyticsTab rebuild** (`src/components/assessment-detail/AnalyticsTab.tsx`):
+- Fully DB-first — self-fetches from Supabase using `useAppContext` user ID
+- 5 output blocks: Score Summary, Marks Lost (rose, negative-marking exams), Section Breakdown, Concept Mastery (heatmap ≥2 attempts / bars for 1), AI Insight Panel (What went well / Next Steps)
+- `attempts` prop removed from component interface; page updated accordingly
+
+**AttemptsTab rebuild** (`src/components/assessment-detail/AttemptsTab.tsx`):
+- DB-first: fetches `attempts` from Supabase; falls back to mock data if no DB rows
+- "View Analysis" button now routes to `?tab=analytics` instead of legacy `/analysis/[id]`
+
+**Question Bank JSONB fix** (`src/app/super-admin/question-bank/page.tsx`):
+- Added `extractPlainText(jsonb)` helper — recursively extracts text from Tiptap doc nodes
+- Mapped `question_text` through `extractPlainText()` on row load (fixes `[object Object]` rendering)
+- Search filter changed from `.ilike('question_text', ...)` to `.filter('question_text::text', 'ilike', ...)` for JSONB compat
+
+**PRD published:**
+- `docs/PRD-AI-ANALYTICS.md` rewritten to v2.0 (Apr 13 2026)
+- Confluence: https://keyskillset-product-management.atlassian.net/wiki/x/CgBEBw (Release 32 Phase 2)
+- Added to `docs/CLAUDE-ATLAS.md`
+
+---
+
 ### April 12, 2026 — Tiptap Rich Text Integration — Question Bank (KSS-DB-018, KSS-DB-019)
 
 **Schema applied:**

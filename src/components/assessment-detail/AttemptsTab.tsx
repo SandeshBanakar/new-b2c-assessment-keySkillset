@@ -16,12 +16,27 @@ import { getAssessments } from '@/utils/assessmentUtils';
 import type { Assessment, MockAttempt } from '@/types';
 
 interface AttemptsTabProps {
-  attempts: MockAttempt[];
+  attempts: MockAttempt[];   // mock fallback — used when DB has no rows
   assessmentId: string;
 }
 
-function StatusBadge({ status }: { status: MockAttempt['status'] }) {
-  if (status === 'completed') {
+interface DbAttempt {
+  id: string;
+  attempt_number: number;
+  status: string;
+  score: number | null;
+  total_questions: number | null;
+  correct_count: number | null;
+  incorrect_count: number | null;
+  time_spent_seconds: number | null;
+  is_free_attempt: boolean | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  if (s === 'completed') {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -29,7 +44,7 @@ function StatusBadge({ status }: { status: MockAttempt['status'] }) {
       </span>
     );
   }
-  if (status === 'in_progress') {
+  if (s === 'in_progress') {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-medium bg-amber-50 text-amber-700 rounded-full px-2 py-0.5">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
@@ -37,7 +52,7 @@ function StatusBadge({ status }: { status: MockAttempt['status'] }) {
       </span>
     );
   }
-  if (status === 'abandoned') {
+  if (s === 'abandoned') {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-medium bg-zinc-100 text-zinc-500 rounded-full px-2 py-0.5">
         <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
@@ -48,25 +63,240 @@ function StatusBadge({ status }: { status: MockAttempt['status'] }) {
   return null;
 }
 
+function durationLabel(seconds: number | null): string {
+  if (!seconds) return '— min';
+  const mins = Math.round(seconds / 60);
+  return `${mins} min`;
+}
 
-export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps) {
+export default function AttemptsTab({ attempts: mockFallback, assessmentId }: AttemptsTabProps) {
   const router = useRouter();
-  const { isSubscribed } = useAppContext();
-  const [localAttempts, setLocalAttempts] = useState<MockAttempt[]>(attempts);
-  const [abandonTarget, setAbandonTarget] = useState<MockAttempt | null>(null);
+  const { user, isSubscribed } = useAppContext();
+  const [dbAttempts, setDbAttempts] = useState<DbAttempt[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [abandonTarget, setAbandonTarget] = useState<DbAttempt | null>(null);
   const [abandoning, setAbandoning] = useState(false);
+  const [assessmentMeta, setAssessmentMeta] = useState<Assessment | undefined>(undefined);
   const subscribed = isSubscribed(assessmentId);
 
-  // Find assessment info for tier/access checks
-  const [assessmentMeta, setAssessmentMeta] = useState<Assessment | undefined>(undefined);
   useEffect(() => {
     getAssessments().then((all) => setAssessmentMeta(all.find((a) => a.id === assessmentId)));
   }, [assessmentId]);
 
-  // Free attempt: find in data or synthesize
+  useEffect(() => {
+    if (!user?.id) { setLoading(false); return; }
+
+    supabase
+      .from('attempts')
+      .select(
+        'id, attempt_number, status, score, total_questions, correct_count, incorrect_count, time_spent_seconds, is_free_attempt, started_at, completed_at',
+      )
+      .eq('user_id', user.id)
+      .eq('assessment_id', assessmentId)
+      .order('attempt_number', { ascending: true })
+      .then(({ data }) => {
+        setDbAttempts(data ?? []);
+        setLoading(false);
+      });
+  }, [user?.id, assessmentId]);
+
+  async function handleAbandon() {
+    if (!abandonTarget) return;
+    setAbandoning(true);
+    await supabase
+      .from('attempts')
+      .update({ status: 'abandoned', score: 0 })
+      .eq('id', abandonTarget.id);
+    setDbAttempts((prev) =>
+      (prev ?? []).map((a) =>
+        a.id === abandonTarget.id ? { ...a, status: 'abandoned', score: 0 } : a,
+      ),
+    );
+    setAbandonTarget(null);
+    setAbandoning(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="w-6 h-6 border-2 border-blue-700 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // ── DB-first: if DB has rows, render those. Otherwise fall back to mock. ──
+  const useDb = dbAttempts !== null && dbAttempts.length > 0;
+
+  if (useDb) {
+    const completedDb = dbAttempts!.filter((a) => a.status.toLowerCase() === 'completed');
+    const bestScore =
+      completedDb.length > 0
+        ? Math.max(...completedDb.map((a) => a.score ?? 0))
+        : null;
+
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-zinc-900">Your Attempts</h2>
+          {bestScore !== null && (
+            <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
+              <Trophy className="w-4 h-4 text-amber-500" />
+              Best: {bestScore}
+            </span>
+          )}
+        </div>
+
+        <div className="bg-white shadow-sm rounded-md divide-y divide-zinc-100">
+          {dbAttempts!.map((attempt) => {
+            const statusLower = attempt.status.toLowerCase();
+            const label = attempt.is_free_attempt
+              ? 'Free Attempt'
+              : `Attempt ${attempt.attempt_number}`;
+            const scoreDisplay =
+              statusLower === 'completed' && attempt.score !== null
+                ? String(attempt.score)
+                : '—';
+
+            return (
+              <div key={attempt.id} className="flex flex-wrap items-center gap-4 py-4 px-6">
+                {/* Left */}
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
+                    {label}
+                  </span>
+                  {statusLower !== 'not_started' && (
+                    <StatusBadge status={attempt.status} />
+                  )}
+                </div>
+
+                {/* Middle */}
+                <div className="hidden md:flex items-center gap-4 text-xs text-zinc-500">
+                  <span className="flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5" />
+                    {attempt.total_questions
+                      ? `${attempt.total_questions} Questions`
+                      : assessmentMeta
+                        ? `${assessmentMeta.questionCount} Questions`
+                        : '— Questions'}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Trophy className="w-3.5 h-3.5" />
+                    Score: {scoreDisplay}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    {durationLabel(attempt.time_spent_seconds)}
+                  </span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-3 shrink-0">
+                  {statusLower === 'completed' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        router.push(`/assessments/${assessmentId}?tab=analytics`)
+                      }
+                      className="rounded-md border-zinc-200 text-zinc-700 text-sm"
+                    >
+                      View Analysis
+                    </Button>
+                  )}
+                  {statusLower === 'in_progress' && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          router.push(`/assessments/${assessmentId}/instructions`)
+                        }
+                        className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
+                      >
+                        Resume Test
+                      </Button>
+                      <button
+                        onClick={() => setAbandonTarget(attempt)}
+                        className="text-xs text-rose-600 hover:text-rose-700 underline"
+                      >
+                        Abandon
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Locked rows — shown when not subscribed and DB has only free attempt */}
+        {!subscribed && (
+          <div className="bg-white shadow-sm rounded-md divide-y divide-zinc-100 mt-2">
+            {Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-4 py-4 px-6">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Lock className="w-4 h-4 text-zinc-300" />
+                  <span className="text-sm font-medium text-zinc-400">
+                    Attempt {i + 1}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-sm rounded-md text-zinc-400 border-zinc-200 shrink-0"
+                  onClick={() => router.push('/plans')}
+                >
+                  Upgrade to Access
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Abandon confirmation */}
+        <Dialog
+          open={!!abandonTarget}
+          onOpenChange={(open) => !open && setAbandonTarget(null)}
+        >
+          <DialogContent className="max-w-sm rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold text-zinc-900">
+                Abandon{' '}
+                {abandonTarget?.is_free_attempt
+                  ? 'Free Attempt'
+                  : `Attempt ${abandonTarget?.attempt_number}`}
+                ?
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-zinc-600 leading-relaxed">
+              This will forfeit this attempt. Your score will be recorded as 0. This
+              cannot be undone.
+            </p>
+            <div className="flex gap-3 mt-2">
+              <Button
+                variant="outline"
+                onClick={() => setAbandonTarget(null)}
+                className="flex-1 rounded-md border-zinc-200 text-zinc-700"
+              >
+                Keep attempting
+              </Button>
+              <Button
+                disabled={abandoning}
+                onClick={handleAbandon}
+                className="flex-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white"
+              >
+                Yes, abandon
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ── Mock fallback — no DB rows for this assessment ────────────────────────
   const freeAttempt: MockAttempt =
-    localAttempts.find((a) => a.attemptNumber === 0) ?? {
-      id: `free-attempt-${assessmentId}`,
+    mockFallback.find((a) => a.attemptNumber === 0) ?? {
+      id: `free-${assessmentId}`,
       assessmentId,
       attemptNumber: 0,
       status: 'not_started',
@@ -78,62 +308,37 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
       completedAt: null,
     };
 
-  // Paid attempts (1–5) — only rendered for subscribed users
-  const paidAttempts = localAttempts.filter((a) => a.attemptNumber > 0);
-
-  const completedAttempts = [freeAttempt, ...paidAttempts].filter(
+  const paidAttempts = mockFallback.filter((a) => a.attemptNumber > 0);
+  const completedMock = [freeAttempt, ...paidAttempts].filter(
     (a) => a.status === 'completed',
   );
-  const bestScore =
-    completedAttempts.length > 0
-      ? Math.max(...completedAttempts.map((a) => a.score ?? 0))
+  const bestScoreMock =
+    completedMock.length > 0
+      ? Math.max(...completedMock.map((a) => a.score ?? 0))
       : null;
 
-  async function handleAbandon() {
-    if (!abandonTarget) return;
-    setAbandoning(true);
-
-    try {
-      await supabase
-        .from('attempts')
-        .update({ status: 'abandoned', score: 0 })
-        .eq('id', abandonTarget.id);
-    } catch {
-      // Proceed with optimistic update regardless
-    }
-
-    setLocalAttempts((prev) =>
-      prev.map((a) =>
-        a.id === abandonTarget.id ? { ...a, status: 'abandoned', score: 0 } : a,
-      ),
-    );
-    setAbandonTarget(null);
-    setAbandoning(false);
-  }
-
   const freeScoreDisplay =
-    freeAttempt.status === 'not_started' || freeAttempt.status === 'in_progress' || freeAttempt.score === null
+    freeAttempt.status === 'not_started' ||
+    freeAttempt.status === 'in_progress' ||
+    freeAttempt.score === null
       ? '—'
       : String(freeAttempt.score);
 
   return (
     <div>
-      {/* Header row */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-medium text-zinc-900">Your Attempts</h2>
-        {bestScore !== null && (
+        {bestScoreMock !== null && (
           <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
             <Trophy className="w-4 h-4 text-amber-500" />
-            Best: {bestScore}
+            Best: {bestScoreMock}
           </span>
         )}
       </div>
 
-      {/* Attempt rows */}
       <div className="bg-white shadow-sm rounded-md divide-y divide-zinc-100">
-        {/* Free attempt — always shown */}
+        {/* Free attempt */}
         <div className="flex flex-wrap items-center gap-4 py-4 px-6">
-          {/* Left */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
               Free Attempt
@@ -142,12 +347,10 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
               <StatusBadge status={freeAttempt.status} />
             )}
           </div>
-
-          {/* Middle — hidden on mobile */}
           <div className="hidden md:flex items-center gap-4 text-xs text-zinc-500">
             <span className="flex items-center gap-1">
               <FileText className="w-3.5 h-3.5" />
-              {assessmentMeta ? `${assessmentMeta.questionCount} Questions` : '— Questions'}
+              {assessmentMeta ? `${assessmentMeta.questionCount} Questions` : '—'}
             </span>
             <span className="flex items-center gap-1">
               <Trophy className="w-3.5 h-3.5" />
@@ -155,45 +358,37 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
             </span>
             <span className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
-              {freeAttempt.durationMinutes
-                ? `${freeAttempt.durationMinutes} min`
-                : '— min'}
+              {freeAttempt.durationMinutes ? `${freeAttempt.durationMinutes} min` : '—'}
             </span>
           </div>
-
-          {/* Right — CTA */}
           <div className="flex items-center gap-3 shrink-0">
             {freeAttempt.status === 'completed' && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push(`/assessments/${assessmentId}`)}
+                onClick={() =>
+                  router.push(`/assessments/${assessmentId}?tab=analytics`)
+                }
                 className="rounded-md border-zinc-200 text-zinc-700 text-sm"
               >
                 View Analysis
               </Button>
             )}
             {freeAttempt.status === 'in_progress' && (
-              <>
-                <Button
-                  size="sm"
-                  onClick={() => router.push(`/assessments/${assessmentId}`)}
-                  className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
-                >
-                  Resume Free Attempt
-                </Button>
-                <button
-                  onClick={() => setAbandonTarget(freeAttempt)}
-                  className="text-xs text-rose-600 hover:text-rose-700 underline"
-                >
-                  Abandon attempt
-                </button>
-              </>
+              <Button
+                size="sm"
+                onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
+                className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
+              >
+                Resume Free Attempt
+              </Button>
             )}
             {freeAttempt.status === 'not_started' && (
               <Button
                 size="sm"
-                onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
+                onClick={() =>
+                  router.push(`/assessments/${assessmentId}/instructions`)
+                }
                 className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
               >
                 Start Free Attempt
@@ -202,26 +397,23 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
           </div>
         </div>
 
-        {/* Paid attempts — only if subscribed */}
+        {/* Paid attempts */}
         {subscribed &&
           paidAttempts.map((attempt, idx) => {
-            const prevAttempt = idx === 0 ? freeAttempt : paidAttempts[idx - 1];
+            const prev = idx === 0 ? freeAttempt : paidAttempts[idx - 1];
             const isLocked =
               attempt.status === 'not_started' &&
-              prevAttempt.status !== 'completed' &&
-              prevAttempt.status !== 'abandoned';
-
+              prev.status !== 'completed' &&
+              prev.status !== 'abandoned';
             const scoreDisplay =
-              attempt.status === 'not_started' || attempt.status === 'in_progress' || attempt.score === null
+              attempt.status === 'not_started' ||
+              attempt.status === 'in_progress' ||
+              attempt.score === null
                 ? '—'
                 : String(attempt.score);
 
             return (
-              <div
-                key={attempt.id}
-                className="flex flex-wrap items-center gap-4 py-4 px-6"
-              >
-                {/* Left */}
+              <div key={attempt.id} className="flex flex-wrap items-center gap-4 py-4 px-6">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
                     Attempt {attempt.attemptNumber}
@@ -235,15 +427,11 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
                     </span>
                   )}
                 </div>
-
-                {/* Middle — hidden on mobile */}
                 {!isLocked && (
                   <div className="hidden md:flex items-center gap-4 text-xs text-zinc-500">
                     <span className="flex items-center gap-1">
                       <FileText className="w-3.5 h-3.5" />
-                      {assessmentMeta
-                        ? `${assessmentMeta.questionCount} Questions`
-                        : '— Questions'}
+                      {assessmentMeta ? `${assessmentMeta.questionCount} Questions` : '—'}
                     </span>
                     <span className="flex items-center gap-1">
                       <Trophy className="w-3.5 h-3.5" />
@@ -251,23 +439,17 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" />
-                      {attempt.durationMinutes
-                        ? `${attempt.durationMinutes} min`
-                        : '— min'}
+                      {attempt.durationMinutes ? `${attempt.durationMinutes} min` : '—'}
                     </span>
                   </div>
                 )}
-
-                {/* Right — actions */}
                 <div className="flex items-center gap-3 shrink-0">
                   {attempt.status === 'completed' && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        router.push(
-                          `/assessments/${assessmentId}/analysis/${attempt.id}`,
-                        )
+                        router.push(`/assessments/${assessmentId}?tab=analytics`)
                       }
                       className="rounded-md border-zinc-200 text-zinc-700 text-sm"
                     >
@@ -275,20 +457,12 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
                     </Button>
                   )}
                   {attempt.status === 'in_progress' && (
-                    <>
-                      <Button
-                        size="sm"
-                        className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
-                      >
-                        Resume Test
-                      </Button>
-                      <button
-                        onClick={() => setAbandonTarget(attempt)}
-                        className="text-xs text-rose-600 hover:text-rose-700 underline"
-                      >
-                        Abandon attempt
-                      </button>
-                    </>
+                    <Button
+                      size="sm"
+                      className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
+                    >
+                      Resume Test
+                    </Button>
                   )}
                   {attempt.status === 'not_started' && !isLocked && (
                     <Button
@@ -304,7 +478,6 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
           })}
       </div>
 
-      {/* Locked rows — shown when not subscribed */}
       {!subscribed && (
         <div className="bg-white shadow-sm rounded-md divide-y divide-zinc-100 mt-2">
           {Array.from({ length: 5 }, (_, i) => (
@@ -313,14 +486,6 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
                 <Lock className="w-4 h-4 text-zinc-300" />
                 <span className="text-sm font-medium text-zinc-400">
                   Attempt {i + 1}
-                </span>
-              </div>
-              <div className="hidden md:flex items-center gap-4 text-xs text-zinc-300">
-                <span className="flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5" />
-                  {assessmentMeta
-                    ? `${assessmentMeta.questionCount} Questions`
-                    : '— Questions'}
                 </span>
               </div>
               <Button
@@ -335,41 +500,6 @@ export default function AttemptsTab({ attempts, assessmentId }: AttemptsTabProps
           ))}
         </div>
       )}
-
-      {/* Abandon confirmation dialog */}
-      <Dialog open={!!abandonTarget} onOpenChange={(open) => !open && setAbandonTarget(null)}>
-        <DialogContent className="max-w-sm rounded-lg">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold text-zinc-900">
-              Abandon{' '}
-              {abandonTarget?.attemptNumber === 0
-                ? 'Free Attempt'
-                : `Attempt ${abandonTarget?.attemptNumber}`}
-              ?
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-zinc-600 leading-relaxed">
-            This will forfeit this attempt. Your score will be recorded as 0. This cannot be
-            undone.
-          </p>
-          <div className="flex gap-3 mt-2">
-            <Button
-              variant="outline"
-              onClick={() => setAbandonTarget(null)}
-              className="flex-1 rounded-md border-zinc-200 text-zinc-700"
-            >
-              Keep attempting
-            </Button>
-            <Button
-              disabled={abandoning}
-              onClick={handleAbandon}
-              className="flex-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white"
-            >
-              Yes, abandon
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

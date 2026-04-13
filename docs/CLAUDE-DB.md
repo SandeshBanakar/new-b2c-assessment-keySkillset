@@ -230,20 +230,26 @@ last_modified_by (uuid nullable)
 plan_type, tier (BASIC|PRO|PREMIUM|ENTERPRISE|FREE|null), plan_audience ('B2C'|'B2B'),
 plan_category ('ASSESSMENT'|'COURSE_BUNDLE'|'SINGLE_COURSE_PLAN' DEFAULT 'ASSESSMENT'),
 scope ('PLATFORM_WIDE'|'CATEGORY_BUNDLE'), price (INR DEFAULT 0),
-price_usd (numeric), status (DRAFT|PUBLISHED|ARCHIVED),
+price_usd (numeric), billing_cycle ('ANNUAL'|'MONTHLY'),
+status (DRAFT|LIVE|DELETED),   -- KSS-DB-021: PUBLISHED→LIVE, ARCHIVED→DELETED
+compare_at_price (numeric NULL),     -- KSS-DB-020: promotional display price (INR)
+compare_at_price_usd (numeric NULL), -- KSS-DB-020: promotional display price (USD)
+was_live (boolean DEFAULT false),    -- KSS-DB-021: true once plan has ever been LIVE
 display_name, tagline, feature_bullets (jsonb DEFAULT '[]'), footnote,
 is_popular (boolean DEFAULT false), cta_label, max_attempts_per_assessment,
 is_free (boolean DEFAULT false)
 ```
+- status lifecycle: DRAFT → LIVE → DRAFT (editing) | DRAFT → DELETED (soft delete)
+- `was_live=true` once a plan transitions to LIVE; preserved even when moved back to DRAFT
+- `compare_at_price` / `compare_at_price_usd`: SINGLE_COURSE_PLAN only; both must be set or neither; must exceed `price`/`price_usd`; display-only (Stripe pricing is separate)
 - B2B plans: `price=0` always, `scope=PLATFORM_WIDE` always
 - B2B plans have NO: `display_name`, `tagline`, `feature_bullets`, `is_popular`, `cta_label`
 - B2C Assessment tiers: `BASIC/PRO/PREMIUM`. B2B tier: `ENTERPRISE`. Tiers are ASSESSMENT-only.
 - SINGLE_COURSE_PLAN tier: `FREE` when `is_free=true`, `NULL` when paid. Never use BASIC/PRO/PREMIUM for course plans.
 - `is_free=true` → `price=0`, `price_usd=0`, `stripe_price_id=NULL`, `tier='FREE'`
 - `is_free=false` (paid SINGLE_COURSE_PLAN) → `tier=NULL`
-- One active (DRAFT or PUBLISHED) SINGLE_COURSE_PLAN per course enforced at UI level (KSS-SA-026)
+- One active (DRAFT or LIVE) SINGLE_COURSE_PLAN per course enforced at UI level (KSS-SA-026)
 - `max_attempts_per_assessment = 6` platform-wide (1 free + 5 paid) — never hardcode 5
-- 9 plans: 6 B2C + 3 B2B (all `PLATFORM_WIDE/PUBLISHED`)
 
 ### plan_content_map
 ```
@@ -414,6 +420,54 @@ client_audit_log — tenant_id, actor_id, actor_name,
 - **KSS-DB-016**: Added `concept_tag` (text nullable) to `questions` table.
 - **KSS-DB-018 (Apr 12 2026)**: Migrated `questions` rich-text columns from TEXT → JSONB: `question_text`, `explanation`, `passage_text`. Migrated `options[].text` from plain string to Tiptap doc inside JSONB array. Existing text rows wrapped in minimal `{ type:'doc', content:[{type:'paragraph',content:[{type:'text',text:'...'}]}] }` shape.
 - **KSS-DB-019 (Apr 12 2026)**: Migrated `passage_sub_questions` rich-text columns from TEXT → JSONB: `question_text`, `explanation`. Same Tiptap doc shape as KSS-DB-018.
+- **KSS-DB-020 (Apr 13 2026)**: Added `compare_at_price` (numeric NULL) and `compare_at_price_usd` (numeric NULL) to `plans`. Used for promotional strikethrough display on SINGLE_COURSE_PLAN only. Both currencies must be set together or neither.
+- **KSS-DB-021 (Apr 13 2026)**: Plan lifecycle overhaul. (1) Added `was_live` (boolean DEFAULT false) to `plans`. (2) Dropped `plans_status_check` constraint `(DRAFT|PUBLISHED|ARCHIVED)`. (3) Migrated PUBLISHED→LIVE, ARCHIVED→DELETED (backfilling `was_live=true` for both). (4) Added new `plans_status_check` constraint `(DRAFT|LIVE|DELETED)`. The `was_live` flag distinguishes a brand-new DRAFT (false) from a plan that has previously been live (true).
+- **KSS-DB-022 (Apr 13 2026)**: Created `attempt_answers` table. Stores per-question answer data for a completed attempt. Columns: `id (uuid PK)`, `attempt_id (FK→attempts)`, `question_id (uuid)`, `user_answer (text)`, `is_correct (bool)`, `time_spent_seconds (int)`, `created_at`, plus four columns added same day via ALTER: `section_id (text)`, `concept_tag (text)`, `is_skipped (bool DEFAULT false)`, `marks_awarded (numeric 6,2 DEFAULT 0)`. Indexes on `attempt_id` and `concept_tag`.
+- **KSS-DB-023 (Apr 13 2026)**: Created `attempt_section_results` table. Stores per-section aggregate results for a completed attempt. Columns: `id (uuid PK)`, `attempt_id (FK→attempts)`, `section_id (text)`, `section_label (text)`, `correct_count`, `incorrect_count`, `skipped_count`, `marks_scored (numeric 8,2)`, `marks_possible (numeric 8,2)`, `time_spent_seconds (int)`, `accuracy_percent (numeric 5,2)`, `created_at`. UNIQUE `(attempt_id, section_id)`.
+- **KSS-DB-024 (Apr 13 2026)**: Created `user_concept_mastery` table. Stores concept-tag mastery aggregated per user per assessment per attempt. Columns: `id (uuid PK)`, `user_id (uuid)`, `assessment_id (text)`, `concept_tag (text)`, `attempt_number (int)`, `correct_count (int)`, `total_count (int)`, `mastery_percent (numeric 5,2)`, `updated_at`. UNIQUE `(user_id, assessment_id, concept_tag, attempt_number)`. Index on `(user_id, assessment_id)`.
+- **KSS-DB-025 (Apr 13 2026)**: Created `attempt_ai_insights` table. Stores static demo AI insight text per completed attempt. Columns: `id (uuid PK)`, `attempt_id (FK→attempts UNIQUE)`, `what_went_well (text NOT NULL)`, `next_steps (text NOT NULL)`, `model_used (text DEFAULT 'static_demo')`, `generated_at (timestamptz)`. UNIQUE `(attempt_id)`.
+
+### attempt_answers (KSS-DB-022, Apr 13 2026)
+```
+id (uuid PK), attempt_id (FK→attempts ON DELETE CASCADE),
+question_id (uuid), section_id (text), user_answer (text),
+concept_tag (text), is_correct (bool DEFAULT false),
+is_skipped (bool DEFAULT false), marks_awarded (numeric 6,2 DEFAULT 0),
+time_spent_seconds (int DEFAULT 0), created_at (timestamptz)
+```
+- Indexes: attempt_id, concept_tag
+
+### attempt_section_results (KSS-DB-023, Apr 13 2026)
+```
+id (uuid PK), attempt_id (FK→attempts ON DELETE CASCADE),
+section_id (text), section_label (text),
+correct_count (int), incorrect_count (int), skipped_count (int),
+marks_scored (numeric 8,2), marks_possible (numeric 8,2),
+time_spent_seconds (int), accuracy_percent (numeric 5,2), created_at (timestamptz)
+UNIQUE (attempt_id, section_id)
+```
+
+### user_concept_mastery (KSS-DB-024, Apr 13 2026)
+```
+id (uuid PK), user_id (uuid NOT NULL), assessment_id (text NOT NULL),
+concept_tag (text NOT NULL), attempt_number (int NOT NULL),
+correct_count (int DEFAULT 0), total_count (int DEFAULT 0),
+mastery_percent (numeric 5,2), updated_at (timestamptz)
+UNIQUE (user_id, assessment_id, concept_tag, attempt_number)
+```
+- Index: (user_id, assessment_id)
+- assessment_id stores the UUID as text (matches attempts.assessment_id cast)
+
+### attempt_ai_insights (KSS-DB-025, Apr 13 2026)
+```
+id (uuid PK), attempt_id (FK→attempts ON DELETE CASCADE UNIQUE),
+what_went_well (text NOT NULL), next_steps (text NOT NULL),
+model_used (text DEFAULT 'static_demo'), generated_at (timestamptz)
+```
+- UNIQUE (attempt_id) — one insight row per attempt
+- model_used = 'static_demo' for all seeded demo rows; production will use 'claude-sonnet-4-6'
+
+---
 
 ## DEFERRED SCHEMA CHANGES (do not attempt without KSS-DB-XXX authorisation)
 

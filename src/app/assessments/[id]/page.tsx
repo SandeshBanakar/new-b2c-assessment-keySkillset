@@ -146,7 +146,6 @@ function AssessmentDetailPageInner() {
         )}
         {activeTab === 'analytics' && (
           <AnalyticsTab
-            attempts={attempts}
             assessment={assessment}
             assessmentId={assessment.id}
             onSwitchToAttempts={() => setActiveTab('attempts')}

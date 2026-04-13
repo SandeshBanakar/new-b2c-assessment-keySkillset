@@ -41,6 +41,16 @@ Sub-PRDs AAP-1 through AAP-5 to be created as children of this page. IDs to be a
 
 ---
 
+## B2C Analytics PRD
+
+| # | Title | URL |
+|---|-------|-----|
+| Standalone | AI-Powered Insights Engine — B2C End-User Assessment Analytics (v2.0 — Apr 13 2026) | https://keyskillset-product-management.atlassian.net/wiki/x/CgBEBw |
+
+Standalone page — not a child of Master PRD. Stored in Release 32 Phase 2 folder.
+
+---
+
 ## Production Release Folders
 
 These are the canonical Confluence folder URLs for all production PRDs. New PRD pages are created as children inside these folders.
