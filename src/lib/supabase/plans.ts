@@ -1741,3 +1741,101 @@ export async function fetchAssessmentCountsForPlans(
   }
   return counts
 }
+
+// ─── End-user /plans page — DB-first helpers ──────────────────────────────────
+
+const PLAN_SELECT = `
+  id, name, display_name, description, price, billing_cycle,
+  audience_type, plan_audience, plan_category, status, scope, tier, category,
+  max_attempts_per_assessment, feature_bullets,
+  tagline, footnote, is_popular, cta_label, created_at,
+  plan_subscribers (subscriber_count)
+`
+
+export async function fetchLivePlatformPlans(): Promise<PlanRow[]> {
+  const { data, error } = await supabase
+    .from('plans')
+    .select(PLAN_SELECT)
+    .eq('plan_audience', 'B2C')
+    .eq('plan_category', 'ASSESSMENT')
+    .eq('scope', 'PLATFORM_WIDE')
+    .eq('status', 'LIVE')
+    .order('price', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return normalisePlanSubscribers(data ?? []) as unknown as PlanRow[]
+}
+
+export async function fetchLiveCategoryPlansGrouped(): Promise<Record<string, PlanRow[]>> {
+  const { data, error } = await supabase
+    .from('plans')
+    .select(PLAN_SELECT)
+    .eq('plan_audience', 'B2C')
+    .eq('plan_category', 'ASSESSMENT')
+    .eq('scope', 'CATEGORY_BUNDLE')
+    .eq('status', 'LIVE')
+    .not('feature_bullets', 'eq', '[]')
+    .order('price', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  const plans = normalisePlanSubscribers(data ?? []) as unknown as PlanRow[]
+
+  // Group by category
+  const grouped: Record<string, PlanRow[]> = {}
+  for (const plan of plans) {
+    if (!plan.category) continue
+    if (!grouped[plan.category]) grouped[plan.category] = []
+    grouped[plan.category].push(plan)
+  }
+
+  // Only show categories that have all 3 tiers (BASIC, PRO, PREMIUM)
+  const complete: Record<string, PlanRow[]> = {}
+  for (const [cat, catPlans] of Object.entries(grouped)) {
+    const tiers = new Set(catPlans.map((p) => p.tier))
+    if (tiers.has('BASIC') && tiers.has('PRO') && tiers.has('PREMIUM')) {
+      complete[cat] = catPlans
+    }
+  }
+
+  return complete
+}
+
+export type ActivePlanInfo = {
+  planId: string
+  scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
+  category: string | null
+  tier: 'BASIC' | 'PRO' | 'PREMIUM' | 'ENTERPRISE' | 'FREE' | null
+}
+
+export async function fetchActivePlanForUser(userId: string): Promise<ActivePlanInfo | null> {
+  const now = new Date().toISOString()
+
+  const { data: subRow } = await supabase
+    .from('b2c_assessment_subscriptions')
+    .select('plan_id')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .gt('current_period_end', now)
+    .not('plan_id', 'is', null)
+    .order('current_period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!subRow?.plan_id) return null
+
+  const { data: plan } = await supabase
+    .from('plans')
+    .select('id, scope, category, tier')
+    .eq('id', subRow.plan_id)
+    .maybeSingle()
+
+  if (!plan) return null
+
+  return {
+    planId: plan.id,
+    scope: plan.scope as 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE',
+    category: plan.category,
+    tier: plan.tier as ActivePlanInfo['tier'],
+  }
+}

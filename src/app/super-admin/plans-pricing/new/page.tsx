@@ -129,7 +129,7 @@ function B2CForm() {
     if (price === '' || price < 0) return 'Price must be 0 or a positive number.'
     if (allowedTypes.length === 0) return 'Select at least one allowed assessment type.'
     if (scope === 'CATEGORY_BUNDLE' && !category)
-      return 'Select an exam category for this Category Bundle plan.'
+      return 'Select an exam category for this Category Plan.'
     if (maxAttempts < 1 || maxAttempts > 99) return 'Max attempts must be between 1 and 99.'
     return null
   }
@@ -282,7 +282,7 @@ function B2CForm() {
           <SectionHeading
             number="2"
             title="Plan Scope"
-            subtitle="Platform-wide covers all categories. Category Bundle is locked to one exam."
+            subtitle="Platform-wide covers all categories. Category Plan is locked to one exam."
           />
           <div className="space-y-4">
             <div>
@@ -291,7 +291,7 @@ function B2CForm() {
                 {(
                   [
                     { value: 'PLATFORM_WIDE',    label: 'Platform-wide',    description: 'All exam categories included' },
-                    { value: 'CATEGORY_BUNDLE',  label: 'Category Bundle',  description: 'One exam category only' },
+                    { value: 'CATEGORY_BUNDLE',  label: 'Category Plan',    description: 'One exam category only' },
                   ] as const
                 ).map((opt) => (
                   <button

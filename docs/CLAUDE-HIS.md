@@ -6,6 +6,39 @@
 
 ## COMPLETED WORK LOG
 
+### April 13, 2026 — B2C Plans Page DB-First Rebuild + Category Plans (KSS-SA-031 extension)
+
+**Data changes (no schema change — data-only):**
+- Restored 3 PLATFORM_WIDE plans (DELETED→LIVE): All Exams Basic/Pro/Premium
+  - Added display_name, tagline, feature_bullets, is_popular (Pro=true), cta_label
+- Updated NEET Pro (`96729cdd`): feature_bullets, is_popular=true, display_name, tagline, cta_label
+- Updated JEE Premium (`4b68b3b9`): feature_bullets, display_name, tagline, cta_label
+- Inserted 4 new CATEGORY_BUNDLE LIVE plans: NEET Basic, NEET Premium, JEE Basic, JEE Pro (is_popular for Pro)
+- Inserted plan_subscribers for 4 new plans (412/178/334/267)
+- Extended all active b2c_assessment_subscriptions.current_period_end to 2026-05-13
+- Linked Basic user (a0c16137) subscription plan_id → Platform Basic (7151a03c)
+- Inserted NEET Basic subscription for free user 9a3b56a5
+
+**Demo plan → user state:**
+- Free user (9a3b56a5) → NEET Basic
+- Basic user (a0c16137) → Platform Basic
+- Pro user / Priya (e150d59c) → NEET Pro (was already linked)
+- Premium user (191c894d) → JEE Premium (was already linked)
+
+**Code changes:**
+- `src/lib/supabase/plans.ts`: Added `fetchLivePlatformPlans()`, `fetchLiveCategoryPlansGrouped()`, `fetchActivePlanForUser()`, `ActivePlanInfo` type
+- `src/app/plans/page.tsx`: Full DB-first rewrite — platform plans + category plans accordion (collapsed by default), mutual exclusivity CTA logic, no gamification strip, warning banner global
+- `src/app/super-admin/plans-pricing/new/page.tsx`: Rename "Category Bundle" → "Category Plans" (label + subtitle + validation message)
+
+**CTA mutual exclusivity rules (locked):**
+- No active plan → all CTAs available
+- On platform plan → category plan CTAs: "Cancel current plan first"
+- On category plan → platform plan CTAs: "Cancel current plan first", other category CTAs: "Cancel current plan first"
+- Within same group: lower tier → "Unable to Downgrade", higher tier → "Upgrade to [tier]"
+- Category plans: only show categories with all 3 tiers (BASIC/PRO/PREMIUM) + non-empty feature_bullets
+
+---
+
 ### April 13, 2026 — B2C Analytics Engine — Demo Build (KSS-DB-022 to KSS-DB-025)
 
 **Schema applied (project: uqweguyeaqkbxgtpkhez):**

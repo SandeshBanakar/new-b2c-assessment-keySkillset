@@ -1,141 +1,242 @@
-'use client';
+'use client'
 
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { CheckCircle, AlertTriangle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { BackButton } from '@/components/navigation/BackButton'
+import PageWrapper from '@/components/layout/PageWrapper'
+import { AuthGuard } from '@/components/shared/AuthGuard'
+import { useAppContext } from '@/context/AppContext'
 import {
-  CheckCircle,
-  AlertTriangle,
-  Flame,
-  Zap,
-  Map,
-  Trophy,
-  Users,
-} from 'lucide-react';
-import { BackButton } from '@/components/navigation/BackButton';
-import PageWrapper from '@/components/layout/PageWrapper';
-import { AuthGuard } from '@/components/shared/AuthGuard';
-import { useAppContext } from '@/context/AppContext';
-import type { Tier } from '@/types';
+  fetchLivePlatformPlans,
+  fetchLiveCategoryPlansGrouped,
+  fetchActivePlanForUser,
+  type PlanRow,
+  type ActivePlanInfo,
+} from '@/lib/supabase/plans'
 
-// -------------------------------------------------------
-// Plan data
-// -------------------------------------------------------
+// ─── Tier rank for upgrade/downgrade comparisons ──────────────────────────────
 
-type PaidTier = 'basic' | 'professional' | 'premium';
+const TIER_RANK: Record<string, number> = { BASIC: 1, PRO: 2, PREMIUM: 3 }
 
-const TIER_RANK: Record<Tier, number> = {
-  free: 0, basic: 1, professional: 2, premium: 3,
-};
+// ─── CTA logic ────────────────────────────────────────────────────────────────
 
-const PLAN_PRICES: Record<PaidTier, string> = {
-  basic:        '₹299',
-  professional: '₹599',
-  premium:      '₹999',
-};
-
-interface PlanDef {
-  tier:          PaidTier;
-  name:          string;
-  features:      string[];
-  isHighlighted?: boolean;
+type CTAState = {
+  label: string
+  disabled: boolean
+  style: 'primary' | 'current' | 'muted' | 'blocked'
 }
 
-const PLANS: PlanDef[] = [
-  {
-    tier: 'basic',
-    name: 'Basic',
-    features: [
-      'Full Tests included',
-      'Daily Quiz included',
-      'XP, Streaks, Levels 1–5',
-      'Basic Quest Map',
-      '1 Free + 5 Paid attempts per assessment',
-    ],
-  },
-  {
-    tier: 'professional',
-    name: 'Professional',
-    isHighlighted: true,
-    features: [
-      'Full Tests + Subject Tests',
-      'Daily Quiz included',
-      'XP, Streaks, Levels 1–8',
-      'Full Quest Map + Badge Set',
-      'Puzzle Mode on Subject Tests',
-      '1 week Streak Freeze',
-      '1 Free + 5 Paid attempts per assessment',
-    ],
-  },
-  {
-    tier: 'premium',
-    name: 'Premium',
-    features: [
-      'Full Tests + Subject Tests + Chapter Tests',
-      'Daily Quiz included',
-      'All levels 1–10 + Rare Badges',
-      'Puzzle Mode on all types',
-      '2 week Streak Freeze',
-      'Priority support + Early access',
-      '1 Free + 5 Paid attempts per assessment',
-    ],
-  },
-];
+function getPlanCTA(plan: PlanRow, active: ActivePlanInfo | null): CTAState {
+  const defaultLabel = plan.cta_label ?? `Get ${plan.display_name ?? plan.tier}`
 
-const GAMIFICATION_ITEMS = [
-  { icon: Flame,  label: 'Streaks'   },
-  { icon: Zap,    label: 'XP'        },
-  { icon: Map,    label: 'Quest Map' },
-  { icon: Trophy, label: 'Badges'    },
-  { icon: Users,  label: 'Squad'     },
-];
-
-// -------------------------------------------------------
-// Helper
-// -------------------------------------------------------
-
-function getUpgradeLabel(userTier: Tier, planTier: PaidTier): string {
-  if (userTier === 'free') {
-    if (planTier === 'basic')        return 'Start with Basic';
-    if (planTier === 'professional') return 'Choose Professional';
-    return 'Go Premium';
+  if (!active) {
+    return { label: defaultLabel, disabled: false, style: 'primary' }
   }
-  if (userTier === 'basic') {
-    if (planTier === 'professional') return 'Upgrade to Professional';
-    return 'Upgrade to Premium';
+
+  // Current plan
+  if (active.planId === plan.id) {
+    return { label: 'Current Plan', disabled: true, style: 'current' }
   }
-  return 'Upgrade to Premium';
+
+  // Same group = same scope + same category (or both platform-wide)
+  const sameGroup =
+    active.scope === plan.scope &&
+    (plan.scope === 'PLATFORM_WIDE' || active.category === plan.category)
+
+  if (sameGroup) {
+    const activeRank = TIER_RANK[active.tier ?? ''] ?? 0
+    const planRank   = TIER_RANK[plan.tier ?? ''] ?? 0
+    if (planRank < activeRank)  return { label: 'Unable to Downgrade', disabled: true,  style: 'muted'    }
+    if (planRank > activeRank)  return { label: `Upgrade to ${plan.display_name ?? plan.tier}`, disabled: false, style: 'primary' }
+  }
+
+  // Different scope or different category
+  return { label: 'Cancel current plan first', disabled: true, style: 'blocked' }
 }
 
-// -------------------------------------------------------
-// Plans content
-// -------------------------------------------------------
+// ─── Plan card ────────────────────────────────────────────────────────────────
+
+function PlanCard({
+  plan,
+  active,
+  onUpgrade,
+}: {
+  plan: PlanRow
+  active: ActivePlanInfo | null
+  onUpgrade: (plan: PlanRow) => void
+}) {
+  const cta = getPlanCTA(plan, active)
+
+  const ctaClass =
+    cta.style === 'primary'
+      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+      : cta.style === 'current'
+      ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed pointer-events-none'
+      : cta.style === 'muted'
+      ? 'opacity-50 cursor-not-allowed pointer-events-none border border-zinc-300 text-zinc-500'
+      : 'opacity-50 cursor-not-allowed pointer-events-none border border-zinc-300 text-zinc-500'
+
+  return (
+    <div
+      className={`bg-white rounded-2xl p-6 shadow-sm relative flex flex-col ${
+        plan.is_popular ? 'border-2 border-blue-500' : 'border border-zinc-200'
+      }`}
+    >
+      {plan.is_popular && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+          <span className="bg-amber-400 text-amber-900 text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap">
+            Most Popular
+          </span>
+        </div>
+      )}
+
+      <p className="text-xl font-semibold text-zinc-900">{plan.display_name ?? plan.name}</p>
+
+      {plan.tagline && (
+        <p className="text-xs text-zinc-500 mt-1">{plan.tagline}</p>
+      )}
+
+      <p className="text-3xl font-semibold text-zinc-900 mt-3">
+        ₹{plan.price.toLocaleString('en-IN')}
+        <span className="text-base font-normal text-zinc-500">/month</span>
+      </p>
+      <p className="text-xs text-zinc-400 mt-0.5 mb-4">Billed monthly</p>
+
+      <ul className="mt-2 space-y-2 flex-1">
+        {(plan.feature_bullets ?? []).map((bullet, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-zinc-600">
+            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+            {bullet}
+          </li>
+        ))}
+      </ul>
+
+      <button
+        onClick={() => !cta.disabled && onUpgrade(plan)}
+        disabled={cta.disabled}
+        className={`w-full mt-6 rounded-xl py-3 font-semibold text-base transition-colors ${ctaClass}`}
+      >
+        {cta.label}
+      </button>
+
+      {plan.footnote && (
+        <p className="text-xs text-zinc-400 text-center mt-2">{plan.footnote}</p>
+      )}
+    </div>
+  )
+}
+
+// ─── Category accordion ───────────────────────────────────────────────────────
+
+function CategoryAccordion({
+  category,
+  plans,
+  active,
+  onUpgrade,
+}: {
+  category: string
+  plans: PlanRow[]
+  active: ActivePlanInfo | null
+  onUpgrade: (plan: PlanRow) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  const basicPlan  = plans.find((p) => p.tier === 'BASIC')
+  const proPlan    = plans.find((p) => p.tier === 'PRO')
+  const premiumPlan = plans.find((p) => p.tier === 'PREMIUM')
+
+  const isActiveCategory = active?.scope === 'CATEGORY_BUNDLE' && active.category === category
+
+  return (
+    <div className={`border rounded-2xl overflow-hidden ${isActiveCategory ? 'border-blue-300 bg-blue-50/30' : 'border-zinc-200 bg-white'}`}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-6 py-4 text-left"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-base font-semibold text-zinc-900">{category}</span>
+          {isActiveCategory && (
+            <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+              Active
+            </span>
+          )}
+          <span className="text-sm text-zinc-400">
+            {basicPlan && proPlan && premiumPlan
+              ? `Basic ₹${basicPlan.price} · Pro ₹${proPlan.price} · Premium ₹${premiumPlan.price}`
+              : `from ₹${plans[0]?.price ?? 0}/mo`}
+          </span>
+        </div>
+        {open
+          ? <ChevronUp className="w-4 h-4 text-zinc-400 shrink-0" />
+          : <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
+        }
+      </button>
+
+      {open && (
+        <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+          {plans.map((plan) => (
+            <PlanCard key={plan.id} plan={plan} active={active} onUpgrade={onUpgrade} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main content ─────────────────────────────────────────────────────────────
 
 function PlansContent() {
-  const router = useRouter();
-  const { user } = useAppContext();
+  const router = useRouter()
+  const { user } = useAppContext()
 
-  if (!user) return null;
+  const [platformPlans, setPlatformPlans]   = useState<PlanRow[]>([])
+  const [categoryPlans, setCategoryPlans]   = useState<Record<string, PlanRow[]>>({})
+  const [activePlan, setActivePlan]         = useState<ActivePlanInfo | null>(null)
+  const [loading, setLoading]               = useState(true)
+  const [error, setError]                   = useState<string | null>(null)
 
-  const userTier = user.subscriptionTier;
+  useEffect(() => {
+    if (!user) return
+
+    Promise.all([
+      fetchLivePlatformPlans(),
+      fetchLiveCategoryPlansGrouped(),
+      fetchActivePlanForUser(user.id),
+    ])
+      .then(([platform, category, active]) => {
+        setPlatformPlans(platform)
+        setCategoryPlans(category)
+        setActivePlan(active)
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [user])
+
+  if (!user) return null
+
+  function handleUpgrade(plan: PlanRow) {
+    router.push(`/checkout?plan=${plan.id}`)
+  }
+
+  const categoryEntries = Object.entries(categoryPlans)
 
   return (
     <div className="min-h-screen bg-zinc-50">
-
-      {/* Back link */}
       <div className="max-w-5xl mx-auto px-4 pt-4">
         <BackButton />
       </div>
 
       <PageWrapper>
-
-        {/* Page header */}
+        {/* Header */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-zinc-900">Choose Your Plan</h1>
+          <h1 className="text-3xl font-semibold text-zinc-900">Choose Your Plan</h1>
           <p className="text-zinc-500 text-sm mt-2">
-            Unlock assessments for SAT, JEE, NEET, and PMP
+            Unlock assessments for SAT, JEE, NEET, and more
           </p>
         </div>
 
-        {/* Warning banner — always shown to all users */}
+        {/* Global warning banner */}
         <div className="mt-2 mb-8 max-w-xl mx-auto bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
           <p className="text-amber-700 text-sm text-center">
@@ -143,102 +244,63 @@ function PlansContent() {
           </p>
         </div>
 
-        {/* Plan cards grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {PLANS.map((plan) => {
-            const isCurrent = userTier === plan.tier;
-            const isLower   = TIER_RANK[userTier] > TIER_RANK[plan.tier];
-            const isHigher  = TIER_RANK[userTier] < TIER_RANK[plan.tier];
-
-            return (
-              <div
-                key={plan.tier}
-                className={`bg-white rounded-2xl p-6 shadow-sm relative ${
-                  plan.isHighlighted
-                    ? 'border-2 border-blue-500'
-                    : 'border border-zinc-200'
-                }`}
-              >
-                {/* Most Popular badge */}
-                {plan.isHighlighted && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-
-                {/* Plan name */}
-                <p className="text-xl font-bold text-zinc-900">{plan.name}</p>
-
-                {/* Price */}
-                <p className="text-3xl font-bold text-zinc-900 mt-1">
-                  {PLAN_PRICES[plan.tier]}
-                  <span className="text-base font-normal text-zinc-500">/month</span>
-                </p>
-
-                {/* Billing note */}
-                <p className="text-xs text-zinc-400 mt-0.5 mb-4">Billed monthly</p>
-
-                {/* Feature list */}
-                <ul className="mt-4 space-y-2">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-zinc-600">
-                      <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* CTA button */}
-                {isCurrent && (
-                  <button
-                    disabled
-                    className="w-full mt-6 rounded-xl py-3 font-semibold text-base bg-zinc-100 text-zinc-400 cursor-not-allowed pointer-events-none"
-                  >
-                    Current Plan
-                  </button>
-                )}
-
-                {isLower && (
-                  <button
-                    disabled
-                    title="Downgrade is not available. Contact support."
-                    className="w-full mt-6 rounded-xl py-3 font-semibold text-base opacity-50 cursor-not-allowed pointer-events-none border border-zinc-300 text-zinc-500"
-                  >
-                    Unable to Downgrade
-                  </button>
-                )}
-
-                {isHigher && (
-                  <button
-                    onClick={() => router.push(`/checkout?plan=${plan.tier}`)}
-                    className="w-full mt-6 rounded-xl py-3 font-semibold text-base bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                  >
-                    {getUpgradeLabel(userTier, plan.tier)}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Gamification strip */}
-        <div className="mt-12 bg-zinc-50 border border-zinc-200 rounded-2xl px-6 py-5 text-center max-w-5xl mx-auto">
-          <p className="text-sm font-medium text-zinc-700 mb-3">Every plan unlocks:</p>
-          <div className="flex flex-wrap items-center justify-center gap-6">
-            {GAMIFICATION_ITEMS.map(({ icon: Icon, label }) => (
-              <span key={label} className="flex items-center gap-1.5 text-sm text-zinc-600">
-                <Icon className="w-4 h-4 text-amber-500" />
-                {label}
-              </span>
-            ))}
+        {/* Loading / error states */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
           </div>
-        </div>
+        )}
 
+        {error && (
+          <p className="text-sm text-rose-600 text-center py-10">{error}</p>
+        )}
+
+        {!loading && !error && (
+          <>
+            {/* ── Platform-wide plans ── */}
+            <div className="mb-4">
+              <h2 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-4">
+                Platform Plans — All Exams
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                {platformPlans.map((plan) => (
+                  <PlanCard
+                    key={plan.id}
+                    plan={plan}
+                    active={activePlan}
+                    onUpgrade={handleUpgrade}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* ── Category plans ── */}
+            {categoryEntries.length > 0 && (
+              <div className="mt-12">
+                <h2 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-4">
+                  Category Plans — Exam Specific
+                </h2>
+                <p className="text-sm text-zinc-500 mb-6">
+                  Focused plans for a single exam — AI-powered analytics, concept mastery, and personalised next steps.
+                </p>
+                <div className="space-y-3">
+                  {categoryEntries.map(([category, plans]) => (
+                    <CategoryAccordion
+                      key={category}
+                      category={category}
+                      plans={plans}
+                      active={activePlan}
+                      onUpgrade={handleUpgrade}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </PageWrapper>
     </div>
-  );
+  )
 }
 
 export default function PlansPage() {
@@ -246,5 +308,5 @@ export default function PlansPage() {
     <AuthGuard>
       <PlansContent />
     </AuthGuard>
-  );
+  )
 }
