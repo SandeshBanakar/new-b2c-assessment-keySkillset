@@ -1,17 +1,17 @@
 type Props = { status: string }
 
 const config: Record<string, { label: string; classes: string }> = {
-  PUBLISHED: {
-    label: 'Published',
+  LIVE: {
+    label: 'Live',
     classes: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   },
   DRAFT: {
     label: 'Draft',
     classes: 'bg-amber-50 text-amber-700 border border-amber-200',
   },
-  ARCHIVED: {
-    label: 'Archived',
-    classes: 'bg-zinc-100 text-zinc-500 border border-zinc-200',
+  DELETED: {
+    label: 'Deleted',
+    classes: 'bg-rose-50 text-rose-400 border border-rose-200',
   },
 }
 

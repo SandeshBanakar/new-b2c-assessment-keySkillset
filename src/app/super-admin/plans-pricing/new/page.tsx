@@ -1204,9 +1204,12 @@ function SingleCoursePlanForm() {
 
   const [name, setName]               = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [billingCycle, setBillingCycle] = useState<'ANNUAL' | 'MONTHLY'>('ANNUAL')
   const [pricingMode, setPricingMode] = useState<'paid' | 'free'>('paid')
   const [price, setPrice]             = useState<number | ''>('')
   const [priceUsd, setPriceUsd]       = useState<number | ''>('')
+  const [compareAtPrice, setCompareAtPrice]       = useState<number | ''>('')
+  const [compareAtPriceUsd, setCompareAtPriceUsd] = useState<number | ''>('')
   const [stripePriceId, setStripePriceId] = useState('')
 
   const [courseItems, setCourseItems]         = useState<B2CCourseBundlePickerItem[]>([])
@@ -1229,23 +1232,38 @@ function SingleCoursePlanForm() {
     c.title.toLowerCase().includes(courseSearch.toLowerCase())
   )
 
+  function handleBillingCycleChange(cycle: 'ANNUAL' | 'MONTHLY') {
+    setBillingCycle(cycle)
+    // Reset pricing when billing cycle changes — prices differ between cycles
+    setPrice('')
+    setPriceUsd('')
+    setStripePriceId('')
+    setCompareAtPrice('')
+    setCompareAtPriceUsd('')
+  }
+
   function validate(): string | null {
     if (!name.trim()) return 'Plan name is required.'
     if (!isFree) {
       if (price === '' || Number(price) < 0) return 'Price (₹) must be 0 or a positive number.'
       if (priceUsd === '' || Number(priceUsd) < 0) return 'Price (USD) must be 0 or a positive number.'
+      const hasInr = compareAtPrice !== '' && Number(compareAtPrice) > 0
+      const hasUsd = compareAtPriceUsd !== '' && Number(compareAtPriceUsd) > 0
+      if (hasInr !== hasUsd) return 'Set compare-at price in both currencies, or leave both empty.'
+      if (hasInr && Number(compareAtPrice) <= Number(price)) return 'Compare-at price (₹) must be greater than the sale price.'
+      if (hasUsd && Number(compareAtPriceUsd) <= Number(priceUsd)) return 'Compare-at price ($) must be greater than the sale price.'
     }
     return null
   }
 
-  async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
+  async function handleSubmit(status: 'DRAFT' | 'LIVE') {
     const err = validate()
     if (err) { setError(err); return }
 
     if (selectedCourse) {
       const hasActivePlan = await checkCourseHasActivePlan(selectedCourse)
       if (hasActivePlan) {
-        setError('This course already has an active (Draft or Published) single course plan. Archive the existing plan before creating a new one.')
+        setError('This course already has an active (Draft or Live) single course plan. Delete the existing plan before creating a new one.')
         return
       }
     }
@@ -1253,28 +1271,34 @@ function SingleCoursePlanForm() {
     setError(null)
     setSubmitting(true)
     try {
-      const effectivePrice    = isFree ? 0 : price as number
-      const effectivePriceUsd = isFree ? 0 : priceUsd as number
-      const effectiveStripeId = isFree ? null : (stripePriceId.trim() || null)
+      const effectivePrice       = isFree ? 0 : price as number
+      const effectivePriceUsd    = isFree ? 0 : priceUsd as number
+      const effectiveStripeId    = isFree ? null : (stripePriceId.trim() || null)
+      const hasCompareAt         = !isFree && compareAtPrice !== '' && Number(compareAtPrice) > 0
+      const effectiveCompareAt   = hasCompareAt ? Number(compareAtPrice) : null
+      const effectiveCompareAtUsd = hasCompareAt ? Number(compareAtPriceUsd) : null
 
       const planId = await createSingleCoursePlan({
-        name:            name.trim(),
-        display_name:    displayName.trim() || null,
-        price:           effectivePrice,
-        price_usd:       effectivePriceUsd,
-        stripe_price_id: effectiveStripeId,
+        name:                 name.trim(),
+        display_name:         displayName.trim() || null,
+        price:                effectivePrice,
+        price_usd:            effectivePriceUsd,
+        stripe_price_id:      effectiveStripeId,
+        billing_cycle:        isFree ? 'ANNUAL' : billingCycle,
+        compare_at_price:     effectiveCompareAt,
+        compare_at_price_usd: effectiveCompareAtUsd,
         status,
-        is_free:         isFree,
+        is_free:              isFree,
       })
       if (selectedCourse) {
         await addContentToPlan(planId, selectedCourse, 'COURSE')
-        if (status === 'PUBLISHED') {
+        if (status === 'LIVE') {
           const { syncCourseFromPlan } = await import('@/lib/supabase/plans')
           await syncCourseFromPlan(selectedCourse, {
             price:           effectivePrice,
             price_usd:       effectivePriceUsd,
             stripe_price_id: effectiveStripeId,
-            status,
+            status:          'LIVE',
           })
         }
       }
@@ -1355,16 +1379,38 @@ function SingleCoursePlanForm() {
         </div>
       </div>
 
-      {/* SECTION 3 — Pricing */}
+      {/* SECTION 3 — Billing Cycle */}
       <div className="bg-white border border-zinc-200 rounded-md p-6">
-        <SectionHeading number="3" title="Pricing" subtitle="Set the pricing mode and price details for this individual course plan." />
+        <SectionHeading number="3" title="Billing Cycle" subtitle="How often subscribers are charged for this course." />
+        <div className="flex gap-2">
+          {(['ANNUAL', 'MONTHLY'] as const).map((cycle) => (
+            <button
+              key={cycle} type="button"
+              onClick={() => handleBillingCycleChange(cycle)}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md border transition-colors ${
+                billingCycle === cycle
+                  ? 'bg-blue-700 text-white border-blue-700'
+                  : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+              }`}
+            >
+              {cycle === 'ANNUAL' ? 'Annual' : 'Monthly'}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-zinc-400 mt-2">
+          One course can only have one plan. Changing the billing cycle resets all pricing fields.
+        </p>
+      </div>
+
+      {/* SECTION 4 — Pricing */}
+      <div className="bg-white border border-zinc-200 rounded-md p-6">
+        <SectionHeading number="4" title="Pricing" subtitle="Set the pricing mode and price details for this individual course plan." />
 
         {/* Pricing Mode toggle */}
         <div className="flex gap-2 mb-5">
           {(['paid', 'free'] as const).map((mode) => (
             <button
-              key={mode}
-              type="button"
+              key={mode} type="button"
               onClick={() => setPricingMode(mode)}
               className={`px-4 py-1.5 text-sm font-medium rounded-md border transition-colors ${
                 pricingMode === mode
@@ -1385,8 +1431,9 @@ function SingleCoursePlanForm() {
             </p>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="space-y-4">
+            {/* Sale prices */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel label="Price (₹)" required />
                 <div className="relative">
@@ -1412,16 +1459,43 @@ function SingleCoursePlanForm() {
                 </div>
               </div>
             </div>
+
+            {/* Compare-at prices (promotional) */}
+            <div>
+              <FieldLabel label="Compare-at price (optional — shown as strikethrough)" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
+                  <input
+                    type="number" min={0} value={compareAtPrice}
+                    placeholder="e.g. 4999"
+                    onChange={(e) => setCompareAtPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+                  <input
+                    type="number" min={0} step="0.01" value={compareAtPriceUsd}
+                    placeholder="e.g. 59.99"
+                    onChange={(e) => setCompareAtPriceUsd(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1">Must be higher than the sale price. Set both currencies or neither.</p>
+            </div>
+
             <div>
               <FieldLabel label="Stripe Price ID" />
               <input
                 type="text" value={stripePriceId} onChange={(e) => setStripePriceId(e.target.value)}
-                placeholder="price_annual_..."
+                placeholder={billingCycle === 'ANNUAL' ? 'price_annual_...' : 'price_monthly_...'}
                 className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
               />
-              <p className="text-xs text-zinc-400 mt-1">Auto-synced to the course record on Publish.</p>
+              <p className="text-xs text-zinc-400 mt-1">Auto-synced to the course record when the plan goes live.</p>
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -1447,10 +1521,10 @@ function SingleCoursePlanForm() {
             Save as Draft
           </button>
           <button
-            type="button" disabled={submitting} onClick={() => handleSubmit('PUBLISHED')}
+            type="button" disabled={submitting} onClick={() => handleSubmit('LIVE')}
             className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Publishing...' : 'Publish Plan'}
+            {submitting ? 'Saving...' : 'Set Live'}
           </button>
         </div>
       </div>

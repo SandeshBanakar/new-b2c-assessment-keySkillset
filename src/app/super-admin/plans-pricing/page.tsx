@@ -26,8 +26,8 @@ type Tab = 'assessment-plans' | 'single-course-plan' | 'course-bundle-plans' | '
 const PAGE_SIZE_OPTIONS = [25, 50, 100]
 const CARD_PAGE_SIZE    = 12
 
-// ─── Archive Warning Modal ────────────────────────────────────────────────────
-function ArchivePlanModal({
+// ─── Soft Delete Modal ────────────────────────────────────────────────────────
+function SoftDeletePlanModal({
   plan,
   onClose,
   onConfirm,
@@ -50,25 +50,25 @@ function ArchivePlanModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-md border border-zinc-200 shadow-xl w-full max-w-md">
           <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
-            <h2 className="text-sm font-semibold text-zinc-900">Archive Plan</h2>
+            <h2 className="text-sm font-semibold text-zinc-900">Delete Plan</h2>
             <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
               <X className="w-4 h-4" />
             </button>
           </div>
           <div className="px-6 py-5 space-y-4">
-            <div className="flex items-start gap-3 p-3 rounded-md bg-rose-50 border border-rose-100">
-              <AlertTriangle className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-rose-700">{plan.name}</p>
-                <p className="text-xs text-rose-600 mt-0.5">
-                  {subscriberCount > 0
-                    ? `${subscriberCount} subscriber${subscriberCount !== 1 ? 's' : ''} on this plan.`
-                    : 'No active subscribers on this plan.'}
-                </p>
+            {subscriberCount > 0 && (
+              <div className="flex items-start gap-3 p-3 rounded-md bg-amber-50 border border-amber-100">
+                <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">{plan.name}</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    {subscriberCount} active {subscriberCount !== 1 ? 'subscribers' : 'subscriber'} — they retain access until their billing period ends.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
             <p className="text-sm text-zinc-700">
-              This action is destructive. Make sure you inform the users via Salesforce about this action.
+              The plan will be hidden from all B2C pages. This action can be reviewed in the audit log.
             </p>
           </div>
           <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-100">
@@ -81,7 +81,7 @@ function ArchivePlanModal({
               className="px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-md disabled:opacity-50 flex items-center gap-2"
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {saving ? 'Archiving…' : 'Archive Plan'}
+              {saving ? 'Deleting…' : 'Delete Plan'}
             </button>
           </div>
         </div>
@@ -171,13 +171,13 @@ function AssessmentPlanCard({
   plan,
   assessmentCount,
   onView,
-  onArchive,
+  onDelete,
   onCountClick,
 }: {
   plan: PlanRow
   assessmentCount: number
   onView: () => void
-  onArchive: () => void
+  onDelete: () => void
   onCountClick: () => void
 }) {
   const subscribers = plan.plan_subscribers?.subscriber_count ?? 0
@@ -225,12 +225,12 @@ function AssessmentPlanCardGrid({
   plans,
   counts,
   onView,
-  onArchive,
+  onDelete,
 }: {
   plans: PlanRow[]
   counts: Record<string, number>
   onView: (plan: PlanRow) => void
-  onArchive: (plan: PlanRow) => void
+  onDelete: (plan: PlanRow) => void
 }) {
   const [viewingPlan, setViewingPlan] = useState<PlanRow | null>(null)
 
@@ -247,7 +247,7 @@ function AssessmentPlanCardGrid({
             plan={plan}
             assessmentCount={counts[plan.id] ?? 0}
             onView={() => onView(plan)}
-            onArchive={() => onArchive(plan)}
+            onDelete={() => onDelete(plan)}
             onCountClick={() => setViewingPlan(plan)}
           />
         ))}
@@ -269,13 +269,13 @@ function AssessmentPlanSection({
   fetchFn,
   page,
   onPageChange,
-  onArchive,
+  onDelete,
 }: {
   title: string
   fetchFn: (page: number, pageSize: number) => Promise<{ data: PlanRow[]; count: number }>
   page: number
   onPageChange: (p: number) => void
-  onArchive: (plan: PlanRow) => void
+  onDelete: (plan: PlanRow) => void
 }) {
   const router = useRouter()
   const [plans, setPlans]     = useState<PlanRow[]>([])
@@ -316,7 +316,7 @@ function AssessmentPlanSection({
         plans={plans}
         counts={counts}
         onView={(p) => router.push(`/super-admin/plans-pricing/${p.id}`)}
-        onArchive={onArchive}
+        onDelete={onDelete}
       />
       <PaginationBar
         page={page}
@@ -341,20 +341,35 @@ function AssessmentPlansTab({
   onCategoryPageChange: (p: number) => void
   onCreateB2C: () => void
 }) {
-  const [archivingPlan, setArchivingPlan] = useState<PlanRow | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [deletingPlan, setDeletingPlan] = useState<PlanRow | null>(null)
+  const [showDeleted, setShowDeleted]   = useState(false)
+  const [refreshKey, setRefreshKey]     = useState(0)
 
-  async function handleArchive(plan: PlanRow) {
-    await updatePlan(plan.id, { status: 'ARCHIVED' })
-    setArchivingPlan(null)
+  async function handleDelete(plan: PlanRow) {
+    await updatePlan(plan.id, { status: 'DELETED' })
+    setDeletingPlan(null)
     setRefreshKey((k) => k + 1)
   }
 
+  const platformFetch = useCallback(
+    (page: number, pageSize: number) => fetchPlatformAssessmentPlansPaginated(page, pageSize, showDeleted),
+    [showDeleted]
+  )
+  const categoryFetch = useCallback(
+    (page: number, pageSize: number) => fetchCategoryAssessmentPlansPaginated(page, pageSize, showDeleted),
+    [showDeleted]
+  )
+
   return (
     <div>
-      {/* Platform Plans */}
+      {/* Platform Plans header */}
       <div className="flex items-center justify-between mb-4">
-        <span />
+        <button
+          onClick={() => setShowDeleted((v) => !v)}
+          className="text-xs font-medium text-zinc-500 border border-zinc-200 rounded-md px-3 py-1.5 hover:bg-zinc-50 transition-colors"
+        >
+          {showDeleted ? 'Hide deleted' : 'Show deleted'}
+        </button>
         <button
           onClick={onCreateB2C}
           className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors"
@@ -364,31 +379,31 @@ function AssessmentPlansTab({
         </button>
       </div>
 
-      <div key={`platform-${refreshKey}`} className="mb-10">
+      <div key={`platform-${refreshKey}-${showDeleted}`} className="mb-10">
         <AssessmentPlanSection
           title="Platform Plans"
-          fetchFn={fetchPlatformAssessmentPlansPaginated}
+          fetchFn={platformFetch}
           page={platformPage}
           onPageChange={onPlatformPageChange}
-          onArchive={setArchivingPlan}
+          onDelete={setDeletingPlan}
         />
       </div>
 
-      <div key={`category-${refreshKey}`}>
+      <div key={`category-${refreshKey}-${showDeleted}`}>
         <AssessmentPlanSection
           title="Category Plans"
-          fetchFn={fetchCategoryAssessmentPlansPaginated}
+          fetchFn={categoryFetch}
           page={categoryPage}
           onPageChange={onCategoryPageChange}
-          onArchive={setArchivingPlan}
+          onDelete={setDeletingPlan}
         />
       </div>
 
-      {archivingPlan && (
-        <ArchivePlanModal
-          plan={archivingPlan}
-          onClose={() => setArchivingPlan(null)}
-          onConfirm={() => handleArchive(archivingPlan)}
+      {deletingPlan && (
+        <SoftDeletePlanModal
+          plan={deletingPlan}
+          onClose={() => setDeletingPlan(null)}
+          onConfirm={() => handleDelete(deletingPlan)}
         />
       )}
     </div>
@@ -410,25 +425,34 @@ function SingleCoursePlanTab({
   onCreateSingleCoursePlan: () => void
 }) {
   const router = useRouter()
-  const [plans, setPlans]     = useState<SingleCoursePlanRow[]>([])
-  const [total, setTotal]     = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [plans, setPlans]         = useState<SingleCoursePlanRow[]>([])
+  const [total, setTotal]         = useState(0)
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState<string | null>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   useEffect(() => {
     setLoading(true)
-    fetchSingleCoursePlansPaginated(page, pageSize)
+    fetchSingleCoursePlansPaginated(page, pageSize, showDeleted)
       .then(({ data, count }) => { setPlans(data); setTotal(count) })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [page, pageSize])
+  }, [page, pageSize, showDeleted])
 
   return (
     <div>
       <div className="flex items-start justify-between mb-6">
-        <h2 className="text-sm font-semibold text-zinc-700">Plan Records</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-zinc-700">Plan Records</h2>
+          <button
+            onClick={() => setShowDeleted((v) => !v)}
+            className="text-xs font-medium text-zinc-500 border border-zinc-200 rounded-md px-3 py-1.5 hover:bg-zinc-50 transition-colors"
+          >
+            {showDeleted ? 'Hide deleted' : 'Show deleted'}
+          </button>
+        </div>
         <button
           onClick={onCreateSingleCoursePlan}
           className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0"
@@ -459,38 +483,55 @@ function SingleCoursePlanTab({
               <thead>
                 <tr className="border-b border-zinc-200 bg-zinc-50">
                   <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Plan Name</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Course</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Billing</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Price (USD)</th>
                   <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {plans.map((plan) => (
-                  <tr key={plan.id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {plan.course_name ?? <span className="text-zinc-400">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-right text-zinc-700 font-medium">
-                      {plan.is_free
-                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">Free</span>
-                        : plan.price_usd != null ? `$${Number(plan.price_usd).toFixed(2)}` : <span className="text-zinc-400">—</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <PlanStatusBadge status={plan.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
-                        className="text-xs text-blue-700 hover:text-blue-800 font-medium"
-                      >
-                        View / Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {plans.map((plan) => {
+                  const hasCompareAt = !plan.is_free && plan.compare_at_price_usd != null && plan.compare_at_price_usd > 0
+                  return (
+                    <tr key={plan.id} className={`hover:bg-zinc-50 transition-colors ${plan.status === 'DELETED' ? 'opacity-50' : ''}`}>
+                      <td className="px-4 py-3 font-medium text-zinc-900">{plan.name}</td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        {plan.course_name ?? <span className="text-zinc-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-600">
+                          {plan.billing_cycle === 'MONTHLY' ? 'Monthly' : 'Annual'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-zinc-700 font-medium">
+                        {plan.is_free ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">Free</span>
+                        ) : hasCompareAt ? (
+                          <span className="flex items-center justify-end gap-1.5">
+                            <span className="line-through text-zinc-400 text-xs">${Number(plan.compare_at_price_usd).toFixed(2)}</span>
+                            <span>${Number(plan.price_usd).toFixed(2)}</span>
+                          </span>
+                        ) : plan.price_usd != null ? (
+                          `$${Number(plan.price_usd).toFixed(2)}`
+                        ) : (
+                          <span className="text-zinc-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <PlanStatusBadge status={plan.status} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => router.push(`/super-admin/plans-pricing/${plan.id}`)}
+                          className="text-xs text-blue-700 hover:text-blue-800 font-medium"
+                        >
+                          View / Edit
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -523,20 +564,21 @@ function CourseBundlePlansTab({
   onCreateBundlePlan: () => void
 }) {
   const router = useRouter()
-  const [bundles, setBundles] = useState<CourseBundlePlanRow[]>([])
-  const [total, setTotal]     = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [bundles, setBundles]         = useState<CourseBundlePlanRow[]>([])
+  const [total, setTotal]             = useState(0)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   useEffect(() => {
     setLoading(true)
-    fetchCourseBundlePlansPaginated(page, pageSize)
+    fetchCourseBundlePlansPaginated(page, pageSize, showDeleted)
       .then(({ data, count }) => { setBundles(data); setTotal(count) })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [page, pageSize])
+  }, [page, pageSize, showDeleted])
 
   return (
     <div>
@@ -545,13 +587,21 @@ function CourseBundlePlansTab({
           <h2 className="text-sm font-semibold text-zinc-700">Course Bundle Plans</h2>
           <p className="text-xs text-zinc-400 mt-0.5">Annual B2C plans containing curated course collections.</p>
         </div>
-        <button
-          onClick={onCreateBundlePlan}
-          className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          Create Bundle Plan
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowDeleted((v) => !v)}
+            className="text-xs font-medium text-zinc-500 border border-zinc-200 rounded-md px-3 py-1.5 hover:bg-zinc-50 transition-colors"
+          >
+            {showDeleted ? 'Hide deleted' : 'Show deleted'}
+          </button>
+          <button
+            onClick={onCreateBundlePlan}
+            className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Create Bundle Plan
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -584,7 +634,7 @@ function CourseBundlePlansTab({
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {bundles.map((bundle) => (
-                  <tr key={bundle.id} className="hover:bg-zinc-50 transition-colors">
+                  <tr key={bundle.id} className={`hover:bg-zinc-50 transition-colors ${bundle.status === 'DELETED' ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-3 font-medium text-zinc-900">{bundle.name}</td>
                     <td className="px-4 py-3 text-zinc-600">{bundle.display_name ?? <span className="text-zinc-400">—</span>}</td>
                     <td className="px-4 py-3 text-right text-zinc-700 font-medium">₹{bundle.price.toLocaleString('en-IN')}</td>
@@ -630,20 +680,21 @@ function B2BPlansTab({
   onCreateB2B: () => void
 }) {
   const router = useRouter()
-  const [cards, setCards]     = useState<B2BPlanCard[]>([])
-  const [total, setTotal]     = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [cards, setCards]             = useState<B2BPlanCard[]>([])
+  const [total, setTotal]             = useState(0)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
 
   const totalPages = Math.max(1, Math.ceil(total / CARD_PAGE_SIZE))
 
   useEffect(() => {
     setLoading(true)
-    fetchB2BPlansForGridPaginated(page, CARD_PAGE_SIZE)
+    fetchB2BPlansForGridPaginated(page, CARD_PAGE_SIZE, showDeleted)
       .then(({ data, count }) => { setCards(data); setTotal(count) })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [page])
+  }, [page, showDeleted])
 
   return (
     <div>
@@ -651,13 +702,21 @@ function B2BPlansTab({
         <p className="text-sm text-zinc-600">
           B2B plan pricing is managed per-tenant via the Contract tab.
         </p>
-        <button
-          onClick={onCreateB2B}
-          className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0 ml-4"
-        >
-          <Plus className="w-4 h-4" />
-          Create B2B Plan
-        </button>
+        <div className="flex items-center gap-2 ml-4">
+          <button
+            onClick={() => setShowDeleted((v) => !v)}
+            className="text-xs font-medium text-zinc-500 border border-zinc-200 rounded-md px-3 py-1.5 hover:bg-zinc-50 bg-white transition-colors"
+          >
+            {showDeleted ? 'Hide deleted' : 'Show deleted'}
+          </button>
+          <button
+            onClick={onCreateB2B}
+            className="inline-flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Create B2B Plan
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -681,7 +740,7 @@ function B2BPlansTab({
               <button
                 key={card.id}
                 onClick={() => router.push(`/super-admin/plans-pricing/${card.id}`)}
-                className="bg-white border border-zinc-200 rounded-md p-5 text-left hover:border-zinc-300 hover:shadow-sm transition-all"
+                className={`bg-white border border-zinc-200 rounded-md p-5 text-left hover:border-zinc-300 hover:shadow-sm transition-all ${card.status === 'DELETED' ? 'opacity-50' : ''}`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-sm font-semibold text-zinc-900 leading-snug">{card.name}</p>

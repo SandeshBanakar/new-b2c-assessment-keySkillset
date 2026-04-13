@@ -9,7 +9,10 @@ type Props = { planId: string }
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   CREATED:         { label: 'Created',        color: 'text-blue-700 bg-blue-50 border-blue-200' },
   PUBLISHED:       { label: 'Published',       color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-  ARCHIVED:        { label: 'Archived',        color: 'text-zinc-600 bg-zinc-100 border-zinc-200' },
+  LIVE:            { label: 'Set Live',         color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+  ARCHIVED:        { label: 'Archived',         color: 'text-zinc-600 bg-zinc-100 border-zinc-200' },
+  DELETED:         { label: 'Deleted',          color: 'text-rose-600 bg-rose-50 border-rose-200' },
+  SET_TO_DRAFT:    { label: 'Set to Draft',     color: 'text-amber-700 bg-amber-50 border-amber-200' },
   UPDATED:         { label: 'Updated',         color: 'text-amber-700 bg-amber-50 border-amber-200' },
   CONTENT_ADDED:   { label: 'Content added',   color: 'text-violet-700 bg-violet-50 border-violet-200' },
   CONTENT_REMOVED: { label: 'Content removed', color: 'text-rose-700 bg-rose-50 border-rose-200' },

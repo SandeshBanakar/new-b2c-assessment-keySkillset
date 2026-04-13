@@ -230,6 +230,9 @@ export type PlanDetail = PlanRow & {
   price_usd: number | null
   stripe_price_id: string | null
   is_free: boolean
+  compare_at_price: number | null
+  compare_at_price_usd: number | null
+  was_live: boolean
 }
 
 export type PlanAuditEntry = {
@@ -258,6 +261,7 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
       audience_type, plan_audience, plan_category, status, scope, tier, category,
       max_attempts_per_assessment, feature_bullets,
       tagline, footnote, is_popular, cta_label, stripe_price_id, is_free,
+      compare_at_price, compare_at_price_usd, was_live,
       created_at,
       plan_subscribers (subscriber_count)
     `)
@@ -278,6 +282,9 @@ export async function fetchPlanById(id: string): Promise<PlanDetail> {
     plan_category: ((row as {plan_category?: string}).plan_category ?? 'ASSESSMENT') as 'ASSESSMENT' | 'COURSE_BUNDLE' | 'SINGLE_COURSE_PLAN' | 'ALL_CONTENT',
     // allowed_assessment_types is not a DB column — default to [] client-side
     allowed_assessment_types: [],
+    compare_at_price:     (row as PlanDetail).compare_at_price ?? null,
+    compare_at_price_usd: (row as PlanDetail).compare_at_price_usd ?? null,
+    was_live:             (row as PlanDetail).was_live ?? false,
     plan_subscribers: Array.isArray(row.plan_subscribers)
       ? (row.plan_subscribers[0] ?? null)
       : row.plan_subscribers,
@@ -312,7 +319,8 @@ export async function fetchAllAssessmentsForPlan(): Promise<
 export async function updatePlan(
   id: string,
   fields: Partial<Omit<CreatePlanPayload, 'status'>> & {
-    status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+    status?: 'DRAFT' | 'LIVE' | 'DELETED'
+    was_live?: boolean
   }
 ): Promise<void> {
   const { error } = await supabase
@@ -353,7 +361,7 @@ export async function fetchPublishedPlans(): Promise<PublishedPlanOption[]> {
   const { data, error } = await supabase
     .from('plans')
     .select('id, name, price, scope')
-    .eq('status', 'PUBLISHED')
+    .eq('status', 'LIVE')
     .order('price', { ascending: true })
   if (error) throw new Error(error.message)
   return data as PublishedPlanOption[]
@@ -1164,10 +1172,14 @@ export type SingleCoursePlanRow = {
   price: number | null
   price_usd: number | null
   stripe_price_id: string | null
+  billing_cycle: 'ANNUAL' | 'MONTHLY'
   status: string
   course_id: string | null
   course_name: string | null
   is_free: boolean
+  compare_at_price: number | null
+  compare_at_price_usd: number | null
+  was_live: boolean
 }
 
 export type CreateSingleCoursePlanPayload = {
@@ -1176,8 +1188,11 @@ export type CreateSingleCoursePlanPayload = {
   price: number
   price_usd: number
   stripe_price_id: string | null
-  status: 'DRAFT' | 'PUBLISHED'
+  billing_cycle: 'ANNUAL' | 'MONTHLY'
+  status: 'DRAFT' | 'LIVE'
   is_free: boolean
+  compare_at_price: number | null
+  compare_at_price_usd: number | null
 }
 
 export type UpdateSingleCoursePlanPayload = {
@@ -1186,15 +1201,18 @@ export type UpdateSingleCoursePlanPayload = {
   price: number
   price_usd: number
   stripe_price_id: string | null
-  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+  billing_cycle: 'ANNUAL' | 'MONTHLY'
+  status: 'DRAFT' | 'LIVE' | 'DELETED'
   is_free: boolean
+  compare_at_price: number | null
+  compare_at_price_usd: number | null
 }
 
 export async function syncCourseFromPlan(
   courseId: string,
   plan: { price: number; price_usd: number; stripe_price_id: string | null; status: string }
 ) {
-  if (plan.status === 'PUBLISHED') {
+  if (plan.status === 'LIVE') {
     await supabase
       .from('courses')
       .update({
@@ -1204,11 +1222,41 @@ export async function syncCourseFromPlan(
         stripe_price_id: plan.stripe_price_id,
       })
       .eq('id', courseId)
-  } else if (plan.status === 'ARCHIVED') {
+  } else if (plan.status === 'DELETED' || plan.status === 'DRAFT') {
     await supabase
       .from('courses')
       .update({ is_individually_purchasable: false })
       .eq('id', courseId)
+  }
+}
+
+// Handles plan status transition + course sync for SINGLE_COURSE_PLAN lifecycle
+export async function transitionSingleCoursePlanStatus(
+  planId: string,
+  newStatus: 'LIVE' | 'DRAFT' | 'DELETED',
+  pricingSnapshot: { price: number; price_usd: number | null; stripe_price_id: string | null },
+  currentWasLive: boolean
+): Promise<void> {
+  const setWasLive = newStatus === 'LIVE' ? true : currentWasLive
+  const { error } = await supabase
+    .from('plans')
+    .update({ status: newStatus, was_live: setWasLive })
+    .eq('id', planId)
+  if (error) throw new Error(error.message)
+
+  const { data: pcmRow } = await supabase
+    .from('plan_content_map')
+    .select('content_item_id')
+    .eq('plan_id', planId)
+    .eq('content_type', 'COURSE')
+    .maybeSingle()
+  if (pcmRow) {
+    await syncCourseFromPlan((pcmRow as { content_item_id: string }).content_item_id, {
+      price:           pricingSnapshot.price,
+      price_usd:       pricingSnapshot.price_usd ?? 0,
+      stripe_price_id: pricingSnapshot.stripe_price_id,
+      status:          newStatus,
+    })
   }
 }
 
@@ -1218,22 +1266,24 @@ export async function createSingleCoursePlan(
   const { data, error } = await supabase
     .from('plans')
     .insert({
-      name:            payload.name,
-      display_name:    payload.display_name,
-      price:           payload.is_free ? 0 : payload.price,
-      price_usd:       payload.is_free ? 0 : payload.price_usd,
-      stripe_price_id: payload.is_free ? null : payload.stripe_price_id,
-      billing_cycle:   'ANNUAL',
-      feature_bullets: [],
-      plan_audience:   'B2C',
-      plan_type:       'WHOLE_PLATFORM',
-      tier:            payload.is_free ? 'FREE' : null,
-      audience_type:   'B2C',
-      plan_category:   'SINGLE_COURSE_PLAN',
-      scope:           'PLATFORM_WIDE',
-      status:          payload.status,
-      is_popular:      false,
-      is_free:         payload.is_free,
+      name:                 payload.name,
+      display_name:         payload.display_name,
+      price:                payload.is_free ? 0 : payload.price,
+      price_usd:            payload.is_free ? 0 : payload.price_usd,
+      stripe_price_id:      payload.is_free ? null : payload.stripe_price_id,
+      billing_cycle:        payload.is_free ? 'ANNUAL' : payload.billing_cycle,
+      compare_at_price:     payload.is_free ? null : payload.compare_at_price,
+      compare_at_price_usd: payload.is_free ? null : payload.compare_at_price_usd,
+      feature_bullets:      [],
+      plan_audience:        'B2C',
+      plan_type:            'WHOLE_PLATFORM',
+      tier:                 payload.is_free ? 'FREE' : null,
+      audience_type:        'B2C',
+      plan_category:        'SINGLE_COURSE_PLAN',
+      scope:                'PLATFORM_WIDE',
+      status:               payload.status,
+      is_popular:           false,
+      is_free:              payload.is_free,
     })
     .select('id')
     .single()
@@ -1248,14 +1298,17 @@ export async function updateSingleCoursePlan(
   const { error } = await supabase
     .from('plans')
     .update({
-      name:            payload.name,
-      display_name:    payload.display_name,
-      price:           payload.is_free ? 0 : payload.price,
-      price_usd:       payload.is_free ? 0 : payload.price_usd,
-      stripe_price_id: payload.is_free ? null : payload.stripe_price_id,
-      status:          payload.status,
-      tier:            payload.is_free ? 'FREE' : null,
-      is_free:         payload.is_free,
+      name:                 payload.name,
+      display_name:         payload.display_name,
+      price:                payload.is_free ? 0 : payload.price,
+      price_usd:            payload.is_free ? 0 : payload.price_usd,
+      stripe_price_id:      payload.is_free ? null : payload.stripe_price_id,
+      billing_cycle:        payload.billing_cycle,
+      compare_at_price:     payload.is_free ? null : payload.compare_at_price,
+      compare_at_price_usd: payload.is_free ? null : payload.compare_at_price_usd,
+      status:               payload.status,
+      tier:                 payload.is_free ? 'FREE' : null,
+      is_free:              payload.is_free,
     })
     .eq('id', planId)
   if (error) throw new Error(error.message)
@@ -1275,14 +1328,16 @@ export async function updateSingleCoursePlan(
 export async function fetchSingleCoursePlans(): Promise<SingleCoursePlanRow[]> {
   const { data: plans, error } = await supabase
     .from('plans')
-    .select('id, name, display_name, price, price_usd, stripe_price_id, status, is_free')
+    .select('id, name, display_name, price, price_usd, stripe_price_id, billing_cycle, compare_at_price, compare_at_price_usd, was_live, status, is_free')
     .eq('plan_category', 'SINGLE_COURSE_PLAN')
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
 
   const planList = (plans ?? []) as {
     id: string; name: string; display_name: string | null
-    price: number | null; price_usd: number | null; stripe_price_id: string | null; status: string; is_free: boolean
+    price: number | null; price_usd: number | null; stripe_price_id: string | null
+    billing_cycle: string | null; compare_at_price: number | null; compare_at_price_usd: number | null
+    was_live: boolean | null; status: string; is_free: boolean
   }[]
   if (planList.length === 0) return []
 
@@ -1314,16 +1369,20 @@ export async function fetchSingleCoursePlans(): Promise<SingleCoursePlanRow[]> {
   return planList.map((p) => {
     const courseId = courseIdByPlan[p.id] ?? null
     return {
-      id:              p.id,
-      name:            p.name,
-      display_name:    p.display_name,
-      price:           p.price,
-      price_usd:       p.price_usd,
-      stripe_price_id: p.stripe_price_id,
-      status:          p.status,
-      course_id:       courseId,
-      course_name:     courseId ? (courseNameMap[courseId] ?? null) : null,
-      is_free:         p.is_free ?? false,
+      id:                   p.id,
+      name:                 p.name,
+      display_name:         p.display_name,
+      price:                p.price,
+      price_usd:            p.price_usd,
+      stripe_price_id:      p.stripe_price_id,
+      billing_cycle:        (p.billing_cycle as 'ANNUAL' | 'MONTHLY') ?? 'ANNUAL',
+      compare_at_price:     p.compare_at_price ?? null,
+      compare_at_price_usd: p.compare_at_price_usd ?? null,
+      was_live:             p.was_live ?? false,
+      status:               p.status,
+      course_id:            courseId,
+      course_name:          courseId ? (courseNameMap[courseId] ?? null) : null,
+      is_free:              p.is_free ?? false,
     }
   })
 }
@@ -1420,10 +1479,11 @@ function normalisePlanSubscribers<T extends { plan_subscribers: unknown }>(rows:
 
 export async function fetchPlatformAssessmentPlansPaginated(
   page: number,
-  pageSize: number
+  pageSize: number,
+  includeDeleted = false
 ): Promise<Paginated<PlanRow>> {
   const { from, to } = range(page, pageSize)
-  const { data, count, error } = await supabase
+  let q = supabase
     .from('plans')
     .select(`
       id, name, display_name, description, price, billing_cycle,
@@ -1437,6 +1497,8 @@ export async function fetchPlatformAssessmentPlansPaginated(
     .eq('scope', 'PLATFORM_WIDE')
     .order('created_at', { ascending: false })
     .range(from, to)
+  if (!includeDeleted) q = q.neq('status', 'DELETED')
+  const { data, count, error } = await q
 
   if (error) throw new Error(error.message)
   return { data: normalisePlanSubscribers(data ?? []) as unknown as PlanRow[], count: count ?? 0 }
@@ -1444,10 +1506,11 @@ export async function fetchPlatformAssessmentPlansPaginated(
 
 export async function fetchCategoryAssessmentPlansPaginated(
   page: number,
-  pageSize: number
+  pageSize: number,
+  includeDeleted = false
 ): Promise<Paginated<PlanRow>> {
   const { from, to } = range(page, pageSize)
-  const { data, count, error } = await supabase
+  let q = supabase
     .from('plans')
     .select(`
       id, name, display_name, description, price, billing_cycle,
@@ -1461,6 +1524,8 @@ export async function fetchCategoryAssessmentPlansPaginated(
     .eq('scope', 'CATEGORY_BUNDLE')
     .order('created_at', { ascending: false })
     .range(from, to)
+  if (!includeDeleted) q = q.neq('status', 'DELETED')
+  const { data, count, error } = await q
 
   if (error) throw new Error(error.message)
   return { data: normalisePlanSubscribers(data ?? []) as unknown as PlanRow[], count: count ?? 0 }
@@ -1468,21 +1533,26 @@ export async function fetchCategoryAssessmentPlansPaginated(
 
 export async function fetchSingleCoursePlansPaginated(
   page: number,
-  pageSize: number
+  pageSize: number,
+  includeDeleted = false
 ): Promise<Paginated<SingleCoursePlanRow>> {
   const { from, to } = range(page, pageSize)
-  const { data: plans, count, error } = await supabase
+  let q = supabase
     .from('plans')
-    .select('id, name, display_name, price, price_usd, stripe_price_id, status, is_free', { count: 'exact' })
+    .select('id, name, display_name, price, price_usd, stripe_price_id, billing_cycle, status, is_free, compare_at_price, compare_at_price_usd, was_live', { count: 'exact' })
     .eq('plan_category', 'SINGLE_COURSE_PLAN')
     .order('created_at', { ascending: false })
     .range(from, to)
+  if (!includeDeleted) q = q.neq('status', 'DELETED')
+  const { data: plans, count, error } = await q
 
   if (error) throw new Error(error.message)
 
   const planList = (plans ?? []) as {
     id: string; name: string; display_name: string | null
-    price: number | null; price_usd: number | null; stripe_price_id: string | null; status: string; is_free: boolean
+    price: number | null; price_usd: number | null; stripe_price_id: string | null
+    billing_cycle: string; status: string; is_free: boolean
+    compare_at_price: number | null; compare_at_price_usd: number | null; was_live: boolean
   }[]
   if (planList.length === 0) return { data: [], count: count ?? 0 }
 
@@ -1518,12 +1588,16 @@ export async function fetchSingleCoursePlansPaginated(
         name:            p.name,
         display_name:    p.display_name,
         price:           p.price,
-        price_usd:       p.price_usd,
-        stripe_price_id: p.stripe_price_id,
-        status:          p.status,
-        course_id:       courseId,
-        course_name:     courseId ? (courseNameMap[courseId] ?? null) : null,
-        is_free:         p.is_free ?? false,
+        price_usd:            p.price_usd,
+        stripe_price_id:      p.stripe_price_id,
+        billing_cycle:        (p.billing_cycle as 'ANNUAL' | 'MONTHLY') ?? 'ANNUAL',
+        status:               p.status,
+        course_id:            courseId,
+        course_name:          courseId ? (courseNameMap[courseId] ?? null) : null,
+        is_free:              p.is_free ?? false,
+        compare_at_price:     p.compare_at_price ?? null,
+        compare_at_price_usd: p.compare_at_price_usd ?? null,
+        was_live:             p.was_live ?? false,
       }
     }),
     count: count ?? 0,
@@ -1532,7 +1606,7 @@ export async function fetchSingleCoursePlansPaginated(
 
 // ─── One-active-plan-per-course guard (KSS-SA-026) ───────────────────────────
 export async function checkCourseHasActivePlan(courseId: string): Promise<boolean> {
-  // Returns true if the course already has a DRAFT or PUBLISHED single course plan
+  // Returns true if the course already has a DRAFT or LIVE single course plan
   const { data: pcmRows } = await supabase
     .from('plan_content_map')
     .select('plan_id')
@@ -1547,23 +1621,26 @@ export async function checkCourseHasActivePlan(courseId: string): Promise<boolea
     .select('id')
     .in('id', planIds)
     .eq('plan_category', 'SINGLE_COURSE_PLAN')
-    .in('status', ['DRAFT', 'PUBLISHED'])
+    .in('status', ['DRAFT', 'LIVE'])
 
   return (activePlans ?? []).length > 0
 }
 
 export async function fetchCourseBundlePlansPaginated(
   page: number,
-  pageSize: number
+  pageSize: number,
+  includeDeleted = false
 ): Promise<Paginated<CourseBundlePlanRow>> {
   const { from, to } = range(page, pageSize)
-  const { data: plans, count, error } = await supabase
+  let q = supabase
     .from('plans')
     .select('id, name, display_name, price, status', { count: 'exact' })
     .eq('plan_audience', 'B2C')
     .eq('plan_category', 'COURSE_BUNDLE')
     .order('created_at', { ascending: false })
     .range(from, to)
+  if (!includeDeleted) q = q.neq('status', 'DELETED')
+  const { data: plans, count, error } = await q
 
   if (error) throw new Error(error.message)
 
@@ -1596,15 +1673,18 @@ export async function fetchCourseBundlePlansPaginated(
 
 export async function fetchB2BPlansForGridPaginated(
   page: number,
-  pageSize: number
+  pageSize: number,
+  includeDeleted = false
 ): Promise<Paginated<B2BPlanCard>> {
   const { from, to } = range(page, pageSize)
-  const { data: plans, count, error } = await supabase
+  let q = supabase
     .from('plans')
     .select('id, name, status', { count: 'exact' })
     .eq('plan_audience', 'B2B')
     .order('name', { ascending: true })
     .range(from, to)
+  if (!includeDeleted) q = q.neq('status', 'DELETED')
+  const { data: plans, count, error } = await q
 
   if (error) throw new Error(error.message)
 

@@ -828,19 +828,21 @@ export function SingleCoursePlanEditSlideOver({
   const [price, setPrice]             = useState<number | ''>(plan.price ?? '')
   const [priceUsd, setPriceUsd]       = useState<number | ''>(plan.price_usd ?? '')
   const [stripeId, setStripeId]       = useState(plan.stripe_price_id ?? '')
-  const [status, setStatus]           = useState<'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>(
-    plan.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+  const [billingCycle, setBillingCycle] = useState<'ANNUAL' | 'MONTHLY'>(
+    (plan.billing_cycle as 'ANNUAL' | 'MONTHLY') ?? 'ANNUAL'
   )
+  const [compareAtPrice, setCompareAtPrice]       = useState<number | ''>(plan.compare_at_price ?? '')
+  const [compareAtPriceUsd, setCompareAtPriceUsd] = useState<number | ''>(plan.compare_at_price_usd ?? '')
   const [saving, setSaving]             = useState(false)
   const [error, setError]               = useState<string | null>(null)
   const [showFreeWarning, setShowFreeWarning] = useState(false)
   const [pendingFreeSwitch, setPendingFreeSwitch] = useState(false)
 
-  const isFree = pricingMode === 'free'
+  const isFree    = pricingMode === 'free'
+  const wasLive   = plan.was_live === true
 
   function handlePricingModeChange(mode: 'paid' | 'free') {
     if (mode === 'free' && pricingMode === 'paid') {
-      // Warn before switching a paid plan to free
       setPendingFreeSwitch(true)
       setShowFreeWarning(true)
     } else {
@@ -850,8 +852,21 @@ export function SingleCoursePlanEditSlideOver({
 
   function confirmFreeSwitch() {
     setPricingMode('free')
+    setCompareAtPrice('')
+    setCompareAtPriceUsd('')
     setShowFreeWarning(false)
     setPendingFreeSwitch(false)
+  }
+
+  function handleBillingCycleChange(cycle: 'ANNUAL' | 'MONTHLY') {
+    if (wasLive) return
+    setBillingCycle(cycle)
+    // Reset prices so SA must enter new pricing for the new cycle
+    setPrice('')
+    setPriceUsd('')
+    setStripeId('')
+    setCompareAtPrice('')
+    setCompareAtPriceUsd('')
   }
 
   function validate(): string | null {
@@ -859,6 +874,11 @@ export function SingleCoursePlanEditSlideOver({
     if (!isFree) {
       if (price === '' || Number(price) < 0) return 'Price (₹) must be a valid number.'
       if (priceUsd === '' || Number(priceUsd) < 0) return 'Price (USD) must be a valid number.'
+      const hasInr = compareAtPrice !== '' && Number(compareAtPrice) > 0
+      const hasUsd = compareAtPriceUsd !== '' && Number(compareAtPriceUsd) > 0
+      if (hasInr !== hasUsd) return 'Set compare-at price in both currencies, or leave both empty.'
+      if (hasInr && Number(compareAtPrice) <= Number(price)) return 'Compare-at price (₹) must be greater than the sale price.'
+      if (hasUsd && Number(compareAtPriceUsd) <= Number(priceUsd)) return 'Compare-at price ($) must be greater than the sale price.'
     }
     return null
   }
@@ -869,14 +889,18 @@ export function SingleCoursePlanEditSlideOver({
     setError(null)
     setSaving(true)
     try {
+      const hasCompareAt = !isFree && compareAtPrice !== '' && Number(compareAtPrice) > 0
       await updateSingleCoursePlan(plan.id, {
-        name:            name.trim(),
-        display_name:    displayName.trim() || null,
-        price:           isFree ? 0 : price as number,
-        price_usd:       isFree ? 0 : priceUsd as number,
-        stripe_price_id: isFree ? null : (stripeId.trim() || null),
-        status,
-        is_free:         isFree,
+        name:                name.trim(),
+        display_name:        displayName.trim() || null,
+        price:               isFree ? 0 : price as number,
+        price_usd:           isFree ? 0 : priceUsd as number,
+        stripe_price_id:     isFree ? null : (stripeId.trim() || null),
+        is_free:             isFree,
+        billing_cycle:       billingCycle,
+        compare_at_price:    hasCompareAt ? Number(compareAtPrice) : null,
+        compare_at_price_usd: hasCompareAt ? Number(compareAtPriceUsd) : null,
+        status:              plan.status as 'DRAFT' | 'LIVE' | 'DELETED',
       })
       onSaved()
     } catch (e: unknown) {
@@ -932,6 +956,38 @@ export function SingleCoursePlanEditSlideOver({
             </div>
           </div>
 
+          {/* Billing Cycle */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Billing Cycle</p>
+            {wasLive ? (
+              <div className="flex items-center gap-3 px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-md">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                  {billingCycle === 'ANNUAL' ? 'Annual' : 'Monthly'}
+                </span>
+                <span className="text-xs text-zinc-400">Billing cycle is locked after a plan has been live.</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  {(['ANNUAL', 'MONTHLY'] as const).map((cycle) => (
+                    <button
+                      key={cycle} type="button"
+                      onClick={() => handleBillingCycleChange(cycle)}
+                      className={`px-4 py-1.5 text-sm font-medium rounded-md border transition-colors ${
+                        billingCycle === cycle
+                          ? 'bg-blue-700 text-white border-blue-700'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {cycle === 'ANNUAL' ? 'Annual' : 'Monthly'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-400">Changing the billing cycle resets all pricing fields.</p>
+              </>
+            )}
+          </div>
+
           {/* Pricing */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Pricing</p>
@@ -962,6 +1018,7 @@ export function SingleCoursePlanEditSlideOver({
               </div>
             ) : (
               <>
+                {/* Sale prices */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-700 mb-1">Price (₹) <span className="text-rose-500">*</span></label>
@@ -986,42 +1043,45 @@ export function SingleCoursePlanEditSlideOver({
                     </div>
                   </div>
                 </div>
+
+                {/* Compare-at prices (promotional) */}
+                <div>
+                  <p className="text-xs font-medium text-zinc-700 mb-1">
+                    Compare-at price <span className="text-zinc-400 font-normal">(optional — shown as strikethrough)</span>
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₹</span>
+                      <input
+                        type="number" min={0} value={compareAtPrice}
+                        placeholder="e.g. 4999"
+                        onChange={(e) => setCompareAtPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+                      <input
+                        type="number" min={0} step="0.01" value={compareAtPriceUsd}
+                        placeholder="e.g. 59.99"
+                        onChange={(e) => setCompareAtPriceUsd(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="w-full border border-zinc-200 rounded-md pl-7 pr-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1">Must be higher than the sale price. Set both currencies or neither.</p>
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-zinc-700 mb-1">Stripe Price ID</label>
                   <input
                     type="text" value={stripeId} onChange={(e) => setStripeId(e.target.value)}
-                    placeholder="price_annual_..."
+                    placeholder={billingCycle === 'ANNUAL' ? 'price_annual_...' : 'price_monthly_...'}
                     className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                   />
                   <p className="text-xs text-zinc-400 mt-1">Auto-synced to course record on save.</p>
                 </div>
               </>
-            )}
-          </div>
-
-          {/* Status */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</p>
-            <div className="flex gap-2">
-              {(['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const).map((s) => (
-                <button
-                  key={s} type="button"
-                  onClick={() => setStatus(s)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                    status === s
-                      ? 'bg-blue-700 text-white border-blue-700'
-                      : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
-                  }`}
-                >
-                  {s.charAt(0) + s.slice(1).toLowerCase()}
-                </button>
-              ))}
-            </div>
-            {status === 'PUBLISHED' && (
-              <p className="text-xs text-emerald-600">Publishing will set the course as individually purchasable and sync prices.</p>
-            )}
-            {status === 'ARCHIVED' && (
-              <p className="text-xs text-amber-600">Archiving will remove the individually purchasable flag from the course.</p>
             )}
           </div>
 
@@ -1057,7 +1117,7 @@ export function SingleCoursePlanEditSlideOver({
               </div>
               <div className="px-6 py-5">
                 <p className="text-sm text-zinc-700">
-                  This will set prices to <span className="font-medium">₹0 / $0</span> and remove the Stripe link on the course. Are you sure?
+                  This will set prices to <span className="font-medium">₹0 / $0</span> and remove the Stripe link on the course. Compare-at pricing will also be cleared. Are you sure?
                 </p>
               </div>
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-100">
