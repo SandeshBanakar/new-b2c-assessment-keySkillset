@@ -214,6 +214,9 @@ export default function AnalyticsTab({
   const overallAccuracy =
     totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
 
+  const isAiEligible =
+    user?.subscriptionTier === 'professional' ||
+    user?.subscriptionTier === 'premium';
   const negMark = NEG_MARKS[assessment.exam] ?? 0;
   const latestIncorrect = sectionResults.reduce((s, r) => s + r.incorrect_count, 0);
   const marksLost = Math.round(latestIncorrect * negMark * 100) / 100;
@@ -461,14 +464,16 @@ export default function AnalyticsTab({
       <SolutionsPanel solutions={filteredSolutions} />
 
       {/* ── Block 5: AI Insight Panel ─────────────────────────────────────── */}
-      {aiInsight && (
-        <div className="bg-white shadow-sm rounded-md p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Lightbulb className="w-4 h-4 text-blue-600" />
-            <h3 className="text-base font-medium text-zinc-900">AI Insight</h3>
+      <div className="bg-white shadow-sm rounded-md p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <Lightbulb className="w-4 h-4 text-blue-600" />
+          <h3 className="text-base font-medium text-zinc-900">AI Insight</h3>
+          {isAiEligible && (
             <span className="ml-auto text-xs text-zinc-400">Powered by Claude</span>
-          </div>
+          )}
+        </div>
 
+        {isAiEligible && aiInsight ? (
           <div className="space-y-5">
             {/* What went well */}
             <div className="rounded-md bg-emerald-50 border border-emerald-100 p-4">
@@ -492,8 +497,38 @@ export default function AnalyticsTab({
               </p>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-5">
+            {/* Upgrade Prompt */}
+            <div className="rounded-md bg-emerald-50 border border-emerald-100 p-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <p className="text-sm font-medium text-emerald-700">What went well</p>
+              </div>
+              <p className="text-sm text-zinc-700 leading-relaxed">
+                We are thrilled to say that you are doing well but to get AI insights, you may need to upgrade your plan.
+              </p>
+            </div>
+
+            {/* Upgrade CTA */}
+            <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Target className="w-4 h-4 text-blue-600 shrink-0" />
+                <p className="text-sm font-medium text-blue-700">Next Steps</p>
+              </div>
+              <p className="text-sm text-zinc-700 leading-relaxed mb-4">
+                Unlock personalized AI insights to accelerate your learning journey.
+              </p>
+              <button
+                onClick={() => window.location.href = '/plans'}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Upgrade Now
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

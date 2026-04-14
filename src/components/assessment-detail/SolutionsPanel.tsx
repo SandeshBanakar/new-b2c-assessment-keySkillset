@@ -121,6 +121,93 @@ export const SOLUTION_QUESTIONS: DemoSolution[] = [
   },
 ];
 
+export const SAT_SOLUTION_QUESTIONS: DemoSolution[] = [
+  {
+    id: 'sat-q-1',
+    type: 'mcq-single',
+    questionNumber: '1',
+    questionText:
+      'If f(x) = 3x^2 - 2x + 1, what is f(2)?',
+    options: ['A. 7', 'B. 9', 'C. 11', 'D. 13'],
+    correctAnswer: 'B',
+    explanation:
+      'Evaluate the quadratic at x = 2: 3(4) - 2(2) + 1 = 12 - 4 + 1 = 9. The correct answer is B.',
+    conceptTag: 'Quadratic equations',
+  },
+  {
+    id: 'sat-q-2',
+    type: 'mcq-multiple',
+    questionNumber: '2',
+    questionText:
+      'Which TWO statements about the equation 2x + 3 = 7 are true?',
+    options: [
+      'A. The solution is x = 2.',
+      'B. The graph is a line with slope 2.',
+      'C. It has two solutions because it is a quadratic.',
+      'D. It represents a linear function.',
+    ],
+    correctAnswers: ['A', 'D'],
+    explanation:
+      '2x + 3 = 7 is a linear equation with slope 2 and a single solution x = 2. It is not quadratic and does not have two solutions.',
+    conceptTag: 'Linear functions',
+  },
+  {
+    id: 'sat-q-3',
+    type: 'passage-single',
+    questionNumber: '3',
+    passageText:
+      'The author argues that the best way to prepare for the SAT Writing section is to read widely and practice editing real sentences. By working with passages written by experienced journalists, students learn to spot errors in grammar, usage, and style. Preparation also includes learning how to choose the most precise language and understand the writer’s purpose.',
+    questionText:
+      'According to the passage, what is most important for SAT Writing preparation?',
+    options: [
+      'A. Memorizing grammar rules without reading examples.',
+      'B. Reading widely and editing real sentences.',
+      'C. Practicing only multiple-choice vocabulary questions.',
+      'D. Writing essays on unfamiliar topics.',
+    ],
+    correctAnswer: 'B',
+    explanation:
+      'The passage emphasizes reading widely and practicing editing real sentences as the best preparation strategy.',
+    conceptTag: 'Reading comprehension',
+  },
+  {
+    id: 'sat-q-4',
+    type: 'passage-multi',
+    questionNumber: '4',
+    passageText:
+      'A student newspaper article described a new campus shuttle service. The writer noted that the shuttle runs every 15 minutes, that it connects both dorms and academic buildings, and that riders can use existing student ID cards to board. The article also mentioned that the service will reduce travel time for students who previously relied on city buses.',
+    conceptTag: 'Text structure and organization',
+    subQuestions: [
+      {
+        questionText:
+          'What is the main purpose of the article?',
+        options: [
+          'A. To criticize the campus shuttle service.',
+          'B. To inform students about a new transportation option.',
+          'C. To compare student ID cards with city bus tickets.',
+          'D. To explain why the old bus service was better.',
+        ],
+        correctAnswers: ['B'],
+        explanation:
+          'The article is informing students about a new campus shuttle service and how it works.',
+      },
+      {
+        questionText:
+          'Which detail best supports the writer’s point that the service is convenient?',
+        options: [
+          'A. It runs every 15 minutes.',
+          'B. It will reduce travel time for students.',
+          'C. Riders can use student ID cards to board.',
+          'D. It connects dorms and academic buildings.',
+        ],
+        correctAnswers: ['C', 'D'],
+        explanation:
+          'Using student ID cards and connecting dorms with academic buildings are both concrete conveniences mentioned in the passage.',
+      },
+    ],
+  },
+];
+
 export default function SolutionsPanel({
   solutions,
 }: {

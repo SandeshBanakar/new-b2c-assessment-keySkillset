@@ -13,6 +13,11 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
+import SolutionsPanel, {
+  QUESTION_TYPE_LABELS,
+  SAT_SOLUTION_QUESTIONS,
+  type SolutionQuestionType,
+} from '@/components/assessment-detail/SolutionsPanel';
 import type { Assessment } from '@/types';
 
 // ─── SAT domain taxonomy (client-side grouping — no DB column) ─────────────────
@@ -86,6 +91,14 @@ const RW_DOMAIN_ORDER = [
 const FULL_TEST_SECTION_ORDER = ['rw_module_1', 'rw_module_2', 'math_module_1', 'math_module_2'];
 const MATH_SECTION_ORDER      = ['algebra', 'advanced_math', 'psda', 'geometry_trig'];
 const RW_SECTION_ORDER        = ['craft_structure', 'info_ideas', 'sec', 'expression_ideas'];
+
+const SOLUTION_FILTERS: { label: string; value: 'ALL' | SolutionQuestionType }[] = [
+  { label: 'All question types', value: 'ALL' },
+  { label: 'MCQ Single', value: 'mcq-single' },
+  { label: 'MCQ Multiple', value: 'mcq-multiple' },
+  { label: 'Passage Single', value: 'passage-single' },
+  { label: 'Passage Multiple', value: 'passage-multi' },
+];
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -314,6 +327,11 @@ export default function SATAnalyticsTab({
   const [conceptMastery, setConceptMastery]     = useState<ConceptMastery[]>([]);
   const [allInsights, setAllInsights]           = useState<Record<string, AiInsight>>({});
   const [selectedAttemptIdx, setSelectedAttemptIdx] = useState(0);
+  const [filter, setFilter]                     = useState<'ALL' | SolutionQuestionType>('ALL');
+
+  const isAiEligible =
+    user?.subscriptionTier === 'professional' ||
+    user?.subscriptionTier === 'premium';
 
   const isFullTest   = assessment.type === 'full-test';
   const showMath     = isFullTest || assessment.subject === 'Math';
@@ -384,27 +402,31 @@ export default function SATAnalyticsTab({
         .order('concept_tag');
       setConceptMastery(masteryData ?? []);
 
-      // 4. AI insights for all attempts
-      const { data: insightsData } = await supabase
-        .from('attempt_ai_insights')
-        .select('attempt_id, what_went_well, next_steps')
-        .in('attempt_id', attemptIds);
+      // 4. AI insights for all attempts — premium/pro only
+      if (isAiEligible) {
+        const { data: insightsData } = await supabase
+          .from('attempt_ai_insights')
+          .select('attempt_id, what_went_well, next_steps')
+          .in('attempt_id', attemptIds);
 
-      const insightsMap: Record<string, AiInsight> = {};
-      for (const row of insightsData ?? []) {
-        insightsMap[row.attempt_id as string] = {
-          what_went_well: row.what_went_well as string,
-          next_steps: row.next_steps as string,
-        };
+        const insightsMap: Record<string, AiInsight> = {};
+        for (const row of insightsData ?? []) {
+          insightsMap[row.attempt_id as string] = {
+            what_went_well: row.what_went_well as string,
+            next_steps: row.next_steps as string,
+          };
+        }
+        setAllInsights(insightsMap);
+      } else {
+        setAllInsights({});
       }
-      setAllInsights(insightsMap);
 
       setLoading(false);
     }
 
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, assessmentId]);
+  }, [user?.id, assessmentId, isAiEligible]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -437,11 +459,20 @@ export default function SATAnalyticsTab({
   const selectedAttempt  = attempts[Math.min(selectedAttemptIdx, attempts.length - 1)];
   const sectionResults   = allSections[selectedAttempt.id] ?? [];
   const aiInsight        = allInsights[selectedAttempt.id] ?? null;
-  const attemptNumbers   = [...new Set(conceptMastery.map((m) => m.attempt_number))].sort((a, b) => a - b);
-  const allConceptTags   = [...new Set(conceptMastery.map((m) => m.concept_tag))];
+
+  const filteredSolutions = SAT_SOLUTION_QUESTIONS.filter(
+    (item) => filter === 'ALL' || item.type === filter,
+  );
+  const allowedConceptTags = new Set(filteredSolutions.map((item) => item.conceptTag));
+  const filteredConceptMastery = conceptMastery.filter(
+    (m) => filter === 'ALL' || allowedConceptTags.has(m.concept_tag),
+  );
+
+  const attemptNumbers = [...new Set(filteredConceptMastery.map((m) => m.attempt_number))].sort((a, b) => a - b);
+  const allConceptTags = [...new Set(filteredConceptMastery.map((m) => m.concept_tag))];
 
   // "Where You Lost Points" — weak sub-skills for the selected attempt
-  const weakConcepts = conceptMastery
+  const weakConcepts = filteredConceptMastery
     .filter(
       (m) =>
         m.attempt_number === selectedAttempt.attempt_number &&
@@ -593,44 +624,135 @@ export default function SATAnalyticsTab({
         )}
       </div>
 
-      {/* ── Block 3: Concept Mastery Heatmap (all attempts — not filtered) ──── */}
-      {conceptMastery.length > 0 && (
-        <div className="bg-white shadow-sm rounded-md p-6">
-          <h3 className="text-base font-medium text-zinc-900 mb-1">Concept Mastery</h3>
-          <p className="text-xs text-zinc-400 mb-5">All attempts shown — select an attempt above to filter other sections</p>
+      {/* ── Filter dropdown for analytics + solutions ───────────────────────── */}
+      <div className="bg-white shadow-sm rounded-md p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-zinc-900">Analytics filter</p>
+            <p className="text-xs text-zinc-500">
+              Narrow the view to a specific question type for the concept heatmap and solutions panel.
+            </p>
+          </div>
+          <label className="relative inline-flex items-center w-full sm:w-auto">
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as 'ALL' | SolutionQuestionType)}
+              className="w-full sm:w-64 pl-4 pr-4 py-2 border border-zinc-200 rounded-md text-sm text-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              {SOLUTION_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
 
-          {isFullTest ? (
-            // Full test: two panels side by side (Option C)
-            <div className="flex flex-col gap-8 lg:flex-row lg:gap-6">
-              {showRw && (
-                <ConceptMasteryPanel
-                  title="Reading & Writing"
-                  groups={rwGroups}
-                  conceptMastery={conceptMastery}
-                  attemptNumbers={attemptNumbers}
-                />
-              )}
-              {showRw && showMath && <div className="hidden lg:block w-px bg-zinc-200 self-stretch" />}
-              {showMath && (
-                <ConceptMasteryPanel
-                  title="Math"
-                  groups={mathGroups}
-                  conceptMastery={conceptMastery}
-                  attemptNumbers={attemptNumbers}
-                />
-              )}
+      {/* ── Block 3: Concept Mastery Heatmap (all attempts — filtered by question type) ──── */}
+      {filteredConceptMastery.length > 0 && (
+        <div className="bg-white shadow-sm rounded-md p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-medium text-zinc-900">Concept Mastery</h3>
+              <p className="text-xs text-zinc-500 mt-1">
+                Showing tags for {filter === 'ALL' ? 'all question types' : QUESTION_TYPE_LABELS[filter]}.
+              </p>
+            </div>
+            {filter !== 'ALL' && (
+              <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2 py-1">
+                {QUESTION_TYPE_LABELS[filter]}
+              </span>
+            )}
+          </div>
+
+          {attemptNumbers.length >= 2 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="text-left text-xs font-medium text-zinc-400 pb-2 pr-4 min-w-[160px]">
+                      Skill
+                    </th>
+                    {attemptNumbers.map((n) => (
+                      <th
+                        key={n}
+                        className="text-center text-xs font-medium text-zinc-400 pb-2 px-2 whitespace-nowrap"
+                      >
+                        Attempt {n}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allConceptTags.map((tag) => (
+                    <tr key={tag} className="border-t border-zinc-50">
+                      <td className="text-xs font-medium text-zinc-700 py-2 pr-4">
+                        {tag}
+                      </td>
+                      {attemptNumbers.map((n) => {
+                        const pct = filteredConceptMastery.find(
+                          (m) => m.concept_tag === tag && m.attempt_number === n,
+                        )?.mastery_percent ?? null;
+                        return (
+                          <td key={n} className="text-center py-2 px-2">
+                            <span
+                              className={`inline-block text-xs font-medium rounded px-2 py-0.5 ${masteryBadgeClass(pct)}`}
+                            >
+                              {pct !== null ? `${Math.round(pct)}%` : '—'}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
-            // Subject test: single panel
-            <ConceptMasteryPanel
-              title={showMath ? 'Math' : 'Reading & Writing'}
-              groups={showMath ? mathGroups : rwGroups}
-              conceptMastery={conceptMastery}
-              attemptNumbers={attemptNumbers}
-            />
+            <div className="space-y-3">
+              {allConceptTags.map((tag) => {
+                const pct = filteredConceptMastery.find(
+                  (m) => m.concept_tag === tag && m.attempt_number === attemptNumbers[0],
+                )?.mastery_percent ?? null;
+                return (
+                  <div key={tag}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-zinc-700">{tag}</span>
+                      <span className="text-xs text-zinc-500">
+                        {pct !== null ? `${Math.round(pct)}%` : '—'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-zinc-100 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full ${masteryBarClass(pct)}`}
+                        style={{ width: `${pct ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
+
+          <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-zinc-100">
+            <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              &ge;80% — strong
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              60–79% — developing
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+              &lt;60% — needs work
+            </span>
+          </div>
         </div>
       )}
+
+      <SolutionsPanel solutions={filteredSolutions} />
 
       {/* ── Block 4: Where You Lost Points (computed — responds to filter) ──── */}
       {weakConcepts.length > 0 && (
@@ -681,15 +803,18 @@ export default function SATAnalyticsTab({
       )}
 
       {/* ── Block 5: AI Insight Panel (responds to attempt filter) ───────────── */}
-      {aiInsight && (
-        <div className="bg-white shadow-sm rounded-md p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Lightbulb className="w-4 h-4 text-blue-600" />
-            <h3 className="text-base font-medium text-zinc-900">AI Insight</h3>
+      <div className="bg-white shadow-sm rounded-md p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <Lightbulb className="w-4 h-4 text-blue-600" />
+          <h3 className="text-base font-medium text-zinc-900">AI Insight</h3>
+          {isAiEligible && (
             <span className="ml-auto text-xs text-zinc-400">
               Attempt {selectedAttempt.attempt_number} · Powered by Claude
             </span>
-          </div>
+          )}
+        </div>
+
+        {isAiEligible && aiInsight ? (
           <div className="space-y-4">
             <div className="rounded-md bg-emerald-50 border border-emerald-100 p-4">
               <div className="flex items-center gap-1.5 mb-2">
@@ -706,8 +831,35 @@ export default function SATAnalyticsTab({
               <p className="text-sm text-zinc-700 leading-relaxed">{aiInsight.next_steps}</p>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-md bg-emerald-50 border border-emerald-100 p-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <p className="text-sm font-medium text-emerald-700">What You Did Well</p>
+              </div>
+              <p className="text-sm text-zinc-700 leading-relaxed">
+                We are thrilled to say that you are doing well but to get AI insights, you may need to upgrade your plan.
+              </p>
+            </div>
+            <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Target className="w-4 h-4 text-blue-600 shrink-0" />
+                <p className="text-sm font-medium text-blue-700">How to Improve</p>
+              </div>
+              <p className="text-sm text-zinc-700 leading-relaxed mb-4">
+                Unlock personalized AI insights to accelerate your learning journey.
+              </p>
+              <button
+                onClick={() => window.location.href = '/plans'}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Upgrade Now
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
     </div>
   );

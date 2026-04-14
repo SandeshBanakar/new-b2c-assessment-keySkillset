@@ -46,6 +46,7 @@ Sub-PRDs AAP-1 through AAP-5 to be created as children of this page. IDs to be a
 | # | Title | URL |
 |---|-------|-----|
 | Standalone | AI-Powered Insights Engine — B2C End-User Assessment Analytics (v2.0 — Apr 13 2026) | https://keyskillset-product-management.atlassian.net/wiki/x/CgBEBw |
+| Standalone | AI Insights Upgrade Prompt for Basic/Free Users (v1.0 — Apr 14 2026) | https://keyskillset-product-management.atlassian.net/wiki/x/[TBD-PRD-034] |
 
 Standalone page — not a child of Master PRD. Stored in Release 32 Phase 2 folder.
 
