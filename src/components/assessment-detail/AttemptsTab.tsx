@@ -196,7 +196,9 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId }: At
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        router.push(`/assessments/${assessmentId}?tab=analytics`)
+                        router.push(
+                          `/assessments/${assessmentId}?tab=analytics&attemptId=${attempt.id}`,
+                        )
                       }
                       className="rounded-md border-zinc-200 text-zinc-700 text-sm"
                     >
@@ -374,6 +376,7 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId }: At
                 View Analysis
               </Button>
             )}
+
             {freeAttempt.status === 'in_progress' && (
               <Button
                 size="sm"
