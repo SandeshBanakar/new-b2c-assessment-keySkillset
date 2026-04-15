@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useAssessments } from '@/hooks/useAssessments';
-import { getAttemptData } from '@/data/mockAttempts';
+import { useUserAttempts, DEFAULT_ATTEMPT } from '@/hooks/useUserAttempts';
 import AssessmentCard from '@/components/assessment/AssessmentCard';
 import type { SupabaseAssessment } from '@/types/assessment';
+import type { MockAttemptData } from '@/data/mockAttempts';
 import type { Tier } from '@/types';
 
 // -------------------------------------------------------
@@ -31,13 +32,13 @@ const EXAM_SORT_ORDER = ['CLAT', 'IIT-JEE', 'NEET', 'PMP', 'SAT'];
 function ExamCategorySection({
   examType,
   items,
-  userId,
+  attemptsMap,
   userTier,
   typeLabel,
 }: {
   examType: string;
   items: SupabaseAssessment[];
-  userId: string;
+  attemptsMap: Map<string, MockAttemptData>;
   userTier: Tier;
   typeLabel: string;
 }) {
@@ -74,7 +75,7 @@ function ExamCategorySection({
               <AssessmentCard
                 key={assessment.id}
                 assessment={assessment}
-                attemptData={getAttemptData(userId, assessment.title)}
+                attemptData={attemptsMap.get(assessment.id) ?? DEFAULT_ATTEMPT}
                 userTier={userTier}
               />
             ))}
@@ -101,6 +102,7 @@ function ExamCategorySection({
 export default function AssessmentLibrarySection() {
   const { user } = useAppContext();
   const { assessments, loading, error } = useAssessments();
+  const { attemptsMap, loading: attemptsLoading } = useUserAttempts(user?.id);
 
   const [activeType,       setActiveType]       = useState<ActiveType>('full-test');
   const [selectedExam,     setSelectedExam]     = useState<string>('all');
@@ -112,7 +114,7 @@ export default function AssessmentLibrarySection() {
   const userId    = user.id;
   const isPremium = tier === 'premium';
 
-  if (loading) return (
+  if (loading || attemptsLoading) return (
     <div className="flex items-center justify-center py-24">
       <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
     </div>
@@ -151,7 +153,7 @@ export default function AssessmentLibrarySection() {
 
     if (selectedProgress !== 'all') {
       items = items.filter((a) => {
-        const attempt = getAttemptData(userId, a.title);
+        const attempt = attemptsMap.get(a.id) ?? DEFAULT_ATTEMPT;
         const status  = attempt.status;
         if (selectedProgress === 'not-started' && status !== 'not_started') return false;
         if (selectedProgress === 'in-progress'  && status !== 'inprogress')  return false;
@@ -255,7 +257,7 @@ export default function AssessmentLibrarySection() {
             key={examType}
             examType={examType}
             items={items}
-            userId={userId}
+            attemptsMap={attemptsMap}
             userTier={tier}
             typeLabel={typeLabel}
           />

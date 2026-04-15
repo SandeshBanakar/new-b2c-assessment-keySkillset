@@ -59,7 +59,7 @@ export const DEMO_USERS: DemoUser[] = [
     subscription_tier: 'premium',
     subscription_status: 'active',
     user_onboarded: true,
-    selected_exams: ['JEE', 'NEET'],
+    selected_exams: ['SAT', 'JEE', 'NEET', 'CLAT'],
     goal: 'Crack IIT-JEE',
     xp: 3200,
     streak: 21,

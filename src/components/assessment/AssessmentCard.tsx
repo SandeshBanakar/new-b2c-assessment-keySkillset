@@ -238,26 +238,8 @@ export default function AssessmentCard({
           </button>
         )}
 
-        {/* STATE 6: Tier allows, completed, attempts remain */}
-        {cardState === 6 && (
-          <div className="flex gap-2">
-            <button
-              onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-semibold transition-colors"
-            >
-              View Analysis
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-              className="flex-1 border border-zinc-300 text-zinc-600 bg-white hover:bg-zinc-50 rounded-lg py-2.5 text-sm transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* STATE 7: All 6 attempts used */}
-        {cardState === 7 && (
+        {/* STATE 6 + 7: Completed — view analysis only, no retry */}
+        {(cardState === 6 || cardState === 7) && (
           <button
             onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
             className="border border-zinc-300 text-zinc-700 bg-white hover:bg-zinc-50 w-full rounded-lg py-2.5 text-sm font-medium transition-colors"

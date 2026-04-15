@@ -6,6 +6,39 @@
 
 ## COMPLETED WORK LOG
 
+### April 15, 2026 — B2C Assessment Card CTA + Demo Data Seeding (KSS-SA-035)
+
+**Ticket:** KSS-SA-035 | **Release:** 32 | **PRD:** `prds/PRD-B2C-ASSESSMENT-CARD-CTA.md`
+
+**Data changes (no schema changes):**
+- `assessments.total_questions` corrected to match `assessment_question_map` row counts
+- 7 chapter tests updated: `min_tier='professional'` → `min_tier='premium'` (NEET Mechanics, Thermodynamics, Electrochemistry, Genetics; JEE Calculus; CLAT Legal Reasoning, Logical Reasoning)
+- Premium User: `is_free_attempt=true` set on all `attempt_number=1` rows; 2 chapter test attempts added per 9 chapter tests; chapter test analytics (section_results, concept_mastery, ai_insights) repurposed from Priya; `selected_exams` updated to `['SAT','JEE','NEET','CLAT']`
+- Priya Sharma: all old attempts + concept_mastery deleted; re-seeded with 6 clean attempts (1 free + 5 paid) per SAT+NEET full+subject tests only — no analytics
+- Basic User: chapter/subject test attempts + invalid CLAT row deleted; re-seeded SAT FT1 (3 attempts), SAT FT2 (3 attempts), JEE FT1 (2 attempts); section_results + concept_mastery seeded on attempt_number=1 for SAT FT1 + FT2; NO ai_insights
+- Free User: all attempts deleted; SAT Full Test 1 attempt_number=1 (is_free_attempt=true, COMPLETED) seeded
+
+**Code changes:**
+- `src/components/assessment/AssessmentCard.tsx` — States 6+7 collapsed to single "View Analysis" button, Retry removed
+- `src/hooks/useUserAttempts.ts` — NEW hook; fetches all attempts for userId from Supabase; returns `Map<assessmentId, MockAttemptData>`; exports `DEFAULT_ATTEMPT`
+- `src/components/assessment/AssessmentLibrarySection.tsx` — replaced all `getAttemptData(userId, title)` calls with `attemptsMap.get(assessment.id) ?? DEFAULT_ATTEMPT`; `ExamCategorySection` now receives `attemptsMap` prop; loading state covers both hooks
+- `src/data/demoUsers.ts` — Premium User `selected_exams` updated to `['SAT','JEE','NEET','CLAT']`
+- `src/components/quiz/RetryButton.tsx` — deleted (was TODO stub returning null, never imported)
+
+**PRDs:**
+- `prds/PRD-B2C-ASSESSMENT-CARD-CTA.md` — new file (KSS-SA-035, Release 32)
+- `prds/PRD-AI-INSIGHTS-UPGRADE-PROMPT.md` — status → UPDATED; Section 10 added (Basic/Free demo data decisions for isAiEligible gate)
+
+**Build:** `npm run build` passed clean.
+
+**Key decisions locked:**
+- No Retry on card — permanent. States 6+7 identical. Retry lives in detail/instructions flow only.
+- `mockAttempts.ts` retained as type source (`MockAttemptData` interface) — `DEMO_ATTEMPTS` map is now dead code for library section but not deleted.
+- Basic User has no ai_insights by design — always hits `isAiEligible=false` gate.
+- `user_concept_mastery.assessment_id` is `text` type, UNIQUE on `(user_id, assessment_id, concept_tag, attempt_number)`.
+
+---
+
 ### April 13, 2026 — B2C Plans Page DB-First Rebuild + Category Plans (KSS-SA-031 extension)
 
 **Data changes (no schema change — data-only):**

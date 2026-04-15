@@ -336,28 +336,29 @@ Assessment attempts are permanent. Once a paid attempt is used, it cannot be ret
 - `RetryButton.tsx` deleted — was a TODO stub returning null.
 - Document reference: confirmed Q&A session Apr 15 2026.
 
-**Card state model (locked):**
-- State 1: No attempt row → "Start Free Test"
-- State 2: is_free_attempt=true + COMPLETED → "View Analysis" + "Upgrade to Unlock Full Access"
-- State 4: Tier blocked → "Upgrade to [tier]"
-- State 5: Free attempt in progress (status≠COMPLETED) → "Continue Your Test"
-- State 6 + 7 (collapsed): Any COMPLETED paid attempt OR all 6 attempts used → "View Analysis" only
+**Card state model (locked) — matches `deriveCardState()` in AssessmentCard.tsx:**
+- State 1: Tier below min_tier, free attempt not yet used → "Take Free Test" + "Upgrade to Access"
+- State 2: Tier below min_tier, free attempt exhausted (COMPLETED) → "Continue Your Test" + "Upgrade to Access"
+- State 4: Tier allows, 0 attempts → "Start Your Test"
+- State 5: Tier allows, attempt in progress → "Resume Test"
+- State 6 + 7 (collapsed): Tier allows, any COMPLETED attempt → "View Analysis" only
 
 **Free User card states:**
-- SAT Full Test 1: State 2 (free attempt used, COMPLETED)
-- All other assessments: State 1 (no attempt row)
+- SAT Full Test 1: State 2 (is_free_attempt=true, COMPLETED, tier=free below most min_tier)
+- All other assessments: State 1 (no attempt row, free attempt available)
 
 **Basic User card states:**
-- Full tests (SAT FT1, SAT FT2, JEE FT1): State 6/7 → "View Analysis" (paid attempts present)
-- Subject tests: State 1 (no attempt rows — not shown as active)
-- Chapter tests: State 4 (min_tier='premium', basic tier blocked)
+- Full tests (SAT FT1, SAT FT2, JEE FT1): State 6 → "View Analysis" (3/3/2 attempts, all COMPLETED)
+- Subject tests: State 1 (no attempt rows, min_tier='professional' or 'premium', basic blocked)
+- Chapter tests: State 1 (no attempt rows, min_tier='premium', basic blocked)
 
 **Pro User (Priya) card states:**
-- Full tests + subject tests: State 7 → "View Analysis" (6 attempts seeded, all COMPLETED)
-- Chapter tests: State 4 (min_tier='premium', professional tier blocked)
+- Full tests + subject tests: State 7 → "View Analysis" (6 attempts each, all COMPLETED)
+- Chapter tests: State 1 (min_tier='premium', professional tier blocked)
 
 **Premium User card states:**
-- All assessments: State 7 → "View Analysis" (all attempts present, all COMPLETED)
+- Full tests + subject tests: State 6 or 7 → "View Analysis" (varies by attempt count)
+- Chapter tests: State 6 → "View Analysis" (2 attempts each, all COMPLETED)
 
 ---
 

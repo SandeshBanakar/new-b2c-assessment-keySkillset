@@ -1,5 +1,5 @@
 # PRD — AI Insights Upgrade Prompt for Basic/Free Users
-# Status: IMPLEMENTED — Apr 14 2026
+# Status: UPDATED — Apr 15 2026 (originally IMPLEMENTED Apr 14 2026)
 # Owner: keySkillset Product
 # Ticket: KSS-SA-034 (AI Insights Upgrade UX)
 # Confluence: https://keyskillset-product-management.atlassian.net/wiki/x/CgBEBw
@@ -148,3 +148,30 @@ If issues arise:
 - SATAnalyticsTab.tsx updated
 - Build validated
 - Ready for deployment
+
+---
+
+## 10. Demo Data Alignment — Apr 15 2026 Update
+
+### 10.1 isAiEligible Gate Behaviour Per Persona
+
+The `isAiEligible` flag (`subscriptionTier === 'professional' || 'premium'`) is the sole mechanism controlling AI Insights visibility. This section records the confirmed demo data decisions for each persona.
+
+| Persona | Tier | isAiEligible | AI Insights Shown |
+|---------|------|-------------|-------------------|
+| Free User | free | false | Upgrade prompt always |
+| Basic User | basic | false | Upgrade prompt always |
+| Priya Sharma | professional | true | Real AI insights (where seeded) |
+| Premium User | premium | true | Real AI insights (where seeded) |
+
+### 10.2 Basic User — No ai_insights Seeded (By Design)
+
+Basic User has no rows in `attempt_ai_insights`. This is intentional — Basic User always hits the `isAiEligible = false` gate and sees the upgrade prompt. Seeding ai_insights for Basic User would be unreachable data and was deliberately omitted.
+
+### 10.3 Free User — SAT Full Test 1 Hits the Gate
+
+Free User has 1 completed attempt on SAT Full Test 1 (`attempt_number=1, is_free_attempt=true, status=COMPLETED`). When the Free User views the analysis for this attempt, `isAiEligible = false` — they will see the upgrade prompt, not AI insights. No ai_insights rows are seeded for Free User.
+
+### 10.4 No Schema Changes
+
+This update documents demo data seeding decisions only. No changes were made to the `isAiEligible` logic, `AnalyticsTab.tsx`, or `SATAnalyticsTab.tsx`.

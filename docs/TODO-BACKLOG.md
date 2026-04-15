@@ -1,5 +1,5 @@
 # TODO Backlog — keySkillset Platform
-# Updated Apr 13 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+# Updated Apr 15 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
 
 ---
 
@@ -74,6 +74,9 @@ Remaining production work:
 | TODO-008 | `SyllabusSection` type deprecated | After KSS-SA-030, unused. Remove in cleanup. | `src/types/index.ts` |
 | TODO-009 | `mockSyllabus` unused after KSS-SA-030 | Remove in cleanup. | `src/data/assessments.ts` |
 | TODO-010 | `navigation_policy` vs sections validation | SECTION_LOCKED advisory only until sections builder ships. | `linear/page.tsx` |
+| TODO-014 | `ContinueLearningWidget.tsx` still uses `getAttemptData` | Dashboard "Continue Learning" widget uses dead mock data keys — all real users fall to 0-attempt default. Migrate to `useUserAttempts()` hook same as AssessmentLibrarySection (KSS-SA-035). | `src/components/dashboard/ContinueLearningWidget.tsx` |
+| TODO-015 | `YourAssessmentsSection.tsx` still uses `getAttemptData` | "Your Assessments" section on dashboard/profile uses dead mock data keys. Migrate to `useUserAttempts()` hook. | `src/components/assessment/YourAssessmentsSection.tsx` |
+| TODO-016 | `mockAttempts.ts` DEMO_ATTEMPTS map is dead code | `getAttemptData()` no longer called from AssessmentLibrarySection. Remaining callers (TODO-014, TODO-015) should be migrated then this file's map + function can be removed. Keep `MockAttemptData` interface and `DEFAULT_ATTEMPT` (exported from `useUserAttempts.ts`). | `src/data/mockAttempts.ts` |
 
 ---
 
@@ -101,6 +104,8 @@ Remaining production work:
 | ~~TODO-005~~ | Unified questions table + sources + chapters | KSS-DB-009/010/011/012 applied Apr 11 2026 |
 | ~~TODO-007~~ | assessment_config needs marks fields | assessment_config JSONB with sections[] added KSS-DB-017 |
 | ~~TODO-012~~ | Slug vs UUID routing decision | Path C implemented: UUID lookup on assessment_items first, slug fallback on assessments |
+| ~~KSS-SA-035~~ | B2C assessment card CTA + attempt state model + demo data seeding | Completed Apr 15 2026. No Retry locked. useUserAttempts hook live. All 4 persona datasets seeded. |
+| ~~KSS-SA-034~~ | AI Insights upgrade prompt for basic/free users | Originally completed Apr 14 2026. Updated Apr 15 2026 — added Section 10 (demo data decisions for isAiEligible gate). |
 
 ---
 
