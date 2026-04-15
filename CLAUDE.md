@@ -1,108 +1,39 @@
-# CLAUDE.md — keySkillset Platform
-# READ THIS ENTIRE FILE BEFORE ANY ACTION. DO NOT WRITE CODE UNTIL YOU HAVE.
-## CURRENT TASK STATUS — UPDATE BEFORE EVERY COMMIT
+# CLAUDE.md — Mission Control
+# AMBIGUITY PROTOCOL: STOP/STATE/LIST OPTIONS if schema or locked behaviors are unclear.
 
-**Last worked on:** [date]
-**Machine:** [office/home]
-**Branch:** feat/KSS-XXX-NNN
+## CURRENT TASK STATUS
 **Task:** [one line description]
-**Status:** [In progress / Blocked / Ready to commit]
-**Next step:** [exactly what needs to happen next]
-**Blockers:** [anything unresolved]
+**Status:** [In progress / Blocked]
 
----
-## MACHINE CONFIGURATION
+Maintain this status while each task is being conducted. If there are two tasks running at a time, then record:
+**TASK 1:** [one line description]
+**Status 1:** [In progress / Blocked]
 
-| Machine | Drive | Project Path |
-|---|---|---|
-| Office laptop | C: | C:\Projects\new-b2c-assessment-keySkillset |
-| Home laptop | D: | D:\Projects\new-b2c-assessment-keySkillset |
-
-Always detect the current machine's drive before running path-dependent commands.
-
+**TASK 2:** [one line description]
+**Status 2:** [In progress / Blocked]
 ---
 
-## AMBIGUITY PROTOCOL — READ FIRST
-
-If a task touches schema, locked behaviours, or platform hierarchy and the rule does
-not explicitly cover the edge case:
-**STOP. State the ambiguity. List 2–3 options with tradeoffs. Wait for confirmation.**
-Never make a silent assumption. Never write code to "unblock" an unclear rule.
+## CONTEXT ROUTING (Read ONLY when relevant)
+- **Database/SQL:** Read `@docs/CLAUDE-DB.md`
+- **UI/Design/Platform:** Read `@docs/CLAUDE-PLATFORM.md`
+- **Git/Workflow/Config:** Read `@docs/CLAUDE-RULES.md`
+- **PRDs:** Draft in `/prds/[feature-name].md`. NEVER use MCP for Atlassian.
+- **History:** Read `@docs/CLAUDE-HISTORY.md` to avoid repeating mistakes.
 
 ---
 
-## WHAT THIS CODEBASE IS
-
-Demo app on Vercel + Supabase. Every UI decision and schema choice becomes a
-specification for the production engineering team. Precision is mandatory.
-
-**Stack:** Next.js 16.1.6 (Turbopack), TypeScript, Tailwind CSS
-**Repo:** github.com/SandeshBanakar/new-b2c-assessment-keySkillset
-**Supabase project ID:** uqweguyeaqkbxgtpkhez
-**Docs ref:** Context7 — https://context7.com/ (consult before any library implementation)
+## PRIMARY DIRECTIVES
+- **PRD Standards:** All new features must have a PRD in `/prds/` following the `@docs/PRD-TEMPLATE.md` structure.
+- **UI Focus:** MOBILE-FIRST RESPONSIVENESS. [cite_start]Every mockup description and component must prioritize mobile layouts before scaling to desktop[cite: 1, 4].
+- **Reuse First:** Always check the `Impacted Existing Components` section in the PRD to avoid duplicate UI work.
 
 ---
 
-## SUPPLEMENTARY FILES — READ WHEN RELEVANT
+## CRITICAL GUARDRAILS (Never Violate)
+- **DB:** RLS OFF ALWAYS. Use `execute_sql` only. `tenant_scope_id` != `tenant_id`.
+- **UI:** Tailwind tokens only. NO `font-bold` (use medium/semibold).
+- **GIT:** No main commits. `npm run build` must pass.
+- **MCP:** Batch SQL commands. Never run one-by-one.
 
-Before starting any task, identify which files below apply and read them first.
-
-| File | Read when... |
-|---|---|
-| `@docs/CLAUDE-DB.md` | Any DB query, schema change, or data model question |
-| `@docs/CLAUDE-PLATFORM.md` | Any UI, nav, roles, tenant, plan, or content question |
-| `@docs/CLAUDE-HISTORY.md` | Asked "what changed", debugging unexpected behaviour, or verifying completed work |
-| `@docs/CLAUDE-ATLAS.md` | Any Confluence PRD update, or to find the canonical PRD URL for a feature |
-
+Do NOT read CLAUDE-DB.md unless the current task involves execute_sql or schema discussion.
 ---
-
-## TIER 1 — NEVER VIOLATE (enforced on every task, no exceptions)
-
-These rules apply regardless of task type. Violating any of these is a blocking error.
-
-**Database**
-- RLS OFF permanently on ALL tables — never add RLS to any table, ever
-- Never modify schema without an authorised `KSS-DB-XXX` prompt confirmed in chat first
-- All schema changes via `execute_sql` — never `apply_migration`
-- `tenant_scope_id` on `content_items` is NOT `tenant_id` — column name is critical, never confuse them
-
-**Design system** (full token table in `@docs/CLAUDE-PLATFORM.md`)
-- Tailwind tokens ONLY — zero custom hex values, zero inline styles
-- NEVER use `font-bold` — only `font-medium` or `font-semibold`
-
-**Permanently removed — never re-add**
-- Course Store | Content tab on Tenant detail | Duplicate Tenant action
-- Team Manager role or persona anywhere in V1 (deferred to V2)
-- Exam engine: never modify locked behaviours without explicit "Override locked behaviour" instruction
-
-**Git**
-- Never commit directly to main
-- Branch format: `feat/KSS-[TRACK]-[NNN]` or `fix/KSS-[TRACK]-[NNN]`
-- `npm run build` must pass before any commit
-
----
-
----
-
-## DEVELOPMENT WORKFLOW
-
-```
-1. Read CLAUDE.md fully → read relevant supplementary file(s) → branch
-2. Schema change: write SQL with IF NOT EXISTS → show user → wait approval
-   → execute_sql → verify → update CLAUDE-DB.md → npm run build
-3. Data-only fix: confirm intent → run directly
-4. Code: read file before editing → minimal targeted changes → no unused imports
-   → no commented-out code → npm run build must pass
-5. Commit: git status + diff → stage specific files (not -A)
-   → imperative message + prompt ID → Co-authored-by: Claude Sonnet 4.6
-6. PRD: update Confluence via MCP after build passes
-```
-
----
-
-## SELF-CHECK (4 questions — run before every commit)
-
-1. Did I touch schema without an authorised KSS-DB-XXX prompt? → **STOP if yes**
-2. Does `npm run build` pass? → **STOP if no**
-3. Did I add RLS to any table? → **STOP if yes**
-4. Is there anything in this diff I'm uncertain about? → **Ask before committing**

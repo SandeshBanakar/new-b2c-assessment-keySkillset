@@ -327,6 +327,40 @@ Course Performance 'Free' badge: show when no `b2c_course_subscriptions` row for
 
 ---
 
+## B2C ASSESSMENT CARD — LOCKED BEHAVIOURS (Apr 15 2026)
+
+**No Retry — permanent product decision**
+Assessment attempts are permanent. Once a paid attempt is used, it cannot be retried.
+- States 6 and 7 are collapsed: both show "View Analysis" only.
+- There is NO retry, re-attempt, or re-take CTA anywhere in the B2C platform.
+- `RetryButton.tsx` deleted — was a TODO stub returning null.
+- Document reference: confirmed Q&A session Apr 15 2026.
+
+**Card state model (locked):**
+- State 1: No attempt row → "Start Free Test"
+- State 2: is_free_attempt=true + COMPLETED → "View Analysis" + "Upgrade to Unlock Full Access"
+- State 4: Tier blocked → "Upgrade to [tier]"
+- State 5: Free attempt in progress (status≠COMPLETED) → "Continue Your Test"
+- State 6 + 7 (collapsed): Any COMPLETED paid attempt OR all 6 attempts used → "View Analysis" only
+
+**Free User card states:**
+- SAT Full Test 1: State 2 (free attempt used, COMPLETED)
+- All other assessments: State 1 (no attempt row)
+
+**Basic User card states:**
+- Full tests (SAT FT1, SAT FT2, JEE FT1): State 6/7 → "View Analysis" (paid attempts present)
+- Subject tests: State 1 (no attempt rows — not shown as active)
+- Chapter tests: State 4 (min_tier='premium', basic tier blocked)
+
+**Pro User (Priya) card states:**
+- Full tests + subject tests: State 7 → "View Analysis" (6 attempts seeded, all COMPLETED)
+- Chapter tests: State 4 (min_tier='premium', professional tier blocked)
+
+**Premium User card states:**
+- All assessments: State 7 → "View Analysis" (all attempts present, all COMPLETED)
+
+---
+
 ## EXAM ENGINE — LOCKED BEHAVIOURS
 
 NEVER modify without explicit "Override locked behaviour" instruction.

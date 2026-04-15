@@ -506,6 +506,70 @@ Premium user: `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
 
 ---
 
+## DEMO SEED DATA — B2C PERSONA USERS (Apr 15 2026)
+
+All data-only. No schema changes. Decisions locked after multi-round Q&A.
+
+### Persona UUIDs
+- Free User: `9a3b56a5-31f6-4a58-81fa-66157c68d4f0`
+- Basic User: `a0c16137-7fd5-44f5-96e6-60e4617d9230`
+- Priya Sharma (Pro): `e150d59c-13c1-4db3-b6d7-4f30c29178e9`
+- Premium User: `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
+
+### Attempt rules (platform-wide)
+- `max_attempts_per_assessment = 6` (1 free + 5 paid)
+- `attempt_number=1, is_free_attempt=true` = free attempt
+- `attempt_number=2–6, is_free_attempt=false` = paid attempts
+
+### Free User
+- SAT Full Test 1: 1 attempt (is_free_attempt=true, COMPLETED) → **State 2** (free attempt used, upgrade CTA)
+- All other assessments: **State 1** (no attempt row)
+
+### Basic User (selected_exams: ['SAT','JEE'])
+- Full tests only — no subject tests, no chapter tests shown as active
+- SAT Full Test 1: 3 attempts (1 free + 2 paid)
+- SAT Full Test 2: 3 attempts (1 free + 2 paid)
+- JEE Full Test 1: 2 attempts (1 free + 1 paid)
+- Analytics on attempt_number=1 only: section_results + concept_mastery copied from Premium User
+  - SAT Full Test 2 analytics copied from SAT Full Test 1 data (Premium had no FT2 analytics)
+  - JEE Full Test 1: bare attempt rows (Premium had no JEE FT1 analytics)
+- NO ai_insights on any Basic User attempt → "Upgrade Now" CTA shows in analytics tab
+- `isAiEligible = false` for basic tier → confirmed by AnalyticsTab
+
+### Priya Sharma (Pro, selected_exams: ['SAT','NEET'])
+- 6 clean attempts (1 free + 5 paid) per: SAT Full Test 1, SAT Full Test 2, SAT Math, SAT R&W, NEET Full Test 1, NEET Physics, NEET Biology, NEET Chemistry
+- No chapter tests (min_tier='premium', Priya is professional)
+- No analytics on any Priya attempt (bare rows)
+
+### Premium User (selected_exams: ['SAT','JEE','NEET','CLAT'])
+- Full tests + subject tests: remain as-is (untouched except is_free_attempt fix)
+- is_free_attempt=true set on ALL attempt_number=1 rows (was false — fixed Apr 15 2026)
+- Chapter tests: 2 attempts each (attempt_number 1 free + 2 paid) for all 9 chapter tests
+  - 7 non-SAT chapters: attempt_answers + section_results + concept_mastery repurposed from Priya
+  - SAT Craft & Structure: section_results + concept_mastery from Priya (no attempt_answers)
+  - SAT Information & Ideas: bare analytics (Priya had none)
+- ai_insights seeded for all 18 chapter test attempts (model_used='static_demo')
+
+### Premium User chapter test attempt IDs (seeded Apr 15 2026)
+| Assessment | #1 attempt_id (free) | #2 attempt_id (paid) |
+|---|---|---|
+| CLAT — Legal Reasoning | `94f280d1-da48-4092-8e83-5a90922aa837` | `b12511e0-832c-4cd7-9009-7c40c82de7e6` |
+| CLAT — Logical Reasoning | `3da307a9-1926-4135-b6eb-3f1071f109e5` | `0b28bdf9-98c0-4b2c-a16b-897154bf6a6f` |
+| Craft & Structure (SAT) | `bb44ceda-8c67-4e5c-8177-3fbb82c115c7` | `8381bd1d-f8cd-4828-8c1e-d043d8714686` |
+| Information & Ideas (SAT) | `f6d9bc14-1668-4042-a50b-3a0d42ca78ed` | `493c2605-93ca-4350-a9dc-16caf69f3318` |
+| JEE — Calculus | `ea2a2da1-ee20-4c0f-83e2-190230d4d48a` | `8f5d173e-00e1-413a-892c-8c069afdca5f` |
+| NEET — Electrochemistry | `125a4567-b7e3-4d8f-abba-3f9a9173155c` | `b7d99fa8-5920-4ba8-8b86-ca2a9e272b2c` |
+| NEET — Genetics | `ef8f3d82-b4b2-4182-961c-13cdf65c5a2c` | `5a116bb5-d04d-43ff-b5fc-85d427c73447` |
+| NEET — Mechanics | `242f4274-365c-40b5-8608-179aded27787` | `936aa0a1-95a5-40ee-b0d3-c870305adad8` |
+| NEET — Thermodynamics | `0ca71190-87c3-4486-9415-56fff80449d8` | `6182d6ed-17b2-4d43-b731-9cc2d8aa069e` |
+
+### Chapter tests — min_tier
+- All 9 chapter tests: `min_tier = 'premium'`
+- 2 SAT chapter tests (Craft & Structure, Information & Ideas) already were 'premium'
+- 7 others updated Apr 15 2026: NEET Mechanics, Thermodynamics, Electrochemistry, Genetics; JEE Calculus; CLAT Legal Reasoning, Logical Reasoning
+
+---
+
 ## DEFERRED SCHEMA CHANGES (do not attempt without KSS-DB-XXX authorisation)
 
 - **DB-TODO-002**: `MAINTENANCE` status as first-class state in `assessment_items` + `courses`.
