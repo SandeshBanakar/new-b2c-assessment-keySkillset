@@ -15,6 +15,9 @@
 - **UI Focus:** MOBILE-FIRST RESPONSIVENESS. [cite_start]Every mockup description and component must prioritize mobile layouts before scaling to desktop[cite: 1, 4].
 - **Reuse First:** Always check the `Impacted Existing Components` section in the PRD to avoid duplicate UI work.
 - Always update TODO-BACKLOG.md file with currect tasks to be completed before the start of every session. And update the status of those tasks after session.
+- Always self-critique your answers, decisions, and code.
+- Analyse as Software Architect and then proceed. 
+- Ask clarification questions before commiting or concluding anything.
 
 ---
 
@@ -25,8 +28,4 @@
 - **MCP:** Batch SQL commands. Never run one-by-one.
 
 Do NOT read CLAUDE-DB.md unless the current task involves execute_sql or schema discussion.
-
-Always self-critique your answers, decisions, and code. 
-Analyse as Software Architect and then proceed. 
-Ask clarification questions before commiting or concluding anything.
 ---
