@@ -8,6 +8,9 @@
 - RLS OFF on ALL tables — permanently. Never add RLS. No exceptions.
 - Never modify schema without `KSS-DB-XXX` authorisation confirmed in Claude.ai project chat
 - Schema changes via `execute_sql` ONLY (project_id: uqweguyeaqkbxgtpkhez)
+- Write the SQL query manually as the Supabase project query is turned off via mcp
+- All the query and results after the query is asked to run manually in Supabase for any task that has DB or schema change, it will be updated in `/docs/SQL-RESPONSE.txt`.
+- `/docs/SQL-RESPONSE.txt`is a dynamic file and should only be considered as RAM storage for SQL queries executed for this project
 - Always use `IF NOT EXISTS` in CREATE statements
 - After any schema change: verify → update this file → run `npm run build`
 
