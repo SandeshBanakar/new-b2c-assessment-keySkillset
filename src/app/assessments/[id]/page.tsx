@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { Star, Users } from 'lucide-react';
+import { Lock, Star, Users } from 'lucide-react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { BackButton } from '@/components/navigation/BackButton';
 import OverviewTab from '@/components/assessment-detail/OverviewTab';
@@ -16,7 +16,7 @@ import { mockAttempts } from '@/data/assessments';
 
 type Tab = 'overview' | 'attempts' | 'analytics';
 
-const TABS: { id: Tab; label: string }[] = [
+const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'attempts', label: 'Attempts' },
   { id: 'analytics', label: 'Analytics' },
@@ -26,12 +26,31 @@ function AssessmentDetailPageInner() {
   const params = useParams<{ id: string }>();
   const { user } = useAppContext();
 
-  const searchParams = useSearchParams()
-  const tabParam = searchParams.get('tab') as Tab | null
-  const validTabs: Tab[] = ['overview', 'attempts', 'analytics']
-  const [activeTab, setActiveTab] = useState<Tab>(
-    tabParam && validTabs.includes(tabParam) ? tabParam : 'overview'
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab') as Tab | null;
+  const attemptIdParam = searchParams.get('attemptId') ?? undefined;
+
+  const userTier = user?.subscriptionTier ?? 'free';
+  const hasAnalyticsAccess =
+    userTier === 'professional' || userTier === 'premium';
+
+  // Filter tabs: hide Analytics for free + basic (demo tier gate)
+  const TABS = ALL_TABS.filter(
+    (t) => t.id !== 'analytics' || hasAnalyticsAccess,
   );
+
+  const validTabs: Tab[] = TABS.map((t) => t.id);
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (tabParam && validTabs.includes(tabParam)) return tabParam;
+    return 'overview';
+  });
+
+  // If analytics tab was requested but user lacks access, redirect to overview
+  useEffect(() => {
+    if (activeTab === 'analytics' && !hasAnalyticsAccess) {
+      setActiveTab('overview');
+    }
+  }, [activeTab, hasAnalyticsAccess]);
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [assessmentsLoaded, setAssessmentsLoaded] = useState(false);
@@ -42,12 +61,11 @@ function AssessmentDetailPageInner() {
       setAssessmentsLoaded(true);
     });
   }, [params.id]);
+
   const attempts = mockAttempts.filter((a) => a.assessmentId === params.id);
-  const userTier = user?.subscriptionTier ?? 'free';
-  const router = useRouter()
+  const router = useRouter();
   const showUpgradeBanner =
-    userTier === 'free' &&
-    isFreeAttemptExhausted(params.id, attempts)
+    userTier === 'free' && isFreeAttemptExhausted(params.id, attempts);
 
   if (!assessmentsLoaded) {
     return (
@@ -67,8 +85,7 @@ function AssessmentDetailPageInner() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      {/* Hero band — dark bg, this section only */}
-
+      {/* Hero band */}
       <div className="bg-zinc-900 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <BackButton className="mb-4 text-zinc-400 hover:text-white" />
@@ -87,8 +104,9 @@ function AssessmentDetailPageInner() {
             </div>
           )}
 
-          <h1 className="text-2xl font-semibold text-white">{assessment.title}</h1>
-
+          <h1 className="text-2xl font-semibold text-white">
+            {assessment.title}
+          </h1>
           <p className="text-sm text-zinc-400 mt-1">
             {assessment.exam} &middot;{' '}
             {assessment.type
@@ -96,7 +114,6 @@ function AssessmentDetailPageInner() {
               .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
               .join(' ')}
           </p>
-
           <div className="flex items-center gap-3 mt-3 text-sm text-zinc-400">
             <span className="flex items-center gap-1">
               <Star className="w-4 h-4 text-amber-500" />
@@ -128,6 +145,17 @@ function AssessmentDetailPageInner() {
                 {tab.label}
               </button>
             ))}
+
+            {/* Analytics upgrade nudge — shown in tab bar for free+basic */}
+            {!hasAnalyticsAccess && (
+              <button
+                onClick={() => router.push('/plans')}
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors"
+              >
+                <Lock className="w-3 h-3" />
+                Unlock Analytics
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -145,19 +173,23 @@ function AssessmentDetailPageInner() {
         {activeTab === 'attempts' && (
           <AttemptsTab attempts={attempts} assessmentId={assessment.id} />
         )}
-        {activeTab === 'analytics' && (
+        {activeTab === 'analytics' && hasAnalyticsAccess && (
           assessment.exam === 'SAT' &&
           (assessment.type === 'full-test' || assessment.type === 'subject-test')
-            ? <SATAnalyticsTab
+            ? (
+              <SATAnalyticsTab
                 assessment={assessment}
                 assessmentId={assessment.id}
                 onSwitchToAttempts={() => setActiveTab('attempts')}
               />
-            : <AnalyticsTab
+            ) : (
+              <AnalyticsTab
                 assessment={assessment}
                 assessmentId={assessment.id}
                 onSwitchToAttempts={() => setActiveTab('attempts')}
+                initialAttemptId={attemptIdParam}
               />
+            )
         )}
       </PageWrapper>
     </div>
@@ -166,12 +198,14 @@ function AssessmentDetailPageInner() {
 
 export default function AssessmentDetailPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
       <AssessmentDetailPageInner />
     </Suspense>
-  )
+  );
 }

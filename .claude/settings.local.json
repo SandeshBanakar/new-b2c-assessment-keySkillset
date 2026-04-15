@@ -111,7 +111,18 @@
       "Bash(echo \"exit: $?\")",
       "mcp__atlassian__createConfluencePage",
       "Bash(npm ls:*)",
-      "Bash(taskkill /F /IM node.exe)"
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(claude mcp:*)",
+      "Bash(npx supabase:*)",
+      "Read(//d/Projects/new-b2c-assessment-keySkillset/$APPDATA/supabase/**)",
+      "Read(//d/Projects/new-b2c-assessment-keySkillset/$HOME/.config/supabase/**)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.get\\(''''mcpServers'''',{}\\).items\\(\\) if ''''supabase'''' in k.lower\\(\\)}, indent=2\\)\\)\")",
+      "Read(//d/Projects/new-b2c-assessment-keySkillset/$LOCALAPPDATA/**)",
+      "Read(//d/Projects/new-b2c-assessment-keySkillset/$HOME/.config/**)",
+      "Read(//d/Projects/new-b2c-assessment-keySkillset/$HOME/**)",
+      "Read(//d/Projects/new-b2c-assessment-keySkillset/$HOME/.claude/**)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k\\) for k in d]\")",
+      "Bash(python:*)"
     ]
   },
   "enabledMcpjsonServers": [
