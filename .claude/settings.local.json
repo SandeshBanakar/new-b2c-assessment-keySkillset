@@ -111,7 +111,11 @@
       "Bash(echo \"exit: $?\")",
       "mcp__atlassian__createConfluencePage",
       "Bash(npm ls:*)",
-      "Bash(taskkill /F /IM node.exe)"
+      "Bash(taskkill /F /IM node.exe)",
+      "Read(//c/Users/SandeshBanakarI/.claude/**)",
+      "Bash(ls ~/.claude/settings*)",
+      "Bash(npx -y @supabase/mcp-server-supabase@latest --help)",
+      "Bash(npm --version)"
     ]
   },
   "enabledMcpjsonServers": [
