@@ -1,5 +1,24 @@
 # CLAUDE.md — keySkillset Platform
 # READ THIS ENTIRE FILE BEFORE ANY ACTION. DO NOT WRITE CODE UNTIL YOU HAVE.
+## CURRENT TASK STATUS — UPDATE BEFORE EVERY COMMIT
+
+**Last worked on:** [date]
+**Machine:** [office/home]
+**Branch:** feat/KSS-XXX-NNN
+**Task:** [one line description]
+**Status:** [In progress / Blocked / Ready to commit]
+**Next step:** [exactly what needs to happen next]
+**Blockers:** [anything unresolved]
+
+---
+## MACHINE CONFIGURATION
+
+| Machine | Drive | Project Path |
+|---|---|---|
+| Office laptop | C: | C:\Projects\new-b2c-assessment-keySkillset |
+| Home laptop | D: | D:\Projects\new-b2c-assessment-keySkillset |
+
+Always detect the current machine's drive before running path-dependent commands.
 
 ---
 
