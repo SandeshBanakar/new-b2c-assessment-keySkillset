@@ -1,40 +1,103 @@
 # PRD [KSS-ID]: [Feature Name]
-**Status:** DRAFT / REVIEW / LOCKED
-**Author:** [Your Name]
-**Target Version:** V1 (Locked) / V2 (Deferred)
+
+**Status:** DRAFT / REVIEW / LOCKED  
+**Author:** [Your Name]  
+**Stakeholders:** Engineering (Radhika, Yashwanthkrishna), Product, QA, Design  
+**Target Version:** V1 (Current)
 
 ---
 
 ## 1. Executive Summary & "The Why"
-*One paragraph on the problem we are solving for the user (e.g., B2B Learner organization) and the business value (e.g., reducing churn).*
+### 1.1 Problem Statement
+*Describe the specific pain point this feature addresses for the B2B organization or the individual learner. What is broken or missing?*
 
-## 2. User Personas & Impacts
-- **Client Admin:** [How it changes their workflow]
-- **Learner:** [The end-user experience]
-- **Super Admin:** [Management overhead]
+### 1.2 Business Value & ROI
+*How does this contribute to the North Star metric? (e.g., increasing simulation completion rates, reducing churn, or improving admin efficiency).*
 
-## 3. Functional Requirements (BDD Style)
-*Use "Given-When-Then" format to avoid ambiguity.*
-- **Scenario:** Creating a new [Entity]
-  - **Given** I am a Client Admin on a FULL_CREATOR tenant
-  - **When** I submit a unique name and description
-  - **Then** a new record is created with status 'ACTIVE' and an audit log is generated.
+### 1.3 Strategic Alignment
+*Does this align with the current quarterly roadmap for keySkillset?*
 
-## 4. Technical Constraints & Data Model (The "Claude" Section)
-*Crucial: Explicitly link to `CLAUDE-DB.md` rules here.*
-- **Schema:** Requires new table `[table_name]`? (Yes/No)
-- **RLS:** Must remain OFF.
-- **Tenant Scope:** Use `tenant_id` for ownership; `tenant_scope_id` for content visibility.
-- **Polymorphism:** If linking to content, specify `content_type` (COURSE/ASSESSMENT).
+---
 
-## 5. Scope Boundaries (V1 vs. V2)
-- **IN SCOPE:** [Bullet list of mandatory features]
-- **OUT OF SCOPE (V2):** [Deferred features to avoid scope creep]
+## 2. User Personas & Impact
+| Persona | Impact / Workflow Change |
+| :--- | :--- |
+| **Client Admin** | *e.g., Will now be able to bulk-assign simulation licenses via a single CSV upload.* |
+| **Learner** | *e.g., Will experience a seamless transition between the dashboard and the simulation environment.* |
+| **Super Admin** | *e.g., Gains the ability to override tenant-level settings for troubleshooting.* |
 
-## 6. Edge Cases & Error Handling
-- What happens if the tenant hits their seat limit?
-- What happens if a duplicate name is submitted? (Case-insensitivity check).
+---
 
-## 7. Success Metrics
-- [Metric 1]: e.g., 20% reduction in manual support tickets.
-- [Metric 2]: e.g., 100% audit coverage for all CRUD actions.
+## 3. User Flow & System Logic
+### 3.1 Functional Flowchart
+*Briefly describe the flow here or link to a diagram (e.g., Whimsical/Lucidchart).*
+- **Entry Point:** Where does the user start?
+- **Process:** What happens in the backend?
+- **Outcome:** What is the final state?
+
+### 3.2 State Transition Logic
+*If applicable, define how an entity changes status (e.g., Draft -> Published -> Archived).*
+
+---
+
+## 4. Functional Requirements (BDD Style)
+*Use Given-When-Then scenarios to define behavior for the engineering team.*
+
+### Scenario 1: [Feature Action Name]
+* **Given** I am a Client Admin with [Specific Permissions]
+* **When** I perform [Action X]
+* **Then** the system should [Primary Result]
+* **And** [Secondary Result/Audit Log Generation]
+
+### Scenario 2: [Alternative Path/Failure]
+* **Given** [Condition]
+* **When** [User Action]
+* **Then** the system should display [Specific Error Message/Validation]
+
+---
+
+## 5. Technical Specifications (Production Grade)
+### 5.1 Data Entities & Logic
+*Define the logic for the backend team (AWS/Postgres environment).*
+- **Primary Entity:** [e.g., Simulation_Record]
+- **Key Attributes:** `tenant_id`, `user_id`, `status`, `timestamp`.
+- **Relationships:** [e.g., One-to-Many relationship between Tenant and Learners].
+- **Audit Logging:** All mutations must be logged to the `audit_logs` table.
+
+### 5.2 API Requirements
+- **Endpoints:** Define if new REST/GraphQL endpoints are needed.
+- **Payload Requirements:** [e.g., JSON structure for POST requests].
+
+### 5.3 Infrastructure & Storage
+- **S3 Integration:** Does this require file storage (e.g., certificates, simulation assets)?
+- **Trigger Logic:** Specify any automated triggers (e.g., Course Completion -> Certificate Generation).
+
+---
+
+## 6. Scope Boundaries (V1 vs. V2)
+### 6.1 IN SCOPE (V1)
+- [Requirement 1]
+- [Requirement 2]
+
+### 6.2 OUT OF SCOPE (V2 / Deferred)
+- [Requirement 3 - Deferred to avoid scope creep]
+- [Advanced analytics/Reporting v2]
+
+---
+
+## 7. Edge Cases & Risk Mitigation
+- **Concurrency:** What happens if two admins edit the same record simultaneously?
+- **Validation:** Define character limits, case-insensitivity for unique names, and required fields.
+- **Environment:** Behavior during high-latency or disconnection (Local caching vs. Cloud sync).
+
+---
+
+## 8. Success Metrics (KPIs)
+- **Primary Metric:** [e.g., 25% reduction in onboarding time].
+- **Technical Metric:** [e.g., API response time < 200ms for 95th percentile].
+
+---
+
+## 9. SEO & Metadata (Product Optimization)
+- **Technical SEO:** [e.g., Schema markup requirements for public-facing course pages].
+- **Metadata:** Define dynamic meta-tags if the feature has a public URL.
