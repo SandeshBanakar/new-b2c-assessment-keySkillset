@@ -6,6 +6,44 @@
 
 ## COMPLETED WORK LOG
 
+### April 16, 2026 — Akash Institute Content Bank: 6 Private Courses Seed + UI Extension
+
+**No schema changes — data-only seed + UI code change.**
+
+**Seed data (SQL-RESPONSE.txt):**
+- 6 B2B_ONLY courses inserted into `courses` table for Akash Institute (`tenant_id = ec1bc005-e76d-4208-ab0f-abe0d316e260`)
+- All seeded with `status = INACTIVE` → appear under "Pending Review" tab in Content Bank
+- `created_by = 7e1c0560-3f2b-44fa-ae18-ebb05ad2f860` (Rahul Sharma — Akash CA)
+- `price = 0`, `price_usd = 0`, `audience_type = B2B_ONLY`, `is_individually_purchasable = false`
+
+| Course | UUID | `course_type` |
+|---|---|---|
+| NEET Preparation Course | `96a8eebd-b8dc-4a57-a89e-68cf5ca74ab7` | COMBINATION |
+| JEE Preparation Course | `4487343a-bc74-4a6c-83aa-feb0f2cd7536` | COMBINATION |
+| Cognitive Skills Course | `7b57da77-014e-4436-9d58-d6ebf062cc25` | CLICK_BASED |
+| SAT Preparation Course | `e96e99dd-5a8e-4c66-b9cf-6d3eaf6c597a` | COMBINATION |
+| Typing Course | `ee93d801-d98e-4059-83b5-0a707afe7df3` | KEYBOARD_TRAINER |
+| English Language Course | `dd4923ab-ce70-4e55-97f0-052dbdc62008` | VIDEO |
+
+**Code changes:**
+- `src/app/client-admin/[tenant]/content-bank/page.tsx` — extended to query both `assessment_items` (by `tenant_scope_id`) and `courses` (by `tenant_id`) in parallel via `Promise.all`; results merged and sorted by `created_at` desc
+- `ContentItem` type: removed `category_name`, renamed `test_type` → `item_type`, added `content_type: 'ASSESSMENT' | 'COURSE'`
+- `handleMakeLive` / `handleArchive`: branch on `content_type` to update correct table (`courses` or `assessment_items`)
+- Table columns: "Category" replaced with **"Content Type"** (violet `Course` / blue `Assessment` badge); "Test Type" renamed **"Type"** — shows formatted test_type for assessments, formatted course_type for courses
+- Row keys: `${content_type}-${id}` to prevent collision between the two datasets
+- Imported `formatCourseType` from `@/lib/utils` — used for COURSE rows in "Type" column
+
+**Build:** `npm run build` passed clean.
+
+**Key decisions locked:**
+- "Pending Review" = `status = INACTIVE` for both assessments and courses — consistent across tables
+- Tenant-private courses scoped by `tenant_id` on `courses`. Assessments scoped by `tenant_scope_id` on `assessment_items`. These are different columns — never conflate.
+- Super Admin and Master Org Content Creators have zero visibility into Akash-private courses — privacy enforced purely by `tenant_id` scoping in the query (no RLS needed, no visibility_scope column on courses)
+- B2B courses always `price = 0` — do not add non-zero prices to B2B tenant courses
+- Content Bank is FULL_CREATOR tenants only — RUN_ONLY tenants are redirected to Catalog
+
+---
+
 ### April 15, 2026 — B2C Assessment Card CTA + Demo Data Seeding (KSS-SA-035)
 
 **Ticket:** KSS-SA-035 | **Release:** 32 | **PRD:** `prds/PRD-B2C-ASSESSMENT-CARD-CTA.md`
@@ -418,10 +456,11 @@ Base: https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/page
 
 **B2C demo users (16 total):** 6 Free, 4 Basic, 3 Pro, 3 Premium. 1 Suspended (Meera Krishnan), 3 Inactive.
 
-**Courses (9 total):**
+**Courses (15 total):**
 - 1 B2C ARCHIVED: HIPAA Compliance Training (`425b71f4`, `is_individually_purchasable=true`, $12.99)
-- 7 B2B LIVE
-- 1 INACTIVE: CLAT
+- 7 B2B LIVE (platform-wide, `tenant_id = NULL`)
+- 1 INACTIVE: CLAT (platform-wide)
+- 6 B2B INACTIVE: Akash-private (`tenant_id = ec1bc005`, seeded Apr 16 2026) — NEET, JEE, Cognitive Skills, SAT, Typing, English Language
 
 **Plans (9 total):** 6 B2C + 3 B2B (Akash Standard, TechCorp Premium, Enterprise Pro — all PLATFORM_WIDE/PUBLISHED)
 

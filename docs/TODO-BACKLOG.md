@@ -1,5 +1,80 @@
 # TODO Backlog — keySkillset Platform
-# Updated Apr 15 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+# Updated Apr 16 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+
+---
+
+## [DONE] Akash Institute Content Bank — Courses Seed + UI Extension (Apr 16 2026)
+
+Seed 6 private B2B courses for Akash Institute and extend the Content Bank page to show courses alongside assessment_items.
+
+### Scope
+- Seed 6 courses into `courses` table (`tenant_id = ec1bc005-e76d-4208-ab0f-abe0d316e260`, `status = INACTIVE`, `audience_type = B2B_ONLY`)
+- Courses: NEET, JEE, Cognitive Skills, SAT, Typing, English Language
+- Extend `/client-admin/[tenant]/content-bank/page.tsx` to also query `courses` where `tenant_id = tenantId`
+- Unified table display: add "Content Type" column (ASSESSMENT / COURSE), adapt "Type" column to show test_type OR course_type
+
+### Tasks
+
+| # | Task | Status |
+|---|------|--------|
+| CB-001 | Write SQL to seed 6 courses for Akash Institute | [x] DONE — SQL-RESPONSE.txt (run in Supabase) |
+| CB-002 | Extend Content Bank page to query + display courses (unified ContentItem type) | [x] DONE |
+| CB-003 | Add "Content Type" pill (ASSESSMENT / COURSE) to Content Bank table | [x] DONE |
+| CB-004 | Adapt "Type" column — show test_type for assessments, course_type for courses | [x] DONE |
+| CB-005 | Ensure Make Live / Archive actions work correctly for course rows | [x] DONE |
+
+---
+
+## [IN-PROGRESS] Sources & Chapters — KSS-SA-036 (Apr 16 2026)
+
+Schema changes authorized. UI rebuild + soft-delete implementation.
+
+### Schema (run in Supabase — results → SQL-RESPONSE.txt)
+
+| # | Migration | SQL | Status |
+|---|-----------|-----|--------|
+| KSS-DB-027 | Add `status` to `sources` | `ALTER TABLE sources ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','ACTIVE'));` | [x] DONE Apr 16 |
+| KSS-DB-028a | Add `deleted_at` to `sources` | `ALTER TABLE sources ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL;` | [x] DONE Apr 16 |
+| KSS-DB-028b | Add `deleted_at` to `chapters` | `ALTER TABLE chapters ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL;` | [x] DONE Apr 16 |
+| KSS-DB-029 | Drop `status` from `chapters` | `ALTER TABLE chapters DROP COLUMN IF EXISTS status;` | [ ] PENDING — run in Supabase |
+
+### Seed SQL (run after KSS-DB-029)
+
+| # | Task | Status |
+|---|------|--------|
+| SEED-001 | Assign `created_by` + `last_modified_by` on existing chapters | [ ] PENDING — Option A: ~60% never edited, ~40% have last editor. Use admin_users from SQL-RESPONSE.txt |
+
+### Code Tasks
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| SC-001 | Sources main page — full rebuild | `src/app/super-admin/sources-chapters/page.tsx` | [x] DONE Apr 16 |
+| SC-001a | — Add `difficulty`, `target_exam`, `status`, `deleted_at` to Source type + query | page.tsx | [x] DONE |
+| SC-001b | — Add Difficulty column to table + badge colours (EASY/MEDIUM/HARD/MIXED) | page.tsx | [x] DONE |
+| SC-001c | — Fix action icons: Eye → Layers → Pencil → Trash (icon-only, no text pill) | page.tsx | [x] DONE |
+| SC-001d | — Create modal: add Target Exam, Difficulty Level, Status fields | page.tsx | [x] DONE |
+| SC-001e | — Edit modal: add Target Exam, Difficulty Level, Status fields | page.tsx | [x] DONE |
+| SC-001f | — View modal: live chapter fetch + Difficulty + Target Exam + Chapters list + Statistics | page.tsx | [x] DONE |
+| SC-001g | — Delete modal: simple confirm (no content-blocking), soft-delete source + child chapters | page.tsx | [x] DONE |
+| SC-001h | — All queries filter `deleted_at IS NULL` | page.tsx | [x] DONE |
+| SC-001i | — PaginationBar: 25/50/100 rows per page, platform-standard | page.tsx | [x] DONE |
+| SC-001j | — Button label: "New Source" → "Create Source" | page.tsx | [x] DONE |
+| SC-001k | — ViewSourceModal: remove StatusBadge from chapter rows (post KSS-DB-029) | page.tsx | [x] DONE Apr 16 |
+| SC-002 | Chapter list page — full rebuild matching production | `src/app/super-admin/sources-chapters/[sourceId]/page.tsx` | [x] DONE Apr 16 |
+| SC-002a | — Remove status entirely from chapters (types, query, UI) | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002b | — Table: Chapter Name / Difficulty / Questions / Created By / Last Edited / Actions | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002c | — Batch admin_users lookup for created_by + last_modified_by names | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002d | — "Never edited" when last_modified_by IS NULL | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002e | — Actions: FileText+Questions button / Eye / Pencil / Trash | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002f | — Create modal: Chapter Name (textarea) + Difficulty only | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002g | — Preview modal: Source + Difficulty + Total Questions stat + black Close | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002h | — Delete modal: amber warning (no blocking) if question_count > 0 | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002i | — Filters: Search + All Difficulties + All Creators (dynamic) | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002j | — Info banner: "Chapters added here will be tagged directly to '[source.name]'" | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-002k | — PaginationBar: 25/50/100 + "Showing X–Y of Z results" | [sourceId]/page.tsx | [x] DONE Apr 16 |
+| SC-003 | Update CLAUDE-DB.md — add KSS-DB-027/028/029 schema entries | `docs/CLAUDE-DB.md` | [x] DONE Apr 16 |
+| SC-004 | Question assignment diagnostic SQL (deferred — after UI) | `docs/SQL-RESPONSE.txt` | [ ] DEFERRED |
+| SC-005 | Questions page full rebuild | `src/app/super-admin/sources-chapters/[sourceId]/[chapterId]/page.tsx` | [ ] NEXT SESSION |
 
 ---
 

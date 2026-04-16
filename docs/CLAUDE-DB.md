@@ -146,24 +146,32 @@ override_marks_negative (numeric DEFAULT 0 — KSS-DB-013)
 - `override_marks=true` → engine uses override_marks_correct/negative for ALL questions, ignoring per-question marks
 - KSS-DB-013 applied April 11 2026
 
-### sources (Assessment Creation — KSS-DB-010, Apr 11 2026)
+### sources (Assessment Creation — KSS-DB-010, Apr 11 2026; KSS-DB-027/028 Apr 16 2026)
 ```
 id, name, description, exam_category_id (FK→exam_categories),
 difficulty ('easy'|'medium'|'hard'|'mixed' DEFAULT 'mixed'),
-target_exam (text optional), created_by (FK→admin_users),
-last_modified_by (FK→admin_users), created_at, updated_at
+target_exam (text optional),
+status (TEXT NOT NULL DEFAULT 'DRAFT' CHECK IN ('DRAFT','ACTIVE') — KSS-DB-027),
+deleted_at (TIMESTAMPTZ NULL — KSS-DB-028, soft delete),
+created_by (FK→admin_users), last_modified_by (FK→admin_users), created_at, updated_at
 ```
+- Soft delete: set `deleted_at = NOW()`. ALL queries must filter `deleted_at IS NULL`.
+- `status`: DRAFT = being populated | ACTIVE = ready for use in assessments.
+- `target_exam`: free-text label only (e.g. "NEET 2025") — reference field, not FK.
 
-### chapters (Assessment Creation — KSS-DB-011, Apr 11 2026; KSS-DB-015 Apr 11 2026)
+### chapters (Assessment Creation — KSS-DB-011, Apr 11 2026; KSS-DB-015 Apr 11 2026; KSS-DB-028 Apr 16 2026; KSS-DB-029 Apr 16 2026)
 ```
 id, source_id (FK→sources ON DELETE CASCADE), name,
 description (text nullable — KSS-DB-015),
 order_index (int DEFAULT 0 — KSS-DB-015, controls display order within source),
 difficulty ('easy'|'medium'|'hard'|'mixed' DEFAULT 'medium'),
-status ('DRAFT'|'ACTIVE' DEFAULT 'DRAFT'),
+deleted_at (TIMESTAMPTZ NULL — KSS-DB-028, soft delete),
 created_by (FK→admin_users), last_modified_by (FK→admin_users),
 created_at, updated_at
 ```
+- NOTE: `status` column DROPPED via KSS-DB-029 (Apr 16 2026). Chapters are always live from creation — no draft/archive concept.
+- Soft delete: set `deleted_at = NOW()`. ALL queries must filter `deleted_at IS NULL`.
+- When a source is soft-deleted, all child chapters are soft-deleted in the same operation.
 
 ### questions (Assessment Creation — KSS-DB-009 extended Apr 11 2026; KSS-DB-018 Apr 12 2026)
 ```
@@ -223,7 +231,15 @@ price_usd (numeric nullable), currency (DEFAULT 'INR'),
 is_individually_purchasable (boolean DEFAULT false), stripe_price_id,
 last_modified_by (uuid nullable)
 ```
-- 9 courses: 1 B2C ARCHIVED (HIPAA — `425b71f4`, purchasable, $12.99), 7 B2B LIVE, 1 INACTIVE (CLAT)
+- 15 courses total: 1 B2C ARCHIVED (HIPAA — `425b71f4`, purchasable, $12.99), 7 B2B LIVE (platform-wide), 1 INACTIVE (CLAT), 6 B2B INACTIVE (Akash private — Apr 16 2026)
+- Akash-private courses (`tenant_id = ec1bc005-e76d-4208-ab0f-abe0d316e260`, `status = INACTIVE`, `audience_type = B2B_ONLY`, `price = 0`):
+  - NEET Preparation Course (`96a8eebd`) — COMBINATION
+  - JEE Preparation Course (`4487343a`) — COMBINATION
+  - Cognitive Skills Course (`7b57da77`) — CLICK_BASED
+  - SAT Preparation Course (`e96e99dd`) — COMBINATION
+  - Typing Course (`ee93d801`) — KEYBOARD_TRAINER
+  - English Language Course (`dd4923ab`) — VIDEO
+- Tenant-private courses are scoped by `tenant_id` on `courses` (NOT `tenant_scope_id` — that column is on `assessment_items` only)
 - `is_individually_purchasable` managed ONLY via SINGLE_COURSE_PLAN plan lifecycle — no manual toggle
 - On SINGLE_COURSE_PLAN PUBLISHED: sync `price + price_usd + stripe_price_id` to course + set `purchasable=true`
 - On SINGLE_COURSE_PLAN ARCHIVED: set `is_individually_purchasable=false` (prices kept)
@@ -429,6 +445,9 @@ client_audit_log — tenant_id, actor_id, actor_name,
 - **KSS-DB-023 (Apr 13 2026)**: Created `attempt_section_results` table. Stores per-section aggregate results for a completed attempt. Columns: `id (uuid PK)`, `attempt_id (FK→attempts)`, `section_id (text)`, `section_label (text)`, `correct_count`, `incorrect_count`, `skipped_count`, `marks_scored (numeric 8,2)`, `marks_possible (numeric 8,2)`, `time_spent_seconds (int)`, `accuracy_percent (numeric 5,2)`, `created_at`. UNIQUE `(attempt_id, section_id)`.
 - **KSS-DB-024 (Apr 13 2026)**: Created `user_concept_mastery` table. Stores concept-tag mastery aggregated per user per assessment per attempt. Columns: `id (uuid PK)`, `user_id (uuid)`, `assessment_id (text)`, `concept_tag (text)`, `attempt_number (int)`, `correct_count (int)`, `total_count (int)`, `mastery_percent (numeric 5,2)`, `updated_at`. UNIQUE `(user_id, assessment_id, concept_tag, attempt_number)`. Index on `(user_id, assessment_id)`.
 - **KSS-DB-025 (Apr 13 2026)**: Created `attempt_ai_insights` table. Stores static demo AI insight text per completed attempt. Columns: `id (uuid PK)`, `attempt_id (FK→attempts UNIQUE)`, `what_went_well (text NOT NULL)`, `next_steps (text NOT NULL)`, `model_used (text DEFAULT 'static_demo')`, `generated_at (timestamptz)`. UNIQUE `(attempt_id)`.
+- **KSS-DB-027 (Apr 16 2026)**: Added `status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','ACTIVE'))` to `sources` table. Enables SA to mark a source as Draft (being populated) or Active (ready for use in assessments).
+- **KSS-DB-028 (Apr 16 2026)**: Added `deleted_at TIMESTAMPTZ NULL` to both `sources` and `chapters` tables for soft delete. All queries on both tables must filter `WHERE deleted_at IS NULL`. Deleting a source soft-deletes all child chapters in the same operation.
+- **KSS-DB-029 (Apr 16 2026)**: Dropped `status` column from `chapters` table (`ALTER TABLE chapters DROP COLUMN IF EXISTS status;`). Chapters have no draft/archive concept — they are always live from creation. UI and all queries updated to remove any reference to chapter status.
 - **KSS-DB-026 (Apr 14 2026)**: Created `concept_tags` table. SA-controlled concept tag registry for analytics. Columns: `id (uuid PK)`, `name (text NOT NULL)`, `exam_category (text NOT NULL)`, `subject (text nullable)`, `created_by (uuid FK→admin_users nullable)`, `created_at (timestamptz)`. UNIQUE index on `(name, exam_category, COALESCE(subject,''))`. RLS OFF. Soft link to `questions.concept_tag` (no FK constraint — `questions.concept_tag` stays free-text; registry is display-only for SA Marketing Config view).
 
 ### attempt_answers (KSS-DB-022, Apr 13 2026)

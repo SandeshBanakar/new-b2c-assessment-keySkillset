@@ -12,9 +12,20 @@
 
 ---
 
+## SUPABASE / SQL WORKFLOW
+- **Supabase MCP is permanently disabled.** Never attempt `mcp__supabase__*` calls.
+- All SQL runs manually by the user in the Supabase SQL editor.
+- **SQL handoff protocol:**
+  1. Write the SQL query into `docs/SQL-RESPONSE.txt` (overwrite the file).
+  2. Tell the user to run it and paste the JSON response back into `SQL-RESPONSE.txt`.
+  3. Once the user confirms the file is updated, read `SQL-RESPONSE.txt` to get the result.
+- If `SQL-RESPONSE.txt` is empty or stale, write the next pending query there and wait.
+
+---
+
 ## DEVELOPMENT WORKFLOW
 1. **Init:** Read `CLAUDE.md` → check `@docs/CLAUDE-HIS.md` → branch.
-2. **Schema:** Write SQL with `IF NOT EXISTS` → show user → wait for approval → execute batch.
+2. **Schema:** Write SQL with `IF NOT EXISTS` → show user → wait for approval → user runs in Supabase → pastes result to `SQL-RESPONSE.txt`.
 3. **Execution:** Read file → minimal targeted changes → no unused imports → `npm run build`.
 4. **Commit:** `git status` + `diff` → stage specific files (not -A).
    - Message: Imperative + [KSS-ID] + Co-authored-by: Claude Sonnet 4.6

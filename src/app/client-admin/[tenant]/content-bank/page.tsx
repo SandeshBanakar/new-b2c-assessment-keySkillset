@@ -12,18 +12,20 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId } from '@/lib/client-admin/tenants'
+import { formatCourseType } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ContentStatus = 'INACTIVE' | 'LIVE' | 'ARCHIVED'
 type FilterStatus = 'ALL' | ContentStatus
+type ContentKind = 'ASSESSMENT' | 'COURSE'
 
 interface ContentItem {
   id: string
   title: string
-  test_type: string
+  item_type: string        // test_type for ASSESSMENT, course_type for COURSE
   status: ContentStatus
-  category_name: string | null
+  content_type: ContentKind
   created_at: string
 }
 
@@ -48,6 +50,22 @@ function StatusBadge({ status }: { status: ContentStatus }) {
     <span className="inline-flex items-center gap-1 text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200 rounded-md px-2 py-0.5">
       <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 inline-block" />
       Archived
+    </span>
+  )
+}
+
+// ─── Content Type Badge ───────────────────────────────────────────────────────
+
+function ContentTypeBadge({ kind }: { kind: ContentKind }) {
+  if (kind === 'COURSE')
+    return (
+      <span className="inline-flex items-center text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200 rounded-md px-2 py-0.5">
+        Course
+      </span>
+    )
+  return (
+    <span className="inline-flex items-center text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-md px-2 py-0.5">
+      Assessment
     </span>
   )
 }
@@ -194,55 +212,62 @@ export default function ContentBankPage() {
     if (!tenantId) return
     setLoading(true)
 
-    // Fetch TENANT_PRIVATE assessment_items for this tenant (all non-DRAFT statuses)
-    const { data: contentData } = await supabase
-      .from('assessment_items')
-      .select('id, title, test_type, status, exam_category_id, created_at')
-      .eq('tenant_scope_id', tenantId)
-      .in('status', ['INACTIVE', 'LIVE', 'ARCHIVED'])
-      .order('created_at', { ascending: false })
+    // Fetch both TENANT_PRIVATE assessment_items and tenant-owned courses in parallel
+    const [assessmentRes, courseRes] = await Promise.all([
+      supabase
+        .from('assessment_items')
+        .select('id, title, test_type, status, created_at')
+        .eq('tenant_scope_id', tenantId)
+        .in('status', ['INACTIVE', 'LIVE', 'ARCHIVED'])
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('courses')
+        .select('id, title, course_type, status, created_at')
+        .eq('tenant_id', tenantId)
+        .in('status', ['INACTIVE', 'LIVE', 'ARCHIVED'])
+        .order('created_at', { ascending: false }),
+    ])
 
-    if (!contentData) {
-      setLoading(false)
-      return
-    }
-
-    // Resolve category names
-    const categoryIds = [
-      ...new Set(
-        contentData.map((c: { exam_category_id: string | null }) => c.exam_category_id).filter(Boolean)
-      ),
-    ] as string[]
-    let categoryMap: Record<string, string> = {}
-    if (categoryIds.length > 0) {
-      const { data: cats } = await supabase
-        .from('exam_categories')
-        .select('id, name')
-        .in('id', categoryIds)
-      if (cats) {
-        categoryMap = Object.fromEntries(
-          (cats as { id: string; name: string }[]).map((c) => [c.id, c.name])
-        )
-      }
-    }
-
-    setItems(
-      (contentData as {
+    const assessmentItems: ContentItem[] = (
+      (assessmentRes.data ?? []) as {
         id: string
         title: string
         test_type: string | null
         status: string
-        exam_category_id: string | null
         created_at: string
-      }[]).map((c) => ({
-        id: c.id,
-        title: c.title,
-        test_type: c.test_type ?? '—',
-        status: c.status as ContentStatus,
-        category_name: c.exam_category_id ? (categoryMap[c.exam_category_id] ?? null) : null,
-        created_at: c.created_at,
-      }))
+      }[]
+    ).map((c) => ({
+      id: c.id,
+      title: c.title,
+      item_type: c.test_type ?? '',
+      status: c.status as ContentStatus,
+      content_type: 'ASSESSMENT' as ContentKind,
+      created_at: c.created_at,
+    }))
+
+    const courseItems: ContentItem[] = (
+      (courseRes.data ?? []) as {
+        id: string
+        title: string
+        course_type: string | null
+        status: string
+        created_at: string
+      }[]
+    ).map((c) => ({
+      id: c.id,
+      title: c.title,
+      item_type: c.course_type ?? '',
+      status: c.status as ContentStatus,
+      content_type: 'COURSE' as ContentKind,
+      created_at: c.created_at,
+    }))
+
+    // Merge and sort by created_at descending
+    const merged = [...assessmentItems, ...courseItems].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
+
+    setItems(merged)
     setLoading(false)
   }, [tenantId])
 
@@ -255,8 +280,9 @@ export default function ContentBankPage() {
   async function handleMakeLive() {
     if (!makeLiveTarget) return
     setSaving(true)
+    const table = makeLiveTarget.content_type === 'COURSE' ? 'courses' : 'assessment_items'
     await supabase
-      .from('assessment_items')
+      .from(table)
       .update({ status: 'LIVE', updated_at: new Date().toISOString() })
       .eq('id', makeLiveTarget.id)
     setSaving(false)
@@ -267,8 +293,9 @@ export default function ContentBankPage() {
   async function handleArchive() {
     if (!archiveTarget) return
     setSaving(true)
+    const table = archiveTarget.content_type === 'COURSE' ? 'courses' : 'assessment_items'
     await supabase
-      .from('assessment_items')
+      .from(table)
       .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
       .eq('id', archiveTarget.id)
     setSaving(false)
@@ -300,8 +327,12 @@ export default function ContentBankPage() {
     })
   }
 
-  function formatTestType(t: string) {
-    return t.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+  function formatItemType(item: ContentItem): string {
+    if (!item.item_type) return '—'
+    if (item.content_type === 'COURSE') {
+      return formatCourseType(item.item_type) ?? '—'
+    }
+    return item.item_type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
   }
 
   // Don't render until FULL_CREATOR is confirmed (prevents flash before redirect)
@@ -391,7 +422,7 @@ export default function ContentBankPage() {
               <div className="mx-auto w-10 h-10 rounded-md bg-zinc-100 flex items-center justify-center mb-3">
                 <FileText className="w-5 h-5 text-zinc-400" />
               </div>
-              <p className="text-sm font-medium text-zinc-700">
+              <p className="text-sm font-semibold text-zinc-700">
                 {filterStatus === 'INACTIVE'
                   ? 'No content pending review'
                   : filterStatus === 'LIVE'
@@ -412,14 +443,14 @@ export default function ContentBankPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 bg-zinc-50">
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide w-[38%]">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide w-[36%]">
                     Title
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                    Category
+                    Content Type
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                    Test Type
+                    Type
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
                     Status
@@ -434,19 +465,17 @@ export default function ContentBankPage() {
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {filtered.map((item) => (
-                  <tr key={item.id} className="hover:bg-zinc-50/50 transition-colors">
+                  <tr key={`${item.content_type}-${item.id}`} className="hover:bg-zinc-50/50 transition-colors">
                     <td className="px-4 py-3">
                       <p className="font-medium text-zinc-900">{item.title}</p>
                     </td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {item.category_name ?? (
-                        <span className="text-zinc-400">—</span>
-                      )}
+                    <td className="px-4 py-3">
+                      <ContentTypeBadge kind={item.content_type} />
                     </td>
                     <td className="px-4 py-3">
-                      {item.test_type !== '—' ? (
+                      {formatItemType(item) !== '—' ? (
                         <span className="text-xs font-medium bg-zinc-100 text-zinc-600 border border-zinc-200 rounded-md px-2 py-0.5">
-                          {formatTestType(item.test_type)}
+                          {formatItemType(item)}
                         </span>
                       ) : (
                         <span className="text-zinc-400">—</span>

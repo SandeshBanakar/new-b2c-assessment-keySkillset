@@ -1,25 +1,25 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import { PaginationBar } from '@/components/ui/PaginationBar'
 import {
   Plus,
   Search,
   Eye,
   Pencil,
   Trash2,
-  ChevronRight,
-  BookOpen,
   ArrowLeft,
   X,
-  AlertTriangle,
+  FileText,
+  Info,
+  BookOpen,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ChapterDifficulty = 'easy' | 'medium' | 'hard' | 'mixed'
-type ChapterStatus = 'DRAFT' | 'ACTIVE'
 
 interface Source {
   id: string
@@ -31,10 +31,12 @@ interface Chapter {
   id: string
   source_id: string
   name: string
-  description: string | null
   order_index: number
   difficulty: ChapterDifficulty
-  status: ChapterStatus
+  created_by: string | null
+  created_by_name: string | null
+  last_modified_by: string | null
+  last_modified_by_name: string | null
   question_count: number
   created_at: string
   updated_at: string
@@ -42,13 +44,11 @@ interface Chapter {
 
 interface ChapterFormData {
   name: string
-  description: string
-  order_index: number
-  difficulty: ChapterDifficulty
-  status: ChapterStatus
+  difficulty: ChapterDifficulty | ''
 }
 
 const DEMO_SA_ID = '3bd6101b-1fb9-4c96-a9a5-c958a3deb54a'
+const PAGE_SIZE_OPTIONS = [25, 50, 100]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,21 +64,13 @@ function DifficultyBadge({ difficulty }: { difficulty: ChapterDifficulty }) {
   const cls: Record<ChapterDifficulty, string> = {
     easy: 'bg-green-50 text-green-700',
     medium: 'bg-amber-50 text-amber-700',
-    hard: 'bg-rose-50 text-rose-700',
+    hard: 'bg-rose-50 text-rose-600',
     mixed: 'bg-zinc-100 text-zinc-600',
   }
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls[difficulty]}`}>
       {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
     </span>
-  )
-}
-
-function StatusBadge({ status }: { status: ChapterStatus }) {
-  return status === 'ACTIVE' ? (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700">Active</span>
-  ) : (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-500">Draft</span>
   )
 }
 
@@ -115,7 +107,10 @@ function Modal({
       <div className={`bg-white rounded-xl shadow-xl w-full ${width} max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 shrink-0">
           <h2 className="text-sm font-semibold text-zinc-900">{title}</h2>
-          <button onClick={onClose} className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors">
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -128,19 +123,20 @@ function Modal({
 // ─── Chapter Form Modal ───────────────────────────────────────────────────────
 
 function ChapterFormModal({
-  open, onClose, onSaved, sourceId, initial, nextOrderIndex,
+  open,
+  onClose,
+  onSaved,
+  sourceId,
+  initial,
 }: {
-  open: boolean; onClose: () => void; onSaved: () => void
-  sourceId: string; initial?: Chapter; nextOrderIndex: number
+  open: boolean
+  onClose: () => void
+  onSaved: () => void
+  sourceId: string
+  initial?: Chapter
 }) {
   const isEdit = !!initial
-  const [form, setForm] = useState<ChapterFormData>({
-    name: initial?.name ?? '',
-    description: initial?.description ?? '',
-    order_index: initial?.order_index ?? nextOrderIndex,
-    difficulty: initial?.difficulty ?? 'medium',
-    status: initial?.status ?? 'DRAFT',
-  })
+  const [form, setForm] = useState<ChapterFormData>({ name: '', difficulty: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -148,93 +144,99 @@ function ChapterFormModal({
     if (open) {
       setForm({
         name: initial?.name ?? '',
-        description: initial?.description ?? '',
-        order_index: initial?.order_index ?? nextOrderIndex,
-        difficulty: initial?.difficulty ?? 'medium',
-        status: initial?.status ?? 'DRAFT',
+        difficulty: initial?.difficulty ?? '',
       })
       setError(null)
     }
-  }, [open, initial, nextOrderIndex])
+  }, [open, initial])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) { setError('Chapter name is required.'); return }
-    setSaving(true); setError(null)
+    if (!form.difficulty) { setError('Please select a difficulty level.'); return }
+    setSaving(true)
+    setError(null)
     try {
       if (isEdit && initial) {
-        const { error: err } = await supabase.from('chapters').update({
-          name: form.name.trim(),
-          description: form.description.trim() || null,
-          order_index: form.order_index,
-          difficulty: form.difficulty,
-          status: form.status,
-          last_modified_by: DEMO_SA_ID,
-          updated_at: new Date().toISOString(),
-        }).eq('id', initial.id)
+        const { error: err } = await supabase
+          .from('chapters')
+          .update({
+            name: form.name.trim(),
+            difficulty: form.difficulty,
+            last_modified_by: DEMO_SA_ID,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', initial.id)
         if (err) throw err
       } else {
-        const { error: err } = await supabase.from('chapters').insert({
-          source_id: sourceId,
-          name: form.name.trim(),
-          description: form.description.trim() || null,
-          order_index: form.order_index,
-          difficulty: form.difficulty,
-          status: form.status,
-          created_by: DEMO_SA_ID,
-          last_modified_by: DEMO_SA_ID,
-        })
+        const { error: err } = await supabase
+          .from('chapters')
+          .insert({
+            source_id: sourceId,
+            name: form.name.trim(),
+            difficulty: form.difficulty,
+            created_by: DEMO_SA_ID,
+            // NOTE: last_modified_by intentionally NOT set on INSERT
+          })
         if (err) throw err
       }
-      onSaved(); onClose()
+      onSaved()
+      onClose()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save chapter.')
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Chapter' : 'Add Chapter'}>
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Chapter' : 'Create New Chapter'}>
       <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
-        {error && <div className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-3 py-2">{error}</div>}
+        {error && (
+          <div className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-3 py-2">
+            {error}
+          </div>
+        )}
         <div>
           <FieldLabel label="Chapter Name" required />
-          <input className={inputCls} placeholder="e.g. Chapter 1 — Atomic Structure" value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <FieldLabel label="Order Index" />
-            <input type="number" min={1} className={inputCls} value={form.order_index}
-              onChange={(e) => setForm((f) => ({ ...f, order_index: parseInt(e.target.value) || 1 }))} />
-          </div>
-          <div>
-            <FieldLabel label="Difficulty" />
-            <select className={inputCls} value={form.difficulty}
-              onChange={(e) => setForm((f) => ({ ...f, difficulty: e.target.value as ChapterDifficulty }))}>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-              <option value="mixed">Mixed</option>
-            </select>
-          </div>
+          <textarea
+            className={`${inputCls} resize-none`}
+            rows={3}
+            placeholder="e.g. Atomic Structure"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
         </div>
         <div>
-          <FieldLabel label="Status" />
-          <select className={inputCls} value={form.status}
-            onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ChapterStatus }))}>
-            <option value="DRAFT">Draft</option>
-            <option value="ACTIVE">Active</option>
+          <FieldLabel label="Difficulty" required />
+          <select
+            className={inputCls}
+            value={form.difficulty}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, difficulty: e.target.value as ChapterDifficulty | '' }))
+            }
+          >
+            <option value="">Select difficulty</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+            <option value="mixed">Mixed</option>
           </select>
         </div>
-        <div>
-          <FieldLabel label="Description" />
-          <textarea className={`${inputCls} resize-none`} rows={3} placeholder="Optional description"
-            value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-        </div>
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors">Cancel</button>
-          <button type="submit" disabled={saving} className="px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors disabled:opacity-50">
-            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Chapter'}
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : isEdit ? 'Update Chapter' : 'Create Chapter'}
           </button>
         </div>
       </form>
@@ -242,26 +244,43 @@ function ChapterFormModal({
   )
 }
 
-// ─── View Chapter Modal ───────────────────────────────────────────────────────
+// ─── Preview Chapter Modal ────────────────────────────────────────────────────
 
-function ViewChapterModal({ open, onClose, chapter }: { open: boolean; onClose: () => void; chapter: Chapter | null }) {
+function PreviewChapterModal({
+  open,
+  onClose,
+  chapter,
+  sourceName,
+}: {
+  open: boolean
+  onClose: () => void
+  chapter: Chapter | null
+  sourceName: string
+}) {
   if (!chapter) return null
   return (
-    <Modal open={open} onClose={onClose} title="View Chapter">
+    <Modal open={open} onClose={onClose} title={`Preview Chapter: ${chapter.name}`} width="max-w-md">
       <div className="px-5 py-4 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <p className="text-xs text-zinc-500 mb-0.5">Chapter Name</p>
-            <p className="text-sm font-medium text-zinc-900">{chapter.name}</p>
-          </div>
-          <div><p className="text-xs text-zinc-500 mb-0.5">Order</p><p className="text-sm text-zinc-700">{chapter.order_index}</p></div>
-          <div><p className="text-xs text-zinc-500 mb-0.5">Questions</p><p className="text-sm font-medium text-zinc-900">{chapter.question_count}</p></div>
-          <div><p className="text-xs text-zinc-500 mb-0.5">Difficulty</p><DifficultyBadge difficulty={chapter.difficulty} /></div>
-          <div><p className="text-xs text-zinc-500 mb-0.5">Status</p><StatusBadge status={chapter.status} /></div>
-          <div><p className="text-xs text-zinc-500 mb-0.5">Created</p><p className="text-sm text-zinc-700">{formatDateTime(chapter.created_at)}</p></div>
-          <div><p className="text-xs text-zinc-500 mb-0.5">Updated</p><p className="text-sm text-zinc-700">{formatDateTime(chapter.updated_at)}</p></div>
+        <div>
+          <p className="text-xs text-zinc-500 mb-0.5">Source</p>
+          <p className="text-sm font-medium text-zinc-900">{sourceName}</p>
         </div>
-        {chapter.description && <div><p className="text-xs text-zinc-500 mb-0.5">Description</p><p className="text-sm text-zinc-700">{chapter.description}</p></div>}
+        <div>
+          <p className="text-xs text-zinc-500 mb-0.5">Difficulty</p>
+          <DifficultyBadge difficulty={chapter.difficulty} />
+        </div>
+        <div className="bg-zinc-50 rounded-lg px-4 py-3 border border-zinc-200">
+          <p className="text-xs text-zinc-500 mb-1">Total Questions</p>
+          <p className="text-2xl font-semibold text-zinc-900">{chapter.question_count}</p>
+        </div>
+        <div className="flex justify-end pt-1">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-sm font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </Modal>
   )
@@ -269,27 +288,51 @@ function ViewChapterModal({ open, onClose, chapter }: { open: boolean; onClose: 
 
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 
-function DeleteModal({ open, onClose, onConfirm, chapterName, hasQuestions, deleting }: {
-  open: boolean; onClose: () => void; onConfirm: () => void
-  chapterName: string; hasQuestions: boolean; deleting: boolean
+function DeleteModal({
+  open,
+  onClose,
+  onConfirm,
+  chapter,
+  deleting,
+}: {
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  chapter: Chapter | null
+  deleting: boolean
 }) {
+  if (!chapter) return null
   return (
     <Modal open={open} onClose={onClose} title="Delete Chapter" width="max-w-sm">
       <div className="px-5 py-4 space-y-3">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-zinc-900">Delete &ldquo;{chapterName}&rdquo;?</p>
-            {hasQuestions
-              ? <p className="text-xs text-rose-600 mt-1">This chapter has questions. Remove all questions before deleting.</p>
-              : <p className="text-xs text-zinc-500 mt-1">This action cannot be undone.</p>}
+        <p className="text-sm text-zinc-700">
+          Are you sure you want to delete{' '}
+          <span className="font-medium text-zinc-900">&ldquo;{chapter.name}&rdquo;</span>? This
+          action cannot be undone.
+        </p>
+        {chapter.question_count > 0 && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+            <span className="text-amber-600 text-xs mt-0.5">⚠</span>
+            <p className="text-xs text-amber-700">
+              This chapter contains {chapter.question_count} question
+              {chapter.question_count !== 1 ? 's' : ''}. Questions will remain in the Question
+              Bank.
+            </p>
           </div>
-        </div>
+        )}
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors">Cancel</button>
-          <button onClick={onConfirm} disabled={deleting || hasQuestions}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-rose-600 rounded-md hover:bg-rose-700 transition-colors disabled:opacity-50">
-            {deleting ? 'Deleting…' : 'Delete'}
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-rose-600 rounded-md hover:bg-rose-700 transition-colors disabled:opacity-50"
+          >
+            {deleting ? 'Deleting…' : 'Delete Chapter'}
           </button>
         </div>
       </div>
@@ -307,7 +350,13 @@ export default function SourceDetailPage() {
   const [source, setSource] = useState<Source | null>(null)
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [loading, setLoading] = useState(true)
+
   const [search, setSearch] = useState('')
+  const [difficultyFilter, setDifficultyFilter] = useState('')
+  const [creatorFilter, setCreatorFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
   const [createOpen, setCreateOpen] = useState(false)
   const [viewChapter, setViewChapter] = useState<Chapter | null>(null)
   const [editChapter, setEditChapter] = useState<Chapter | null>(null)
@@ -317,11 +366,19 @@ export default function SourceDetailPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     const [sourceRes, chaptersRes] = await Promise.all([
-      supabase.from('sources').select('id, name, exam_categories(name)').eq('id', sourceId).single(),
-      supabase.from('chapters').select(`
-        id, source_id, name, description, order_index, difficulty, status, created_at, updated_at,
-        questions(count)
-      `).eq('source_id', sourceId).order('order_index', { ascending: true }),
+      supabase
+        .from('sources')
+        .select('id, name, exam_categories(name)')
+        .eq('id', sourceId)
+        .single(),
+      supabase
+        .from('chapters')
+        .select(
+          'id, source_id, name, order_index, difficulty, created_by, last_modified_by, created_at, updated_at, questions(count)',
+        )
+        .eq('source_id', sourceId)
+        .is('deleted_at', null)
+        .order('order_index', { ascending: true }),
     ])
 
     if (sourceRes.data) {
@@ -331,127 +388,335 @@ export default function SourceDetailPage() {
     }
 
     if (chaptersRes.data) {
-      setChapters(chaptersRes.data.map((row: Record<string, unknown>) => {
-        const qArr = Array.isArray(row.questions) ? row.questions : []
-        const questionCount = qArr.length > 0 && typeof qArr[0] === 'object' && qArr[0] !== null
-          ? (qArr[0] as { count?: number }).count ?? 0 : 0
-        return {
-          id: row.id as string,
-          source_id: row.source_id as string,
-          name: row.name as string,
-          description: (row.description as string | null) ?? null,
-          order_index: (row.order_index as number) ?? 0,
-          difficulty: (row.difficulty as ChapterDifficulty) ?? 'medium',
-          status: (row.status as ChapterStatus) ?? 'DRAFT',
-          question_count: questionCount,
-          created_at: row.created_at as string,
-          updated_at: row.updated_at as string,
+      const chaptersRaw = chaptersRes.data as Record<string, unknown>[]
+
+      // Collect unique admin IDs across created_by + last_modified_by
+      const adminIds = [
+        ...new Set([
+          ...chaptersRaw.map((c) => c.created_by as string | null).filter(Boolean),
+          ...chaptersRaw.map((c) => c.last_modified_by as string | null).filter(Boolean),
+        ]),
+      ] as string[]
+
+      const adminMap = new Map<string, string>()
+      if (adminIds.length > 0) {
+        const { data: admins } = await supabase
+          .from('admin_users')
+          .select('id, name')
+          .in('id', adminIds)
+        for (const a of admins ?? []) {
+          const admin = a as { id: string; name: string }
+          adminMap.set(admin.id, admin.name)
         }
-      }))
+      }
+
+      setChapters(
+        chaptersRaw.map((row) => {
+          const qArr = Array.isArray(row.questions) ? row.questions : []
+          const questionCount =
+            qArr.length > 0 && typeof qArr[0] === 'object' && qArr[0] !== null
+              ? (qArr[0] as { count?: number }).count ?? 0
+              : 0
+          const createdById = row.created_by as string | null
+          const modifiedById = row.last_modified_by as string | null
+          return {
+            id: row.id as string,
+            source_id: row.source_id as string,
+            name: row.name as string,
+            order_index: (row.order_index as number) ?? 0,
+            difficulty: (row.difficulty as ChapterDifficulty) ?? 'medium',
+            created_by: createdById,
+            created_by_name: createdById ? (adminMap.get(createdById) ?? null) : null,
+            last_modified_by: modifiedById,
+            last_modified_by_name: modifiedById ? (adminMap.get(modifiedById) ?? null) : null,
+            question_count: questionCount,
+            created_at: row.created_at as string,
+            updated_at: row.updated_at as string,
+          }
+        }),
+      )
     }
     setLoading(false)
   }, [sourceId])
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setPage(1) }, [search, difficultyFilter, creatorFilter])
+
   async function handleDelete() {
     if (!deleteChapter) return
     setDeleting(true)
-    const { error } = await supabase.from('chapters').delete().eq('id', deleteChapter.id)
+    const { error } = await supabase
+      .from('chapters')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', deleteChapter.id)
     setDeleting(false)
     if (!error) { setDeleteChapter(null); fetchData() }
   }
 
-  const filtered = chapters.filter((c) =>
-    search.trim() === '' || c.name.toLowerCase().includes(search.toLowerCase()))
+  // Derive unique creators from loaded chapter data
+  const creatorOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const c of chapters) {
+      if (c.created_by && c.created_by_name) seen.set(c.created_by, c.created_by_name)
+    }
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }))
+  }, [chapters])
 
-  const nextOrderIndex = chapters.length > 0
-    ? Math.max(...chapters.map((c) => c.order_index)) + 1 : 1
+  const filtered = chapters.filter((c) => {
+    if (search.trim() && !c.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (difficultyFilter && c.difficulty !== difficultyFilter) return false
+    if (creatorFilter && c.created_by !== creatorFilter) return false
+    return true
+  })
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const showingFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1
+  const showingTo = Math.min(page * pageSize, filtered.length)
 
   return (
     <div className="px-6 py-6">
-      <button onClick={() => router.push('/super-admin/sources-chapters')}
-        className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 transition-colors mb-4">
-        <ArrowLeft className="w-3.5 h-3.5" />Sources &amp; Chapters
+      {/* Back button */}
+      <button
+        onClick={() => router.push('/super-admin/sources-chapters')}
+        className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 transition-colors mb-4"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Back to Source
       </button>
 
-      <div className="flex items-center justify-between mb-6">
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-base font-semibold text-zinc-900">{source ? source.name : 'Loading…'}</h1>
-          {source && (
-            <p className="text-xs text-zinc-500 mt-0.5">
-              {source.exam_category_name ? `${source.exam_category_name} · ` : ''}
-              {chapters.length} chapter{chapters.length !== 1 ? 's' : ''}
-            </p>
-          )}
+          <h1 className="text-base font-semibold text-zinc-900">
+            {source ? source.name : 'Loading…'}
+          </h1>
+          <p className="text-xs text-zinc-500 mt-0.5">Manage chapters and organize content</p>
         </div>
-        <button onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors">
-          <Plus className="w-4 h-4" />Add Chapter
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Create Chapter
         </button>
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative w-64">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
-          <input className="w-full pl-8 pr-3 py-1.5 text-sm border border-zinc-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Search chapters…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Info banner */}
+      {source && (
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 mb-4">
+          <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+          <p className="text-xs text-blue-700">
+            Chapters added here will be tagged directly to{' '}
+            <span className="font-medium">&ldquo;{source.name}&rdquo;</span>
+          </p>
         </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+          <input
+            className="w-full pl-8 pr-3 py-1.5 text-sm border border-zinc-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Search chapters…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="px-3 py-1.5 text-sm border border-zinc-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-zinc-700"
+          value={difficultyFilter}
+          onChange={(e) => setDifficultyFilter(e.target.value)}
+        >
+          <option value="">All Difficulties</option>
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+          <option value="mixed">Mixed</option>
+        </select>
+        <select
+          className="px-3 py-1.5 text-sm border border-zinc-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-zinc-700"
+          value={creatorFilter}
+          onChange={(e) => setCreatorFilter(e.target.value)}
+        >
+          <option value="">All Creators</option>
+          {creatorOptions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </div>
 
+      {/* Table */}
       <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50">
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide w-10">#</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">Chapter Name</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">Difficulty</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">Questions</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">Created</th>
-              <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">Actions</th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                Chapter Name
+              </th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                Difficulty
+              </th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                Questions
+              </th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                Created By
+              </th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                Last Edited
+              </th>
+              <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-400">Loading chapters…</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center">
-                <BookOpen className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
-                <p className="text-sm text-zinc-500">{search ? 'No chapters match your search.' : 'No chapters yet. Add the first chapter to this source.'}</p>
-              </td></tr>
-            ) : filtered.map((chapter) => (
-              <tr key={chapter.id} className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors">
-                <td className="px-4 py-3 text-zinc-400 text-xs">{chapter.order_index}</td>
-                <td className="px-4 py-3">
-                  <span className="font-medium text-zinc-900">{chapter.name}</span>
-                  {chapter.description && <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{chapter.description}</p>}
-                </td>
-                <td className="px-4 py-3"><DifficultyBadge difficulty={chapter.difficulty} /></td>
-                <td className="px-4 py-3"><StatusBadge status={chapter.status} /></td>
-                <td className="px-4 py-3 text-zinc-700">{chapter.question_count}</td>
-                <td className="px-4 py-3 text-zinc-500">{formatDateTime(chapter.created_at)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-1">
-                    <button onClick={() => setViewChapter(chapter)} title="View" className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"><Eye className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => setEditChapter(chapter)} title="Edit" className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => setDeleteChapter(chapter)} title="Delete" className="p-1.5 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => router.push(`/super-admin/sources-chapters/${sourceId}/${chapter.id}`)}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors ml-1">
-                      Questions<ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-sm text-zinc-400">
+                  Loading chapters…
                 </td>
               </tr>
-            ))}
+            ) : paginated.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center">
+                  <BookOpen className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
+                  <p className="text-sm text-zinc-500">
+                    {search || difficultyFilter || creatorFilter
+                      ? 'No chapters match your filters.'
+                      : 'No chapters yet. Create the first chapter for this source.'}
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              paginated.map((chapter) => (
+                <tr
+                  key={chapter.id}
+                  className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors"
+                >
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-zinc-900">{chapter.name}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <DifficultyBadge difficulty={chapter.difficulty} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-1 text-zinc-700">
+                      <FileText className="w-3.5 h-3.5 text-zinc-400" />
+                      {chapter.question_count}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-sm text-zinc-700">{chapter.created_by_name ?? '—'}</p>
+                    <p className="text-xs text-zinc-400">{formatDateTime(chapter.created_at)}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    {chapter.last_modified_by ? (
+                      <>
+                        <p className="text-sm text-zinc-700">
+                          {chapter.last_modified_by_name ?? '—'}
+                        </p>
+                        <p className="text-xs text-zinc-400">{formatDateTime(chapter.updated_at)}</p>
+                      </>
+                    ) : (
+                      <span className="text-xs text-zinc-400 italic">Never edited</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/super-admin/sources-chapters/${sourceId}/${chapter.id}`,
+                          )
+                        }
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        Questions
+                      </button>
+                      <button
+                        onClick={() => setViewChapter(chapter)}
+                        title="Preview"
+                        className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setEditChapter(chapter)}
+                        title="Edit"
+                        className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteChapter(chapter)}
+                        title="Delete"
+                        className="p-1.5 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      <ChapterFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={fetchData} sourceId={sourceId} nextOrderIndex={nextOrderIndex} />
-      <ChapterFormModal open={!!editChapter} onClose={() => setEditChapter(null)} onSaved={fetchData} sourceId={sourceId} initial={editChapter ?? undefined} nextOrderIndex={nextOrderIndex} />
-      <ViewChapterModal open={!!viewChapter} onClose={() => setViewChapter(null)} chapter={viewChapter} />
-      <DeleteModal open={!!deleteChapter} onClose={() => setDeleteChapter(null)} onConfirm={handleDelete} chapterName={deleteChapter?.name ?? ''} hasQuestions={(deleteChapter?.question_count ?? 0) > 0} deleting={deleting} />
+      {/* Pagination */}
+      {!loading && filtered.length > 0 && (
+        <div className="mt-3 text-xs text-zinc-500">
+          Showing {showingFrom}–{showingTo} of {filtered.length} result
+          {filtered.length !== 1 ? 's' : ''}
+        </div>
+      )}
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        onPageSizeChange={(size) => {
+          setPageSize(size)
+          setPage(1)
+        }}
+      />
+
+      {/* Modals */}
+      <ChapterFormModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSaved={fetchData}
+        sourceId={sourceId}
+      />
+      <ChapterFormModal
+        open={!!editChapter}
+        onClose={() => setEditChapter(null)}
+        onSaved={fetchData}
+        sourceId={sourceId}
+        initial={editChapter ?? undefined}
+      />
+      <PreviewChapterModal
+        open={!!viewChapter}
+        onClose={() => setViewChapter(null)}
+        chapter={viewChapter}
+        sourceName={source?.name ?? ''}
+      />
+      <DeleteModal
+        open={!!deleteChapter}
+        onClose={() => setDeleteChapter(null)}
+        onConfirm={handleDelete}
+        chapter={deleteChapter}
+        deleting={deleting}
+      />
     </div>
   )
 }
