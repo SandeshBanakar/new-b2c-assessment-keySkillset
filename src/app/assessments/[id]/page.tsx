@@ -39,6 +39,7 @@ function AssessmentDetailPageInner() {
     if (tabParam && validTabs.includes(tabParam)) return tabParam;
     return 'overview';
   });
+  const [selectedAttemptId, setSelectedAttemptId] = useState<string | undefined>(attemptIdParam);
 
   // AI Insights locked for free + basic tiers
   const isAiLocked = userTier === 'free' || userTier === 'basic';
@@ -162,7 +163,14 @@ function AssessmentDetailPageInner() {
           />
         )}
         {activeTab === 'attempts' && (
-          <AttemptsTab attempts={attempts} assessmentId={assessment.id} />
+          <AttemptsTab
+            attempts={attempts}
+            assessmentId={assessment.id}
+            onSwitchToAnalytics={(attemptId) => {
+              setSelectedAttemptId(attemptId);
+              setActiveTab('analytics');
+            }}
+          />
         )}
         {activeTab === 'analytics' && (
           assessment.exam === 'SAT' &&
@@ -178,7 +186,7 @@ function AssessmentDetailPageInner() {
                 assessment={assessment}
                 assessmentId={assessment.id}
                 onSwitchToAttempts={() => setActiveTab('attempts')}
-                initialAttemptId={attemptIdParam}
+                initialAttemptId={selectedAttemptId}
                 userTier={userTier}
               />
             )
