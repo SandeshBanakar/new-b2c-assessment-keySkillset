@@ -1,5 +1,40 @@
 # TODO Backlog — keySkillset Platform
-# Updated Apr 16 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+# Updated Apr 17 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+
+---
+
+## [IN-PROGRESS] Concept Tags + Platform Config — KSS-SA-037 (Apr 17 2026)
+
+Schema changes, seeding, UI, and QuestionForm dropdown update.
+
+### Schema (run in Supabase)
+
+| # | Migration | Status |
+|---|-----------|--------|
+| KSS-DB-030 | Recreate `concept_tags` table (full hierarchy: exam_category, subject, concept_name, slug) | [ ] PENDING |
+| KSS-DB-031 | Create `question_concept_mappings` table (question_id → concept_tag_id FK) | [ ] PENDING |
+| KSS-DB-032 | Enhance `user_concept_mastery` (add module_id, stage computed, attempt_count, last_attempt_date, trend) | [ ] PENDING |
+
+### Seed Data
+
+| # | Task | Status |
+|---|------|--------|
+| CT-SEED-001 | Seed SAT concept tags (R&W: 4 subjects × ~5 tags, Math: 4 subjects × ~6 tags) | [ ] PENDING |
+| CT-SEED-002 | Seed NEET concept tags (Physics, Chemistry, Biology) | [ ] PENDING |
+| CT-SEED-003 | Seed JEE concept tags (Math, Physics, Chemistry) | [ ] PENDING |
+| CT-SEED-004 | Seed CLAT concept tags (English, Legal, Logical, Quant, Current Affairs) | [ ] PENDING |
+
+### Code Tasks
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| CT-001 | Platform Config page — Concept Tags CRUD (list, create, edit, delete) | `src/app/super-admin/platform-config/page.tsx` | [ ] PENDING |
+| CT-002 | Update Super Admin nav to include Platform Config below Marketing | `src/app/super-admin/layout.tsx` | [ ] PENDING |
+| CT-003 | QuestionForm: convert `concept_tag` from text input → dropdown from `concept_tags` table | `src/app/super-admin/question-bank/_components/QuestionForm.tsx` | [ ] PENDING |
+| CT-004 | Update `CLAUDE-DB.md` with new schema + SAT scoring table | `docs/CLAUDE-DB.md` | [ ] PENDING |
+| CT-005 | Create `docs/SEEDING-FRAMEWORK.md` | `docs/SEEDING-FRAMEWORK.md` | [ ] PENDING |
+| CT-006 | Create `database.schema.json` | `database.schema.json` | [ ] PENDING |
+| CT-007 | Update PRD-AI-ANALYTICS.md with mastery fields spec | `prds/PRD-AI-ANALYTICS.md` | [ ] PENDING |
 
 ---
 
@@ -160,6 +195,7 @@ Remaining production work:
 | Ticket | Feature | Status |
 |--------|---------|--------|
 | KSS-SA-007 | Marketing Config | [PENDING] |
+| KSS-SA-[TBD] | Platform Config (Concept Tags CRUD) | [IN-PROGRESS — Apr 17 2026] |
 | KSS-CA-007 | CA Dashboard | [PENDING] |
 | KSS-CA-009 | Audit Log (CA) | [PENDING] |
 | KSS-SA-019 | Contract mandatory on CA creation (Phase 2 enforcement) | [CRITICAL] |
@@ -168,6 +204,7 @@ Remaining production work:
 | KSS-SA-[TBD] | Build Super Admin login + authentication flow | [PENDING] |
 | KSS-CA-[TBD] | Build Client Admin login + authentication flow | [PENDING] |
 | KSS-B2C-[TBD] | Build B2C user signup + onboarding flow | [PENDING] |
+| KSS-SA-[TBD] | SAT Exam Engine (scoring + adaptive routing) | [BACKLOG — todo after concept tags shipped] |
 
 ---
 
@@ -190,3 +227,12 @@ Remaining production work:
 |---|-------|--------|
 | TODO-011 | SECTION_LOCKED + sections count validation | Confirm: block save or just warn? |
 | TODO-013 | Empty what_youll_get fallback | If display_config.what_youll_get is empty, learner sees nothing. Platform-default bullets needed? |
+
+---
+
+## RULES (Added Apr 17 2026)
+
+- This file MUST be updated at the START of every session with new tasks
+- Mark tasks `[IN-PROGRESS]` as work begins, `[x] DONE` on completion
+- Archive completed tasks to the `[DONE]` section at end of session
+- Never delete context — archive only

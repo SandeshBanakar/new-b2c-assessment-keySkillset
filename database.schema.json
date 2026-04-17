@@ -1,0 +1,235 @@
+{
+  "_meta": {
+    "project": "keySkillset",
+    "last_updated": "2026-04-17",
+    "supabase_project_id": "uqweguyeaqkbxgtpkhez",
+    "rls": "OFF on ALL tables — permanently",
+    "notes": "This file is a programmatic cache of the DB schema. Update after every KSS-DB-XXX migration."
+  },
+  "tables": {
+    "tenants": {
+      "pk": "id (uuid)",
+      "columns": ["id", "name", "type", "feature_toggle_mode", "licensed_categories (ARRAY)", "stripe_customer_id", "is_active", "created_at", "contact_name", "contact_email", "contact_phone", "contact_phone_country_code", "timezone", "date_format", "address_line1", "address_line2", "city", "state", "country", "zip_code", "logo_url"],
+      "notes": "feature_toggle_mode: FULL_CREATOR | RUN_ONLY. Locked IDs: Akash=ec1bc005, TechCorp=7caa0566"
+    },
+    "admin_users": {
+      "pk": "id (uuid)",
+      "columns": ["id", "email (UNIQUE)", "name", "role", "tenant_id", "is_active", "created_at", "password_hash"],
+      "roles": ["SUPER_ADMIN", "CLIENT_ADMIN", "CONTENT_CREATOR"],
+      "notes": "Master Org CCs: tenant_id IS NULL. DEMO_SA_ID: 3bd6101b-1fb9-4c96-a9a5-c958a3deb54a"
+    },
+    "users": {
+      "pk": "id (uuid)",
+      "columns": ["id", "email", "display_name", "subscription_tier", "subscription_status", "subscription_start_date", "subscription_end_date", "stripe_subscription_id", "status", "last_active_date", "user_onboarded", "selected_exams", "goal", "xp", "streak", "role", "free_attempt_used", "organization_id", "created_at", "updated_at", "suspension_reason", "suspended_at", "suspended_by", "unsuspend_reason", "unsuspended_at", "unsuspended_by"],
+      "enums": {
+        "subscription_tier": ["free", "basic", "professional", "premium"],
+        "status": ["ACTIVE", "SUSPENDED"]
+      },
+      "notes": "INACTIVE is UI-computed. subscription_tier = assessment plan tier only.",
+      "locked_uuids": {
+        "free_user": "9a3b56a5-31f6-4a58-81fa-66157c68d4f0",
+        "basic_user": "a0c16137-7fd5-44f5-96e6-60e4617d9230",
+        "pro_user_priya": "e150d59c-13c1-4db3-b6d7-4f30c29178e9",
+        "premium_user": "191c894d-b532-4fa8-b1fe-746e5cdcdcc8"
+      }
+    },
+    "assessment_items": {
+      "pk": "id (uuid)",
+      "columns": ["id", "title", "exam_category_id", "test_type", "source", "status", "audience_type", "visibility_scope", "tenant_scope_id", "created_by", "last_modified_by", "created_at", "updated_at", "description", "display_config", "assessment_type", "assessments_id", "assessment_config"],
+      "enums": {
+        "status": ["DRAFT", "INACTIVE", "LIVE", "ARCHIVED", "MAINTENANCE"],
+        "visibility_scope": ["GLOBAL", "TENANT_PRIVATE", "PENDING_PROMOTION"],
+        "assessment_type": ["LINEAR", "ADAPTIVE"]
+      },
+      "footgun": "tenant_scope_id (NOT tenant_id) — IS NULL = GLOBAL, NOT NULL = TENANT_PRIVATE"
+    },
+    "assessments": {
+      "pk": "id (uuid)",
+      "columns": ["id", "title", "description", "exam_type", "assessment_type", "subject", "difficulty", "duration_minutes", "total_questions", "score_min", "score_max", "architecture", "min_tier", "visibility", "org_id", "is_active", "created_at", "thumbnail_url", "tags", "slug", "exam", "type", "tier", "is_puzzle_mode", "rating", "total_users", "override_marks", "override_marks_correct", "override_marks_negative"],
+      "notes": "Exam engine reads by slug. override_marks=true → engine uses override values for ALL questions."
+    },
+    "sources": {
+      "pk": "id (uuid)",
+      "columns": ["id", "name", "description", "exam_category_id", "difficulty", "target_exam", "status", "deleted_at", "created_by", "last_modified_by", "created_at", "updated_at"],
+      "enums": {
+        "difficulty": ["easy", "medium", "hard", "mixed"],
+        "status": ["DRAFT", "ACTIVE"]
+      },
+      "soft_delete": "WHERE deleted_at IS NULL on all queries"
+    },
+    "chapters": {
+      "pk": "id (uuid)",
+      "columns": ["id", "source_id", "name", "description", "order_index", "difficulty", "deleted_at", "created_by", "last_modified_by", "created_at", "updated_at"],
+      "enums": {
+        "difficulty": ["easy", "medium", "hard", "mixed"]
+      },
+      "notes": "No status column (dropped KSS-DB-029). Always live from creation.",
+      "soft_delete": "WHERE deleted_at IS NULL on all queries"
+    },
+    "questions": {
+      "pk": "id (uuid)",
+      "columns": ["id", "assessment_id", "source_id", "chapter_id", "question_type", "question_text (JSONB)", "passage_text (JSONB)", "options (JSONB)", "correct_answer (JSONB)", "acceptable_answers (JSONB)", "explanation (JSONB)", "explanation_steps", "video_url", "marks", "negative_marks", "categories", "concept_tag", "status", "difficulty", "section_name", "randomize_options", "module_name", "subject", "skill_group", "question_order", "created_by", "last_modified_by", "created_at", "updated_at"],
+      "enums": {
+        "question_type": ["MCQ_SINGLE", "MCQ_MULTI", "PASSAGE_SINGLE", "PASSAGE_MULTI", "NUMERIC"],
+        "status": ["DRAFT", "ACTIVE", "FLAGGED"],
+        "difficulty": ["easy", "medium", "hard", "mixed"]
+      },
+      "rich_text_fields": ["question_text", "passage_text", "explanation", "options[].text"],
+      "notes": "concept_tag is free text — registry is concept_tags table. correct_answer is JSONB array."
+    },
+    "concept_tags": {
+      "pk": "id (uuid)",
+      "columns": ["id", "exam_category", "subject", "concept_name", "slug", "description", "created_by", "created_at"],
+      "unique": "(exam_category, subject, concept_name)",
+      "indexes": ["exam_category", "(exam_category, subject)", "slug"],
+      "seed_counts": {
+        "SAT": 45,
+        "NEET": 43,
+        "JEE": 33,
+        "CLAT": 23,
+        "total": 144
+      },
+      "notes": "KSS-DB-030 Apr 17 2026. Immutable seed data. SA can add via Platform Config. Hard delete with warning."
+    },
+    "question_concept_mappings": {
+      "pk": "id (uuid)",
+      "columns": ["id", "question_id", "concept_tag_id", "created_at"],
+      "fks": {
+        "question_id": "questions.id ON DELETE CASCADE",
+        "concept_tag_id": "concept_tags.id ON DELETE CASCADE"
+      },
+      "unique": "(question_id, concept_tag_id)",
+      "notes": "KSS-DB-031 Apr 17 2026. One question → one concept (UI enforced). One concept → many questions."
+    },
+    "assessment_question_map": {
+      "pk": "id (uuid)",
+      "columns": ["id", "assessment_id", "question_id", "section_name", "order_index", "created_at"],
+      "unique": "(assessment_id, question_id)"
+    },
+    "passage_sub_questions": {
+      "pk": "id (uuid)",
+      "columns": ["id", "parent_question_id", "question_text (JSONB)", "options (JSONB)", "correct_answer (JSONB)", "explanation (JSONB)", "video_url", "order_index", "created_at", "updated_at"]
+    },
+    "attempts": {
+      "pk": "id (uuid)",
+      "columns": ["id", "user_id", "assessment_id", "attempt_number", "is_free_attempt", "score", "correct", "incorrect", "skipped", "time_spent", "status", "passed", "created_at"],
+      "notes": "passed: true/false for chapter/subject tests (≥60%), null for full tests. max_attempts=6 (1 free + 5 paid)."
+    },
+    "attempt_answers": {
+      "pk": "id (uuid)",
+      "columns": ["id", "attempt_id", "question_id", "section_id", "user_answer", "concept_tag", "is_correct", "is_skipped", "marks_awarded", "time_spent_seconds", "created_at"],
+      "notes": "KSS-DB-022. concept_tag mirrors questions.concept_tag for analytics."
+    },
+    "attempt_section_results": {
+      "pk": "id (uuid)",
+      "columns": ["id", "attempt_id", "section_id", "section_label", "correct_count", "incorrect_count", "skipped_count", "marks_scored", "marks_possible", "time_spent_seconds", "accuracy_percent", "created_at"],
+      "unique": "(attempt_id, section_id)",
+      "notes": "KSS-DB-023."
+    },
+    "user_concept_mastery": {
+      "pk": "id (uuid)",
+      "columns": ["id", "user_id", "assessment_id", "concept_tag", "attempt_number", "correct_count", "total_count", "mastery_percent", "updated_at", "module_id", "stage (GENERATED STORED)", "attempt_count", "last_attempt_date", "trend"],
+      "unique": "(user_id, assessment_id, concept_tag, attempt_number)",
+      "indexes": ["(user_id, assessment_id)"],
+      "stage_logic": "≥80%=strength, ≥60%=developing, ≥40%=needs_practice, <40%=weak",
+      "trend_values": ["improving", "declining", "stable"],
+      "notes": "KSS-DB-024 + KSS-DB-032. stage is GENERATED STORED — never insert/update directly."
+    },
+    "attempt_ai_insights": {
+      "pk": "id (uuid)",
+      "columns": ["id", "attempt_id", "what_went_well", "next_steps", "model_used", "generated_at"],
+      "unique": "(attempt_id)",
+      "notes": "KSS-DB-025. model_used='static_demo' for seeded rows; production='claude-sonnet-4-6'."
+    },
+    "plans": {
+      "pk": "id (uuid)",
+      "columns": ["id", "plan_type", "tier", "plan_audience", "plan_category", "scope", "price", "price_usd", "billing_cycle", "status", "compare_at_price", "compare_at_price_usd", "was_live", "display_name", "tagline", "feature_bullets", "footnote", "is_popular", "cta_label", "max_attempts_per_assessment", "is_free"],
+      "enums": {
+        "plan_audience": ["B2C", "B2B"],
+        "plan_category": ["ASSESSMENT", "COURSE_BUNDLE", "SINGLE_COURSE_PLAN"],
+        "scope": ["PLATFORM_WIDE", "CATEGORY_BUNDLE"],
+        "status": ["DRAFT", "LIVE", "DELETED"],
+        "tier": ["BASIC", "PRO", "PREMIUM", "ENTERPRISE", "FREE", null]
+      }
+    },
+    "courses": {
+      "pk": "id (uuid)",
+      "columns": ["id", "title", "description", "course_type", "status", "source", "tenant_id", "created_by", "created_at", "updated_at", "audience_type", "price", "price_usd", "currency", "is_individually_purchasable", "stripe_price_id", "last_modified_by"]
+    },
+    "learners": {
+      "pk": "id (uuid)",
+      "columns": ["id", "tenant_id", "full_name", "email", "phone", "phone_country_code", "department_id", "team_id", "status", "employee_roll_number", "notes", "created_by", "created_at", "last_active_at"]
+    }
+  },
+  "sat_scoring": {
+    "source": "public/scoring-sat-practice-test-4-digital.pdf",
+    "copyright": "© 2023 College Board",
+    "total_score_range": "400-1600",
+    "section_score_range": "200-800",
+    "rw_max_raw": 66,
+    "math_max_raw": 54,
+    "conversion_table": [
+      {"raw": 0, "rw_lower": 200, "rw_upper": 200, "math_lower": 200, "math_upper": 200},
+      {"raw": 7, "rw_lower": 200, "rw_upper": 210, "math_lower": 200, "math_upper": 220},
+      {"raw": 8, "rw_lower": 200, "rw_upper": 220, "math_lower": 200, "math_upper": 230},
+      {"raw": 9, "rw_lower": 210, "rw_upper": 230, "math_lower": 220, "math_upper": 250},
+      {"raw": 10, "rw_lower": 230, "rw_upper": 250, "math_lower": 250, "math_upper": 280},
+      {"raw": 11, "rw_lower": 240, "rw_upper": 260, "math_lower": 280, "math_upper": 310},
+      {"raw": 12, "rw_lower": 250, "rw_upper": 270, "math_lower": 290, "math_upper": 320},
+      {"raw": 13, "rw_lower": 260, "rw_upper": 280, "math_lower": 300, "math_upper": 330},
+      {"raw": 14, "rw_lower": 280, "rw_upper": 300, "math_lower": 310, "math_upper": 340},
+      {"raw": 15, "rw_lower": 290, "rw_upper": 310, "math_lower": 320, "math_upper": 350},
+      {"raw": 16, "rw_lower": 320, "rw_upper": 340, "math_lower": 330, "math_upper": 360},
+      {"raw": 17, "rw_lower": 340, "rw_upper": 360, "math_lower": 330, "math_upper": 360},
+      {"raw": 18, "rw_lower": 350, "rw_upper": 370, "math_lower": 340, "math_upper": 370},
+      {"raw": 19, "rw_lower": 360, "rw_upper": 380, "math_lower": 350, "math_upper": 380},
+      {"raw": 20, "rw_lower": 370, "rw_upper": 390, "math_lower": 360, "math_upper": 390},
+      {"raw": 21, "rw_lower": 370, "rw_upper": 390, "math_lower": 370, "math_upper": 400},
+      {"raw": 22, "rw_lower": 380, "rw_upper": 400, "math_lower": 370, "math_upper": 400},
+      {"raw": 23, "rw_lower": 390, "rw_upper": 410, "math_lower": 380, "math_upper": 410},
+      {"raw": 24, "rw_lower": 400, "rw_upper": 420, "math_lower": 390, "math_upper": 420},
+      {"raw": 25, "rw_lower": 410, "rw_upper": 430, "math_lower": 400, "math_upper": 430},
+      {"raw": 26, "rw_lower": 420, "rw_upper": 440, "math_lower": 420, "math_upper": 450},
+      {"raw": 27, "rw_lower": 420, "rw_upper": 440, "math_lower": 430, "math_upper": 460},
+      {"raw": 28, "rw_lower": 430, "rw_upper": 450, "math_lower": 440, "math_upper": 470},
+      {"raw": 29, "rw_lower": 440, "rw_upper": 460, "math_lower": 460, "math_upper": 490},
+      {"raw": 30, "rw_lower": 450, "rw_upper": 470, "math_lower": 470, "math_upper": 500},
+      {"raw": 31, "rw_lower": 460, "rw_upper": 480, "math_lower": 480, "math_upper": 510},
+      {"raw": 32, "rw_lower": 460, "rw_upper": 480, "math_lower": 500, "math_upper": 530},
+      {"raw": 33, "rw_lower": 470, "rw_upper": 490, "math_lower": 510, "math_upper": 540},
+      {"raw": 34, "rw_lower": 480, "rw_upper": 500, "math_lower": 520, "math_upper": 550},
+      {"raw": 35, "rw_lower": 490, "rw_upper": 510, "math_lower": 530, "math_upper": 560},
+      {"raw": 36, "rw_lower": 490, "rw_upper": 510, "math_lower": 550, "math_upper": 580},
+      {"raw": 37, "rw_lower": 500, "rw_upper": 520, "math_lower": 560, "math_upper": 590},
+      {"raw": 38, "rw_lower": 510, "rw_upper": 530, "math_lower": 570, "math_upper": 600},
+      {"raw": 39, "rw_lower": 520, "rw_upper": 540, "math_lower": 580, "math_upper": 610},
+      {"raw": 40, "rw_lower": 530, "rw_upper": 550, "math_lower": 590, "math_upper": 620},
+      {"raw": 41, "rw_lower": 540, "rw_upper": 560, "math_lower": 600, "math_upper": 630},
+      {"raw": 42, "rw_lower": 540, "rw_upper": 560, "math_lower": 620, "math_upper": 650},
+      {"raw": 43, "rw_lower": 550, "rw_upper": 570, "math_lower": 630, "math_upper": 660},
+      {"raw": 44, "rw_lower": 560, "rw_upper": 580, "math_lower": 650, "math_upper": 680},
+      {"raw": 45, "rw_lower": 570, "rw_upper": 590, "math_lower": 670, "math_upper": 700},
+      {"raw": 46, "rw_lower": 580, "rw_upper": 600, "math_lower": 690, "math_upper": 720},
+      {"raw": 47, "rw_lower": 590, "rw_upper": 610, "math_lower": 710, "math_upper": 740},
+      {"raw": 48, "rw_lower": 590, "rw_upper": 610, "math_lower": 730, "math_upper": 760},
+      {"raw": 49, "rw_lower": 600, "rw_upper": 620, "math_lower": 740, "math_upper": 770},
+      {"raw": 50, "rw_lower": 610, "rw_upper": 630, "math_lower": 750, "math_upper": 780},
+      {"raw": 51, "rw_lower": 620, "rw_upper": 640, "math_lower": 760, "math_upper": 790},
+      {"raw": 52, "rw_lower": 630, "rw_upper": 650, "math_lower": 770, "math_upper": 800},
+      {"raw": 53, "rw_lower": 630, "rw_upper": 650, "math_lower": 780, "math_upper": 800},
+      {"raw": 54, "rw_lower": 640, "rw_upper": 660, "math_lower": 790, "math_upper": 800},
+      {"raw": 55, "rw_lower": 650, "rw_upper": 670, "math_lower": null, "math_upper": null},
+      {"raw": 56, "rw_lower": 660, "rw_upper": 680, "math_lower": null, "math_upper": null},
+      {"raw": 57, "rw_lower": 670, "rw_upper": 690, "math_lower": null, "math_upper": null},
+      {"raw": 58, "rw_lower": 680, "rw_upper": 700, "math_lower": null, "math_upper": null},
+      {"raw": 59, "rw_lower": 690, "rw_upper": 710, "math_lower": null, "math_upper": null},
+      {"raw": 60, "rw_lower": 700, "rw_upper": 720, "math_lower": null, "math_upper": null},
+      {"raw": 61, "rw_lower": 710, "rw_upper": 730, "math_lower": null, "math_upper": null},
+      {"raw": 62, "rw_lower": 720, "rw_upper": 740, "math_lower": null, "math_upper": null},
+      {"raw": 63, "rw_lower": 730, "rw_upper": 750, "math_lower": null, "math_upper": null},
+      {"raw": 64, "rw_lower": 750, "rw_upper": 770, "math_lower": null, "math_upper": null},
+      {"raw": 65, "rw_lower": 770, "rw_upper": 790, "math_lower": null, "math_upper": null},
+      {"raw": 66, "rw_lower": 790, "rw_upper": 800, "math_lower": null, "math_upper": null}
+    ]
+  }
+}

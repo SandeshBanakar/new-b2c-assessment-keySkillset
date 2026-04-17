@@ -1,5 +1,5 @@
 # PRD — B2C End-User Assessment Analytics: AI-Powered Insights Engine
-# Status: UPDATED — Apr 13 2026
+# Status: UPDATED — Apr 17 2026 (KSS-DB-030/031/032 + Concept Tags Registry)
 # Owner: keySkillset Product
 # Ticket: KSS-SA-031 (Analytics) / KSS-SA-032 (Question Seeding)
 # Confluence: https://keyskillset-product-management.atlassian.net/wiki/x/CgBEBw
@@ -243,10 +243,40 @@ Output:
 `concept_tag` is a single free-text label on every question in the `questions` table.
 It identifies the **narrowest meaningful curriculum unit** the question tests.
 
-Rules (confirmed CT-1/CT-2/CT-3, Apr 11 2026):
-- **One tag per question** — not an array
+Rules (confirmed CT-1/CT-2/CT-3, Apr 11 2026; UPDATED Apr 17 2026 with registry):
+- **One tag per question** — not an array (enforced in QuestionForm UI)
 - **Optional** at question creation (creator can add later)
-- **Free text** — no controlled vocabulary table in V1
+- **Dropdown from registry** — `concept_tags` lookup table introduced KSS-DB-030 (Apr 17 2026)
+- **Concept tags repeat** across all assessments (same tag can appear on many questions in different tests)
+- **Unique per chapter test context only** — a chapter test may map exclusively to one concept tag, but the tag itself is reusable platform-wide
+
+### 4.1a Concept Tag Registry (KSS-DB-030, Apr 17 2026)
+
+New table `concept_tags` provides the controlled vocabulary:
+```
+id, exam_category, subject, concept_name, slug, description, created_by, created_at
+UNIQUE (exam_category, subject, concept_name)
+```
+
+Seeded data (immutable baseline — 144 tags):
+- SAT: 45 tags (R&W × 4 subjects, Math × 4 subjects)
+- NEET: 43 tags (Physics × 15, Chemistry × 15, Biology × 13)
+- JEE: 33 tags (Math × 14, Physics × 9, Chemistry × 10)
+- CLAT: 23 tags (5 subjects)
+
+QuestionForm update: `concept_tag` text field → grouped dropdown by `(exam_category, subject)`.
+The selected `concept_name` text value is stored in `questions.concept_tag` (unchanged schema).
+
+### 4.1b question_concept_mappings (KSS-DB-031, Apr 17 2026)
+
+Join table for FK-level linkage between questions and concept_tags:
+```
+id, question_id (FK→questions), concept_tag_id (FK→concept_tags)
+UNIQUE (question_id, concept_tag_id)
+```
+
+This enables: Platform Config page shows question_count per concept tag.
+Analytics can query via FK for structured joins (not just text matching).
 - Granularity: one NCERT chapter or one exam skill domain.
   Too broad: "Biology". Too narrow: "Step 4 of the chemiosmotic gradient". Correct: "Photosynthesis".
 
@@ -404,29 +434,68 @@ CREATE INDEX IF NOT EXISTS idx_attempt_section_results_attempt ON attempt_sectio
 CREATE INDEX IF NOT EXISTS idx_attempt_section_results_user ON attempt_section_results(user_id, assessment_id);
 ```
 
-### 5.3 user_concept_mastery (KSS-DB-022)
+### 5.3 user_concept_mastery (KSS-DB-024 + KSS-DB-032)
 
-Rolling aggregate — one row per (user, concept_tag). Updated after every attempt.
-UNIQUE constraint prevents duplicate rows; use upsert (INSERT ... ON CONFLICT DO UPDATE).
+Per-attempt tracking — one row per (user, assessment, concept_tag, attempt_number).
+Historical mastery is preserved per attempt (not overwritten). Use INSERT, never UPSERT.
+UNIQUE (user_id, assessment_id, concept_tag, attempt_number).
+
+**UPDATED Apr 17 2026 (KSS-DB-032):** Added 5 new columns to the actual table:
 
 ```sql
-CREATE TABLE IF NOT EXISTS user_concept_mastery (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL,
-  concept_tag     TEXT NOT NULL,
-  exam_category   TEXT,
-  total_seen      INT DEFAULT 0,
-  total_correct   INT DEFAULT 0,
-  mastery_pct     NUMERIC(5,2) DEFAULT 0,
-  last_seen_at    TIMESTAMPTZ,
-  attempt_count   INT DEFAULT 0,
-  trend           TEXT DEFAULT 'neutral',
-  updated_at      TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (user_id, concept_tag)
-);
-CREATE INDEX IF NOT EXISTS idx_user_concept_mastery_user ON user_concept_mastery(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_concept_mastery_exam ON user_concept_mastery(user_id, exam_category);
+-- ACTUAL table schema (as of KSS-DB-032, Apr 17 2026)
+-- (table already exists — do not recreate)
+ALTER TABLE user_concept_mastery
+  ADD COLUMN IF NOT EXISTS module_id text,
+  ADD COLUMN IF NOT EXISTS stage text GENERATED ALWAYS AS (
+    CASE
+      WHEN mastery_percent >= 80 THEN 'strength'
+      WHEN mastery_percent >= 60 THEN 'developing'
+      WHEN mastery_percent >= 40 THEN 'needs_practice'
+      ELSE 'weak'
+    END
+  ) STORED,
+  ADD COLUMN IF NOT EXISTS attempt_count int DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS last_attempt_date timestamptz DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS trend text DEFAULT 'stable' CHECK (trend IN ('improving', 'declining', 'stable'));
 ```
+
+**Full column list (current):**
+```
+id (uuid PK)
+user_id (uuid NOT NULL)
+assessment_id (text NOT NULL)        -- UUID cast to text
+concept_tag (text NOT NULL)          -- mirrors questions.concept_tag
+attempt_number (int NOT NULL)        -- which attempt this row tracks
+correct_count (int DEFAULT 0)
+total_count (int DEFAULT 0)
+mastery_percent (numeric 5,2)        -- (correct_count / total_count) * 100
+updated_at (timestamptz)
+module_id (text nullable)            -- e.g. 'rw_m1', 'math_m2' (KSS-DB-032)
+stage (text GENERATED ALWAYS AS STORED) -- computed from mastery_percent (KSS-DB-032)
+attempt_count (int DEFAULT 1)        -- total questions seen for this concept (KSS-DB-032)
+last_attempt_date (timestamptz)      -- date of this attempt (KSS-DB-032)
+trend (text DEFAULT 'stable')        -- improving/declining/stable (KSS-DB-032)
+```
+
+**Stage computation (automatic — never write directly):**
+- ≥ 80% → `strength`
+- ≥ 60% → `developing`
+- ≥ 40% → `needs_practice`
+- < 40% → `weak`
+
+**Trend computation (application logic — write explicitly):**
+- Compare `mastery_percent` for `attempt_number N` vs `attempt_number N-1` for same `(user_id, assessment_id, concept_tag)`
+- Previous > current by ≥ 5% → `declining`
+- Current > previous by ≥ 5% → `improving`
+- Otherwise → `stable`
+
+**Gemini API scope:** Analyze ALL weak concept tags across ALL modules in the domain.
+Example: `WHERE user_id=X AND assessment_id IN (rw_assessment_id, math_assessment_id) AND stage = 'weak'`
+This cross-module analysis is required — cannot analyze R&W and Math in isolation.
+
+**UNIQUE (user_id, assessment_id, concept_tag, attempt_number)**
+**Index: (user_id, assessment_id)**
 
 ### 5.4 attempt_ai_insights (KSS-DB-023)
 
