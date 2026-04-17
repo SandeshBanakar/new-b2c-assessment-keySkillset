@@ -1,0 +1,481 @@
+BATCH 1 — Lookup (run first, paste results into SQL-RESPONSE.txt)
+
+-- 1a. SA admin UUID (needed for questions.created_by)
+SELECT id, name, role FROM admin_users WHERE role = 'SUPER_ADMIN' LIMIT 1;
+
+JSON Response:
+[
+  {
+    "id": "3bd6101b-1fb9-4c96-a9a5-c958a3deb54a",
+    "name": "Super Admin",
+    "role": "SUPER_ADMIN"
+  }
+]
+---
+-- 1b. SAT Full Test 1 — Premium user attempts
+SELECT id, attempt_number, status, score, score_rw, score_math, correct_count, incorrect_count, accuracy_percent, completed_at
+FROM attempts
+WHERE user_id = '191c894d-b532-4fa8-b1fe-746e5cdcdcc8'
+AND assessment_id = '76b43c99-88c0-4165-a042-40396c8ff129'
+ORDER BY attempt_number;
+
+JSON Response:
+[
+  {
+    "id": "ece53ced-7d61-4419-920e-ae1f68780f66",
+    "attempt_number": 1,
+    "status": "COMPLETED",
+    "score": 1130,
+    "score_rw": 570,
+    "score_math": 560,
+    "correct_count": 63,
+    "incorrect_count": 35,
+    "accuracy_percent": "64.29",
+    "completed_at": "2026-02-06 11:00:00+00"
+  },
+  {
+    "id": "d605591f-1935-4b08-afdc-7ee56099f6e4",
+    "attempt_number": 2,
+    "status": "COMPLETED",
+    "score": 1230,
+    "score_rw": 620,
+    "score_math": 610,
+    "correct_count": 63,
+    "incorrect_count": 35,
+    "accuracy_percent": "64.29",
+    "completed_at": "2026-03-02 11:00:00+00"
+  }
+]
+---
+-- 1c. SAT Math + R&W subject test — Premium user attempts
+SELECT a.id, a.attempt_number, ass.title, a.score, a.correct_count, a.incorrect_count, a.accuracy_percent 
+FROM attempts a 
+JOIN assessments ass ON ass.id = a.assessment_id 
+WHERE a.user_id = '191c894d-b532-4fa8-b1fe-746e5cdcdcc8' 
+AND a.assessment_id IN (
+'6f936fc2-21e1-49b3-8727-09404a7919c4',  -- SAT Math
+'f8976222-386b-4f42-ae6b-e132ec3231c9'   -- SAT R&W
+)
+ORDER BY ass.title, a.attempt_number;
+
+JSON Response:
+[
+  {
+    "id": "16c481c4-a335-49db-81a8-ed051d040f1e",
+    "attempt_number": 1,
+    "title": "SAT Math",
+    "score": 580,
+    "correct_count": 32,
+    "incorrect_count": 12,
+    "accuracy_percent": "72.73"
+  },
+  {
+    "id": "92a375b1-e116-47df-a4a6-c20fd2057774",
+    "attempt_number": 2,
+    "title": "SAT Math",
+    "score": 640,
+    "correct_count": 32,
+    "incorrect_count": 12,
+    "accuracy_percent": "72.73"
+  },
+  {
+    "id": "bc00519e-78d8-4a44-99bc-bd77c9152eff",
+    "attempt_number": 1,
+    "title": "SAT Reading & Writing",
+    "score": 550,
+    "correct_count": 39,
+    "incorrect_count": 15,
+    "accuracy_percent": "72.22"
+  },
+  {
+    "id": "a6f517ec-b290-4e95-963d-7da5db2b06b3",
+    "attempt_number": 2,
+    "title": "SAT Reading & Writing",
+    "score": 590,
+    "correct_count": 41,
+    "incorrect_count": 13,
+    "accuracy_percent": "75.93"
+  },
+  {
+    "id": "e4af27b6-71ec-4315-95cd-840157d5bea9",
+    "attempt_number": 3,
+    "title": "SAT Reading & Writing",
+    "score": 410,
+    "correct_count": 41,
+    "incorrect_count": 13,
+    "accuracy_percent": "75.93"
+  }
+]
+---
+-- 1d. Current section results for SAT Math + R&W subject tests (Premium user)
+SELECT asr.attempt_id, a.attempt_number, ass.title, asr.section_id, asr.section_label, asr.correct_count, asr.incorrect_count, asr.skipped_count, asr.marks_scored, asr.marks_possible, asr.accuracy_percent, asr.time_spent_seconds
+FROM attempt_section_results asr
+JOIN attempts a ON a.id = asr.attempt_id
+JOIN assessments ass ON ass.id = a.assessment_id
+WHERE a.user_id = '191c894d-b532-4fa8-b1fe-746e5cdcdcc8'
+AND a.assessment_id IN (
+'6f936fc2-21e1-49b3-8727-09404a7919c4',
+'f8976222-386b-4f42-ae6b-e132ec3231c9'
+)
+ORDER BY ass.title, a.attempt_number, asr.section_id;
+
+JSON Response:
+[
+  {
+    "attempt_id": "16c481c4-a335-49db-81a8-ed051d040f1e",
+    "attempt_number": 1,
+    "title": "SAT Math",
+    "section_id": "advanced_math",
+    "section_label": "Advanced Math",
+    "correct_count": 6,
+    "incorrect_count": 5,
+    "skipped_count": 0,
+    "marks_scored": "6.00",
+    "marks_possible": "11.00",
+    "accuracy_percent": "54.55",
+    "time_spent_seconds": 675
+  },
+  {
+    "attempt_id": "16c481c4-a335-49db-81a8-ed051d040f1e",
+    "attempt_number": 1,
+    "title": "SAT Math",
+    "section_id": "algebra",
+    "section_label": "Algebra",
+    "correct_count": 8,
+    "incorrect_count": 3,
+    "skipped_count": 0,
+    "marks_scored": "8.00",
+    "marks_possible": "11.00",
+    "accuracy_percent": "72.73",
+    "time_spent_seconds": 675
+  },
+  {
+    "attempt_id": "16c481c4-a335-49db-81a8-ed051d040f1e",
+    "attempt_number": 1,
+    "title": "SAT Math",
+    "section_id": "geometry_trig",
+    "section_label": "Geometry & Trigonometry",
+    "correct_count": 8,
+    "incorrect_count": 2,
+    "skipped_count": 0,
+    "marks_scored": "8.00",
+    "marks_possible": "10.00",
+    "accuracy_percent": "80.00",
+    "time_spent_seconds": 600
+  },
+  {
+    "attempt_id": "16c481c4-a335-49db-81a8-ed051d040f1e",
+    "attempt_number": 1,
+    "title": "SAT Math",
+    "section_id": "psda",
+    "section_label": "Problem Solving & Data Analysis",
+    "correct_count": 10,
+    "incorrect_count": 2,
+    "skipped_count": 0,
+    "marks_scored": "10.00",
+    "marks_possible": "12.00",
+    "accuracy_percent": "83.33",
+    "time_spent_seconds": 750
+  },
+  {
+    "attempt_id": "92a375b1-e116-47df-a4a6-c20fd2057774",
+    "attempt_number": 2,
+    "title": "SAT Math",
+    "section_id": "advanced_math",
+    "section_label": "Advanced Math",
+    "correct_count": 8,
+    "incorrect_count": 3,
+    "skipped_count": 0,
+    "marks_scored": "8.00",
+    "marks_possible": "11.00",
+    "accuracy_percent": "72.73",
+    "time_spent_seconds": 660
+  },
+  {
+    "attempt_id": "92a375b1-e116-47df-a4a6-c20fd2057774",
+    "attempt_number": 2,
+    "title": "SAT Math",
+    "section_id": "algebra",
+    "section_label": "Algebra",
+    "correct_count": 8,
+    "incorrect_count": 3,
+    "skipped_count": 0,
+    "marks_scored": "8.00",
+    "marks_possible": "11.00",
+    "accuracy_percent": "72.73",
+    "time_spent_seconds": 660
+  },
+  {
+    "attempt_id": "92a375b1-e116-47df-a4a6-c20fd2057774",
+    "attempt_number": 2,
+    "title": "SAT Math",
+    "section_id": "geometry_trig",
+    "section_label": "Geometry & Trigonometry",
+    "correct_count": 6,
+    "incorrect_count": 4,
+    "skipped_count": 0,
+    "marks_scored": "6.00",
+    "marks_possible": "10.00",
+    "accuracy_percent": "60.00",
+    "time_spent_seconds": 660
+  },
+  {
+    "attempt_id": "92a375b1-e116-47df-a4a6-c20fd2057774",
+    "attempt_number": 2,
+    "title": "SAT Math",
+    "section_id": "psda",
+    "section_label": "Problem Solving & Data Analysis",
+    "correct_count": 10,
+    "incorrect_count": 2,
+    "skipped_count": 0,
+    "marks_scored": "10.00",
+    "marks_possible": "12.00",
+    "accuracy_percent": "83.33",
+    "time_spent_seconds": 720
+  },
+  {
+    "attempt_id": "bc00519e-78d8-4a44-99bc-bd77c9152eff",
+    "attempt_number": 1,
+    "title": "SAT Reading & Writing",
+    "section_id": "craft_structure",
+    "section_label": "Craft & Structure",
+    "correct_count": 8,
+    "incorrect_count": 5,
+    "skipped_count": 0,
+    "marks_scored": "8.00",
+    "marks_possible": "13.00",
+    "accuracy_percent": "61.54",
+    "time_spent_seconds": 900
+  },
+  {
+    "attempt_id": "bc00519e-78d8-4a44-99bc-bd77c9152eff",
+    "attempt_number": 1,
+    "title": "SAT Reading & Writing",
+    "section_id": "expression_ideas",
+    "section_label": "Expression of Ideas",
+    "correct_count": 10,
+    "incorrect_count": 3,
+    "skipped_count": 0,
+    "marks_scored": "10.00",
+    "marks_possible": "13.00",
+    "accuracy_percent": "76.92",
+    "time_spent_seconds": 904
+  },
+  {
+    "attempt_id": "bc00519e-78d8-4a44-99bc-bd77c9152eff",
+    "attempt_number": 1,
+    "title": "SAT Reading & Writing",
+    "section_id": "info_ideas",
+    "section_label": "Information & Ideas",
+    "correct_count": 11,
+    "incorrect_count": 3,
+    "skipped_count": 0,
+    "marks_scored": "11.00",
+    "marks_possible": "14.00",
+    "accuracy_percent": "78.57",
+    "time_spent_seconds": 896
+  },
+  {
+    "attempt_id": "bc00519e-78d8-4a44-99bc-bd77c9152eff",
+    "attempt_number": 1,
+    "title": "SAT Reading & Writing",
+    "section_id": "sec",
+    "section_label": "Standard English Conventions",
+    "correct_count": 10,
+    "incorrect_count": 4,
+    "skipped_count": 0,
+    "marks_scored": "10.00",
+    "marks_possible": "14.00",
+    "accuracy_percent": "71.43",
+    "time_spent_seconds": 900
+  },
+  {
+    "attempt_id": "a6f517ec-b290-4e95-963d-7da5db2b06b3",
+    "attempt_number": 2,
+    "title": "SAT Reading & Writing",
+    "section_id": "craft_structure",
+    "section_label": "Craft & Structure",
+    "correct_count": 10,
+    "incorrect_count": 3,
+    "skipped_count": 0,
+    "marks_scored": "10.00",
+    "marks_possible": "13.00",
+    "accuracy_percent": "76.92",
+    "time_spent_seconds": 864
+  },
+  {
+    "attempt_id": "a6f517ec-b290-4e95-963d-7da5db2b06b3",
+    "attempt_number": 2,
+    "title": "SAT Reading & Writing",
+    "section_id": "expression_ideas",
+    "section_label": "Expression of Ideas",
+    "correct_count": 10,
+    "incorrect_count": 3,
+    "skipped_count": 0,
+    "marks_scored": "10.00",
+    "marks_possible": "13.00",
+    "accuracy_percent": "76.92",
+    "time_spent_seconds": 1008
+  },
+  {
+    "attempt_id": "a6f517ec-b290-4e95-963d-7da5db2b06b3",
+    "attempt_number": 2,
+    "title": "SAT Reading & Writing",
+    "section_id": "info_ideas",
+    "section_label": "Information & Ideas",
+    "correct_count": 11,
+    "incorrect_count": 3,
+    "skipped_count": 0,
+    "marks_scored": "11.00",
+    "marks_possible": "14.00",
+    "accuracy_percent": "78.57",
+    "time_spent_seconds": 864
+  },
+  {
+    "attempt_id": "a6f517ec-b290-4e95-963d-7da5db2b06b3",
+    "attempt_number": 2,
+    "title": "SAT Reading & Writing",
+    "section_id": "sec",
+    "section_label": "Standard English Conventions",
+    "correct_count": 10,
+    "incorrect_count": 4,
+    "skipped_count": 0,
+    "marks_scored": "10.00",
+    "marks_possible": "14.00",
+    "accuracy_percent": "71.43",
+    "time_spent_seconds": 864
+  }
+]
+
+---
+
+-- 1e. Attempts table schema
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name = 'attempts'
+ORDER BY ordinal_position;
+
+JSON Response:
+[
+  {
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "assessment_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "attempt_number",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": "'not_started'::text"
+  },
+  {
+    "column_name": "score",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "score_rw",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "score_math",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "total_questions",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "correct_count",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "incorrect_count",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "skipped_count",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "accuracy_percent",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "time_spent_seconds",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "started_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "completed_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "column_name": "last_accessed_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "column_name": "is_free_attempt",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "false"
+  },
+  {
+    "column_name": "passed",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": null
+  }
+]
+---
