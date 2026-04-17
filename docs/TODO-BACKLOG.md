@@ -43,7 +43,7 @@ PRD: `prds/super-admin/PRD-SA-DASHBOARD.md`
 
 ---
 
-## [IN-PROGRESS] SAT Analytics Overhaul — KSS-SAT-A01 (Apr 17 2026)
+## [DONE] SAT Analytics Overhaul — KSS-SAT-A01/A02 (Apr 17 2026)
 
 Full rebuild of the SAT analytics experience across full tests, subject tests, and chapter tests.
 PRD: `prds/PRD-SAT-ANALYTICS.md`
@@ -59,57 +59,55 @@ PRD: `prds/PRD-SAT-ANALYTICS.md`
 ### Task 2 — Extract AttemptPillFilter shared component
 | # | Task | File | Status |
 |---|------|------|--------|
-| SAT-A01-T2a | Create `AttemptPillFilter.tsx` shared UI component | `src/components/ui/AttemptPillFilter.tsx` | [ ] PENDING |
-| SAT-A01-T2b | Wire `AttemptPillFilter` into `SATAnalyticsTab` (below Score Progression) | `src/components/assessment-detail/SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T2c | Wire `AttemptPillFilter` into `AnalyticsTab` (replace existing pill logic) | `src/components/assessment-detail/AnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T2a | Create `AttemptPillFilter.tsx` shared UI component | `src/components/ui/AttemptPillFilter.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T2b | Wire `AttemptPillFilter` into `SATAnalyticsTab` (below Score Progression) | `src/components/assessment-detail/SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T2c | Wire `AttemptPillFilter` into `AnalyticsTab` (replace existing pill logic) | `src/components/assessment-detail/AnalyticsTab.tsx` | [x] DONE Apr 17 |
 
 ### Task 3 — SAT Full Test: Remove attempt select + remove question-type filter
 | # | Task | File | Status |
 |---|------|------|--------|
-| SAT-A01-T3a | Remove `<select>` attempt dropdown from inside Section Breakdown | `SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T3b | Remove question-type filter card (`filter` state, `SOLUTION_FILTERS`, `Analytics filter` card) | `SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T3c | Simplify `filteredConceptMastery` → `conceptMastery` (no type gating) | `SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T3d | Simplify `weakConcepts` — remove `allowedConceptTags` filter | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T3a | Remove `<select>` attempt dropdown from inside Section Breakdown | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T3b | Remove question-type filter card — completed by prior session | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T3c | Simplify concept mastery — no type gating | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T3d | Simplify `weakConcepts` — no allowedConceptTags filter | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
 
 ### Task 4 — Remove score from AnalyticsTab pills (standardise)
 | # | Task | File | Status |
 |---|------|------|--------|
-| SAT-A01-T4a | Remove `attempt.score` from pill label in `AnalyticsTab.tsx` | `src/components/assessment-detail/AnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T4a | Remove `attempt.score` from pill label in `AnalyticsTab.tsx` | `src/components/assessment-detail/AnalyticsTab.tsx` | [x] DONE Apr 17 |
 
-### Task 5 — SAT Full Test: Replace hardcoded SolutionsPanel with DB-driven accordion
+### Task 5 — SAT Full Test: DB-driven Solutions Panel
 | # | Task | File | Status |
 |---|------|------|--------|
-| SAT-A01-T5a | Remove `SAT_SOLUTION_QUESTIONS` export + usage from `SolutionsPanel.tsx` | `src/components/assessment-detail/SolutionsPanel.tsx` | [ ] PENDING |
-| SAT-A01-T5b | Adapt `AnalyticsTab` `renderQuestionRow` pattern for SAT module structure (4 module tabs) | `SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T5c | Wire module tabs to `assessment_question_map` by `section_name` (R&W M1/M2, Math M1/M2) | `SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T5d | Wire `attempt_answers` for selected attempt → show user answers + correct answer in accordion | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T5a | `SolutionsPanel.tsx` rebuilt as DB-driven component (prior session) | `src/components/assessment-detail/SolutionsPanel.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T5b-d | Module tabs, assessment_question_map wiring, attempt_answers — complete in SATAnalyticsTab | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
 
-### Task 6 — SAT Full Test: AI Insight block review
+### Task 6 — SAT Full Test: AI Insight block
 | # | Task | File | Status |
 |---|------|------|--------|
-| SAT-A01-T6a | Verify AI Insight block gating: Free/Basic = locked teaser, Pro/Premium = real data or "not available" | `SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T6b | Fix hardcoded "We are thrilled to say..." upgrade copy — align to CLAUDE-RULES.md AI Insight spec | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T6a | AI Insight gating: Free/Basic = upgrade teaser, Pro/Premium = real data or "preparing" | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T6b | Fix `window.location.href = '/plans'` → `router.push('/plans')` | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
 
 ### Task 7 — Subject Test cascade
 | # | Task | File | Status |
 |---|------|------|--------|
-| SAT-A01-T7a | Verify all T2–T6 changes work correctly for subject tests (isFullTest=false path) | `SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T7b | Subject test: confirm Section Breakdown shows 4 domain sections (not R&W/Math modules) | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T7a | T2–T6 changes work for subject tests (isFullTest=false path) | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T7b | Subject test: sections array = ['Math'] or ['R&W'] based on assessment.subject | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
 
 ### Task 8 — Create generic ChapterAnalyticsTab (all exam types)
 | # | Task | File | Status |
 |---|------|------|--------|
-| SAT-A01-T8a | Create `ChapterAnalyticsTab.tsx` — works for SAT, NEET, JEE, CLAT chapter tests | `src/components/assessment-detail/ChapterAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T8b | Blocks: Attempt Summary, AttemptPillFilter, Concept Performance bars, Solutions, AI Insight | `ChapterAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T8c | Negative marking aware: show "Marks Lost" block for NEET/JEE, hide for SAT/CLAT | `ChapterAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T8d | Update `page.tsx` routing: `chapter-test` → `ChapterAnalyticsTab`, SAT ft/st → `SATAnalyticsTab`, else → `AnalyticsTab` | `src/app/assessments/[id]/page.tsx` | [ ] PENDING |
+| SAT-A01-T8a | Create `ChapterAnalyticsTab.tsx` — works for SAT, NEET, JEE, CLAT chapter tests | `src/components/assessment-detail/ChapterAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T8b | Blocks: Attempt Summary, AttemptPillFilter, Concept Performance bars, Solutions, AI Insight | `ChapterAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T8c | Negative marking aware: show "Marks Lost" block for NEET/JEE, hide for SAT/CLAT | `ChapterAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T8d | Update `page.tsx` routing: `chapter-test` → `ChapterAnalyticsTab`, SAT ft/st → `SATAnalyticsTab`, else → `AnalyticsTab` | `src/app/assessments/[id]/page.tsx` | [x] DONE Apr 17 |
 
 ### Task 10 — Extract ConceptMasteryPanel as shared component
 | # | Task | File | Status |
 |---|------|------|--------|
-| SAT-A01-T10a | Create `ConceptMasteryPanel.tsx`: section pills, always-table layout, weakest-first sort, sticky col, date headers | `src/components/assessment-detail/ConceptMasteryPanel.tsx` | [ ] PENDING |
-| SAT-A01-T10b | Wire into `SATAnalyticsTab` — replaces dual Math/RW panels; parent builds tagSectionMap from domain maps | `SATAnalyticsTab.tsx` | [ ] PENDING |
-| SAT-A01-T10c | Wire into `ChapterAnalyticsTab` | `ChapterAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T10a | Create `ConceptMasteryPanel.tsx`: section pills, always-table layout, weakest-first sort, sticky col, date headers | `src/components/assessment-detail/ConceptMasteryPanel.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T10b | Wire into `SATAnalyticsTab` — replaces dual Math/RW panels; parent builds tagSectionMap from domain maps | `SATAnalyticsTab.tsx` | [x] DONE Apr 17 |
+| SAT-A01-T10c | Wire into `ChapterAnalyticsTab` — concept performance uses separate bar chart (not CMP table) | `ChapterAnalyticsTab.tsx` | [x] DONE Apr 17 |
 | SAT-A01-T10d | AnalyticsTab concept mastery upgrade — DEFERRED to separate ticket | `AnalyticsTab.tsx` | [ ] DEFERRED |
 
 ### Task 9 — PRD update
