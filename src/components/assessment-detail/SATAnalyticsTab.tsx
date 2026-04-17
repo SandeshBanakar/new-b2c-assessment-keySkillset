@@ -1,16 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  CircleAlert as AlertCircle,
-  ChartBar as BarChart2,
-  CircleCheck as CheckCircle,
-  Lightbulb,
-  Target,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-} from 'lucide-react';
+import { CircleAlert as AlertCircle, ChartBar as BarChart2, CircleCheck as CheckCircle, Lightbulb, Target, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import SolutionsPanel, {
