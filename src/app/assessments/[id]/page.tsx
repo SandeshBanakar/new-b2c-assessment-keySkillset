@@ -9,6 +9,7 @@ import OverviewTab from '@/components/assessment-detail/OverviewTab';
 import AttemptsTab from '@/components/assessment-detail/AttemptsTab';
 import AnalyticsTab from '@/components/assessment-detail/AnalyticsTab';
 import SATAnalyticsTab from '@/components/assessment-detail/SATAnalyticsTab';
+import ChapterAnalyticsTab from '@/components/assessment-detail/ChapterAnalyticsTab';
 import { useAppContext } from '@/context/AppContext';
 import { getAssessmentBySlug, isFreeAttemptExhausted } from '@/utils/assessmentUtils';
 import type { Assessment } from '@/types';
@@ -173,23 +174,31 @@ function AssessmentDetailPageInner() {
           />
         )}
         {activeTab === 'analytics' && (
-          assessment.exam === 'SAT' &&
-          (assessment.type === 'full-test' || assessment.type === 'subject-test')
+          assessment.type === 'chapter-test'
             ? (
-              <SATAnalyticsTab
+              <ChapterAnalyticsTab
                 assessment={assessment}
                 assessmentId={assessment.id}
                 onSwitchToAttempts={() => setActiveTab('attempts')}
-              />
-            ) : (
-              <AnalyticsTab
-                assessment={assessment}
-                assessmentId={assessment.id}
-                onSwitchToAttempts={() => setActiveTab('attempts')}
-                initialAttemptId={selectedAttemptId}
-                userTier={userTier}
               />
             )
+            : assessment.exam === 'SAT' &&
+              (assessment.type === 'full-test' || assessment.type === 'subject-test')
+              ? (
+                <SATAnalyticsTab
+                  assessment={assessment}
+                  assessmentId={assessment.id}
+                  onSwitchToAttempts={() => setActiveTab('attempts')}
+                />
+              ) : (
+                <AnalyticsTab
+                  assessment={assessment}
+                  assessmentId={assessment.id}
+                  onSwitchToAttempts={() => setActiveTab('attempts')}
+                  initialAttemptId={selectedAttemptId}
+                  userTier={userTier}
+                />
+              )
         )}
       </PageWrapper>
     </div>

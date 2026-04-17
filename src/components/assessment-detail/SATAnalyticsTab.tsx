@@ -1,7 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CircleAlert as AlertCircle, ChartBar as BarChart2, CircleCheck as CheckCircle, Lightbulb, Target, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  CircleAlert as AlertCircle,
+  ChartBar as BarChart2,
+  CircleCheck as CheckCircle,
+  Lightbulb,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import SolutionsPanel, {
@@ -9,6 +19,8 @@ import SolutionsPanel, {
   type UserAnswer,
 } from '@/components/assessment-detail/SolutionsPanel';
 import SATScoringTable from '@/components/assessment-detail/SATScoringTable';
+import ConceptMasteryPanel from '@/components/assessment-detail/ConceptMasteryPanel';
+import AttemptPillFilter from '@/components/ui/AttemptPillFilter';
 import type { Assessment } from '@/types';
 
 // ─── SAT domain taxonomy ───────────────────────────────────────────────────────
@@ -63,19 +75,6 @@ const SAT_RW_DOMAIN_MAP: Record<string, string> = {
   'Sentence and paragraph organization':                 'Expression of Ideas',
   'Effective introduction and conclusion sentences':      'Expression of Ideas',
 };
-
-const MATH_DOMAIN_ORDER = [
-  'Algebra',
-  'Advanced Math',
-  'Problem Solving & Data Analysis',
-  'Geometry & Trigonometry',
-];
-const RW_DOMAIN_ORDER = [
-  'Craft & Structure',
-  'Information & Ideas',
-  'Standard English Conventions',
-  'Expression of Ideas',
-];
 
 const FULL_TEST_SECTION_ORDER = ['rw_module_1', 'rw_module_2', 'math_module_1', 'math_module_2'];
 const MATH_SECTION_ORDER      = ['algebra', 'advanced_math', 'psda', 'geometry_trig'];
@@ -132,20 +131,6 @@ export interface SATAnalyticsTabProps {
 
 // ─── Colour helpers ────────────────────────────────────────────────────────────
 
-function masteryBadgeClass(pct: number | null): string {
-  if (pct === null) return 'bg-zinc-100 text-zinc-400';
-  if (pct >= 80)   return 'bg-emerald-100 text-emerald-700';
-  if (pct >= 60)   return 'bg-amber-100 text-amber-700';
-  return 'bg-rose-100 text-rose-700';
-}
-
-function masteryBarClass(pct: number | null): string {
-  if (pct === null) return 'bg-zinc-200';
-  if (pct >= 80)   return 'bg-emerald-500';
-  if (pct >= 60)   return 'bg-amber-500';
-  return 'bg-rose-500';
-}
-
 function sectionBarClass(pct: number): string {
   if (pct >= 70) return 'bg-emerald-500';
   if (pct >= 50) return 'bg-amber-500';
@@ -153,23 +138,6 @@ function sectionBarClass(pct: number): string {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function groupTagsByDomain(
-  tags: string[],
-  domainMap: Record<string, string>,
-  domainOrder: string[],
-): { domain: string; tags: string[] }[] {
-  const grouped: Record<string, string[]> = {};
-  for (const tag of tags) {
-    const domain = domainMap[tag];
-    if (!domain) continue;
-    if (!grouped[domain]) grouped[domain] = [];
-    grouped[domain].push(tag);
-  }
-  return domainOrder
-    .filter((d) => grouped[d]?.length)
-    .map((d) => ({ domain: d, tags: grouped[d] }));
-}
 
 function formatScore(score: number | null): string {
   if (score === null) return '—';
@@ -201,99 +169,6 @@ function DeltaBadge({ delta }: { delta: number | null }) {
     </span>
   );
 }
-
-// ─── Concept Mastery Panel ─────────────────────────────────────────────────────
-
-function ConceptMasteryPanel({
-  title,
-  groups,
-  conceptMastery,
-  attemptNumbers,
-}: {
-  title: string;
-  groups: { domain: string; tags: string[] }[];
-  conceptMastery: ConceptMastery[];
-  attemptNumbers: number[];
-}) {
-  function getMastery(tag: string, n: number): number | null {
-    return conceptMastery.find(
-      (m) => m.concept_tag === tag && m.attempt_number === n,
-    )?.mastery_percent ?? null;
-  }
-
-  if (groups.length === 0) return null;
-
-  return (
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-medium text-zinc-700 mb-3">{title}</p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr>
-              <th className="text-left text-xs font-medium text-zinc-400 pb-2 pr-4 min-w-[160px]">
-                Skill
-              </th>
-              {attemptNumbers.map((n) => (
-                <th
-                  key={n}
-                  className="text-center text-xs font-medium text-zinc-400 pb-2 px-2 whitespace-nowrap"
-                >
-                  Attempt {n}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map(({ domain, tags }) => (
-              <>
-                <tr key={`domain-${domain}`}>
-                  <td
-                    colSpan={attemptNumbers.length + 1}
-                    className="text-xs font-semibold text-zinc-500 uppercase tracking-wide bg-zinc-50 px-2 py-1.5 border-t border-zinc-100"
-                  >
-                    {domain}
-                  </td>
-                </tr>
-                {tags.map((tag) => (
-                  <tr key={tag} className="border-t border-zinc-50">
-                    <td className="text-xs text-zinc-600 py-2 pr-4 pl-2 leading-snug">
-                      {tag}
-                    </td>
-                    {attemptNumbers.map((n) => {
-                      const pct = getMastery(tag, n);
-                      return (
-                        <td key={n} className="text-center py-2 px-2">
-                          <span
-                            className={`inline-block text-xs font-medium rounded px-2 py-0.5 ${masteryBadgeClass(pct)}`}
-                          >
-                            {pct !== null ? `${Math.round(pct)}%` : '—'}
-                          </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-zinc-100">
-        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />&ge;80% — strong
-        </span>
-        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-          <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />60–79% — developing
-        </span>
-        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-          <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />&lt;60% — needs work
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Section Row ───────────────────────────────────────────────────────────────
 
 function SectionRow({ sec }: { sec: SectionResult }) {
   const pct =
@@ -332,13 +207,14 @@ export default function SATAnalyticsTab({
   assessmentId,
   onSwitchToAttempts,
 }: SATAnalyticsTabProps) {
+  const router = useRouter();
   const { user } = useAppContext();
   const [loading, setLoading]                         = useState(true);
   const [attempts, setAttempts]                       = useState<DbAttempt[]>([]);
   const [allSections, setAllSections]                 = useState<Record<string, SectionResult[]>>({});
   const [conceptMastery, setConceptMastery]           = useState<ConceptMastery[]>([]);
   const [allInsights, setAllInsights]                 = useState<Record<string, AiInsight>>({});
-  const [selectedAttemptIdx, setSelectedAttemptIdx]   = useState(0);
+  const [selectedAttemptId, setSelectedAttemptId]     = useState<string>('');
   const [assessmentQuestions, setAssessmentQuestions] = useState<DbQuestion[]>([]);
   const [allUserAnswers, setAllUserAnswers]            = useState<Record<string, UserAnswer[]>>({});
 
@@ -381,6 +257,9 @@ export default function SATAnalyticsTab({
         return;
       }
 
+      // Pre-select most recent attempt
+      setSelectedAttemptId(completed[completed.length - 1].id);
+
       const attemptIds = completed.map((a) => a.id);
 
       // 2. Section results for ALL attempts
@@ -405,7 +284,7 @@ export default function SATAnalyticsTab({
       }
       setAllSections(sectionsMap);
 
-      // 3. Concept mastery
+      // 3. Concept mastery (all attempts)
       const { data: masteryData } = await supabase
         .from('user_concept_mastery')
         .select('concept_tag, attempt_number, correct_count, total_count, mastery_percent')
@@ -506,13 +385,10 @@ export default function SATAnalyticsTab({
   }
 
   // ── Derived values ──────────────────────────────────────────────────────────
-  const selectedAttempt  = attempts[Math.min(selectedAttemptIdx, attempts.length - 1)];
-  const sectionResults   = allSections[selectedAttempt.id] ?? [];
-  const aiInsight        = allInsights[selectedAttempt.id] ?? null;
-  const selectedAnswers  = allUserAnswers[selectedAttempt.id] ?? [];
-
-  const attemptNumbers   = [...new Set(conceptMastery.map((m) => m.attempt_number))].sort((a, b) => a - b);
-  const allConceptTags   = [...new Set(conceptMastery.map((m) => m.concept_tag))];
+  const selectedAttempt = attempts.find((a) => a.id === selectedAttemptId) ?? attempts[attempts.length - 1];
+  const sectionResults  = allSections[selectedAttempt.id] ?? [];
+  const aiInsight       = allInsights[selectedAttempt.id] ?? null;
+  const selectedAnswers = allUserAnswers[selectedAttempt.id] ?? [];
 
   const weakConcepts = conceptMastery
     .filter(
@@ -524,12 +400,20 @@ export default function SATAnalyticsTab({
     .sort((a, b) => (a.mastery_percent ?? 0) - (b.mastery_percent ?? 0))
     .slice(0, 6);
 
-  const mathGroups = groupTagsByDomain(allConceptTags, SAT_MATH_DOMAIN_MAP, MATH_DOMAIN_ORDER);
-  const rwGroups   = groupTagsByDomain(allConceptTags, SAT_RW_DOMAIN_MAP,   RW_DOMAIN_ORDER);
-
   const firstAttempt  = attempts[0];
   const lastAttempt   = attempts[attempts.length - 1];
   const compositeGain = scoreDelta(firstAttempt.score, lastAttempt.score);
+
+  // Build tagSectionMap and sections for ConceptMasteryPanel
+  const tagSectionMap: Record<string, string> = {};
+  for (const tag of Object.keys(SAT_MATH_DOMAIN_MAP)) tagSectionMap[tag] = 'Math';
+  for (const tag of Object.keys(SAT_RW_DOMAIN_MAP))   tagSectionMap[tag] = 'Reading & Writing';
+
+  const sections = isFullTest
+    ? ['Reading & Writing', 'Math']
+    : assessment.subject === 'Math'
+      ? ['Math']
+      : ['Reading & Writing'];
 
   return (
     <div className="space-y-4">
@@ -562,7 +446,7 @@ export default function SATAnalyticsTab({
               {isFullTest && (a.score_rw !== null || a.score_math !== null) && (
                 <div className="flex gap-3 mt-2">
                   <div className="text-center">
-                    <p className="text-xs text-zinc-400">Reading & Writing</p>
+                    <p className="text-xs text-zinc-400">Reading &amp; Writing</p>
                     <p className="text-base font-medium text-zinc-700">
                       {a.score_rw ?? '—'}
                       <span className="text-xs font-normal text-zinc-400">/800</span>
@@ -585,7 +469,7 @@ export default function SATAnalyticsTab({
         {isFullTest && attempts.length >= 2 && (
           <div className="flex gap-6 mt-4 pt-4 border-t border-zinc-100">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500">R&W</span>
+              <span className="text-xs text-zinc-500">R&amp;W</span>
               <DeltaBadge delta={scoreDelta(firstAttempt.score_rw, lastAttempt.score_rw)} />
             </div>
             <div className="flex items-center gap-2">
@@ -596,23 +480,20 @@ export default function SATAnalyticsTab({
         )}
       </div>
 
-      {/* ── Block 2: Attempt filter + Section Breakdown ──────────────────────── */}
+      {/* ── Block 2: Attempt Pill Filter ─────────────────────────────────────── */}
+      {attempts.length > 1 && (
+        <AttemptPillFilter
+          attempts={attempts}
+          selectedId={selectedAttemptId}
+          onChange={setSelectedAttemptId}
+        />
+      )}
+
+      {/* ── Block 3: Section Breakdown ───────────────────────────────────────── */}
       <div className="bg-white shadow-sm rounded-md p-6">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-medium text-zinc-900">Section Breakdown</h3>
-          {attempts.length > 1 && (
-            <select
-              value={selectedAttemptIdx}
-              onChange={(e) => setSelectedAttemptIdx(Number(e.target.value))}
-              className="text-sm text-zinc-700 border border-zinc-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {attempts.map((a, i) => (
-                <option key={a.id} value={i}>
-                  Attempt {a.attempt_number}
-                </option>
-              ))}
-            </select>
-          )}
+          <span className="text-xs text-zinc-400">Attempt {selectedAttempt.attempt_number}</span>
         </div>
 
         {sectionResults.length === 0 ? (
@@ -624,7 +505,7 @@ export default function SATAnalyticsTab({
                 {sectionResults.filter((s) => s.section_id.startsWith('rw')).length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-                      Reading & Writing
+                      Reading &amp; Writing
                     </p>
                     <div className="space-y-4 pl-0.5">
                       {sectionResults
@@ -655,64 +536,20 @@ export default function SATAnalyticsTab({
         )}
       </div>
 
-      {/* ── Block 3: Concept Mastery Heatmap ────────────────────────────────── */}
+      {/* ── Block 4: Concept Mastery (shared component, all attempts in columns) */}
       {conceptMastery.length > 0 && (
-        <div className="bg-white shadow-sm rounded-md p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-base font-medium text-zinc-900">Concept Mastery</h3>
-              <p className="text-xs text-zinc-500 mt-1">Progress across all attempts</p>
-            </div>
-          </div>
-
-          {attemptNumbers.length >= 2 ? (
-            <div className="space-y-6">
-              {mathGroups.length > 0 && (
-                <ConceptMasteryPanel
-                  title="Math"
-                  groups={mathGroups}
-                  conceptMastery={conceptMastery}
-                  attemptNumbers={attemptNumbers}
-                />
-              )}
-              {rwGroups.length > 0 && (
-                <ConceptMasteryPanel
-                  title="Reading & Writing"
-                  groups={rwGroups}
-                  conceptMastery={conceptMastery}
-                  attemptNumbers={attemptNumbers}
-                />
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {allConceptTags.map((tag) => {
-                const pct = conceptMastery.find(
-                  (m) => m.concept_tag === tag && m.attempt_number === attemptNumbers[0],
-                )?.mastery_percent ?? null;
-                return (
-                  <div key={tag}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-zinc-700">{tag}</span>
-                      <span className="text-xs text-zinc-500">
-                        {pct !== null ? `${Math.round(pct)}%` : '—'}
-                      </span>
-                    </div>
-                    <div className="w-full bg-zinc-100 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full ${masteryBarClass(pct)}`}
-                        style={{ width: `${pct ?? 0}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <ConceptMasteryPanel
+          conceptMastery={conceptMastery}
+          tagSectionMap={tagSectionMap}
+          sections={sections}
+          attempts={attempts.map((a) => ({
+            attempt_number: a.attempt_number,
+            completed_at: a.completed_at,
+          }))}
+        />
       )}
 
-      {/* ── Block 4: Where You Lost Points ──────────────────────────────────── */}
+      {/* ── Block 5: Where You Lost Points ──────────────────────────────────── */}
       {weakConcepts.length > 0 && (
         <div className="bg-white shadow-sm rounded-md p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -760,17 +597,17 @@ export default function SATAnalyticsTab({
         </div>
       )}
 
-      {/* ── Block 5: SAT Scoring Reference ──────────────────────────────────── */}
+      {/* ── Block 6: SAT Scoring Reference ──────────────────────────────────── */}
       <SATScoringTable />
 
-      {/* ── Block 6: Solutions Panel (DB-driven, module pills, 25Q pagination) */}
+      {/* ── Block 7: Solutions Panel (DB-driven, module tabs, 25Q pagination) ── */}
       <SolutionsPanel
         questions={assessmentQuestions}
         userAnswers={selectedAnswers}
         isFullTest={isFullTest}
       />
 
-      {/* ── Block 7: AI Insight Panel ────────────────────────────────────────── */}
+      {/* ── Block 8: AI Insight Panel ────────────────────────────────────────── */}
       <div className="bg-white shadow-sm rounded-md p-6">
         <div className="flex items-center gap-2 mb-5">
           <Lightbulb className="w-4 h-4 text-blue-600" />
@@ -840,7 +677,7 @@ export default function SATAnalyticsTab({
                 Unlock personalized AI insights to accelerate your learning journey.
               </p>
               <button
-                onClick={() => (window.location.href = '/plans')}
+                onClick={() => router.push('/plans')}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
               >
                 Upgrade Now

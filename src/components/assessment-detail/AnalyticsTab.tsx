@@ -18,6 +18,7 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import { tiptapToPlainText } from '@/utils/tiptapUtils';
+import AttemptPillFilter from '@/components/ui/AttemptPillFilter';
 import type { Assessment } from '@/types';
 
 // ── Negative marks per exam ───────────────────────────────────────────────────
@@ -688,42 +689,11 @@ export default function AnalyticsTab({
     <div className="space-y-4">
 
       {/* ── Attempt pill selector ───────────────────────────────────────────── */}
-      <div className="bg-white shadow-sm rounded-md px-6 py-4">
-        <p className="text-xs font-medium text-zinc-500 mb-3">Viewing attempt</p>
-        <div className="flex flex-wrap gap-2">
-          {attempts.map((attempt) => {
-            const isSelected = attempt.id === selectedAttemptId;
-            const isLatestPill = attempt.id === attempts[attempts.length - 1].id;
-            return (
-              <button
-                key={attempt.id}
-                onClick={() => setSelectedAttemptId(attempt.id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition-colors ${
-                  isSelected
-                    ? 'bg-blue-700 text-white'
-                    : 'bg-white border border-zinc-200 text-zinc-700 hover:border-blue-300 hover:text-blue-700'
-                }`}
-              >
-                Attempt {attempt.attempt_number}
-                {isLatestPill && (
-                  <span
-                    className={`text-xs ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}
-                  >
-                    (Latest)
-                  </span>
-                )}
-                {attempt.score !== null && (
-                  <span
-                    className={`text-xs font-medium ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}
-                  >
-                    · {attempt.score}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <AttemptPillFilter
+        attempts={attempts}
+        selectedId={selectedAttemptId ?? ''}
+        onChange={setSelectedAttemptId}
+      />
 
       {analyticsLoading && (
         <div className="flex items-center justify-center py-8">
