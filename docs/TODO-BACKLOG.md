@@ -1,5 +1,124 @@
 # TODO Backlog — keySkillset Platform
-# Updated Apr 17 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+# Updated Apr 17 2026 (session 3). Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+
+---
+
+## [DONE] Super Admin Dashboard — B2C Revenue Tab — KSS-SA-038 (Apr 17 2026)
+
+Super Admin Dashboard Revenue tab fix, rename, and full feature build.
+PRD: `prds/super-admin/PRD-SA-DASHBOARD.md`
+
+### DB Migration
+| # | Migration | Status |
+|---|-----------|--------|
+| KSS-DB-038a | Add `PUBLISHED` to `plans_status_check` constraint | [x] DONE Apr 17 |
+| KSS-DB-038b | Migrate existing `LIVE` B2C plans → `PUBLISHED` (13 rows) | [x] DONE Apr 17 |
+
+### Fixes
+| # | Task | File | Status |
+|---|------|------|--------|
+| SA038-F01 | Fix Revenue tab empty data: `status = 'PUBLISHED'` (was `'PUBLISHED'` → renamed to `'LIVE'` in migration, now restored) | `src/lib/supabase/analytics.ts` | [x] DONE Apr 17 |
+| SA038-F02 | Fix plan publish failure: `'PUBLISHED'` rejected by DB constraint — constraint restored | `plans_status_check` | [x] DONE Apr 17 |
+| SA038-F03 | Fix `syncCourseFromPlan` to accept `'PUBLISHED'` status | `src/lib/supabase/plans.ts` | [x] DONE Apr 17 |
+| SA038-F04 | Fix `transitionSingleCoursePlanStatus` signature + `setWasLive` logic | `src/lib/supabase/plans.ts` | [x] DONE Apr 17 |
+| SA038-F05 | Fix `PlanOverviewTab` publish action: B2C → `PUBLISHED`, B2B → `LIVE` | `src/components/plans/PlanOverviewTab.tsx` | [x] DONE Apr 17 |
+| SA038-F06 | Fix `plans-pricing/new` single course plan handleSubmit: `'LIVE'` → `'PUBLISHED'` | `src/app/super-admin/plans-pricing/new/page.tsx` | [x] DONE Apr 17 |
+| SA038-F07 | Fix `fetchPublishedPlans`, `fetchLivePlatformPlans`, `fetchLiveCategoryPlansGrouped` queries | `src/lib/supabase/plans.ts` | [x] DONE Apr 17 |
+| SA038-F08 | Update TypeScript status types across `plans.ts`, `EditPlanSlideOver.tsx` | multiple | [x] DONE Apr 17 |
+
+### Features
+| # | Task | File | Status |
+|---|------|------|--------|
+| SA038-01 | Rename "Revenue" tab → "B2C Revenue" | `src/app/super-admin/dashboard/page.tsx` | [x] DONE Apr 17 |
+| SA038-02 | Remove "Subscribers by Plan" pie chart from RevenueTab | `src/components/analytics/RevenueTab.tsx` | [x] DONE Apr 17 |
+| SA038-03 | Create reusable `InfoTooltip` component (click-to-open, click-outside-to-close) | `src/components/ui/InfoTooltip.tsx` | [x] DONE Apr 17 |
+| SA038-04 | Add InfoTooltip to Total MRR, New Subscriptions, Churn Rate KPI cards | `RevenueTab.tsx` | [x] DONE Apr 17 |
+| SA038-05 | Add InfoTooltip to Plan column header in table | `RevenueTab.tsx` | [x] DONE Apr 17 |
+| SA038-06 | Fix MRR calculation: `(ANNUAL: price/12, MONTHLY: price) × subscribers` | `src/lib/supabase/analytics.ts` | [x] DONE Apr 17 |
+| SA038-07 | Add `billing_cycle` + `created_at` to `fetchRevenue` plans query; ORDER BY `created_at DESC` | `src/lib/supabase/analytics.ts` | [x] DONE Apr 17 |
+| SA038-08 | Add BILLING column to plan table | `RevenueTab.tsx` | [x] DONE Apr 17 |
+| SA038-09 | Add ADDED ON column to plan table (format: "17 April 2026") | `RevenueTab.tsx` | [x] DONE Apr 17 |
+| SA038-10 | Add client-side pagination to plan table (10/15/25, default 10, page-scoped footer MRR) | `RevenueTab.tsx` | [x] DONE Apr 17 |
+| SA038-11 | Create `prds/super-admin/PRD-SA-DASHBOARD.md` (KSS-SA-038) | `prds/super-admin/PRD-SA-DASHBOARD.md` | [x] DONE Apr 17 |
+
+---
+
+## [IN-PROGRESS] SAT Analytics Overhaul — KSS-SAT-A01 (Apr 17 2026)
+
+Full rebuild of the SAT analytics experience across full tests, subject tests, and chapter tests.
+PRD: `prds/PRD-SAT-ANALYTICS.md`
+
+### Task 1 — Session Setup + Doc Updates
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T1a | Update CLAUDE.md with Active Roles directive | `CLAUDE.md` | [x] DONE Apr 17 |
+| SAT-A01-T1b | Update CLAUDE-PLATFORM.md: AttemptPillFilter spec (no score in pills) | `docs/CLAUDE-PLATFORM.md` | [x] DONE Apr 17 |
+| SAT-A01-T1c | Add SAT analytics task list to TODO-BACKLOG.md | `docs/TODO-BACKLOG.md` | [x] DONE Apr 17 |
+| SAT-A01-T1d | Create PRD-SAT-ANALYTICS.md | `prds/PRD-SAT-ANALYTICS.md` | [x] DONE Apr 17 |
+
+### Task 2 — Extract AttemptPillFilter shared component
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T2a | Create `AttemptPillFilter.tsx` shared UI component | `src/components/ui/AttemptPillFilter.tsx` | [ ] PENDING |
+| SAT-A01-T2b | Wire `AttemptPillFilter` into `SATAnalyticsTab` (below Score Progression) | `src/components/assessment-detail/SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T2c | Wire `AttemptPillFilter` into `AnalyticsTab` (replace existing pill logic) | `src/components/assessment-detail/AnalyticsTab.tsx` | [ ] PENDING |
+
+### Task 3 — SAT Full Test: Remove attempt select + remove question-type filter
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T3a | Remove `<select>` attempt dropdown from inside Section Breakdown | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T3b | Remove question-type filter card (`filter` state, `SOLUTION_FILTERS`, `Analytics filter` card) | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T3c | Simplify `filteredConceptMastery` → `conceptMastery` (no type gating) | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T3d | Simplify `weakConcepts` — remove `allowedConceptTags` filter | `SATAnalyticsTab.tsx` | [ ] PENDING |
+
+### Task 4 — Remove score from AnalyticsTab pills (standardise)
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T4a | Remove `attempt.score` from pill label in `AnalyticsTab.tsx` | `src/components/assessment-detail/AnalyticsTab.tsx` | [ ] PENDING |
+
+### Task 5 — SAT Full Test: Replace hardcoded SolutionsPanel with DB-driven accordion
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T5a | Remove `SAT_SOLUTION_QUESTIONS` export + usage from `SolutionsPanel.tsx` | `src/components/assessment-detail/SolutionsPanel.tsx` | [ ] PENDING |
+| SAT-A01-T5b | Adapt `AnalyticsTab` `renderQuestionRow` pattern for SAT module structure (4 module tabs) | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T5c | Wire module tabs to `assessment_question_map` by `section_name` (R&W M1/M2, Math M1/M2) | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T5d | Wire `attempt_answers` for selected attempt → show user answers + correct answer in accordion | `SATAnalyticsTab.tsx` | [ ] PENDING |
+
+### Task 6 — SAT Full Test: AI Insight block review
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T6a | Verify AI Insight block gating: Free/Basic = locked teaser, Pro/Premium = real data or "not available" | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T6b | Fix hardcoded "We are thrilled to say..." upgrade copy — align to CLAUDE-RULES.md AI Insight spec | `SATAnalyticsTab.tsx` | [ ] PENDING |
+
+### Task 7 — Subject Test cascade
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T7a | Verify all T2–T6 changes work correctly for subject tests (isFullTest=false path) | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T7b | Subject test: confirm Section Breakdown shows 4 domain sections (not R&W/Math modules) | `SATAnalyticsTab.tsx` | [ ] PENDING |
+
+### Task 8 — Create generic ChapterAnalyticsTab (all exam types)
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T8a | Create `ChapterAnalyticsTab.tsx` — works for SAT, NEET, JEE, CLAT chapter tests | `src/components/assessment-detail/ChapterAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T8b | Blocks: Attempt Summary, AttemptPillFilter, Concept Performance bars, Solutions, AI Insight | `ChapterAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T8c | Negative marking aware: show "Marks Lost" block for NEET/JEE, hide for SAT/CLAT | `ChapterAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T8d | Update `page.tsx` routing: `chapter-test` → `ChapterAnalyticsTab`, SAT ft/st → `SATAnalyticsTab`, else → `AnalyticsTab` | `src/app/assessments/[id]/page.tsx` | [ ] PENDING |
+
+### Task 10 — Extract ConceptMasteryPanel as shared component
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T10a | Create `ConceptMasteryPanel.tsx`: section pills, always-table layout, weakest-first sort, sticky col, date headers | `src/components/assessment-detail/ConceptMasteryPanel.tsx` | [ ] PENDING |
+| SAT-A01-T10b | Wire into `SATAnalyticsTab` — replaces dual Math/RW panels; parent builds tagSectionMap from domain maps | `SATAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T10c | Wire into `ChapterAnalyticsTab` | `ChapterAnalyticsTab.tsx` | [ ] PENDING |
+| SAT-A01-T10d | AnalyticsTab concept mastery upgrade — DEFERRED to separate ticket | `AnalyticsTab.tsx` | [ ] DEFERRED |
+
+### Task 9 — PRD update
+| # | Task | File | Status |
+|---|------|------|--------|
+| SAT-A01-T9a | Update `PRD-SAT-ANALYTICS.md` with final decisions post-implementation | `prds/PRD-SAT-ANALYTICS.md` | [ ] PENDING |
+| SAT-A01-T9b | Update `PRD-AI-ANALYTICS.md` §9 components section with new component map | `prds/PRD-AI-ANALYTICS.md` | [ ] PENDING |
+
+---
 
 ---
 

@@ -1,0 +1,47 @@
+-- KSS-SAT-A02 Pre-build Diagnostic
+-- Run ALL statements in Supabase SQL editor. Paste full JSON result back into this file.
+-- Purpose: verify attempt_answers + attempt_section_results actual schema + SAT data existence.
+
+-- ── 1. Column check: attempt_answers ─────────────────────────────────────────
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'attempt_answers'
+ORDER BY ordinal_position;
+
+-- ── 2. Column check: attempt_section_results ─────────────────────────────────
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'attempt_section_results'
+ORDER BY ordinal_position;
+
+-- ── 3. SAT attempt_answers existence check ───────────────────────────────────
+SELECT
+  ass.id AS assessment_id,
+  ass.title AS assessment_title,
+  ass.exam,
+  ass.type AS assessment_type,
+  a.id AS attempt_id,
+  a.attempt_number,
+  a.status,
+  a.user_id,
+  a.completed_at,
+  COUNT(aa.id) AS answer_row_count,
+  COUNT(DISTINCT aa.section_name) AS distinct_sections,
+  STRING_AGG(DISTINCT aa.section_name, ', ' ORDER BY aa.section_name) AS section_names
+FROM assessments ass
+JOIN attempts a ON a.assessment_id::text = ass.id::text
+LEFT JOIN attempt_answers aa ON aa.attempt_id = a.id
+WHERE ass.exam = 'SAT' AND a.status IN ('COMPLETED', 'completed')
+GROUP BY ass.id, ass.title, ass.exam, ass.type, a.id, a.attempt_number, a.status, a.user_id, a.completed_at
+ORDER BY ass.title, a.attempt_number;
+
+-- ── 4. SAT attempt_section_results existence check ───────────────────────────
+SELECT
+  ass.title AS assessment_title,
+  a.attempt_number,
+  asr.*
+FROM attempt_section_results asr
+JOIN attempts a ON a.id = asr.attempt_id
+JOIN assessments ass ON ass.id::text = asr.assessment_id::text
+WHERE ass.exam = 'SAT'
+ORDER BY ass.title, a.attempt_number;

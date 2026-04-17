@@ -1256,7 +1256,7 @@ function SingleCoursePlanForm() {
     return null
   }
 
-  async function handleSubmit(status: 'DRAFT' | 'LIVE') {
+  async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
     const err = validate()
     if (err) { setError(err); return }
 
@@ -1292,13 +1292,13 @@ function SingleCoursePlanForm() {
       })
       if (selectedCourse) {
         await addContentToPlan(planId, selectedCourse, 'COURSE')
-        if (status === 'LIVE') {
+        if (status === 'PUBLISHED') {
           const { syncCourseFromPlan } = await import('@/lib/supabase/plans')
           await syncCourseFromPlan(selectedCourse, {
             price:           effectivePrice,
             price_usd:       effectivePriceUsd,
             stripe_price_id: effectiveStripeId,
-            status:          'LIVE',
+            status:          'PUBLISHED',
           })
         }
       }
@@ -1521,7 +1521,7 @@ function SingleCoursePlanForm() {
             Save as Draft
           </button>
           <button
-            type="button" disabled={submitting} onClick={() => handleSubmit('LIVE')}
+            type="button" disabled={submitting} onClick={() => handleSubmit('PUBLISHED')}
             className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Saving...' : 'Set Live'}

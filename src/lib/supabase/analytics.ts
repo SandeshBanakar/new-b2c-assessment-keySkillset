@@ -64,8 +64,10 @@ export type RevenuePlanRow = {
   planId: string
   name: string
   price: number
+  billingCycle: string
   subscriberCount: number
   mrr: number
+  createdAt: string
 }
 
 export type RevenueData = {
@@ -169,9 +171,10 @@ export async function fetchRevenue(range: DateRange): Promise<RevenueData> {
   const [plansRes, subscribersRes, signupsRes] = await Promise.all([
     supabase
       .from('plans')
-      .select('id, name, price')
+      .select('id, name, price, billing_cycle, created_at')
       .eq('plan_audience', 'B2C')
-      .eq('status', 'PUBLISHED'),
+      .eq('status', 'PUBLISHED')
+      .order('created_at', { ascending: false }),
 
     supabase.from('plan_subscribers').select('plan_id, subscriber_count'),
 
@@ -190,13 +193,20 @@ export async function fetchRevenue(range: DateRange): Promise<RevenueData> {
   const subMap: Record<string, number> = {}
   for (const s of subscribers) subMap[s.plan_id] = s.subscriber_count ?? 0
 
-  const planRows: RevenuePlanRow[] = plans.map((p) => ({
-    planId: p.id,
-    name: p.name,
-    price: p.price ?? 0,
-    subscriberCount: subMap[p.id] ?? 0,
-    mrr: (p.price ?? 0) * (subMap[p.id] ?? 0),
-  }))
+  const planRows: RevenuePlanRow[] = plans.map((p) => {
+    const price       = p.price ?? 0
+    const subscribers = subMap[p.id] ?? 0
+    const monthlyPrice = p.billing_cycle === 'ANNUAL' ? price / 12 : price
+    return {
+      planId:        p.id,
+      name:          p.name,
+      price,
+      billingCycle:  p.billing_cycle ?? 'MONTHLY',
+      subscriberCount: subscribers,
+      mrr:           monthlyPrice * subscribers,
+      createdAt:     p.created_at as string,
+    }
+  })
 
   const totalMrr = planRows.reduce((s, r) => s + r.mrr, 0)
 

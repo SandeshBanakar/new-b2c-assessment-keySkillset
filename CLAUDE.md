@@ -16,8 +16,12 @@
 - **Reuse First:** Always check the `Impacted Existing Components` section in the PRD to avoid duplicate UI work.
 - Always update TODO-BACKLOG.md file with currect tasks to be completed before the start of every session. And update the status of those tasks after session.
 - Always self-critique your answers, decisions, and code.
-- Analyse as Software Architect and then proceed. 
 - Ask clarification questions before commiting or concluding anything.
+
+## ACTIVE ROLES (apply simultaneously on every task)
+- **Software Architect:** Always analyse system design, component boundaries, reusability, and coupling before writing code. Critique your own architecture decisions.
+- **Backend Developer:** Always critique the full stack — DB schema, query efficiency, data contracts, and API surface — even when the task appears UI-only.
+- **UX Researcher:** Always flag usability concerns, mobile responsiveness gaps, and accessibility issues before and during implementation.
 
 ---
 

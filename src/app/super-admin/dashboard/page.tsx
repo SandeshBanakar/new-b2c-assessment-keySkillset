@@ -11,7 +11,7 @@ type TabId = 'health' | 'revenue' | 'tenants' | 'assessments'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'health',      label: 'Platform Health' },
-  { id: 'revenue',     label: 'Revenue' },
+  { id: 'revenue',     label: 'B2C Revenue' },
   { id: 'tenants',     label: 'Client Admins' },
   { id: 'assessments', label: 'Assessments' },
 ]

@@ -900,7 +900,7 @@ export function SingleCoursePlanEditSlideOver({
         billing_cycle:       billingCycle,
         compare_at_price:    hasCompareAt ? Number(compareAtPrice) : null,
         compare_at_price_usd: hasCompareAt ? Number(compareAtPriceUsd) : null,
-        status:              plan.status as 'DRAFT' | 'LIVE' | 'DELETED',
+        status:              plan.status as 'DRAFT' | 'LIVE' | 'PUBLISHED' | 'DELETED',
       })
       onSaved()
     } catch (e: unknown) {

@@ -18,6 +18,12 @@ Icons:       lucide-react ONLY
 Colors:      Tailwind tokens ONLY — zero custom hex, zero inline styles
 ```
 
+**AttemptPillFilter — locked design (Apr 17 2026):**
+- Component: `src/components/ui/AttemptPillFilter.tsx`
+- Shape: `rounded-full`, active = `bg-blue-700 text-white`, inactive = `bg-white border border-zinc-200 text-zinc-700 hover:border-blue-300 hover:text-blue-700`
+- Label: `Attempt N` only — NO score displayed. `(Latest)` tag on most recent pill.
+- Applies platform-wide to ALL analytics tabs (SAT full test, SAT subject test, AnalyticsTab chapter/other). Never show score in the pill.
+
 Plan tier badge colours (Assessment plans only — BASIC/PRO/PREMIUM/ENTERPRISE never apply to course plans):
 - `BASIC` = zinc-100/zinc-600
 - `PRO` = blue-50/blue-700
@@ -126,6 +132,33 @@ src/app/assessments/[id]/exam/page.tsx             LinearExamPlayer
 src/hooks/useExamEngine.ts
 src/data/demoUsers.ts | src/data/assessments.ts | src/lib/supabase/client.ts
 ```
+
+**Assessment Analytics components (KSS-SAT-A01 — Apr 17 2026):**
+```
+src/components/ui/AttemptPillFilter.tsx                  Shared attempt pill — all analytics tabs
+src/components/assessment-detail/ConceptMasteryPanel.tsx Shared concept mastery table — SAT + Chapter
+src/components/assessment-detail/AnalyticsTab.tsx        Non-SAT full/subject tests (NEET, JEE, CLAT)
+src/components/assessment-detail/SATAnalyticsTab.tsx     SAT full-test + subject-test only
+src/components/assessment-detail/ChapterAnalyticsTab.tsx ALL chapter tests (SAT, NEET, JEE, CLAT)
+src/components/assessment-detail/SolutionsPanel.tsx      DELETED — never re-create
+```
+
+**ConceptMasteryPanel rules (locked Apr 17 2026):**
+- Props: `conceptMastery`, `tagSectionMap: Record<string,string>`, `sections: string[]`,
+         `attempts: Array<{ attempt_number: number; completed_at: string | null }>`
+- Section pills: `rounded-full`, same active/inactive colours as AttemptPillFilter
+- Responsive pill label: `<span className="sm:hidden">R&W</span><span className="hidden sm:inline">Reading & Writing</span>`
+- Always table layout (never bar chart fallback) — 1 attempt = 1 column
+- Column header: `Attempt N` primary + `DD MMM` date secondary (from `completed_at`)
+- Rows sorted weakest mastery % first (ascending, most recent attempt's mastery %)
+- Missing data cell = `—` with `bg-zinc-100 text-zinc-400`
+- First column sticky: `sticky left-0 bg-white z-10` — parent must NOT have `overflow-hidden`
+- `overflow-x-auto` outer wrapper for mobile
+- Footer always visible: `≥80% — strong · 60–79% — developing · <60% — needs work`
+- Section pill filters rows only — all attempt columns always visible; sort recomputes per section
+- In `SATAnalyticsTab`: parent builds `tagSectionMap` from `SAT_RW_DOMAIN_MAP`/`SAT_MATH_DOMAIN_MAP` keys
+
+NEVER re-create `SolutionsPanel.tsx`. Use the inline DB-driven accordion pattern from `AnalyticsTab.tsx`.
 
 Rich text editor: **Tiptap + KaTeX** — wired Apr 12 2026 (KSS-DB-018, KSS-DB-019).
 - Component: `src/components/ui/RichTextEditor.tsx` — import `RichTextEditor` (default) + `JSONContent`, `emptyDoc`, `isDocEmpty`, `ensureDoc`

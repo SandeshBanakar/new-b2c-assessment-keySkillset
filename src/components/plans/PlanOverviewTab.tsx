@@ -35,7 +35,7 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
 
   const isB2B          = plan.plan_audience === 'B2B'
   const isSingleCourse = plan.plan_category === 'SINGLE_COURSE_PLAN'
-  const isLive         = plan.status === 'LIVE'
+  const isLive         = plan.status === 'LIVE' || plan.status === 'PUBLISHED'
   const isDraft        = plan.status === 'DRAFT'
   const wasLive        = (plan as PlanDetail).was_live === true
 
@@ -49,13 +49,13 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
     setTransitioning(true)
     try {
       if (isSingleCourse) {
-        await transitionSingleCoursePlanStatus(plan.id, 'LIVE', {
+        await transitionSingleCoursePlanStatus(plan.id, 'PUBLISHED', {
           price:           plan.price,
           price_usd:       (plan as PlanDetail).price_usd ?? null,
           stripe_price_id: (plan as PlanDetail).stripe_price_id ?? null,
         }, wasLive)
       } else {
-        await updatePlan(plan.id, { status: 'LIVE', was_live: true })
+        await updatePlan(plan.id, { status: isB2B ? 'LIVE' : 'PUBLISHED', was_live: true })
       }
       await writePlanAuditLog(plan.id, 'LIVE', {
         stripe_product_id: `stripe_prod_DEMO_${plan.id.slice(0, 8)}`,
