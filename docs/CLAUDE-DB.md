@@ -423,6 +423,140 @@ client_audit_log — tenant_id, actor_id, actor_name,
   entity_id, before_state (jsonb), after_state (jsonb), ip_address, created_at
 ```
 
+### concept_tags (KSS-DB-030, Apr 17 2026 — replaces KSS-DB-026 display-only version)
+```
+id (uuid PK), exam_category (text NOT NULL), subject (text NOT NULL),
+concept_name (text NOT NULL), slug (text NOT NULL),
+description (text nullable),
+created_by (uuid nullable FK→admin_users ON DELETE SET NULL),
+created_at (timestamptz DEFAULT now())
+UNIQUE (exam_category, subject, concept_name)
+```
+- Indexes: exam_category, (exam_category, subject), slug
+- Seeded with 144 tags: SAT=45, NEET=43, JEE=33, CLAT=23
+- IMMUTABLE seed data — concept tags are registry only; SA may add via Platform Config page
+- `questions.concept_tag` (free text) is the operational field; `concept_tags` is the registry
+- Hard delete allowed (with warning if question_count > 0 linked via question_concept_mappings)
+
+### question_concept_mappings (KSS-DB-031, Apr 17 2026)
+```
+id (uuid PK), question_id (uuid NOT NULL FK→questions ON DELETE CASCADE),
+concept_tag_id (uuid NOT NULL FK→concept_tags ON DELETE CASCADE),
+created_at (timestamptz DEFAULT now())
+UNIQUE (question_id, concept_tag_id)
+```
+- Indexes: question_id, concept_tag_id
+- One question → one concept (enforced at UI level in QuestionForm)
+- One concept → many questions (shown in Platform Config list view)
+
+### user_concept_mastery ENHANCED (KSS-DB-032, Apr 17 2026)
+Additional columns added to existing table:
+```
+module_id (text nullable — e.g. 'rw_m1', 'math_m2'),
+stage (text GENERATED ALWAYS AS STORED — computed from mastery_percent):
+  ≥80% → 'strength' | ≥60% → 'developing' | ≥40% → 'needs_practice' | <40% → 'weak'
+attempt_count (int DEFAULT 1),
+last_attempt_date (timestamptz DEFAULT now()),
+trend (text DEFAULT 'stable' CHECK IN ('improving','declining','stable'))
+```
+- `stage` is a Postgres GENERATED ALWAYS AS STORED column — never update directly
+- `trend` is computed by analytics engine (compare last 2 attempt mastery_percent values)
+- Production: update attempt_count and last_attempt_date on every attempt submission
+
+---
+
+## SAT SCORING — Official College Board Conversion Table (Practice Test #4)
+
+Source: `public/scoring-sat-practice-test-4-digital.pdf` — © 2023 College Board (2324-BB-852)
+
+### Structure
+- Total Score: 400–1600 (sum of R&W + Math section scores)
+- Section Scores: 200–800 each (R&W and Math independently)
+- Modules: R&W has Module 1 (33Q) + Module 2 (33Q) = max 66 raw. Math has Module 1 (27Q) + Module 2 (27Q) = max 54 raw.
+- Note: Scores are expressed as ranges (lower/upper) due to simplified paper-based scoring
+
+### Raw Score → Section Score Conversion Table
+
+| Raw Score | R&W Lower | R&W Upper | Math Lower | Math Upper |
+|-----------|-----------|-----------|------------|------------|
+| 0 | 200 | 200 | 200 | 200 |
+| 7 | 200 | 210 | 200 | 220 |
+| 8 | 200 | 220 | 200 | 230 |
+| 9 | 210 | 230 | 220 | 250 |
+| 10 | 230 | 250 | 250 | 280 |
+| 11 | 240 | 260 | 280 | 310 |
+| 12 | 250 | 270 | 290 | 320 |
+| 13 | 260 | 280 | 300 | 330 |
+| 14 | 280 | 300 | 310 | 340 |
+| 15 | 290 | 310 | 320 | 350 |
+| 16 | 320 | 340 | 330 | 360 |
+| 17 | 340 | 360 | 330 | 360 |
+| 18 | 350 | 370 | 340 | 370 |
+| 19 | 360 | 380 | 350 | 380 |
+| 20 | 370 | 390 | 360 | 390 |
+| 21 | 370 | 390 | 370 | 400 |
+| 22 | 380 | 400 | 370 | 400 |
+| 23 | 390 | 410 | 380 | 410 |
+| 24 | 400 | 420 | 390 | 420 |
+| 25 | 410 | 430 | 400 | 430 |
+| 26 | 420 | 440 | 420 | 450 |
+| 27 | 420 | 440 | 430 | 460 |
+| 28 | 430 | 450 | 440 | 470 |
+| 29 | 440 | 460 | 460 | 490 |
+| 30 | 450 | 470 | 470 | 500 |
+| 31 | 460 | 480 | 480 | 510 |
+| 32 | 460 | 480 | 500 | 530 |
+| 33 | 470 | 490 | 510 | 540 |
+| 34 | 480 | 500 | 520 | 550 |
+| 35 | 490 | 510 | 530 | 560 |
+| 36 | 490 | 510 | 550 | 580 |
+| 37 | 500 | 520 | 560 | 590 |
+| 38 | 510 | 530 | 570 | 600 |
+| 39 | 520 | 540 | 580 | 610 |
+| 40 | 530 | 550 | 590 | 620 |
+| 41 | 540 | 560 | 600 | 630 |
+| 42 | 540 | 560 | 620 | 650 |
+| 43 | 550 | 570 | 630 | 660 |
+| 44 | 560 | 580 | 650 | 680 |
+| 45 | 570 | 590 | 670 | 700 |
+| 46 | 580 | 600 | 690 | 720 |
+| 47 | 590 | 610 | 710 | 740 |
+| 48 | 590 | 610 | 730 | 760 |
+| 49 | 600 | 620 | 740 | 770 |
+| 50 | 610 | 630 | 750 | 780 |
+| 51 | 620 | 640 | 760 | 790 |
+| 52 | 630 | 650 | 770 | 800 |
+| 53 | 630 | 650 | 780 | 800 |
+| 54 | 640 | 660 | 790 | 800 |
+| 55 | 650 | 670 | — | — |
+| 56 | 660 | 680 | — | — |
+| 57 | 670 | 690 | — | — |
+| 58 | 680 | 700 | — | — |
+| 59 | 690 | 710 | — | — |
+| 60 | 700 | 720 | — | — |
+| 61 | 710 | 730 | — | — |
+| 62 | 720 | 740 | — | — |
+| 63 | 730 | 750 | — | — |
+| 64 | 750 | 770 | — | — |
+| 65 | 770 | 790 | — | — |
+| 66 | 790 | 800 | — | — |
+
+### Calculation Algorithm
+```
+rw_raw = rw_m1_correct + rw_m2_correct  (0–66)
+math_raw = math_m1_correct + math_m2_correct  (0–54)
+rw_score = lookup(rw_raw) → { lower, upper }
+math_score = lookup(math_raw) → { lower, upper }
+total_lower = rw_score.lower + math_score.lower
+total_upper = rw_score.upper + math_score.upper
+```
+
+### Practice Test #4 Answer Key
+R&W Module 1 (33Q): B,A,A,C,A,B,D,B,B,D,C,D,A,B,C,A,A,A,A,D,D,D,B,C,B,A,C,D,A,A,D,D,C
+R&W Module 2 (33Q): D,D,B,B,B,B,A,C,C,A,A,B,D,C,C,A,B,D,C,A,B,D,D,A,B,B,A,A,C,C,A,A,B
+Math Module 1 (27Q): B,A,B,D,A,9,10,A,B,D,A,C,1/5,80,D,B,B,A,C,100,361/8,B,D,C,C,D,5
+Math Module 2 (27Q): B,B,C,A,A,15/-5,50,B,D,A,A,B,.3,2,A,C,B,D,A,15/17,51,A,C,C,D,B,600
+
 ---
 
 ## COMPLETED SCHEMA CHANGES (April 11 2026)
@@ -447,7 +581,10 @@ client_audit_log — tenant_id, actor_id, actor_name,
 - **KSS-DB-025 (Apr 13 2026)**: Created `attempt_ai_insights` table. Stores static demo AI insight text per completed attempt. Columns: `id (uuid PK)`, `attempt_id (FK→attempts UNIQUE)`, `what_went_well (text NOT NULL)`, `next_steps (text NOT NULL)`, `model_used (text DEFAULT 'static_demo')`, `generated_at (timestamptz)`. UNIQUE `(attempt_id)`.
 - **KSS-DB-027 (Apr 16 2026)**: Added `status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','ACTIVE'))` to `sources` table. Enables SA to mark a source as Draft (being populated) or Active (ready for use in assessments).
 - **KSS-DB-028 (Apr 16 2026)**: Added `deleted_at TIMESTAMPTZ NULL` to both `sources` and `chapters` tables for soft delete. All queries on both tables must filter `WHERE deleted_at IS NULL`. Deleting a source soft-deletes all child chapters in the same operation.
-- **KSS-DB-029 (Apr 16 2026)**: Dropped `status` column from `chapters` table (`ALTER TABLE chapters DROP COLUMN IF EXISTS status;`). Chapters have no draft/archive concept — they are always live from creation. UI and all queries updated to remove any reference to chapter status.
+- **KSS-DB-029 (Apr 16 2026)**: Dropped `status` column from `chapters` table
+- **KSS-DB-030 (Apr 17 2026)**: Recreated `concept_tags` table (full hierarchy). Replaced KSS-DB-026 display-only version. New columns: `exam_category`, `subject`, `concept_name`, `slug`, `description`. UNIQUE on `(exam_category, subject, concept_name)`. Seeded 144 tags: SAT=45, NEET=43, JEE=33, CLAT=23.
+- **KSS-DB-031 (Apr 17 2026)**: Created `question_concept_mappings` table. Links `questions.id → concept_tags.id`. UNIQUE `(question_id, concept_tag_id)`. Soft link — no cascade changes to `questions.concept_tag` text field.
+- **KSS-DB-032 (Apr 17 2026)**: Enhanced `user_concept_mastery` with 5 new columns: `module_id (text)`, `stage (text GENERATED STORED)`, `attempt_count (int DEFAULT 1)`, `last_attempt_date (timestamptz)`, `trend (text CHECK IN ('improving','declining','stable'))`. Stage computed from mastery_percent: ≥80=strength, ≥60=developing, ≥40=needs_practice, <40=weak. (`ALTER TABLE chapters DROP COLUMN IF EXISTS status;`). Chapters have no draft/archive concept — they are always live from creation. UI and all queries updated to remove any reference to chapter status.
 - **KSS-DB-026 (Apr 14 2026)**: Created `concept_tags` table. SA-controlled concept tag registry for analytics. Columns: `id (uuid PK)`, `name (text NOT NULL)`, `exam_category (text NOT NULL)`, `subject (text nullable)`, `created_by (uuid FK→admin_users nullable)`, `created_at (timestamptz)`. UNIQUE index on `(name, exam_category, COALESCE(subject,''))`. RLS OFF. Soft link to `questions.concept_tag` (no FK constraint — `questions.concept_tag` stays free-text; registry is display-only for SA Marketing Config view).
 
 ### attempt_answers (KSS-DB-022, Apr 13 2026)

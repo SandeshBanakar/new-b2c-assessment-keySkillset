@@ -21,6 +21,7 @@ interface OptionEntry { key: string; text: JSONContent }
 
 interface Source { id: string; name: string; exam_category_name: string | null }
 interface Chapter { id: string; source_id: string; name: string; order_index: number }
+interface ConceptTagOption { id: string; exam_category: string; subject: string; concept_name: string; slug: string }
 
 interface SubQuestionDraft {
   id?: string
@@ -192,9 +193,18 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
   const [form, setForm] = useState<FormState>(defaultForm(defaultChapterId, defaultSourceId))
   const [sources, setSources] = useState<Source[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
+  const [conceptTags, setConceptTags] = useState<ConceptTagOption[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingEdit, setLoadingEdit] = useState(mode === 'edit')
+
+  // Load concept tags
+  useEffect(() => {
+    supabase.from('concept_tags')
+      .select('id, exam_category, subject, concept_name, slug')
+      .order('exam_category').order('subject').order('concept_name')
+      .then(({ data }) => { if (data) setConceptTags(data as ConceptTagOption[]) })
+  }, [])
 
   // Load sources
   useEffect(() => {
@@ -533,8 +543,24 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
           </div>
           <div>
             <FieldLabel label="Concept Tag" />
-            <input className={inputCls} placeholder="e.g. sp3 Hybridization" value={form.concept_tag}
-              onChange={(e) => setField('concept_tag', e.target.value)} />
+            <select
+              className={inputCls}
+              value={form.concept_tag}
+              onChange={(e) => setField('concept_tag', e.target.value)}
+            >
+              <option value="">— None —</option>
+              {Array.from(new Set(conceptTags.map(t => `${t.exam_category}|||${t.subject}`))).map(key => {
+                const [exam, subject] = key.split('|||')
+                const group = conceptTags.filter(t => t.exam_category === exam && t.subject === subject)
+                return (
+                  <optgroup key={key} label={`${exam} — ${subject}`}>
+                    {group.map(t => (
+                      <option key={t.id} value={t.concept_name}>{t.concept_name}</option>
+                    ))}
+                  </optgroup>
+                )
+              })}
+            </select>
           </div>
         </div>
 

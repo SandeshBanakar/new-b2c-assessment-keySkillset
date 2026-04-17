@@ -21,6 +21,7 @@ import {
   PlaySquare,
   LogOut,
   MoreHorizontal,
+  Settings2,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -117,6 +118,7 @@ export default function SuperAdminLayout({
             Configuration
           </p>
           <NavItem href="/super-admin/marketing" icon={Megaphone} label="Marketing Config" />
+          <NavItem href="/super-admin/platform-config" icon={Settings2} label="Platform Config" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Compliance

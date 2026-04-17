@@ -1,5 +1,56 @@
 # TODO Backlog — keySkillset Platform
-# Updated Apr 16 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+# Updated Apr 17 2026. Pick up items as separate tickets with KSS-DB-XXX authorisation where required.
+
+---
+
+## [DONE] Concept Tags + Platform Config + SAT Question Seeding — KSS-SA-037 (Apr 17 2026)
+
+Schema changes, seeding, UI, QuestionForm dropdown update, and SAT Practice Test #4 question seeding.
+
+### Schema (run in Supabase)
+
+| # | Migration | Status |
+|---|-----------|--------|
+| KSS-DB-030 | Recreate `concept_tags` table (full hierarchy: exam_category, subject, concept_name, slug) | [x] DONE Apr 17 |
+| KSS-DB-031 | Create `question_concept_mappings` table (question_id → concept_tag_id FK) | [x] DONE Apr 17 |
+| KSS-DB-032 | Enhance `user_concept_mastery` (add module_id, stage computed, attempt_count, last_attempt_date, trend) | [x] DONE Apr 17 |
+
+### Seed Data
+
+| # | Task | Status |
+|---|------|--------|
+| CT-SEED-001 | Seed SAT concept tags (R&W: 4 subjects × ~5 tags, Math: 4 subjects × ~6 tags) | [x] DONE Apr 17 — 45 SAT tags |
+| CT-SEED-002 | Seed NEET concept tags (Physics, Chemistry, Biology) | [x] DONE Apr 17 — 43 NEET tags |
+| CT-SEED-003 | Seed JEE concept tags (Math, Physics, Chemistry) | [x] DONE Apr 17 — 33 JEE tags |
+| CT-SEED-004 | Seed CLAT concept tags (English, Legal, Logical, Quant, Current Affairs) | [x] DONE Apr 17 — 23 CLAT tags |
+
+### Code Tasks
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| CT-001 | Platform Config page — Concept Tags CRUD (list, create, edit, delete) | `src/app/super-admin/platform-config/page.tsx` | [x] DONE Apr 17 |
+| CT-002 | Update Super Admin nav to include Platform Config below Marketing | `src/app/super-admin/layout.tsx` | [x] DONE Apr 17 |
+| CT-003 | QuestionForm: convert `concept_tag` from text input → dropdown from `concept_tags` table | `src/app/super-admin/question-bank/_components/QuestionForm.tsx` | [x] DONE Apr 17 |
+| CT-004 | Update `CLAUDE-DB.md` with new schema + SAT scoring table | `docs/CLAUDE-DB.md` | [x] DONE Apr 17 |
+| CT-005 | Create `docs/SEEDING-FRAMEWORK.md` | `docs/SEEDING-FRAMEWORK.md` | [x] DONE Apr 17 |
+| CT-006 | Create `database.schema.json` | `database.schema.json` | [x] DONE Apr 17 |
+| CT-007 | Update PRD-AI-ANALYTICS.md with mastery fields spec | `prds/PRD-AI-ANALYTICS.md` | [x] DONE Apr 17 |
+
+### SAT Question Seeding (QS-001, QS-002, QS-003)
+
+| # | Task | Status |
+|---|------|--------|
+| QS-002 | Seed 8 SAT sources + 16 chapters | [x] DONE Apr 17 — UUIDs a1000001-...001–008 / b1000001-...001–016 |
+| QS-001 | Seed 120 SAT questions (Practice Test #4) | [x] DONE Apr 17 — 33+33+27+27 across 4 modules |
+| QS-003 | Link questions to assessments (Full Test 120Q, R&W Subject 66Q, Math Subject 54Q) | [x] DONE Apr 17 |
+| QS-003b | Sync question_concept_mappings (120 rows) | [x] DONE Apr 17 |
+
+### SAT Scoring Display UI
+
+| # | Task | Status |
+|---|------|--------|
+| SAT-UI-001 | Build `SATScoringTable` component — collapsible scoring reference | [x] DONE Apr 17 — `src/components/assessment-detail/SATScoringTable.tsx` |
+| SAT-UI-002 | Wire `SATScoringTable` into `SATAnalyticsTab` | [x] DONE Apr 17 |
 
 ---
 
@@ -110,15 +161,18 @@ Remaining production work:
 
 ---
 
-## [HIGH] Question Seeding — KSS-SA-032 (new ticket — not yet built)
+## [PARTIAL] Question Seeding — KSS-SA-032
 
-| # | Issue | Detail | Requires |
-|---|-------|--------|---------|
-| QS-001 | Real questions needed for 4 full tests | NEET (180Q), CLAT (~120–150Q), JEE (90Q), SAT (98Q) — all unique per full test. Subject/chapter tests can reuse. Questions must have concept_tag, explanation, marks. | Separate ticket |
-| QS-002 | Sources + chapters must be seeded before questions | sources (NEET BIO 12TH SYLLABUS, NEET PHYS, etc.), chapters within each source, then questions linked to source+chapter. | After QS-001 |
-| QS-003 | assessment_question_map rows needed | After questions seeded: link questions to full test assessments with section_name. | After QS-001 + QS-002 |
-| QS-004 | Subject and chapter tests need creating in assessments table | NEET Bio subject test, NEET Phy subject test, chapter tests per subject — reusing existing questions. | After QS-001 |
-| QS-005 | Demo attempt data needed for analytics | Seed attempt rows + attempt_answers for demo users to demonstrate analytics algorithm. | After ANA-003 + QS-001 |
+| # | Issue | Detail | Status |
+|---|-------|--------|--------|
+| QS-001 | SAT 120 questions seeded (Practice Test #4) | 33+33+27+27 across 4 modules. MCQ_SINGLE + NUMERIC. All linked to 3 assessments. | [x] DONE Apr 17 |
+| QS-002 | SAT sources + chapters seeded | 8 sources, 16 chapters (2/source) with fixed deterministic UUIDs. | [x] DONE Apr 17 |
+| QS-003 | assessment_question_map seeded | Full Test (120Q), R&W Subject Test (66Q), Math Subject Test (54Q) | [x] DONE Apr 17 |
+| QS-001b | NEET questions (180Q) | NEET (180Q) — all unique, concept_tag, explanation, marks. | [ ] PENDING |
+| QS-001c | CLAT questions (~140Q) | Passage-based English, Legal, Logical, Quant, GK. | [ ] PENDING |
+| QS-001d | JEE questions (90Q) | Physics, Chemistry, Mathematics — MCQ + NUMERIC. | [ ] PENDING |
+| QS-004 | SAT Full Test 2 question mapping | `476083b3-0b9a-4e9e-b550-b02367e6b49b` has no questions — no unique question set seeded yet. | [ ] PENDING |
+| QS-005 | Demo attempt data for new questions | Seed attempt rows + attempt_answers for demo users once NEET/JEE/CLAT/SAT FT2 questions are seeded. | [ ] PENDING |
 
 ---
 
@@ -160,6 +214,7 @@ Remaining production work:
 | Ticket | Feature | Status |
 |--------|---------|--------|
 | KSS-SA-007 | Marketing Config | [PENDING] |
+| KSS-SA-[TBD] | Platform Config (Concept Tags CRUD) | [IN-PROGRESS — Apr 17 2026] |
 | KSS-CA-007 | CA Dashboard | [PENDING] |
 | KSS-CA-009 | Audit Log (CA) | [PENDING] |
 | KSS-SA-019 | Contract mandatory on CA creation (Phase 2 enforcement) | [CRITICAL] |
@@ -168,6 +223,7 @@ Remaining production work:
 | KSS-SA-[TBD] | Build Super Admin login + authentication flow | [PENDING] |
 | KSS-CA-[TBD] | Build Client Admin login + authentication flow | [PENDING] |
 | KSS-B2C-[TBD] | Build B2C user signup + onboarding flow | [PENDING] |
+| KSS-SA-[TBD] | SAT Exam Engine (scoring + adaptive routing) | [BACKLOG — todo after concept tags shipped] |
 
 ---
 
@@ -190,3 +246,12 @@ Remaining production work:
 |---|-------|--------|
 | TODO-011 | SECTION_LOCKED + sections count validation | Confirm: block save or just warn? |
 | TODO-013 | Empty what_youll_get fallback | If display_config.what_youll_get is empty, learner sees nothing. Platform-default bullets needed? |
+
+---
+
+## RULES (Added Apr 17 2026)
+
+- This file MUST be updated at the START of every session with new tasks
+- Mark tasks `[IN-PROGRESS]` as work begins, `[x] DONE` on completion
+- Archive completed tasks to the `[DONE]` section at end of session
+- Never delete context — archive only
