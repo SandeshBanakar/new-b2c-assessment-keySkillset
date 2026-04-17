@@ -1,16 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  AlertCircle,
-  BarChart2,
-  CheckCircle,
-  Lightbulb,
-  Target,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-} from 'lucide-react';
+import { CircleAlert as AlertCircle, ChartBar as BarChart2, CircleCheck as CheckCircle, Lightbulb, Target, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import SolutionsPanel, {
@@ -18,6 +9,7 @@ import SolutionsPanel, {
   SAT_SOLUTION_QUESTIONS,
   type SolutionQuestionType,
 } from '@/components/assessment-detail/SolutionsPanel';
+import SATScoringTable from '@/components/assessment-detail/SATScoringTable';
 import type { Assessment } from '@/types';
 
 // ─── SAT domain taxonomy (client-side grouping — no DB column) ─────────────────
@@ -802,7 +794,10 @@ export default function SATAnalyticsTab({
         </div>
       )}
 
-      {/* ── Block 5: AI Insight Panel (responds to attempt filter) ───────────── */}
+      {/* ── Block 5: SAT Scoring Reference (always visible, collapsible) ──────── */}
+      <SATScoringTable />
+
+      {/* ── Block 6: AI Insight Panel (responds to attempt filter) ───────────── */}
       <div className="bg-white shadow-sm rounded-md p-6">
         <div className="flex items-center gap-2 mb-5">
           <Lightbulb className="w-4 h-4 text-blue-600" />

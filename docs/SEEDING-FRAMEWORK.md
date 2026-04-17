@@ -39,7 +39,14 @@ ORDER BY exam_category, subject;
 
 ## TIER 2: SOURCES (prerequisite for chapters and questions)
 
-Status: **PENDING** (QS-002)
+Status: **PARTIAL** — SAT done (QS-002); NEET/JEE/CLAT pending
+
+| Exam | Sources | Status |
+|------|---------|--------|
+| SAT | 8 sources (4 R&W domains + 4 Math domains) | **DONE Apr 17 2026** — UUIDs `a1000001-0000-0000-0000-000000000001` through `...000000000008` |
+| NEET | 3 sources (Physics, Chemistry, Biology) | PENDING |
+| JEE | 3 sources (Math, Physics, Chemistry) | PENDING |
+| CLAT | 5 sources (English, Legal, Logical, Quant, GK) | PENDING |
 
 ### SAT Sources
 ```sql
@@ -77,7 +84,14 @@ INSERT INTO sources (id, name, description, exam_category_id, difficulty, target
 
 ## TIER 3: CHAPTERS (prerequisite for questions)
 
-Status: **PENDING** (QS-002)
+Status: **PARTIAL** — SAT done; NEET/JEE/CLAT pending
+
+| Exam | Chapters | Status |
+|------|---------|--------|
+| SAT | 16 chapters (2 per source — Module 1 + Module 2) | **DONE Apr 17 2026** — UUIDs `b1000001-0000-0000-0000-000000000001` through `...000000000016` |
+| NEET | ~9 chapters | PENDING |
+| JEE | ~9 chapters | PENDING |
+| CLAT | ~15 chapters | PENDING |
 
 Each source maps to 3–5 chapters. Chapter structure follows subject syllabi.
 
@@ -101,7 +115,15 @@ Status: **PENDING** (QS-001)
 - status: ALWAYS 'ACTIVE' on create
 - DEMO_SA_ID for created_by: `3bd6101b-1fb9-4c96-a9a5-c958a3deb54a`
 
-### SAT Question Plan (Practice Test #4 — 98 Questions)
+### SAT Question Plan (Practice Test #4 — 120 Questions)
+
+Status: **DONE Apr 17 2026** — 120 questions seeded across 4 modules
+
+Question UUID scheme:
+- R&W M1: `0a001001-0001-0001-0001-{seq 12 hex, 000000000001–000000000033}`
+- R&W M2: `0a001002-0001-0001-0001-{seq}`
+- Math M1: `0a001003-0001-0001-0001-{seq, 000000000001–000000000027}`
+- Math M2: `0a001004-0001-0001-0001-{seq}`
 - R&W Module 1: 33 questions → subjects: Craft and Structure, Information and Ideas, Standard English Conventions, Expression of Ideas
 - R&W Module 2: 33 questions → same subjects
 - Math Module 1: 27 questions → subjects: Algebra, Advanced Math, Problem Solving, Geometry
@@ -135,7 +157,17 @@ Correct answers (from scoring PDF):
 
 ## TIER 5: ASSESSMENT QUESTION MAPPINGS (prerequisite for attempts)
 
-Status: **PENDING** (QS-003)
+Status: **PARTIAL** — SAT done; NEET/JEE/CLAT/SAT FT2 pending
+
+| Assessment | Questions | Status |
+|---|---|---|
+| SAT Full Test 1 (`76b43c99-88c0-4165-a042-40396c8ff129`) | 120Q (all 4 modules) | **DONE Apr 17 2026** |
+| SAT R&W Subject Test (`f8976222-386b-4f42-ae6b-e132ec3231c9`) | 66Q (rw_module_1 + rw_module_2) | **DONE Apr 17 2026** |
+| SAT Math Subject Test (`6f936fc2-21e1-49b3-8727-09404a7919c4`) | 54Q (math_module_1 + math_module_2) | **DONE Apr 17 2026** |
+| SAT Full Test 2 (`476083b3-0b9a-4e9e-b550-b02367e6b49b`) | — | PENDING (no unique questions seeded) |
+| NEET Full Test | — | PENDING (QS-001b) |
+| CLAT Full Test | — | PENDING (QS-001c) |
+| JEE Full Test | — | PENDING (QS-001d) |
 
 After questions are seeded, link them to assessments:
 
