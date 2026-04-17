@@ -18,6 +18,7 @@ import type { Assessment, MockAttempt } from '@/types';
 interface AttemptsTabProps {
   attempts: MockAttempt[];   // mock fallback — used when DB has no rows
   assessmentId: string;
+  onSwitchToAnalytics?: (attemptId?: string) => void;
 }
 
 interface DbAttempt {
@@ -69,7 +70,7 @@ function durationLabel(seconds: number | null): string {
   return `${mins} min`;
 }
 
-export default function AttemptsTab({ attempts: mockFallback, assessmentId }: AttemptsTabProps) {
+export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSwitchToAnalytics }: AttemptsTabProps) {
   const router = useRouter();
   const { user, isSubscribed } = useAppContext();
   const [dbAttempts, setDbAttempts] = useState<DbAttempt[] | null>(null);
@@ -196,9 +197,11 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId }: At
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        router.push(
-                          `/assessments/${assessmentId}?tab=analytics&attemptId=${attempt.id}`,
-                        )
+                        onSwitchToAnalytics
+                          ? onSwitchToAnalytics(attempt.id)
+                          : router.push(
+                              `/assessments/${assessmentId}?tab=analytics&attemptId=${attempt.id}`,
+                            )
                       }
                       className="rounded-md border-zinc-200 text-zinc-700 text-sm"
                     >
@@ -349,7 +352,9 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId }: At
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  router.push(`/assessments/${assessmentId}?tab=analytics`)
+                  onSwitchToAnalytics
+                    ? onSwitchToAnalytics()
+                    : router.push(`/assessments/${assessmentId}?tab=analytics`)
                 }
                 className="rounded-md border-zinc-200 text-zinc-700 text-sm"
               >
@@ -432,7 +437,9 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId }: At
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        router.push(`/assessments/${assessmentId}?tab=analytics`)
+                        onSwitchToAnalytics
+                          ? onSwitchToAnalytics()
+                          : router.push(`/assessments/${assessmentId}?tab=analytics`)
                       }
                       className="rounded-md border-zinc-200 text-zinc-700 text-sm"
                     >
