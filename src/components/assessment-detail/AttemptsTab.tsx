@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, FileText, Lock, Trophy } from 'lucide-react';
+import { Clock, FileText, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -230,29 +230,9 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId }: At
           })}
         </div>
 
-        {/* Locked rows — shown when not subscribed and DB has only free attempt */}
-        {!subscribed && (
-          <div className="bg-white shadow-sm rounded-md divide-y divide-zinc-100 mt-2">
-            {Array.from({ length: 5 }, (_, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-4 py-4 px-6">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Lock className="w-4 h-4 text-zinc-300" />
-                  <span className="text-sm font-medium text-zinc-400">
-                    Attempt {i + 1}
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-sm rounded-md text-zinc-400 border-zinc-200 shrink-0"
-                  onClick={() => router.push('/plans')}
-                >
-                  Upgrade to Access
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Ghost locked rows removed: DB data is source of truth.
+            When useDb=true the user's real attempts are shown above.
+            Locking future attempts is handled at the assessment-card level. */}
 
         {/* Abandon confirmation */}
         <Dialog
@@ -481,28 +461,7 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId }: At
           })}
       </div>
 
-      {!subscribed && (
-        <div className="bg-white shadow-sm rounded-md divide-y divide-zinc-100 mt-2">
-          {Array.from({ length: 5 }, (_, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-4 py-4 px-6">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Lock className="w-4 h-4 text-zinc-300" />
-                <span className="text-sm font-medium text-zinc-400">
-                  Attempt {i + 1}
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-sm rounded-md text-zinc-400 border-zinc-200 shrink-0"
-                onClick={() => router.push('/plans')}
-              >
-                Upgrade to Access
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Ghost locked rows removed: access gating is handled at assessment-card level. */}
     </div>
   );
 }

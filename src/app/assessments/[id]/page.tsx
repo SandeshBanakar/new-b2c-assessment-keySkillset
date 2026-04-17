@@ -31,13 +31,8 @@ function AssessmentDetailPageInner() {
   const attemptIdParam = searchParams.get('attemptId') ?? undefined;
 
   const userTier = user?.subscriptionTier ?? 'free';
-  const hasAnalyticsAccess =
-    userTier === 'professional' || userTier === 'premium';
-
-  // Filter tabs: hide Analytics for free + basic (demo tier gate)
-  const TABS = ALL_TABS.filter(
-    (t) => t.id !== 'analytics' || hasAnalyticsAccess,
-  );
+  // Analytics tab always visible for all tiers — AI Insights section is gated inside AnalyticsTab
+  const TABS = ALL_TABS;
 
   const validTabs: Tab[] = TABS.map((t) => t.id);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
@@ -45,12 +40,8 @@ function AssessmentDetailPageInner() {
     return 'overview';
   });
 
-  // If analytics tab was requested but user lacks access, redirect to overview
-  useEffect(() => {
-    if (activeTab === 'analytics' && !hasAnalyticsAccess) {
-      setActiveTab('overview');
-    }
-  }, [activeTab, hasAnalyticsAccess]);
+  // AI Insights locked for free + basic tiers
+  const isAiLocked = userTier === 'free' || userTier === 'basic';
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [assessmentsLoaded, setAssessmentsLoaded] = useState(false);
@@ -146,14 +137,14 @@ function AssessmentDetailPageInner() {
               </button>
             ))}
 
-            {/* Analytics upgrade nudge — shown in tab bar for free+basic */}
-            {!hasAnalyticsAccess && (
+            {/* AI Insights nudge — shown in tab bar only when on analytics tab and tier is free/basic */}
+            {isAiLocked && activeTab === 'analytics' && (
               <button
                 onClick={() => router.push('/plans')}
                 className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors"
               >
                 <Lock className="w-3 h-3" />
-                Unlock Analytics
+                Unlock AI Insights
               </button>
             )}
           </div>
@@ -173,7 +164,7 @@ function AssessmentDetailPageInner() {
         {activeTab === 'attempts' && (
           <AttemptsTab attempts={attempts} assessmentId={assessment.id} />
         )}
-        {activeTab === 'analytics' && hasAnalyticsAccess && (
+        {activeTab === 'analytics' && (
           assessment.exam === 'SAT' &&
           (assessment.type === 'full-test' || assessment.type === 'subject-test')
             ? (
@@ -188,6 +179,7 @@ function AssessmentDetailPageInner() {
                 assessmentId={assessment.id}
                 onSwitchToAttempts={() => setActiveTab('attempts')}
                 initialAttemptId={attemptIdParam}
+                userTier={userTier}
               />
             )
         )}

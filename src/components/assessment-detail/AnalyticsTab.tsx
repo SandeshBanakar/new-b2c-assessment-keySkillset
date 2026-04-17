@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   Lightbulb,
+  Lock,
   Target,
   TrendingDown,
   TrendingUp,
@@ -76,6 +77,17 @@ interface SectionTab {
   sort_order: number;
 }
 
+interface DbSubQuestion {
+  id: string;
+  parent_question_id: string;
+  question_type: string;
+  question_text: unknown;
+  options: { key: string; text: unknown }[];
+  correct_answer: string[] | null;
+  explanation: unknown;
+  order_index: number;
+}
+
 interface DbQuestion {
   id: string;
   question_type: string;
@@ -83,6 +95,7 @@ interface DbQuestion {
   passage_text: unknown;
   options: { key: string; text: unknown }[];
   correct_answer: string[] | null;
+  acceptable_answers: string[] | null;
   explanation: unknown;
   concept_tag: string | null;
   section_name: string;
@@ -100,6 +113,7 @@ interface UserAnswer {
 interface SectionCache {
   questions: DbQuestion[];
   userAnswers: UserAnswer[];
+  subQuestions: Map<string, DbSubQuestion[]>;
 }
 
 interface AnalyticsTabProps {
@@ -107,6 +121,7 @@ interface AnalyticsTabProps {
   assessmentId: string;
   onSwitchToAttempts: () => void;
   initialAttemptId?: string;
+  userTier: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -131,6 +146,89 @@ function sectionBarClass(pct: number): string {
   return 'bg-rose-500';
 }
 
+/** Returns the display string for a question's correct answer key(s). */
+function getCorrectDisplay(q: DbQuestion): string {
+  if (q.question_type === 'NUMERIC') {
+    return q.acceptable_answers?.[0] ?? '—';
+  }
+  return q.correct_answer?.join(', ') ?? '—';
+}
+
+/** Collapsed-row status badge: always shows outcome + answer summary. */
+function QuestionStatusBadge({
+  userAns,
+  isCorrect,
+  isSkipped,
+  correctDisplay,
+  hasData,
+}: {
+  userAns: string | null;
+  isCorrect: boolean;
+  isSkipped: boolean;
+  correctDisplay: string;
+  hasData: boolean;
+}) {
+  if (!hasData) {
+    return (
+      <span className="text-xs text-zinc-400">No answer data</span>
+    );
+  }
+
+  if (isSkipped) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 bg-zinc-100 text-zinc-500">
+        — Skipped · Correct: {correctDisplay}
+      </span>
+    );
+  }
+
+  if (userAns === null) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 bg-zinc-100 text-zinc-500">
+        — Not answered · Correct: {correctDisplay}
+      </span>
+    );
+  }
+
+  if (isCorrect) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 bg-emerald-50 text-emerald-700">
+        ✓ Correct · Your answer: {userAns}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 bg-rose-50 text-rose-700">
+      ✗ Wrong · Your answer: {userAns} · Correct: {correctDisplay}
+    </span>
+  );
+}
+
+/** Two-column marks display for expanded accordion. */
+function MarksRow({ marksAwarded }: { marksAwarded: number }) {
+  const earned = marksAwarded > 0 ? marksAwarded : 0;
+  const lost = marksAwarded < 0 ? Math.abs(marksAwarded) : 0;
+
+  return (
+    <div className="flex rounded-md border border-zinc-100 overflow-hidden">
+      <div className="flex-1 text-center py-2.5">
+        <p className={`text-sm font-semibold ${earned > 0 ? 'text-emerald-600' : 'text-zinc-400'}`}>
+          +{earned}
+        </p>
+        <p className="text-xs text-zinc-500 mt-0.5">Marks Earned</p>
+      </div>
+      <div className="w-px bg-zinc-100" />
+      <div className="flex-1 text-center py-2.5">
+        <p className={`text-sm font-semibold ${lost > 0 ? 'text-rose-600' : 'text-zinc-400'}`}>
+          −{lost}
+        </p>
+        <p className="text-xs text-zinc-500 mt-0.5">Marks Lost</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AnalyticsTab({
@@ -138,8 +236,12 @@ export default function AnalyticsTab({
   assessmentId,
   onSwitchToAttempts,
   initialAttemptId,
+  userTier,
 }: AnalyticsTabProps) {
   const { user } = useAppContext();
+
+  // AI Insights: Pro and Premium only — completely hidden for Free/Basic
+  const isAiEligible = userTier === 'professional' || userTier === 'premium';
 
   // ── Core attempt state ────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
@@ -290,7 +392,8 @@ export default function AnalyticsTab({
           `order_index, section_name,
            questions (
              id, question_type, question_text, passage_text,
-             options, correct_answer, explanation, concept_tag
+             options, correct_answer, acceptable_answers,
+             explanation, concept_tag
            )`,
         )
         .eq('assessment_id', assessmentId)
@@ -305,20 +408,45 @@ export default function AnalyticsTab({
           order_index: row.order_index,
         }));
 
-      // User answers for this attempt × these questions
+      // Fetch sub-questions for any PASSAGE_MULTI questions
+      const passageMultiIds = questions
+        .filter((q) => q.question_type === 'PASSAGE_MULTI')
+        .map((q) => q.id);
+
+      const subQuestions = new Map<string, DbSubQuestion[]>();
+      if (passageMultiIds.length > 0) {
+        const { data: subData } = await supabase
+          .from('passage_sub_questions')
+          .select('id, parent_question_id, question_text, options, correct_answer, explanation, order_index')
+          .in('parent_question_id', passageMultiIds)
+          .order('order_index');
+        // passage_sub_questions are always MCQ — assign a stable question_type
+
+        for (const sub of subData ?? []) {
+          const typed: DbSubQuestion = { ...sub as Omit<DbSubQuestion,'question_type'>, question_type: 'MCQ_SINGLE' };
+          const existing = subQuestions.get(sub.parent_question_id) ?? [];
+          subQuestions.set(sub.parent_question_id, [...existing, typed]);
+        }
+      }
+
+      // User answers for this attempt × these questions + sub-questions
       let userAnswers: UserAnswer[] = [];
-      if (questions.length > 0) {
-        const qIds = questions.map((q) => q.id);
+      const allQuestionIds = [
+        ...questions.map((q) => q.id),
+        ...Array.from(subQuestions.values()).flat().map((sq) => sq.id),
+      ];
+
+      if (allQuestionIds.length > 0) {
         const { data: ansData } = await supabase
           .from('attempt_answers')
           .select('question_id, user_answer, is_correct, is_skipped, marks_awarded')
           .eq('attempt_id', selectedAttemptId)
-          .in('question_id', qIds);
+          .in('question_id', allQuestionIds);
         userAnswers = ansData ?? [];
       }
 
       setSectionCache((prev) =>
-        new Map(prev).set(sectionName, { questions, userAnswers }),
+        new Map(prev).set(sectionName, { questions, userAnswers, subQuestions }),
       );
     },
     [assessmentId, selectedAttemptId, sectionCache],
@@ -365,9 +493,6 @@ export default function AnalyticsTab({
   // ── Derived values ────────────────────────────────────────────────────────
   const selectedAttempt = attempts.find((a) => a.id === selectedAttemptId) ?? attempts[attempts.length - 1];
   const isLatest = selectedAttempt.id === attempts[attempts.length - 1].id;
-  const isAiEligible =
-    user?.subscriptionTier === 'professional' ||
-    user?.subscriptionTier === 'premium';
 
   const negMark = NEG_MARKS[assessment.exam] ?? 0;
   const latestIncorrect = sectionResults.reduce(
@@ -422,16 +547,8 @@ export default function AnalyticsTab({
     return opt ? tiptapToPlainText(opt.text) : key;
   }
 
-  function getUserAnswer(q: DbQuestion): string | null {
-    return sectionData?.userAnswers.find((a) => a.question_id === q.id)?.user_answer ?? null;
-  }
-
-  function isUserAnswerCorrect(q: DbQuestion): boolean {
-    return sectionData?.userAnswers.find((a) => a.question_id === q.id)?.is_correct ?? false;
-  }
-
-  function isSkipped(q: DbQuestion): boolean {
-    return sectionData?.userAnswers.find((a) => a.question_id === q.id)?.is_skipped ?? false;
+  function getAnswerForQuestion(questionId: string): UserAnswer | undefined {
+    return sectionData?.userAnswers.find((a) => a.question_id === questionId);
   }
 
   function toggleQuestion(id: string) {
@@ -441,6 +558,130 @@ export default function AnalyticsTab({
       else next.add(id);
       return next;
     });
+  }
+
+  // Renders a single question row (used for both top-level and sub-questions)
+  function renderQuestionRow(
+    q: { id: string; question_type: string; question_text: unknown; options: { key: string; text: unknown }[]; correct_answer: string[] | null; acceptable_answers?: string[] | null; explanation: unknown; concept_tag?: string | null },
+    idx: number,
+    label: string,
+    isSubQuestion = false,
+  ) {
+    const ans = getAnswerForQuestion(q.id);
+    const hasData = ans !== undefined;
+    const userAns = ans?.user_answer ?? null;
+    const isCorrect = ans?.is_correct ?? false;
+    const isSkipped = ans?.is_skipped ?? false;
+    const marksAwarded = ans?.marks_awarded ?? 0;
+    const correctKeys = q.correct_answer ?? [];
+    const acceptableAnswers = (q as DbQuestion).acceptable_answers ?? null;
+    const correctDisplay =
+      q.question_type === 'NUMERIC'
+        ? (acceptableAnswers?.[0] ?? '—')
+        : (correctKeys.join(', ') || '—');
+
+    const isExpanded = expandedQuestions.has(q.id);
+
+    return (
+      <div
+        key={q.id}
+        className={`border border-zinc-100 rounded-md overflow-hidden ${isSubQuestion ? 'ml-4 border-zinc-200' : ''}`}
+      >
+        {/* Question header — always visible */}
+        <button
+          onClick={() => toggleQuestion(q.id)}
+          className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-zinc-50 transition-colors"
+        >
+          <span className="shrink-0 text-xs font-medium text-zinc-400 mt-0.5 w-6">
+            {label}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-zinc-800 leading-relaxed line-clamp-2">
+              {tiptapToPlainText(q.question_text) || '(Question text)'}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <QuestionStatusBadge
+                userAns={userAns}
+                isCorrect={isCorrect}
+                isSkipped={isSkipped}
+                correctDisplay={correctDisplay}
+                hasData={hasData}
+              />
+              {q.concept_tag && (
+                <span className="text-xs bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
+                  {q.concept_tag}
+                </span>
+              )}
+            </div>
+          </div>
+          {isExpanded ? (
+            <ChevronUp className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+          )}
+        </button>
+
+        {/* Expanded: full content */}
+        {isExpanded && (
+          <div className="px-4 pb-4 border-t border-zinc-100 pt-3 space-y-3">
+            {/* Full question text */}
+            <p className="text-sm text-zinc-800 leading-relaxed">
+              {tiptapToPlainText(q.question_text)}
+            </p>
+
+            {/* Options */}
+            {q.options && q.options.length > 0 && (
+              <div className="space-y-1.5">
+                {q.options.map((opt) => {
+                  const isCorrectOpt = correctKeys.includes(opt.key);
+                  const isUserChoice = userAns === opt.key;
+                  return (
+                    <div
+                      key={opt.key}
+                      className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${
+                        isCorrectOpt
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          : isUserChoice && !isCorrectOpt
+                          ? 'bg-rose-50 border-rose-200 text-rose-800'
+                          : 'bg-white border-zinc-200 text-zinc-700'
+                      }`}
+                    >
+                      <span className="font-medium shrink-0">{opt.key}.</span>
+                      <span>{tiptapToPlainText(opt.text)}</span>
+                      {isCorrectOpt && (
+                        <span className="ml-auto text-xs text-emerald-600 shrink-0">
+                          ✓ Correct
+                        </span>
+                      )}
+                      {isUserChoice && !isCorrectOpt && (
+                        <span className="ml-auto text-xs text-rose-600 shrink-0">
+                          Your answer
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Marks row — two column */}
+            {hasData && (
+              <MarksRow marksAwarded={marksAwarded} />
+            )}
+
+            {/* Explanation */}
+            {q.explanation != null && (
+              <div className="rounded-md bg-blue-50 border border-blue-100 p-3 text-sm text-zinc-700">
+                <p className="font-medium text-blue-700 mb-1 text-xs">
+                  Explanation
+                </p>
+                {tiptapToPlainText(q.explanation)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -789,72 +1030,68 @@ export default function AnalyticsTab({
             </div>
           )}
 
-          {/* ── Block 6: AI Insight Panel ─────────────────────────────────────── */}
-          <div className="bg-white shadow-sm rounded-md p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <Lightbulb className="w-4 h-4 text-blue-600" />
-              <h3 className="text-base font-medium text-zinc-900">AI Insight</h3>
-              {isAiEligible && (
+          {/* ── Block 6: AI Insight — Pro/Premium only ────────────────────────── */}
+          {isAiEligible ? (
+            <div className="bg-white shadow-sm rounded-md p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Lightbulb className="w-4 h-4 text-blue-600" />
+                <h3 className="text-base font-medium text-zinc-900">AI Insight</h3>
                 <span className="ml-auto text-xs text-zinc-400">
                   Powered by Claude
                 </span>
+              </div>
+
+              {aiInsight ? (
+                <div className="space-y-4">
+                  <div className="rounded-md bg-emerald-50 border border-emerald-100 p-4">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <p className="text-sm font-medium text-emerald-700">
+                        What went well
+                      </p>
+                    </div>
+                    <p className="text-sm text-zinc-700 leading-relaxed">
+                      {aiInsight.what_went_well}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Target className="w-4 h-4 text-blue-600 shrink-0" />
+                      <p className="text-sm font-medium text-blue-700">Next Steps</p>
+                    </div>
+                    <p className="text-sm text-zinc-700 leading-relaxed">
+                      {aiInsight.next_steps}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-400">
+                  AI insights are not available for this attempt.
+                </p>
               )}
             </div>
-
-            {isAiEligible && aiInsight ? (
-              <div className="space-y-4">
-                <div className="rounded-md bg-emerald-50 border border-emerald-100 p-4">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <p className="text-sm font-medium text-emerald-700">
-                      What went well
-                    </p>
-                  </div>
-                  <p className="text-sm text-zinc-700 leading-relaxed">
-                    {aiInsight.what_went_well}
-                  </p>
-                </div>
-                <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Target className="w-4 h-4 text-blue-600 shrink-0" />
-                    <p className="text-sm font-medium text-blue-700">Next Steps</p>
-                  </div>
-                  <p className="text-sm text-zinc-700 leading-relaxed">
-                    {aiInsight.next_steps}
-                  </p>
-                </div>
+          ) : (
+            /* Locked panel for Free/Basic — clear gate, no misleading teaser */
+            <div className="bg-white shadow-sm rounded-md p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Lightbulb className="w-4 h-4 text-zinc-300" />
+                <h3 className="text-base font-medium text-zinc-400">AI Insights</h3>
+                <Lock className="w-3.5 h-3.5 text-zinc-300 ml-0.5" />
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="rounded-md bg-emerald-50 border border-emerald-100 p-4">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <p className="text-sm font-medium text-emerald-700">
-                      What went well
-                    </p>
-                  </div>
-                  <p className="text-sm text-zinc-700 leading-relaxed">
-                    You are making progress. Upgrade to Pro or Premium for full AI-powered insights.
-                  </p>
-                </div>
-                <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Target className="w-4 h-4 text-blue-600 shrink-0" />
-                    <p className="text-sm font-medium text-blue-700">Next Steps</p>
-                  </div>
-                  <p className="text-sm text-zinc-700 leading-relaxed mb-4">
-                    Unlock personalised AI insights and next-step recommendations.
-                  </p>
-                  <button
-                    onClick={() => (window.location.href = '/plans')}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 transition-colors"
-                  >
-                    Upgrade Now
-                  </button>
-                </div>
+              <div className="rounded-md bg-zinc-50 border border-zinc-200 p-5 text-center">
+                <p className="text-sm text-zinc-500 leading-relaxed mb-4">
+                  Upgrade to Pro or Premium to unlock personalised AI insights
+                  powered by Claude — including what went well and targeted next steps.
+                </p>
+                <button
+                  onClick={() => (window.location.href = '/plans')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 transition-colors"
+                >
+                  Upgrade Now
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* ── Block 7: Solutions Panel ──────────────────────────────────────── */}
           {sectionTabs.length > 0 && (
@@ -866,7 +1103,7 @@ export default function AnalyticsTab({
                 </h3>
                 {!isLatest && (
                   <span className="ml-auto text-xs text-zinc-400">
-                    Showing correct answers · your answers for Attempt {selAttemptNum}
+                    Showing answers for Attempt {selAttemptNum}
                   </span>
                 )}
               </div>
@@ -925,18 +1162,48 @@ export default function AnalyticsTab({
               {sectionData && sectionData.questions.length > 0 && (
                 <div className="space-y-3">
                   {sectionData.questions.map((q, idx) => {
-                    const isExpanded = expandedQuestions.has(q.id);
-                    const userAns = getUserAnswer(q);
-                    const correct = isUserAnswerCorrect(q);
-                    const skipped = isSkipped(q);
-                    const correctKeys = q.correct_answer ?? [];
+                    const subQs = sectionData.subQuestions.get(q.id) ?? [];
+                    const isPassageMulti = q.question_type === 'PASSAGE_MULTI';
 
+                    // Passage text shown above question for PASSAGE_SINGLE / PASSAGE_MULTI
+                    const hasPassage = q.passage_text != null;
+
+                    if (isPassageMulti && subQs.length > 0) {
+                      // PASSAGE_MULTI: render passage header + nested sub-question rows
+                      return (
+                        <div key={q.id} className="border border-zinc-100 rounded-md overflow-hidden">
+                          {/* Passage header */}
+                          <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-100">
+                            <p className="text-xs font-medium text-zinc-500 mb-1">
+                              Passage {idx + 1}
+                            </p>
+                            {hasPassage && (
+                              <p className="text-sm text-zinc-700 leading-relaxed">
+                                {tiptapToPlainText(q.passage_text)}
+                              </p>
+                            )}
+                          </div>
+                          {/* Sub-questions */}
+                          <div className="space-y-2 p-3">
+                            {subQs.map((sq, sqIdx) =>
+                              renderQuestionRow(
+                                { ...sq, concept_tag: q.concept_tag, acceptable_answers: null as string[] | null },
+                                sqIdx,
+                                `${idx + 1}.${sqIdx + 1}`,
+                                true,
+                              )
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Standard question (MCQ_SINGLE, MCQ_MULTI, NUMERIC, PASSAGE_SINGLE)
                     return (
                       <div
                         key={q.id}
                         className="border border-zinc-100 rounded-md overflow-hidden"
                       >
-                        {/* Question header — always visible */}
                         <button
                           onClick={() => toggleQuestion(q.id)}
                           className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-zinc-50 transition-colors"
@@ -949,25 +1216,26 @@ export default function AnalyticsTab({
                               {tiptapToPlainText(q.question_text) || '(Question text)'}
                             </p>
                             <div className="flex flex-wrap items-center gap-2 mt-2">
-                              {userAns !== null && !skipped ? (
-                                <span
-                                  className={`text-xs font-medium rounded-full px-2 py-0.5 ${
-                                    correct
-                                      ? 'bg-emerald-50 text-emerald-700'
-                                      : 'bg-rose-50 text-rose-700'
-                                  }`}
-                                >
-                                  {correct ? 'Correct' : `Your answer: ${userAns}`}
-                                </span>
-                              ) : skipped ? (
-                                <span className="text-xs font-medium rounded-full px-2 py-0.5 bg-zinc-100 text-zinc-500">
-                                  Skipped
-                                </span>
-                              ) : (
-                                <span className="text-xs text-zinc-400">
-                                  No answer data
-                                </span>
-                              )}
+                              {(() => {
+                                const ans = getAnswerForQuestion(q.id);
+                                const hasData = ans !== undefined;
+                                const userAns = ans?.user_answer ?? null;
+                                const isCorrect = ans?.is_correct ?? false;
+                                const isSkipped = ans?.is_skipped ?? false;
+                                const correctDisplay =
+                                  q.question_type === 'NUMERIC'
+                                    ? (q.acceptable_answers?.[0] ?? '—')
+                                    : (q.correct_answer?.join(', ') || '—');
+                                return (
+                                  <QuestionStatusBadge
+                                    userAns={userAns}
+                                    isCorrect={isCorrect}
+                                    isSkipped={isSkipped}
+                                    correctDisplay={correctDisplay}
+                                    hasData={hasData}
+                                  />
+                                );
+                              })()}
                               {q.concept_tag && (
                                 <span className="text-xs bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
                                   {q.concept_tag}
@@ -975,25 +1243,24 @@ export default function AnalyticsTab({
                               )}
                             </div>
                           </div>
-                          {isExpanded ? (
+                          {expandedQuestions.has(q.id) ? (
                             <ChevronUp className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
                           ) : (
                             <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
                           )}
                         </button>
 
-                        {/* Expanded: passage + options + explanation */}
-                        {isExpanded && (
+                        {expandedQuestions.has(q.id) && (
                           <div className="px-4 pb-4 border-t border-zinc-100 pt-3 space-y-3">
-                            {/* Passage */}
-                            {q.passage_text != null && (
+                            {/* Passage (PASSAGE_SINGLE) */}
+                            {hasPassage && (
                               <div className="rounded-md bg-zinc-50 border border-zinc-200 p-3 text-xs text-zinc-700 leading-relaxed">
                                 <p className="font-medium text-zinc-600 mb-1">Passage</p>
                                 {tiptapToPlainText(q.passage_text)}
                               </div>
                             )}
 
-                            {/* Full question text (if truncated above) */}
+                            {/* Full question text */}
                             <p className="text-sm text-zinc-800 leading-relaxed">
                               {tiptapToPlainText(q.question_text)}
                             </p>
@@ -1002,15 +1269,18 @@ export default function AnalyticsTab({
                             {q.options && q.options.length > 0 && (
                               <div className="space-y-1.5">
                                 {q.options.map((opt) => {
-                                  const isCorrect = correctKeys.includes(opt.key);
+                                  const correctKeys = q.correct_answer ?? [];
+                                  const ans = getAnswerForQuestion(q.id);
+                                  const userAns = ans?.user_answer ?? null;
+                                  const isCorrectOpt = correctKeys.includes(opt.key);
                                   const isUserChoice = userAns === opt.key;
                                   return (
                                     <div
                                       key={opt.key}
                                       className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${
-                                        isCorrect
+                                        isCorrectOpt
                                           ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                                          : isUserChoice && !isCorrect
+                                          : isUserChoice && !isCorrectOpt
                                           ? 'bg-rose-50 border-rose-200 text-rose-800'
                                           : 'bg-white border-zinc-200 text-zinc-700'
                                       }`}
@@ -1019,12 +1289,12 @@ export default function AnalyticsTab({
                                         {opt.key}.
                                       </span>
                                       <span>{tiptapToPlainText(opt.text)}</span>
-                                      {isCorrect && (
+                                      {isCorrectOpt && (
                                         <span className="ml-auto text-xs text-emerald-600 shrink-0">
                                           ✓ Correct
                                         </span>
                                       )}
-                                      {isUserChoice && !isCorrect && (
+                                      {isUserChoice && !isCorrectOpt && (
                                         <span className="ml-auto text-xs text-rose-600 shrink-0">
                                           Your answer
                                         </span>
@@ -1034,6 +1304,14 @@ export default function AnalyticsTab({
                                 })}
                               </div>
                             )}
+
+                            {/* Marks — two column */}
+                            {(() => {
+                              const ans = getAnswerForQuestion(q.id);
+                              return ans !== undefined ? (
+                                <MarksRow marksAwarded={ans.marks_awarded} />
+                              ) : null;
+                            })()}
 
                             {/* Explanation */}
                             {q.explanation != null && (
