@@ -25,7 +25,7 @@ Seed 6 private B2B courses for Akash Institute and extend the Content Bank page 
 
 ---
 
-## [IN-PROGRESS] Sources & Chapters — KSS-SA-036 (Apr 16 2026)
+## [DONE] Sources & Chapters — KSS-SA-036 (Apr 16–17 2026)
 
 Schema changes authorized. UI rebuild + soft-delete implementation.
 
@@ -74,7 +74,7 @@ Schema changes authorized. UI rebuild + soft-delete implementation.
 | SC-002k | — PaginationBar: 25/50/100 + "Showing X–Y of Z results" | [sourceId]/page.tsx | [x] DONE Apr 16 |
 | SC-003 | Update CLAUDE-DB.md — add KSS-DB-027/028/029 schema entries | `docs/CLAUDE-DB.md` | [x] DONE Apr 16 |
 | SC-004 | Question assignment diagnostic SQL (deferred — after UI) | `docs/SQL-RESPONSE.txt` | [ ] DEFERRED |
-| SC-005 | Questions page full rebuild | `src/app/super-admin/sources-chapters/[sourceId]/[chapterId]/page.tsx` | [ ] NEXT SESSION |
+| SC-005 | Questions page full rebuild | `src/app/super-admin/sources-chapters/[sourceId]/[chapterId]/page.tsx` | [x] DONE Apr 17 |
 
 ---
 
