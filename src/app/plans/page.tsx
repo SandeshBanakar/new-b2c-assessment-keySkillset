@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, AlertTriangle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { BackButton } from '@/components/navigation/BackButton'
 import PageWrapper from '@/components/layout/PageWrapper'
@@ -134,13 +134,24 @@ function CategoryAccordion({
   plans,
   active,
   onUpgrade,
+  highlighted,
 }: {
   category: string
   plans: PlanRow[]
   active: ActivePlanInfo | null
   onUpgrade: (plan: PlanRow) => void
+  highlighted?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [ring, setRing] = useState(highlighted ?? false)
+
+  useEffect(() => {
+    if (highlighted) {
+      setRing(true)
+      const t = setTimeout(() => setRing(false), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [highlighted])
 
   const basicPlan  = plans.find((p) => p.tier === 'BASIC')
   const proPlan    = plans.find((p) => p.tier === 'PRO')
@@ -149,7 +160,10 @@ function CategoryAccordion({
   const isActiveCategory = active?.scope === 'CATEGORY_BUNDLE' && active.category === category
 
   return (
-    <div className={`border rounded-2xl overflow-hidden ${isActiveCategory ? 'border-blue-300 bg-blue-50/30' : 'border-zinc-200 bg-white'}`}>
+    <div
+      id={`category-${category.toLowerCase()}`}
+      className={`border rounded-2xl overflow-hidden transition-shadow duration-300 ${isActiveCategory ? 'border-blue-300 bg-blue-50/30' : 'border-zinc-200 bg-white'} ${ring ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`}
+    >
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-6 py-4 text-left"
@@ -187,8 +201,11 @@ function CategoryAccordion({
 // ─── Main content ─────────────────────────────────────────────────────────────
 
 function PlansContent() {
-  const router = useRouter()
-  const { user } = useAppContext()
+  const router        = useRouter()
+  const searchParams  = useSearchParams()
+  const highlight     = searchParams.get('highlight')?.toUpperCase() ?? null
+  const { user }      = useAppContext()
+  const scrolledRef   = useRef(false)
 
   const [platformPlans, setPlatformPlans]   = useState<PlanRow[]>([])
   const [categoryPlans, setCategoryPlans]   = useState<Record<string, PlanRow[]>>({})
@@ -212,6 +229,16 @@ function PlansContent() {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [user])
+
+  // Scroll to highlighted category after load
+  useEffect(() => {
+    if (!highlight || loading || scrolledRef.current) return
+    const el = document.getElementById(`category-${highlight.toLowerCase()}`)
+    if (el) {
+      scrolledRef.current = true
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlight, loading])
 
   if (!user) return null
 
@@ -291,6 +318,7 @@ function PlansContent() {
                       plans={plans}
                       active={activePlan}
                       onUpgrade={handleUpgrade}
+                      highlighted={highlight === category.toUpperCase()}
                     />
                   ))}
                 </div>
@@ -306,7 +334,9 @@ function PlansContent() {
 export default function PlansPage() {
   return (
     <AuthGuard>
-      <PlansContent />
+      <Suspense fallback={<div className="min-h-screen bg-zinc-50" />}>
+        <PlansContent />
+      </Suspense>
     </AuthGuard>
   )
 }

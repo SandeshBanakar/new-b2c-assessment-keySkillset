@@ -8,7 +8,7 @@ import { useUserAttempts, DEFAULT_ATTEMPT } from '@/hooks/useUserAttempts';
 import AssessmentCard from '@/components/assessment/AssessmentCard';
 import type { SupabaseAssessment } from '@/types/assessment';
 import type { MockAttemptData } from '@/data/mockAttempts';
-import type { Tier } from '@/types';
+import type { Tier, ActivePlanInfo } from '@/types';
 
 // -------------------------------------------------------
 // Constants
@@ -35,12 +35,14 @@ function ExamCategorySection({
   attemptsMap,
   userTier,
   typeLabel,
+  activePlanInfo,
 }: {
   examType: string;
   items: SupabaseAssessment[];
   attemptsMap: Map<string, MockAttemptData>;
   userTier: Tier;
   typeLabel: string;
+  activePlanInfo?: ActivePlanInfo | null;
 }) {
   const [showAll, setShowAll] = useState(false);
 
@@ -77,6 +79,7 @@ function ExamCategorySection({
                 assessment={assessment}
                 attemptData={attemptsMap.get(assessment.id) ?? DEFAULT_ATTEMPT}
                 userTier={userTier}
+                activePlanInfo={activePlanInfo}
               />
             ))}
           </div>
@@ -110,9 +113,10 @@ export default function AssessmentLibrarySection() {
 
   if (!user) return null;
 
-  const tier      = user.subscriptionTier;
-  const userId    = user.id;
-  const isPremium = tier === 'premium';
+  const tier           = user.subscriptionTier;
+  const userId         = user.id;
+  const isPremium      = tier === 'premium';
+  const activePlanInfo = user.activePlanInfo ?? null;
 
   if (loading || attemptsLoading) return (
     <div className="flex items-center justify-center py-24">
@@ -260,6 +264,7 @@ export default function AssessmentLibrarySection() {
             attemptsMap={attemptsMap}
             userTier={tier}
             typeLabel={typeLabel}
+            activePlanInfo={activePlanInfo}
           />
         ))
       )}

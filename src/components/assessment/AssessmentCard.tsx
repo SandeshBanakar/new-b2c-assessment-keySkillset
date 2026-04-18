@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { tierAllows } from '@/types/assessment';
 import type { SupabaseAssessment } from '@/types/assessment';
 import type { MockAttemptData } from '@/data/mockAttempts';
-import type { Tier } from '@/types';
+import type { Tier, ActivePlanInfo } from '@/types';
 
 // -------------------------------------------------------
 // Badge tokens
@@ -41,16 +41,23 @@ const EXAM_GRADIENT: Record<string, string> = {
 // Card state derivation — 6 states
 // -------------------------------------------------------
 
-export type CardState = 1 | 2 | 4 | 5 | 6 | 7;
+export type CardState = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+// exam_type in the DB may be 'IIT-JEE' while plan category is 'JEE'
+function normalizeExam(examType: string): string {
+  return examType === 'IIT-JEE' ? 'JEE' : examType
+}
 
 export function deriveCardState({
   userTier,
   assessment,
   attemptData,
+  activePlanInfo,
 }: {
   userTier: Tier;
   assessment: SupabaseAssessment;
   attemptData: MockAttemptData;
+  activePlanInfo?: ActivePlanInfo | null;
 }): CardState {
   const tierAllowsAccess = tierAllows(userTier, assessment.min_tier);
   const attemptsUsed = attemptData.attemptsUsed;
@@ -59,6 +66,14 @@ export function deriveCardState({
 
   // State 7: all 6 attempts consumed
   if (attemptsUsed >= 6) return 7;
+
+  // State 3: user holds a category plan but this assessment is outside their category
+  if (
+    activePlanInfo?.scope === 'CATEGORY_BUNDLE' &&
+    normalizeExam(assessment.exam_type) !== activePlanInfo.category
+  ) {
+    return 3;
+  }
 
   // Tier allows → subscribed states 4–6
   if (tierAllowsAccess) {
@@ -80,6 +95,7 @@ export interface AssessmentCardProps {
   assessment: SupabaseAssessment;
   attemptData: MockAttemptData;
   userTier: Tier;
+  activePlanInfo?: ActivePlanInfo | null;
 }
 
 // -------------------------------------------------------
@@ -90,14 +106,15 @@ export default function AssessmentCard({
   assessment,
   attemptData,
   userTier,
+  activePlanInfo,
 }: AssessmentCardProps) {
   const router = useRouter();
   const [imgError, setImgError] = useState(false);
 
-  const cardState = deriveCardState({ userTier, assessment, attemptData });
+  const cardState = deriveCardState({ userTier, assessment, attemptData, activePlanInfo });
   const detailHref = `/assessments/${assessment.slug ?? assessment.id}?from=assessments`;
 
-  const showFreeAttemptChip = cardState === 1;
+  const showFreeAttemptChip = cardState === 1 || cardState === 3;
   const showExhaustedChip   = cardState === 2;
   const showProgressBar     = cardState === 5 || cardState === 6 || cardState === 7;
   const fillPct = Math.min((attemptData.attemptsUsed / 6) * 100, 100);
@@ -214,6 +231,40 @@ export default function AssessmentCard({
               className="border border-zinc-300 text-zinc-600 bg-white hover:bg-zinc-50 w-full rounded-lg py-2.5 text-sm font-medium transition-colors"
             >
               Upgrade to Access
+            </button>
+          </div>
+        )}
+
+        {/* STATE 3: Category plan mismatch — outside user's exam category */}
+        {cardState === 3 && (
+          <div className="flex flex-col gap-2">
+            {attemptData.status === 'inprogress' ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
+                className="border border-blue-600 text-blue-600 bg-white hover:bg-blue-50 w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
+              >
+                Resume Test
+              </button>
+            ) : attemptData.attemptsUsed > 0 ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
+                className="border border-zinc-300 text-zinc-700 bg-white hover:bg-zinc-50 w-full rounded-lg py-2.5 text-sm font-medium transition-colors"
+              >
+                View Analysis
+              </button>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
+                className="bg-blue-600 hover:bg-blue-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
+              >
+                Take Free Test
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); router.push(`/plans?highlight=${assessment.exam_type}`); }}
+              className="border border-zinc-300 text-zinc-600 bg-white hover:bg-zinc-50 w-full rounded-lg py-2.5 text-sm font-medium transition-colors"
+            >
+              Switch Plan
             </button>
           </div>
         )}

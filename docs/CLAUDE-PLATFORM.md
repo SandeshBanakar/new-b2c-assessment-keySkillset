@@ -83,16 +83,26 @@ Permanently removed: Analytics nav item (merged to Dashboard) | Course Store
 
 ---
 
-## PERSONA SELECTOR (locked)
+## PERSONA SELECTOR (locked — updated KSS-SA-039 Apr 18 2026)
 
 Admin personas use `rounded-md`. Learner personas use `rounded-full`.
 
 ```
-Super Admin → /super-admin         blue-700
-Akash CA    → /client-admin/akash  violet-700
+Super Admin → /super-admin           blue-700
+Akash CA    → /client-admin/akash    violet-700
 TechCorp CA → /client-admin/techcorp teal-700
-Learner     → Free | Basic | Pro | Premium
+Learner (Platform Plans) → Free | Basic | Pro | Premium
+Learner (Category Plans) → NEET Basic | JEE Basic | CLAT Basic
 ```
+
+**Category Plan Learners bay** (below "Learner Personas" divider, same `rounded-full` grid):
+| Persona | UUID | Colour | Icon | Badge |
+|---------|------|--------|------|-------|
+| Ananya Krishnan | `c1a2e3b4-5f6a-7b8c-9d0e-f1a2b3c4d5e6` | `bg-green-700` | `FlaskConical` | `NEET · Basic` |
+| Rohan Mehta | `d2b3f4c5-6a7b-8c9d-0e1f-a2b3c4d5e6f7` | `bg-orange-600` | `Atom` | `JEE · Basic` |
+| Preethi Nair | `e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8` | `bg-purple-700` | `Scale` | `CLAT · Basic` |
+
+On select: `switchPersona()` sets `subscriptionTier = 'free'` + `activePlanInfo = { scope: 'CATEGORY_BUNDLE', tier: 'BASIC', category: 'NEET'/'JEE'/'CLAT' }`. Routes to `/assessments`.
 
 Content Creator personas (`/content-creator/[tenant]/`) are **not built in V1**.
 TechCorp has no CC persona (RUN_ONLY). Akash CC route shows Coming Soon placeholder only.
@@ -358,6 +368,12 @@ Single unified **"Subscriptions & Activity"** section — no separate Assessment
 Course Performance 'Free' badge: show when no `b2c_course_subscriptions` row for `user+course`.
 `cancel_at_period_end=true`: show amber "Cancels [date]" below Active badge — never change badge to non-Active.
 
+**Plan column (KSS-SA-039):** Added after "Tier" column. Sourced from eager LATERAL JOIN on `b2c_assessment_subscriptions` → `plans`.
+- Platform plan holder: shows tier badge (e.g. `Basic`) using existing TIER_BADGE colours
+- Category plan holder: shows `{category} {tier}` (e.g. `NEET Basic`) with a distinct category badge style
+- No active plan: `—`
+- The "Tier" column still shows `subscription_tier` (platform tier only). For category plan holders, Tier = `Free`, Plan = `NEET Basic` — these intentionally differ. The tier tab filter still works correctly (category plan holders appear under "Free" tab).
+
 ---
 
 ## B2C ASSESSMENT CARD — LOCKED BEHAVIOURS (Apr 15 2026)
@@ -372,6 +388,11 @@ Assessment attempts are permanent. Once a paid attempt is used, it cannot be ret
 **Card state model (locked) — matches `deriveCardState()` in AssessmentCard.tsx:**
 - State 1: Tier below min_tier, free attempt not yet used → "Take Free Test" + "Upgrade to Access"
 - State 2: Tier below min_tier, free attempt exhausted (COMPLETED) → "Continue Your Test" + "Upgrade to Access"
+- **State 3 (KSS-SA-039): Category plan mismatch** — user has CATEGORY_BUNDLE plan, assessment is in a DIFFERENT category
+  - Evaluated BEFORE States 4–7. Condition: `activePlanInfo.scope === 'CATEGORY_BUNDLE' AND assessment.exam !== activePlanInfo.category`
+  - State 3a: free attempt unused → "Take Free Test" (primary) + "Switch Plan" (secondary) → `/plans?highlight={examCategory}`
+  - State 3b: free attempt used + COMPLETED → "View Analysis" (primary) + "Switch Plan" (secondary)
+  - State 3c: attempt in-progress → "Resume Test" (primary) + "Switch Plan" (subtle, below CTA)
 - State 4: Tier allows, 0 attempts → "Start Your Test"
 - State 5: Tier allows, attempt in progress → "Resume Test"
 - State 6 + 7 (collapsed): Tier allows, any COMPLETED attempt → "View Analysis" only

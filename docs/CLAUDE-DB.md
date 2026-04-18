@@ -87,7 +87,9 @@ unsuspend_reason (text nullable), unsuspended_at (timestamptz nullable),
 unsuspended_by (uuid nullable → admin_users.id)
 ```
 - `INACTIVE` = UI-computed only (see footguns above)
-- `subscription_tier` = assessment plan tier only
+- `subscription_tier` = **platform plan tier ONLY** — NEVER written by a category plan subscription
+- `subscription_tier` values: `'free'` (default, no platform plan), `'basic'`, `'professional'`, `'premium'`
+- Category plan holders keep `subscription_tier = 'free'` permanently while on a category plan
 - Free tier = no assessment plan subscription row (default unsubscribed state)
 - `suspension_reason` required at app level (confirm disabled until typed)
 - `suspended_by` / `unsuspended_by` hardcoded to demo SA UUID until auth is implemented
@@ -98,7 +100,10 @@ unsuspended_by (uuid nullable → admin_users.id)
   - Basic: `a0c16137-7fd5-44f5-96e6-60e4617d9230`
   - Pro: `e150d59c-13c1-4db3-b6d7-4f30c29178e9` (Priya Sharma)
   - Premium: `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
-  - 16 demo users total: 6 Free, 4 Basic, 3 Pro, 3 Premium. 1 Suspended, 3 Inactive.
+  - Category — NEET Basic: `c1a2e3b4-5f6a-7b8c-9d0e-f1a2b3c4d5e6` (Ananya Krishnan) — KSS-DB-039c
+  - Category — JEE Basic: `d2b3f4c5-6a7b-8c9d-0e1f-a2b3c4d5e6f7` (Rohan Mehta) — KSS-DB-039c
+  - Category — CLAT Basic: `e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8` (Preethi Nair) — KSS-DB-039c
+  - 19 demo users total after KSS-DB-039c: 6 Free, 4 Basic, 3 Pro, 3 Premium, 3 Category-plan. 1 Suspended, 3 Inactive.
 
 ### attempts
 ```
@@ -258,8 +263,11 @@ display_name, tagline, feature_bullets (jsonb DEFAULT '[]'), footnote,
 is_popular (boolean DEFAULT false), cta_label, max_attempts_per_assessment,
 is_free (boolean DEFAULT false)
 ```
-- status lifecycle: DRAFT → LIVE → DRAFT (editing) | DRAFT → DELETED (soft delete)
-- `was_live=true` once a plan transitions to LIVE; preserved even when moved back to DRAFT
+- status lifecycle: DRAFT → PUBLISHED → DRAFT (editing) | DRAFT → DELETED (soft delete)
+  - B2C plans use `PUBLISHED`. B2B plans use `LIVE`. Both are valid DB constraint values post KSS-DB-038.
+- `was_live=true` once a plan transitions to LIVE/PUBLISHED; preserved even when moved back to DRAFT
+- **CATEGORY_BUNDLE plans (KSS-SA-039):** `scope = 'CATEGORY_BUNDLE'`, `category` field = exam category name (must match `exam_categories.name` exactly). One plan per tier per category. All 3 tiers (BASIC/PRO/PREMIUM) must be PUBLISHED for a category to appear on the `/plans` page.
+- **Plan mutual exclusivity (KSS-SA-039):** A user holds at most ONE active assessment plan at a time — either PLATFORM_WIDE OR CATEGORY_BUNDLE, never both. Enforced at UI level (checkout gate + `/plans` CTA). Switching requires cancelling the current plan first.
 - `compare_at_price` / `compare_at_price_usd`: SINGLE_COURSE_PLAN only; both must be set or neither; must exceed `price`/`price_usd`; display-only (Stripe pricing is separate)
 - B2B plans: `price=0` always, `scope=PLATFORM_WIDE` always
 - B2B plans have NO: `display_name`, `tagline`, `feature_bullets`, `is_popular`, `cta_label`

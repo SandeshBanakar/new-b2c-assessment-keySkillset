@@ -1,0 +1,321 @@
+-- ============================================================
+-- KSS-DB-039b: Insert 9 Category Plans (NEET / JEE / CLAT × BASIC / PRO / PREMIUM)
+-- Run FIRST. Should return 9 rows.
+-- ============================================================
+
+INSERT INTO plans (
+  id, name, display_name, tagline,
+  plan_type, tier, plan_audience, plan_category, scope, category,
+  audience_type, price, price_usd, billing_cycle, status, was_live,
+  feature_bullets, footnote, is_popular, cta_label,
+  max_attempts_per_assessment, is_free
+) VALUES
+
+  -- NEET BASIC
+  (
+    '10000001-ca39-0000-0000-000000000001',
+    'neet-basic', 'NEET Basic', 'Essential NEET preparation',
+    'CATEGORY_BUNDLE', 'BASIC', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'NEET',
+    'B2C', 999, 11.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Full access to NEET Basic assessments", "1 free attempt per assessment", "Basic performance analytics"]'::jsonb,
+    NULL, false, 'Start NEET Basic',
+    6, false
+  ),
+
+  -- NEET PRO
+  (
+    '10000002-ca39-0000-0000-000000000001',
+    'neet-pro', 'NEET Pro', 'Serious NEET contenders',
+    'CATEGORY_BUNDLE', 'PRO', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'NEET',
+    'B2C', 1999, 23.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Full access to NEET Basic + Subject tests", "Unlimited NEET practice", "Detailed concept analytics", "AI performance insights"]'::jsonb,
+    NULL, true, 'Get NEET Pro',
+    6, false
+  ),
+
+  -- NEET PREMIUM
+  (
+    '10000003-ca39-0000-0000-000000000001',
+    'neet-premium', 'NEET Premium', 'Top NEET rank aspirants',
+    'CATEGORY_BUNDLE', 'PREMIUM', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'NEET',
+    'B2C', 3499, 41.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Unlimited access to all NEET assessments", "Chapter-level deep practice", "AI-powered insights", "Priority support", "Full concept mastery tracking"]'::jsonb,
+    NULL, false, 'Go NEET Premium',
+    6, false
+  ),
+
+  -- JEE BASIC
+  (
+    '20000001-ca39-0000-0000-000000000001',
+    'jee-basic', 'JEE Basic', 'Essential JEE preparation',
+    'CATEGORY_BUNDLE', 'BASIC', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'JEE',
+    'B2C', 999, 11.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Full access to JEE Basic assessments", "1 free attempt per assessment", "Basic performance analytics"]'::jsonb,
+    NULL, false, 'Start JEE Basic',
+    6, false
+  ),
+
+  -- JEE PRO
+  (
+    '20000002-ca39-0000-0000-000000000001',
+    'jee-pro', 'JEE Pro', 'Crack IIT-JEE with depth',
+    'CATEGORY_BUNDLE', 'PRO', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'JEE',
+    'B2C', 1999, 23.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Full access to JEE Basic + Advanced tests", "Detailed concept analytics", "AI performance insights"]'::jsonb,
+    NULL, true, 'Get JEE Pro',
+    6, false
+  ),
+
+  -- JEE PREMIUM
+  (
+    '20000003-ca39-0000-0000-000000000001',
+    'jee-premium', 'JEE Premium', 'IIT Top Ranker track',
+    'CATEGORY_BUNDLE', 'PREMIUM', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'JEE',
+    'B2C', 3499, 41.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Unlimited access to all JEE assessments", "Physics, Chemistry, Math chapter tests", "AI-powered insights", "Full concept mastery tracking"]'::jsonb,
+    NULL, false, 'Go JEE Premium',
+    6, false
+  ),
+
+  -- CLAT BASIC
+  (
+    '30000001-ca39-0000-0000-000000000001',
+    'clat-basic', 'CLAT Basic', 'Essential CLAT preparation',
+    'CATEGORY_BUNDLE', 'BASIC', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'CLAT',
+    'B2C', 799, 9.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Full access to CLAT Basic assessments", "1 free attempt per assessment", "Basic performance analytics"]'::jsonb,
+    NULL, false, 'Start CLAT Basic',
+    6, false
+  ),
+
+  -- CLAT PRO
+  (
+    '30000002-ca39-0000-0000-000000000001',
+    'clat-pro', 'CLAT Pro', 'NLU aspirant track',
+    'CATEGORY_BUNDLE', 'PRO', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'CLAT',
+    'B2C', 1599, 19.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Full access to all CLAT sections", "Detailed concept analytics", "AI insights for legal reasoning"]'::jsonb,
+    NULL, true, 'Get CLAT Pro',
+    6, false
+  ),
+
+  -- CLAT PREMIUM
+  (
+    '30000003-ca39-0000-0000-000000000001',
+    'clat-premium', 'CLAT Premium', 'Top NLU rank preparation',
+    'CATEGORY_BUNDLE', 'PREMIUM', 'B2C', 'ASSESSMENT', 'CATEGORY_BUNDLE', 'CLAT',
+    'B2C', 2799, 33.99, 'ANNUAL', 'PUBLISHED', true,
+    '["Unlimited CLAT practice", "All 5 sections + passage-based deep dive", "AI-powered insights", "Full mastery tracking"]'::jsonb,
+    NULL, false, 'Go CLAT Premium',
+    6, false
+  )
+
+ON CONFLICT (id) DO NOTHING
+RETURNING id, name, display_name, tier, category, status;
+
+--JSON Response:
+[
+  {
+    "id": "10000001-ca39-0000-0000-000000000001",
+    "name": "neet-basic",
+    "display_name": "NEET Basic",
+    "tier": "BASIC",
+    "category": "NEET",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "10000002-ca39-0000-0000-000000000001",
+    "name": "neet-pro",
+    "display_name": "NEET Pro",
+    "tier": "PRO",
+    "category": "NEET",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "10000003-ca39-0000-0000-000000000001",
+    "name": "neet-premium",
+    "display_name": "NEET Premium",
+    "tier": "PREMIUM",
+    "category": "NEET",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "20000001-ca39-0000-0000-000000000001",
+    "name": "jee-basic",
+    "display_name": "JEE Basic",
+    "tier": "BASIC",
+    "category": "JEE",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "20000002-ca39-0000-0000-000000000001",
+    "name": "jee-pro",
+    "display_name": "JEE Pro",
+    "tier": "PRO",
+    "category": "JEE",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "20000003-ca39-0000-0000-000000000001",
+    "name": "jee-premium",
+    "display_name": "JEE Premium",
+    "tier": "PREMIUM",
+    "category": "JEE",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "30000001-ca39-0000-0000-000000000001",
+    "name": "clat-basic",
+    "display_name": "CLAT Basic",
+    "tier": "BASIC",
+    "category": "CLAT",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "30000002-ca39-0000-0000-000000000001",
+    "name": "clat-pro",
+    "display_name": "CLAT Pro",
+    "tier": "PRO",
+    "category": "CLAT",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "30000003-ca39-0000-0000-000000000001",
+    "name": "clat-premium",
+    "display_name": "CLAT Premium",
+    "tier": "PREMIUM",
+    "category": "CLAT",
+    "status": "PUBLISHED"
+  }
+]
+
+-- ============================================================
+-- KSS-DB-039c: Insert 3 Demo Users (category plan personas)
+-- Run SECOND. Should return 3 rows.
+-- ============================================================
+
+INSERT INTO users (
+  id, email, display_name,
+  subscription_tier, subscription_status,
+  status, last_active_date,
+  user_onboarded, selected_exams, goal,
+  xp, streak, role, free_attempt_used
+) VALUES
+  (
+    'c1a2e3b4-5f6a-7b8c-9d0e-f1a2b3c4d5e6',
+    'neet@keyskillset.com', 'Ananya Krishnan',
+    'free', 'free',
+    'ACTIVE', NOW(),
+    true, ARRAY['NEET']::text[], 'Crack NEET',
+    0, 0, 'student', false
+  ),
+  (
+    'd2b3f4c5-6a7b-8c9d-0e1f-a2b3c4d5e6f7',
+    'jee@keyskillset.com', 'Rohan Mehta',
+    'free', 'free',
+    'ACTIVE', NOW(),
+    true, ARRAY['JEE']::text[], 'Crack JEE',
+    0, 0, 'student', false
+  ),
+  (
+    'e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8',
+    'clat@keyskillset.com', 'Preethi Nair',
+    'free', 'free',
+    'ACTIVE', NOW(),
+    true, ARRAY['CLAT']::text[], 'Crack CLAT',
+    0, 0, 'student', false
+  )
+ON CONFLICT (id) DO NOTHING
+RETURNING id, email, display_name, subscription_tier;
+
+--JSON Response:
+[
+  {
+    "id": "c1a2e3b4-5f6a-7b8c-9d0e-f1a2b3c4d5e6",
+    "email": "neet@keyskillset.com",
+    "display_name": "Ananya Krishnan",
+    "subscription_tier": "free"
+  },
+  {
+    "id": "d2b3f4c5-6a7b-8c9d-0e1f-a2b3c4d5e6f7",
+    "email": "jee@keyskillset.com",
+    "display_name": "Rohan Mehta",
+    "subscription_tier": "free"
+  },
+  {
+    "id": "e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8",
+    "email": "clat@keyskillset.com",
+    "display_name": "Preethi Nair",
+    "subscription_tier": "free"
+  }
+]
+
+-- ============================================================
+-- KSS-DB-039d: Insert b2c_assessment_subscriptions rows
+-- Run THIRD (after 039b and 039c succeed).
+-- Each user gets 1 active subscription to their BASIC category plan.
+-- Should return 3 rows.
+-- ============================================================
+
+INSERT INTO b2c_assessment_subscriptions (
+  id, user_id, plan_id,
+  stripe_subscription_id, stripe_customer_id,
+  product_name, price_usd, currency, billing_interval,
+  status, cancel_at_period_end,
+  current_period_start, current_period_end
+) VALUES
+  (
+    'f1000001-ca39-0000-0000-000000000001',
+    'c1a2e3b4-5f6a-7b8c-9d0e-f1a2b3c4d5e6',  -- Ananya Krishnan
+    '10000001-ca39-0000-0000-000000000001',    -- NEET Basic plan
+    NULL, NULL,
+    'NEET Basic', 11.99, 'usd', 'year',
+    'active', false,
+    NOW(), NOW() + INTERVAL '1 year'
+  ),
+  (
+    'f2000001-ca39-0000-0000-000000000001',
+    'd2b3f4c5-6a7b-8c9d-0e1f-a2b3c4d5e6f7',  -- Rohan Mehta
+    '20000001-ca39-0000-0000-000000000001',    -- JEE Basic plan
+    NULL, NULL,
+    'JEE Basic', 11.99, 'usd', 'year',
+    'active', false,
+    NOW(), NOW() + INTERVAL '1 year'
+  ),
+  (
+    'f3000001-ca39-0000-0000-000000000001',
+    'e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8',  -- Preethi Nair
+    '30000001-ca39-0000-0000-000000000001',    -- CLAT Basic plan
+    NULL, NULL,
+    'CLAT Basic', 9.99, 'usd', 'year',
+    'active', false,
+    NOW(), NOW() + INTERVAL '1 year'
+  )
+ON CONFLICT (id) DO NOTHING
+RETURNING id, user_id, plan_id, product_name, status;
+
+--JSON Response:
+[
+  {
+    "id": "f1000001-ca39-0000-0000-000000000001",
+    "user_id": "c1a2e3b4-5f6a-7b8c-9d0e-f1a2b3c4d5e6",
+    "plan_id": "10000001-ca39-0000-0000-000000000001",
+    "product_name": "NEET Basic",
+    "status": "active"
+  },
+  {
+    "id": "f2000001-ca39-0000-0000-000000000001",
+    "user_id": "d2b3f4c5-6a7b-8c9d-0e1f-a2b3c4d5e6f7",
+    "plan_id": "20000001-ca39-0000-0000-000000000001",
+    "product_name": "JEE Basic",
+    "status": "active"
+  },
+  {
+    "id": "f3000001-ca39-0000-0000-000000000001",
+    "user_id": "e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8",
+    "plan_id": "30000001-ca39-0000-0000-000000000001",
+    "product_name": "CLAT Basic",
+    "status": "active"
+  }
+]
+---

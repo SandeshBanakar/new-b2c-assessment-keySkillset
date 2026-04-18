@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool } from 'lucide-react';
+import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool, FlaskConical, Atom, Scale } from 'lucide-react';
 import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
 import type { DemoUser } from '@/data/demoUsers';
@@ -134,7 +134,7 @@ function PersonaSelector() {
       </div>
 
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 sm:gap-8">
-        {DEMO_USERS.map((persona) => {
+        {DEMO_USERS.filter((u) => !u.active_plan_info || u.active_plan_info.scope === 'PLATFORM_WIDE').map((persona) => {
           const Icon = TIER_ICONS[persona.subscription_tier];
           return (
             <div
@@ -156,6 +156,43 @@ function PersonaSelector() {
                 className={`text-xs rounded-full px-2.5 py-0.5 font-medium capitalize ${TIER_BADGE_CLASSES[persona.subscription_tier]}`}
               >
                 {persona.subscription_tier}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-4 w-full max-w-lg mx-auto">
+        <div className="flex-1 h-px bg-zinc-800" />
+        <p className="text-xs text-zinc-600 whitespace-nowrap">Category Plan Learners</p>
+        <div className="flex-1 h-px bg-zinc-800" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 sm:gap-8">
+        {DEMO_USERS.filter((u) => u.active_plan_info?.scope === 'CATEGORY_BUNDLE').map((persona) => {
+          const category = persona.active_plan_info?.category ?? '';
+          const tier = persona.active_plan_info?.tier ?? '';
+          const Icon = category === 'NEET' ? FlaskConical : category === 'JEE' ? Atom : Scale;
+          const avatarBg = category === 'NEET' ? 'bg-green-700' : category === 'JEE' ? 'bg-orange-700' : 'bg-purple-700';
+          const badgeBg = category === 'NEET' ? 'bg-green-900 text-green-300' : category === 'JEE' ? 'bg-orange-900 text-orange-300' : 'bg-purple-900 text-purple-300';
+          return (
+            <div
+              key={persona.id}
+              onClick={() => handleSelect(persona.id)}
+              className="cursor-pointer group flex flex-col items-center gap-3"
+            >
+              <div
+                className={`w-24 h-24 rounded-full flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 ${avatarBg}`}
+              >
+                <Icon className="w-10 h-10 text-white" />
+              </div>
+
+              <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">
+                {persona.display_name}
+              </span>
+
+              <span className={`text-xs rounded-full px-2.5 py-0.5 font-medium ${badgeBg}`}>
+                {category}·{tier}
               </span>
             </div>
           );

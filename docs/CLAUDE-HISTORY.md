@@ -469,4 +469,96 @@ Base: https://keyskillset-product-management.atlassian.net/wiki/spaces/EKSS/page
 - TechCorp Premium → TechCorp India
 - Enterprise Pro → both tenants
 
+---
+
+### April 17, 2026 — KSS-SA-038: Super Admin Dashboard B2C Revenue Tab
+
+**Ticket:** KSS-SA-038 | **PRD:** `prds/super-admin/PRD-SA-DASHBOARD.md`
+
+**DB changes:**
+- KSS-DB-038a: Added `PUBLISHED` back to `plans_status_check` constraint
+- KSS-DB-038b: Migrated 13 existing LIVE B2C plans → `PUBLISHED` status
+- Plan status rule going forward: B2C plans use `PUBLISHED`, B2B plans use `LIVE`
+
+**Code changes:**
+- Renamed "Revenue" tab → "B2C Revenue" in dashboard
+- Removed "Subscribers by Plan" pie chart from RevenueTab
+- Created reusable `InfoTooltip` component (`src/components/ui/InfoTooltip.tsx`)
+- Fixed MRR calculation: `(ANNUAL: price/12, MONTHLY: price) × subscribers`
+- Added BILLING and ADDED ON columns to plan table
+- Added client-side pagination (10/15/25, default 10) to plan table
+- Fixed `fetchLivePlatformPlans`, `fetchLiveCategoryPlansGrouped`, `fetchPublishedPlans` to use `status = 'PUBLISHED'`
+- Fixed `syncCourseFromPlan`, `transitionSingleCoursePlanStatus`, plan publish action for B2C → `PUBLISHED`
+
+---
+
+### April 17, 2026 — KSS-SAT-A01/A02: SAT Analytics Overhaul
+
+**Ticket:** KSS-SAT-A01/A02 | **PRD:** `prds/PRD-SAT-ANALYTICS.md`
+
+**New components:**
+- `src/components/ui/AttemptPillFilter.tsx` — shared attempt pill (no score in label)
+- `src/components/assessment-detail/ConceptMasteryPanel.tsx` — section pills, always-table layout, weakest-first sort, sticky col
+- `src/components/assessment-detail/SATAnalyticsTab.tsx` — SAT full/subject tests; 400-1600 scoring, 4-module breakdown, dual heatmap, AI Insight panel
+- `src/components/assessment-detail/ChapterAnalyticsTab.tsx` — all chapter tests (SAT/NEET/JEE/CLAT); negative marking aware
+- `src/components/assessment-detail/SATScoringTable.tsx` — collapsible scoring reference
+
+**Deleted:** `SolutionsPanel.tsx` — replaced by inline DB-driven accordion in AnalyticsTab. NEVER recreate.
+
+**Key locks:**
+- AttemptPillFilter: `Attempt N` label only — NO score in pill
+- ConceptMasteryPanel: always table layout (never bar chart), rows sorted weakest-first
+- SATAnalyticsTab: DO NOT TOUCH without explicit instruction — managed in separate session
+- `isAiEligible = userTier === 'professional' || userTier === 'premium'` — locked
+
+---
+
+### April 17, 2026 — KSS-SA-037: Concept Tags + Platform Config + SAT Question Seeding
+
+**Ticket:** KSS-SA-037 | **DB:** KSS-DB-030/031/032
+
+**Schema:**
+- `concept_tags` table (exam_category, subject, concept_name, slug)
+- `question_concept_mappings` (question_id → concept_tag_id)
+- `user_concept_mastery` enhanced (module_id, stage computed, attempt_count, trend)
+
+**Seeded:** 45 SAT + 43 NEET + 33 JEE + 23 CLAT concept tags (144 total)
+
+**SAT Question Seeding:**
+- 8 SAT sources (UUIDs a1000001–008), 16 chapters (b1000001–016)
+- 120 SAT questions (Practice Test #4): 33+33+27+27 across 4 modules
+- Linked to: Full Test (120Q), R&W Subject (66Q), Math Subject (54Q)
+- `question_concept_mappings`: 120 rows synced
+
+**Code:**
+- Platform Config page: Concept Tags CRUD (`src/app/super-admin/platform-config/page.tsx`)
+- Super Admin nav updated to include Platform Config
+- QuestionForm: `concept_tag` converted from text input → dropdown from `concept_tags` table
+- Created `docs/SEEDING-FRAMEWORK.md` and `database.schema.json`
+
+---
+
+### April 18, 2026 — KSS-SA-039: Category Plan Gating & Demo Infrastructure (PRDs + Docs)
+
+**Ticket:** KSS-SA-039 | **PRDs:** `prds/super-admin/PRD-SA-PLANS-PRICING.md` + `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md`
+
+**This session:** Documentation and planning only. Code + DB tasks pending.
+
+**Key decisions locked:**
+- `users.subscription_tier` is platform-plan-only. Category plan holders keep `subscription_tier = 'free'` permanently.
+- `activePlanInfo` shape: `{ scope, tier, category }` — added to `User` type + AppContext. Demo: static from `demoUsers.ts`. Production: fetched once on session start from `b2c_assessment_subscriptions`.
+- Mutual exclusivity: one active plan at a time (platform OR category). Enforced at `/plans` CTA + `/checkout` gate (UI-level, V1).
+- Assessment card State 3 (category mismatch): before States 4–7. "Take Free Test" + "Switch Plan" → `/plans?highlight={category}`.
+- B2C Users "Plan" column: eager LATERAL JOIN on `b2c_assessment_subscriptions` → `plans`. Shows platform plan OR category plan per user.
+- 3 new demo users: Ananya Krishnan (NEET Basic, `c1a2e3b4`), Rohan Mehta (JEE Basic, `d2b3f4c5`), Preethi Nair (CLAT Basic, `e3c4a5d6`)
+- Persona selector new "Category Plan Learners" bay: green/FlaskConical (NEET), orange/Atom (JEE), purple/Scale (CLAT)
+
+**Files created/updated this session:**
+- `prds/super-admin/PRD-SA-PLANS-PRICING.md` — CREATED
+- `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md` — CREATED (§1 LOCKED, §2–5 PLACEHOLDER)
+- `docs/CLAUDE-DB.md` — updated: `subscription_tier` platform-only rule, category plan notes, 3 new demo UUIDs, plan status/mutual exclusivity rules
+- `docs/CLAUDE-PLATFORM.md` — updated: persona selector bay spec, State 3 card spec, B2C Users Plan column spec
+- `docs/CLAUDE-RULES.md` — updated: ASSESSMENT PLAN MUTUAL EXCLUSIVITY section added
+- `docs/TODO-BACKLOG.md` — rewritten: active tasks only, completed work moved here
+
 **b2c_certificates:** 4 demo rows seeded for HIPAA completions (Premium, Priya, Basic, Siddharth)

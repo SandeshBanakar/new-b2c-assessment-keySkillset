@@ -48,6 +48,20 @@
 
 ---
 
+## ASSESSMENT PLAN MUTUAL EXCLUSIVITY (Locked — KSS-SA-039, Apr 18 2026)
+
+A B2C user holds **at most one** active assessment plan at a time — either a PLATFORM_WIDE plan OR a CATEGORY_BUNDLE plan, never both simultaneously.
+
+- **`/plans` page CTA:** If user has an active plan of a different scope or category, button shows "Cancel current plan first" (disabled). This is the primary enforcement point.
+- **`/checkout` gate:** On mount, call `fetchActivePlanForUser(user.id)`. If non-null, render a full-page blocker — no payment form. CTA → `/plans`. This prevents double-subscription even if user bypasses the `/plans` CTA.
+- **Switching:** Cancel current plan → purchase new plan. Both directions (platform→category and category→platform) follow this flow.
+- **Upgrade within same group** (same scope + same category, or both PLATFORM_WIDE): no cancel required. CTA "Upgrade to [Plan]" is enabled.
+- **V1 enforcement level:** UI-only. No DB trigger or server-side constraint. Production would enforce via Stripe webhook validation.
+
+Never remove or loosen this gate without an explicit "Override mutual exclusivity" instruction.
+
+---
+
 ## ANALYTICS ACCESS RULES (Locked — Apr 16 2026)
 > Violations here cause demo regressions. Read carefully before touching any analytics file.
 

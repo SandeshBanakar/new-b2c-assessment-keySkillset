@@ -1,3 +1,5 @@
+import type { ActivePlanInfo } from '@/types'
+
 export type DemoUser = {
   id: string
   email: string
@@ -10,6 +12,7 @@ export type DemoUser = {
   xp: number
   streak: number
   role: string
+  active_plan_info?: ActivePlanInfo | null
 }
 
 export const DEMO_USERS: DemoUser[] = [
@@ -38,6 +41,7 @@ export const DEMO_USERS: DemoUser[] = [
     xp: 450,
     streak: 3,
     role: 'student',
+    active_plan_info: { scope: 'PLATFORM_WIDE', tier: 'BASIC', category: null },
   },
   {
     id: 'e150d59c-13c1-4db3-b6d7-4f30c29178e9',
@@ -51,6 +55,7 @@ export const DEMO_USERS: DemoUser[] = [
     xp: 1250,
     streak: 7,
     role: 'student',
+    active_plan_info: { scope: 'PLATFORM_WIDE', tier: 'PRO', category: null },
   },
   {
     id: '191c894d-b532-4fa8-b1fe-746e5cdcdcc8',
@@ -64,6 +69,50 @@ export const DEMO_USERS: DemoUser[] = [
     xp: 3200,
     streak: 21,
     role: 'student',
+    active_plan_info: { scope: 'PLATFORM_WIDE', tier: 'PREMIUM', category: null },
+  },
+  // ── Category Plan Demo Users ──────────────────────────────────────────────
+  {
+    id: 'c1a2e3b4-5f6a-7b8c-9d0e-f1a2b3c4d5e6',
+    email: 'neet@keyskillset.com',
+    display_name: 'Ananya Krishnan',
+    subscription_tier: 'free',
+    subscription_status: 'free',
+    user_onboarded: true,
+    selected_exams: ['NEET'],
+    goal: 'Crack NEET',
+    xp: 0,
+    streak: 0,
+    role: 'student',
+    active_plan_info: { scope: 'CATEGORY_BUNDLE', tier: 'BASIC', category: 'NEET' },
+  },
+  {
+    id: 'd2b3f4c5-6a7b-8c9d-0e1f-a2b3c4d5e6f7',
+    email: 'jee@keyskillset.com',
+    display_name: 'Rohan Mehta',
+    subscription_tier: 'free',
+    subscription_status: 'free',
+    user_onboarded: true,
+    selected_exams: ['JEE'],
+    goal: 'Crack JEE',
+    xp: 0,
+    streak: 0,
+    role: 'student',
+    active_plan_info: { scope: 'CATEGORY_BUNDLE', tier: 'BASIC', category: 'JEE' },
+  },
+  {
+    id: 'e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8',
+    email: 'clat@keyskillset.com',
+    display_name: 'Preethi Nair',
+    subscription_tier: 'free',
+    subscription_status: 'free',
+    user_onboarded: true,
+    selected_exams: ['CLAT'],
+    goal: 'Crack CLAT',
+    xp: 0,
+    streak: 0,
+    role: 'student',
+    active_plan_info: { scope: 'CATEGORY_BUNDLE', tier: 'BASIC', category: 'CLAT' },
   },
 ]
 

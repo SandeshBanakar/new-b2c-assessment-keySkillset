@@ -152,11 +152,17 @@ export interface SyllabusSection {
 
 // -------------------------------------------------------
 
+export interface ActivePlanInfo {
+  scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE';
+  tier: 'BASIC' | 'PRO' | 'PREMIUM' | null;
+  category: string | null; // e.g. 'NEET', 'JEE', 'CLAT' — null for PLATFORM_WIDE
+}
+
 export interface User {
   id: string;
   email: string;
   displayName: string | null;             // display_name
-  subscriptionTier: Tier;                 // subscription_tier
+  subscriptionTier: Tier;                 // subscription_tier — platform plan tier ONLY
   subscriptionStatus: string;             // subscription_status (e.g. 'free' | 'active' | 'cancelled')
   subscriptionStartDate: string | null;   // subscription_start_date (ISO 8601)
   subscriptionEndDate: string | null;     // subscription_end_date (ISO 8601)
@@ -170,6 +176,7 @@ export interface User {
   streak: number;                         // consecutive days active
   createdAt: string;                      // created_at (ISO 8601)
   updatedAt: string;                      // updated_at (ISO 8601)
+  activePlanInfo?: ActivePlanInfo | null; // null = no active assessment plan
 }
 
 // ─── Assessment Creation (SA) ─────────────────────────────────────────────────

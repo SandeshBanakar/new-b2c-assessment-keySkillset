@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { DEMO_USERS, STORAGE_KEY } from '@/data/demoUsers';
 import { SUBSCRIBED_ASSESSMENTS } from '@/data/assessments';
-import type { User, Exam, Tier } from '@/types';
+import type { User, Exam, Tier, ActivePlanInfo } from '@/types';
 
 interface AppContextValue {
   user: User | null;
@@ -36,6 +36,7 @@ function demoUserToUser(demo: (typeof DEMO_USERS)[number]): User {
     streak: demo.streak,
     createdAt: '',
     updatedAt: '',
+    activePlanInfo: (demo.active_plan_info ?? null) as ActivePlanInfo | null,
   };
 }
 

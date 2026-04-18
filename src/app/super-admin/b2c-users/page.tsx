@@ -178,6 +178,7 @@ function B2CUsersContent() {
                   <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 w-1/4">NAME</th>
                   <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">EMAIL</th>
                   <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">TIER</th>
+                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">PLAN</th>
                   <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">COURSES</th>
                   <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">STATUS</th>
                   <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">LAST ACTIVE</th>
@@ -188,7 +189,7 @@ function B2CUsersContent() {
               <tbody className="divide-y divide-zinc-100">
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-sm text-zinc-400">
+                    <td colSpan={9} className="px-4 py-12 text-center text-sm text-zinc-400">
                       No users match the current filters.
                     </td>
                   </tr>
@@ -207,6 +208,19 @@ function B2CUsersContent() {
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${TIER_BADGE[user.subscriptionTier] ?? 'bg-zinc-100 text-zinc-600'}`}>
                           {TIER_LABELS[user.subscriptionTier] ?? user.subscriptionTier}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {user.activePlanLabel ? (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
+                            user.activePlanScope === 'CATEGORY_BUNDLE'
+                              ? 'bg-green-50 text-green-700'
+                              : 'bg-blue-50 text-blue-700'
+                          }`}>
+                            {user.activePlanLabel}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-zinc-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-zinc-700 font-medium">
                         {user.courseCount}

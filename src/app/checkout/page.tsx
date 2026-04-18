@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Lock } from 'lucide-react';
+import { ChevronLeft, Lock, AlertCircle } from 'lucide-react';
 import { AuthGuard } from '@/components/shared/AuthGuard';
 import { useAppContext } from '@/context/AppContext';
 
@@ -46,6 +46,29 @@ function CheckoutContent() {
   }, [isValidPlan, router]);
 
   if (!plan || !planKey) return null;
+
+  // Mutual exclusivity gate: block if user already holds any active plan
+  if (user?.activePlanInfo) {
+    return (
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full bg-white border border-zinc-200 rounded-2xl p-8 shadow-sm text-center space-y-4">
+          <div className="flex items-center justify-center w-12 h-12 bg-amber-50 rounded-full mx-auto">
+            <AlertCircle className="w-6 h-6 text-amber-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-zinc-900">You already have an active plan</h2>
+          <p className="text-sm text-zinc-500">
+            Cancel your current plan before subscribing to a new one. You can manage your plan on the Plans page.
+          </p>
+          <button
+            onClick={() => router.push('/plans')}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 text-sm transition-colors cursor-pointer"
+          >
+            Go to Plans
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   function handleSubscribe() {
     if (!planKey) return;

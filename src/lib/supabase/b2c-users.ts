@@ -23,6 +23,9 @@ export type B2CUser = {
   // computed
   displayStatus: DisplayStatus
   courseCount: number
+  // active assessment plan (null = no active plan)
+  activePlanLabel: string | null
+  activePlanScope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE' | null
 }
 
 export type UserCourseProgress = {
@@ -124,34 +127,67 @@ export function computeDisplayStatus(
 export async function fetchB2CUsers(): Promise<B2CUser[]> {
   const now = new Date().toISOString()
 
-  const [{ data, error }, { data: activeSubs }, { data: progress }] = await Promise.all([
+  const [{ data, error }, { data: activeSubs }, { data: progress }, { data: assessSubs }] = await Promise.all([
     supabase
       .from('users')
       .select('id, email, display_name, subscription_tier, subscription_status, stripe_subscription_id, subscription_start_date, subscription_end_date, status, last_active_date, created_at')
       .order('created_at', { ascending: false }),
-    // Active entitlement: status active|trialing AND period not yet expired AND course_id present.
-    // Mirrors the platform access gate (CLAUDE-DB: status='active' AND current_period_end > NOW())
-    // extended to include trialing — trialing users have full course access in Stripe's model.
-    // current_period_end nulls excluded by .gt() SQL semantics (consistent with access gate).
+    // Active course entitlement
     supabase
       .from('b2c_course_subscriptions')
       .select('user_id, course_id')
       .in('status', ['active', 'trialing'])
       .gt('current_period_end', now)
       .not('course_id', 'is', null),
-    // Engagement: any course the user has started or completed (IN_PROGRESS or COMPLETED).
-    // Captures free course access once a user opens the course — no subscription row exists for free.
-    // "A completed course is still a course they engaged with."
+    // Course engagement
     supabase
       .from('b2c_course_progress')
       .select('user_id, course_id'),
+    // Active assessment subscriptions — most recent per user resolved in JS below
+    supabase
+      .from('b2c_assessment_subscriptions')
+      .select('user_id, plan_id, status, current_period_end, created_at')
+      .eq('status', 'active')
+      .gt('current_period_end', now)
+      .order('created_at', { ascending: false }),
   ])
 
   if (error) throw new Error(error.message)
 
-  // Union active entitlements + engagement, deduplicated by course_id per user.
-  const courseMap = new Map<string, Set<string>>()
+  // Resolve plan details for active assessment subs
+  const activePlanMap = new Map<string, { planId: string }>()
+  for (const s of (assessSubs ?? [])) {
+    if (!activePlanMap.has(s.user_id) && s.plan_id) {
+      activePlanMap.set(s.user_id, { planId: s.plan_id })
+    }
+  }
 
+  const uniquePlanIds = [...new Set([...activePlanMap.values()].map((v) => v.planId))]
+  const planDetails = new Map<string, { scope: string; tier: string; category: string | null; display_name: string }>()
+  if (uniquePlanIds.length > 0) {
+    const { data: plans } = await supabase
+      .from('plans')
+      .select('id, scope, tier, category, display_name')
+      .in('id', uniquePlanIds)
+    for (const p of (plans ?? [])) {
+      planDetails.set(p.id, { scope: p.scope, tier: p.tier, category: p.category ?? null, display_name: p.display_name })
+    }
+  }
+
+  // Build user → plan label map
+  const planLabelMap = new Map<string, { label: string; scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE' }>()
+  for (const [userId, { planId }] of activePlanMap.entries()) {
+    const plan = planDetails.get(planId)
+    if (!plan) continue
+    const scope = plan.scope as 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
+    const label = scope === 'CATEGORY_BUNDLE' && plan.category
+      ? `${plan.category} ${plan.tier}`
+      : (plan.display_name ?? plan.tier)
+    planLabelMap.set(userId, { label, scope })
+  }
+
+  // Union course entitlements + engagement, deduplicated by course_id per user.
+  const courseMap = new Map<string, Set<string>>()
   for (const s of (activeSubs ?? [])) {
     if (!courseMap.has(s.user_id)) courseMap.set(s.user_id, new Set())
     courseMap.get(s.user_id)!.add(s.course_id as string)
@@ -161,26 +197,31 @@ export async function fetchB2CUsers(): Promise<B2CUser[]> {
     courseMap.get(p.user_id)!.add(p.course_id)
   }
 
-  return (data ?? []).map((u) => ({
-    id: u.id,
-    email: u.email,
-    displayName: u.display_name,
-    subscriptionTier: u.subscription_tier,
-    subscriptionStatus: u.subscription_status,
-    stripeSubscriptionId: u.stripe_subscription_id,
-    subscriptionStartDate: u.subscription_start_date,
-    subscriptionEndDate: u.subscription_end_date,
-    status: u.status as 'ACTIVE' | 'SUSPENDED',
-    lastActiveDate: u.last_active_date,
-    createdAt: u.created_at,
-    suspensionReason: null,
-    suspendedAt: null,
-    suspendedByName: null,
-    unsuspendReason: null,
-    unsuspendedAt: null,
-    displayStatus: computeDisplayStatus(u.status as 'ACTIVE' | 'SUSPENDED', u.last_active_date),
-    courseCount: courseMap.get(u.id)?.size ?? 0,
-  }))
+  return (data ?? []).map((u) => {
+    const plan = planLabelMap.get(u.id)
+    return {
+      id: u.id,
+      email: u.email,
+      displayName: u.display_name,
+      subscriptionTier: u.subscription_tier,
+      subscriptionStatus: u.subscription_status,
+      stripeSubscriptionId: u.stripe_subscription_id,
+      subscriptionStartDate: u.subscription_start_date,
+      subscriptionEndDate: u.subscription_end_date,
+      status: u.status as 'ACTIVE' | 'SUSPENDED',
+      lastActiveDate: u.last_active_date,
+      createdAt: u.created_at,
+      suspensionReason: null,
+      suspendedAt: null,
+      suspendedByName: null,
+      unsuspendReason: null,
+      unsuspendedAt: null,
+      displayStatus: computeDisplayStatus(u.status as 'ACTIVE' | 'SUSPENDED', u.last_active_date),
+      courseCount: courseMap.get(u.id)?.size ?? 0,
+      activePlanLabel: plan?.label ?? null,
+      activePlanScope: plan?.scope ?? null,
+    }
+  })
 }
 
 export async function fetchB2CUser(id: string): Promise<B2CUser | null> {
@@ -221,6 +262,8 @@ export async function fetchB2CUser(id: string): Promise<B2CUser | null> {
     unsuspendedAt: data.unsuspended_at ?? null,
     displayStatus: computeDisplayStatus(data.status as 'ACTIVE' | 'SUSPENDED', data.last_active_date),
     courseCount: 0,
+    activePlanLabel: null,
+    activePlanScope: null,
   }
 }
 
