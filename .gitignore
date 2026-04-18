@@ -41,3 +41,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env
+
+# local env files
+.env.local
+
+# local doc reference
+/docs
+/docs/sat_platform
+
+# prd files and folder
+/prds
