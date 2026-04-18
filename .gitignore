@@ -46,7 +46,7 @@ next-env.d.ts
 .env.local
 
 # local doc reference
-/docs/requirements
+/docs/requirements/
 
 # prd files and folder
-/prds
+/prds/
