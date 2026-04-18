@@ -6,6 +6,53 @@
 
 ## COMPLETED WORK LOG
 
+### April 18, 2026 — Category Plan Gating & Demo Infrastructure (KSS-SA-039)
+
+**Ticket:** KSS-SA-039 | **PRDs:** `prds/super-admin/PRD-SA-PLANS-PRICING.md`, `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md`
+
+**DB seeds (all run in Supabase SQL editor — confirmed via SQL-RESPONSE.txt):**
+- KSS-DB-039a: Confirmed `exam_categories.name` values: `BANK, CLAT, JEE, NEET, SAT, SSC`
+- KSS-DB-039b: 9 category plans inserted — NEET/JEE/CLAT × BASIC/PRO/PREMIUM, all `status = 'PUBLISHED'`, `scope = 'CATEGORY_BUNDLE'`
+  - NEET BASIC `10000001-ca39-…`, NEET PRO `10000002-ca39-…`, NEET PREMIUM `10000003-ca39-…`
+  - JEE BASIC `20000001-ca39-…`, JEE PRO `20000002-ca39-…`, JEE PREMIUM `20000003-ca39-…`
+  - CLAT BASIC `30000001-ca39-…`, CLAT PRO `30000002-ca39-…`, CLAT PREMIUM `30000003-ca39-…`
+- KSS-DB-039c: 3 demo users inserted — all `subscription_tier = 'free'`
+  - Ananya Krishnan `c1a2e3b4-5f6a-7b8c-9d0e-f1a2b3c4d5e6` — `neet@keyskillset.com`, `selected_exams=['NEET']`
+  - Rohan Mehta `d2b3f4c5-6a7b-8c9d-0e1f-a2b3c4d5e6f7` — `jee@keyskillset.com`, `selected_exams=['JEE']`
+  - Preethi Nair `e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8` — `clat@keyskillset.com`, `selected_exams=['CLAT']`
+- KSS-DB-039d: 3 `b2c_assessment_subscriptions` rows — each user linked to their BASIC category plan, `status = 'active'`
+
+**Code changes:**
+- `src/types/index.ts` — Added `ActivePlanInfo` interface (`scope`, `tier`, `category`); added `activePlanInfo?: ActivePlanInfo | null` to `User`
+- `src/data/demoUsers.ts` — Added `active_plan_info?: ActivePlanInfo | null` to `DemoUser` type; added 3 category plan users (Ananya/Rohan/Preethi) to `DEMO_USERS`; platform plan users (Basic/Pro/Premium) now have `active_plan_info` with `scope: 'PLATFORM_WIDE'`
+- `src/context/AppContext.tsx` — `demoUserToUser()` maps `demo.active_plan_info → activePlanInfo`
+- `src/app/page.tsx` — Persona selector: platform plan users filtered to "Learner Personas" bay; new "Category Plan Learners" bay added with FlaskConical/Atom/Scale icons, green/orange/purple colour scheme, `{CATEGORY}·{TIER}` badges
+- `src/components/assessment/AssessmentCard.tsx` — Added State 3 (category mismatch); `normalizeExam()` helper maps `IIT-JEE → JEE`; `deriveCardState()` accepts `activePlanInfo`; State 3 renders "Take Free Test"/"Resume Test"/"View Analysis" + "Switch Plan → /plans?highlight={exam_type}"; `AssessmentCardProps` extended
+- `src/components/assessment/AssessmentLibrarySection.tsx` — `ExamCategorySection` and `AssessmentCard` receive `activePlanInfo` from context
+- `src/app/plans/page.tsx` — `useSearchParams()` wrapped in `Suspense`; `?highlight=` param reads on mount → smooth scroll + 2-second ring animation (`ring-2 ring-blue-500 ring-offset-2`) on `CategoryAccordion`; each accordion gets `id="category-{name.toLowerCase()}"`
+- `src/lib/supabase/b2c-users.ts` — `B2CUser` type extended with `activePlanLabel: string | null`, `activePlanScope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE' | null`; `fetchB2CUsers()` adds 4th parallel query on `b2c_assessment_subscriptions` + resolves plan details via `plans` table
+- `src/app/super-admin/b2c-users/page.tsx` — "PLAN" column added after "TIER" column; green badge for `CATEGORY_BUNDLE` (e.g. "NEET BASIC"), blue for `PLATFORM_WIDE` (e.g. "Basic"), `—` for no active plan; `colSpan` updated to 9
+- `src/app/checkout/page.tsx` — Mutual exclusivity gate: if `user.activePlanInfo` is non-null, renders full-page blocker (AlertCircle + "Go to Plans" CTA). No payment form shown.
+
+**Docs updated this session:**
+- `docs/CLAUDE-DB.md` — `subscription_tier` annotated as platform-plan ONLY; category plan demo UUIDs added; CATEGORY_BUNDLE plan rules + mutual exclusivity rule added
+- `docs/CLAUDE-PLATFORM.md` — "Category Plan Learners" bay spec; State 3 (category mismatch) added to assessment card section; Plan column spec in B2C Users
+- `docs/CLAUDE-RULES.md` — New section: "ASSESSMENT PLAN MUTUAL EXCLUSIVITY (Locked — KSS-SA-039)" before ANALYTICS ACCESS RULES
+- `prds/super-admin/PRD-SA-PLANS-PRICING.md` — New PRD (full spec, SA-side)
+- `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md` — New PRD (end-user side; Section 1 full, Sections 2–5 placeholders)
+
+**Build:** `npm run build` passed clean.
+
+**Key decisions locked:**
+- `users.subscription_tier` is platform-plan tier ONLY — category plan subscriptions NEVER write to this field. Category plan holders always have `subscription_tier = 'free'`.
+- `activePlanInfo` is the single source of truth for all category plan gating decisions across the app (AssessmentCard, checkout gate, plans page CTA).
+- In demo: `activePlanInfo` is static from `demoUsers.ts`. In production: fetched once from `b2c_assessment_subscriptions` on session start.
+- `IIT-JEE` (exam_type in legacy assessments table) normalises to `JEE` (plan category string) via `normalizeExam()` in AssessmentCard.
+- V1 mutual exclusivity is UI-only. No DB trigger or server-side constraint. Production would enforce via Stripe webhook validation.
+- State 3 is checked BEFORE tier-based States 1/2/4–7 in `deriveCardState()`.
+
+---
+
 ### April 16, 2026 — Akash Institute Content Bank: 6 Private Courses Seed + UI Extension
 
 **No schema changes — data-only seed + UI code change.**

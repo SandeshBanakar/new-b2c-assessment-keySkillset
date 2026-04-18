@@ -1,47 +1,5 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 18 2026. Active tasks only. Completed work → CLAUDE-HISTORY.md.
-
----
-
-## [IN-PROGRESS] KSS-SA-039 — Category Plan Gating & Demo Infrastructure (Apr 18 2026)
-
-PRDs: `prds/super-admin/PRD-SA-PLANS-PRICING.md` | `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md`
-
-### DB (run in Supabase — SQL handoff protocol)
-
-| # | Migration | Status |
-|---|-----------|--------|
-| KSS-DB-039a | Check `exam_categories` table — confirm `.name` values for NEET / JEE / CLAT match `plans.category` strings | [x] DONE Apr 18 |
-| KSS-DB-039b | Insert 9 category plans (NEET / JEE / CLAT × BASIC / PRO / PREMIUM), `status = 'PUBLISHED'`, `plan_audience = 'B2C'`, `scope = 'CATEGORY_BUNDLE'` | [x] DONE Apr 18 |
-| KSS-DB-039c | Insert 3 demo users into `users` table: Ananya Krishnan (NEET), Rohan Mehta (JEE), Preethi Nair (CLAT) — `subscription_tier = 'free'` | [x] DONE Apr 18 |
-| KSS-DB-039d | Insert `b2c_assessment_subscriptions` rows — one per demo user pointing to their respective BASIC plan, `status = 'active'` | [x] DONE Apr 18 |
-
-### Code Tasks
-
-| # | Task | File | Status |
-|---|------|------|--------|
-| PLANS-001 | Add `active_plan_info` optional field to `DemoUser` type | `src/data/demoUsers.ts` | [x] DONE Apr 18 |
-| PLANS-002 | Add 3 category plan demo users to `DEMO_USERS` array | `src/data/demoUsers.ts` | [x] DONE Apr 18 |
-| PLANS-003 | Add `activePlanInfo` to `User` type | `src/types/index.ts` | [x] DONE Apr 18 |
-| PLANS-004 | Map `active_plan_info → activePlanInfo` in `demoUserToUser()` | `src/context/AppContext.tsx` | [x] DONE Apr 18 |
-| PLANS-005 | Add "Category Plan Learners" bay to persona selector | `src/app/page.tsx` | [x] DONE Apr 18 |
-| PLANS-006 | Add State 3 (category mismatch) to `deriveCardState()` | `src/components/assessment/AssessmentCard.tsx` | [x] DONE Apr 18 |
-| PLANS-007 | Render State 3 UI — "Take Free Test" + "Switch Plan" → `/plans?highlight={category}` | `src/components/assessment/AssessmentCard.tsx` | [x] DONE Apr 18 |
-| PLANS-008 | Handle `?highlight=` param: smooth scroll + 2s ring animation on category section | `src/app/plans/page.tsx` | [x] DONE Apr 18 |
-| PLANS-009 | `fetchB2CUsers` eager LATERAL JOIN — add plan info to query + `B2CUser` type | `src/lib/supabase/b2c-users.ts` | [x] DONE Apr 18 |
-| PLANS-010 | Add "Plan" column to B2C Users list (after Tier column) | `src/app/super-admin/b2c-users/page.tsx` | [x] DONE Apr 18 |
-| PLANS-011 | Checkout mutual exclusivity gate — block if active subscription exists | `src/app/checkout/page.tsx` | [x] DONE Apr 18 |
-
-### Doc Tasks (completed this session)
-
-| # | Task | Status |
-|---|------|--------|
-| DOC-001 | Update CLAUDE-DB.md — `subscription_tier` platform-only rule, category plan notes, demo UUIDs | [x] DONE Apr 18 |
-| DOC-002 | Update CLAUDE-PLATFORM.md — persona selector bay spec, State 3, Plan column spec | [x] DONE Apr 18 |
-| DOC-003 | Update CLAUDE-RULES.md — mutual exclusivity enforcement section | [x] DONE Apr 18 |
-| DOC-004 | Create `prds/super-admin/PRD-SA-PLANS-PRICING.md` | [x] DONE Apr 18 |
-| DOC-005 | Create `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md` | [x] DONE Apr 18 |
-| DOC-006 | Rewrite TODO-BACKLOG.md (active tasks only) + append CLAUDE-HISTORY.md | [x] DONE Apr 18 |
+# Last updated: Apr 18 2026 (end of session). Active tasks only. Completed work → CLAUDE-HISTORY.md.
 
 ---
 
