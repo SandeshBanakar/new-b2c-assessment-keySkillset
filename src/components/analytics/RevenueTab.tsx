@@ -168,7 +168,6 @@ export default function RevenueTab({ range }: { range: DateRange }) {
                   <InfoTooltip content={TOOLTIP_PLAN} />
                 </div>
               </th>
-              <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">BILLING</th>
               <th className="text-right text-xs font-medium text-zinc-500 px-4 py-2.5">SUBSCRIBERS</th>
               <th className="text-right text-xs font-medium text-zinc-500 px-4 py-2.5">PRICE</th>
               <th className="text-right text-xs font-medium text-zinc-500 px-4 py-2.5">MRR</th>
@@ -179,7 +178,6 @@ export default function RevenueTab({ range }: { range: DateRange }) {
             {pagedRows.map((r) => (
               <tr key={r.planId} className="hover:bg-zinc-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-zinc-900">{r.name}</td>
-                <td className="px-4 py-3 text-zinc-500">{r.billingCycle}</td>
                 <td className="px-4 py-3 text-right text-zinc-600">{r.subscriberCount.toLocaleString()}</td>
                 <td className="px-4 py-3 text-right text-zinc-600">₹{r.price.toLocaleString()}</td>
                 <td className="px-4 py-3 text-right font-medium text-zinc-900">{formatInr(r.mrr)}</td>
@@ -189,7 +187,7 @@ export default function RevenueTab({ range }: { range: DateRange }) {
           </tbody>
           <tfoot className="bg-zinc-50 border-t border-zinc-200">
             <tr>
-              <td colSpan={4} className="px-4 py-2.5 text-xs font-medium text-zinc-500">
+              <td colSpan={3} className="px-4 py-2.5 text-xs font-medium text-zinc-500">
                 Page MRR ({pagedRows.length} plan{pagedRows.length !== 1 ? 's' : ''})
               </td>
               <td colSpan={2} className="px-4 py-2.5 text-right text-sm font-semibold text-zinc-900">

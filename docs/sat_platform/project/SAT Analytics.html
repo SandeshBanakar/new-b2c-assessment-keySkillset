@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SAT Analytics · keySkillset</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.487.0/dist/umd/lucide.js"></script>
+<style>
+  html,body{margin:0;padding:0;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#18181b;background:#fafafa}
+  .font-mono{font-family:'Geist Mono',ui-monospace,monospace}
+  /* small scrollbar */
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#e4e4e7;border-radius:8px}
+  ::-webkit-scrollbar-thumb:hover{background:#d4d4d8}
+  /* subtle crawl for "live" dot */
+  @keyframes softpulse { 0%,100% { opacity: 1 } 50% { opacity: .4 } }
+  .softpulse{animation:softpulse 2s ease-in-out infinite}
+  /* line draw */
+  @keyframes draw { to { stroke-dashoffset: 0 } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  const L = window.lucide;
+  const iconNames = [
+    'Flame','Zap','Users','ChevronLeft','ChevronRight','ChevronDown','ChevronUp','Target','Clock',
+    'TrendingUp','TrendingDown','BarChart3','Trophy','Star','Lock','Unlock','Check','X','Play',
+    'PlayCircle','Youtube','BookOpen','Calculator','Sparkles','GraduationCap','MapPin','Award',
+    'AlertTriangle','CheckCircle2','XCircle','Circle','ArrowRight','ArrowUpRight','Flag','Info',
+    'Pencil','Rocket','Timer','Brain','Layers','Filter','Settings2','Search','Eye','EyeOff',
+    'RotateCcw','Dumbbell','LineChart','Gauge','Hash','Bookmark','Activity','Minus','Plus'
+  ];
+  window.LUCIDE = {};
+  // lucide 0.487 exposes icons via L.createIcons / L.icons with PascalCase keys
+  const icons = L.icons || {};
+  iconNames.forEach(n => {
+    // Try many key formats
+    const candidates = [n, n.replace(/([a-z])([A-Z])/g,'$1-$2').toLowerCase(), n.toLowerCase(), n.replace(/([a-z])([A-Z0-9])/g,'$1-$2').replace(/([0-9])([A-Z])/g,'$1-$2').toLowerCase()];
+    let nodes = null;
+    for (const k of candidates) { if (icons[k]) { nodes = icons[k]; break; } }
+    if (!nodes) {
+      // fallback: render an empty svg
+      window.LUCIDE[n] = function({className='',...rest}){ return React.createElement('svg',{width:16,height:16,viewBox:'0 0 24 24',className,...rest}); };
+      return;
+    }
+    // nodes may be [tag, attrs, children] (new format) or [[tag,attrs],...] (old)
+    const nodeArr = Array.isArray(nodes[0]) ? nodes : (nodes.length===3 && typeof nodes[0]==='string' ? [nodes] : nodes);
+    window.LUCIDE[n] = function IconWrap({className='', ...rest}) {
+      return React.createElement('svg', {
+        width:24, height:24, viewBox:'0 0 24 24', fill:'none',
+        stroke:'currentColor', strokeWidth:2, strokeLinecap:'round', strokeLinejoin:'round',
+        className, ...rest
+      }, nodeArr.map((node, i) => {
+        const tag = node[0], attrs = node[1] || {};
+        return React.createElement(tag, Object.assign({ key: i }, attrs));
+      }));
+    };
+  });
+</script>
+
+<!-- Data -->
+<script type="text/babel" src="src/data.jsx"></script>
+<!-- Shared primitives -->
+<script type="text/babel" src="src/primitives.jsx"></script>
+<!-- Page chrome -->
+<script type="text/babel" src="src/Navbar.jsx"></script>
+<script type="text/babel" src="src/PageHeader.jsx"></script>
+<!-- Main sections -->
+<script type="text/babel" src="src/HeroScore.jsx"></script>
+<script type="text/babel" src="src/CollegeLadder.jsx"></script>
+<script type="text/babel" src="src/Leverage.jsx"></script>
+<script type="text/babel" src="src/ConceptMastery.jsx"></script>
+<script type="text/babel" src="src/Pacing.jsx"></script>
+<script type="text/babel" src="src/MistakeTaxonomy.jsx"></script>
+<script type="text/babel" src="src/DifficultyBreakdown.jsx"></script>
+<script type="text/babel" src="src/StudyPlan.jsx"></script>
+<script type="text/babel" src="src/SectionBreakdown.jsx"></script>
+<script type="text/babel" src="src/PeerPercentile.jsx"></script>
+<script type="text/babel" src="src/Solutions.jsx"></script>
+<script type="text/babel" src="src/Tweaks.jsx"></script>
+<!-- App -->
+<script type="text/babel" src="src/App.jsx"></script>
+
+</body>
+</html>

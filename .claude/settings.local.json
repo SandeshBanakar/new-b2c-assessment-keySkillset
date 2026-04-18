@@ -115,7 +115,8 @@
       "Read(//c/Users/SandeshBanakarI/.claude/**)",
       "Bash(ls ~/.claude/settings*)",
       "Bash(npx -y @supabase/mcp-server-supabase@latest --help)",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "WebFetch(domain:api.anthropic.com)"
     ]
   },
   "enabledMcpjsonServers": [
