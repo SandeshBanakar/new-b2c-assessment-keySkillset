@@ -46,9 +46,7 @@ next-env.d.ts
 .env.local
 
 # local doc reference
-/docs
-/docs/sat_platform
-/docs/SQL-RESPONSE.txt
+/docs/requirements
 
 # prd files and folder
 /prds
