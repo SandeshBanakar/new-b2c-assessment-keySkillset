@@ -6,6 +6,63 @@
 
 ## COMPLETED WORK LOG
 
+### April 19, 2026 — B2C Plan Status Standardization + Tier Cascade + Plan Seeding (KSS-SA-040)
+
+**Ticket:** KSS-SA-040 | **PRD:** `prds/super-admin/PRD-SA-PLANS-PRICING.md` (addendum §11)
+
+**DB migrations applied (confirmed in Supabase):**
+- KSS-DB-040a: `ALTER TABLE plans ADD COLUMN IF NOT EXISTS allowed_assessment_types text[] DEFAULT '{}'` — confirmed
+- KSS-DB-040b: `UPDATE plans SET status = 'LIVE' WHERE status = 'PUBLISHED'` — confirmed; no PUBLISHED rows remain
+- KSS-DB-040c: 18-plan seed confirmed — 3 PLATFORM_WIDE + 5 exam categories × 3 tiers; plan_content_map links; plan_subscribers rows inserted
+
+**Code changes (build passed clean):**
+- `src/lib/supabase/plans.ts`
+  - `CreatePlanPayload.status`: `'DRAFT' | 'LIVE'` (removed PUBLISHED)
+  - `CreatePlanPayload.allowed_assessment_types: string[]` — new field persisted to DB
+  - `updatePlan` type: `'DRAFT' | 'LIVE' | 'DELETED'`
+  - `fetchPublishedPlans`, `fetchLivePlatformPlans`, `fetchLiveCategoryPlansGrouped`: `.eq('status', 'LIVE')` (was PUBLISHED)
+  - `syncCourseFromPlan`, `transitionSingleCoursePlanStatus`: PUBLISHED→LIVE
+  - `CreateB2BPlanPayload`, `CreateCourseBundlePlanPayload`, `CreateSingleCoursePlanPayload`, `UpdateSingleCoursePlanPayload`: all status references updated to LIVE
+  - `checkLivePlanExistsForTierScope(tier, scope, category, excludePlanId?)` — NEW function; returns boolean; queries LIVE B2C ASSESSMENT plans for uniqueness
+- `src/lib/supabase/analytics.ts` — line 176: `.eq('status', 'LIVE')`
+- `src/components/plans/ContentPlanUsageModal.tsx` — StatusBadge: `s === 'LIVE'` (was 'PUBLISHED')
+- `src/app/super-admin/plans-pricing/new/page.tsx`
+  - TIER_ALLOWED_TYPES constant: BASIC→['FULL_TEST'], PRO→['FULL_TEST','SUBJECT_TEST'], PREMIUM→all three
+  - `allowedTypes` derived from `TIER_ALLOWED_TYPES[tier]` — no longer free-form useState
+  - `handleSubmit('DRAFT' | 'LIVE')` — uniqueness guard fires before createPlan when status='LIVE'
+  - `allowed_assessment_types` passed to createPlan payload
+  - Section 4 UI: read-only tiles (blue=included, dim/opacity-50=excluded)
+  - "Make Live" button (was "Publish Plan"), "Going Live..." (was "Publishing...")
+  - B2BForm, CourseBundleForm, SingleCoursePlanForm: PUBLISHED→LIVE in all button labels
+- `src/components/plans/PlanOverviewTab.tsx`
+  - `isLive = plan.status === 'LIVE'` (removed `|| plan.status === 'PUBLISHED'`)
+  - `liveConflictError` state — shows inline error banner if uniqueness guard blocks
+  - `handleSetLive`: fires `checkLivePlanExistsForTierScope` with `plan.id` as excludePlanId; `updatePlan(plan.id, { status: 'LIVE' })`
+  - "Make Live" button (was "Set Live"), "Going Live..." (was "Saving...")
+- `src/components/plans/EditPlanSlideOver.tsx` (B2CEditForm)
+  - `allowedTypes` derived from `TIER_ALLOWED_TYPES[plan.tier]` — no longer togglable
+  - Section 1: read-only Tier badge (zinc/blue/amber for BASIC/PRO/PREMIUM)
+  - Section 4: read-only divs, opacity-50 for non-included types; subtitle "Allowed types are derived from tier and cannot be changed."
+  - Status cast: `'DRAFT' | 'LIVE' | 'DELETED'`
+
+**Bug fixed:**
+- All B2C assessment plan cards were showing "Draft" badge. Root cause: `PlanStatusBadge` had no `PUBLISHED` key, so `status='PUBLISHED'` fell through to `config.DRAFT`. Fix: DB migration (`UPDATE plans SET status='LIVE' WHERE status='PUBLISHED'`) + all code updated to use LIVE.
+
+**End-user /plans page fix:**
+- `fetchLivePlatformPlans` and `fetchLiveCategoryPlansGrouped` were filtering `.eq('status', 'PUBLISHED')` — page returned no plans. Fixed to `.eq('status', 'LIVE')`.
+
+**Key decisions locked:**
+- Plan status vocabulary is now permanently `LIVE | DRAFT | DELETED`. `PUBLISHED` is fully deprecated.
+- `allowed_assessment_types` is always derived from tier — never free-form. BASIC=['FULL_TEST'], PRO=['FULL_TEST','SUBJECT_TEST'], PREMIUM=all three.
+- Uniqueness guard enforced at the LIVE transition point (not draft creation).
+- 18 seed plans use deterministic UUIDs: platform `a1000001-...-000[1-3]`, NEET `a2000001-...`, JEE `a3000001-...`, SAT `a4000001-...`, CLAT `a5000001-...`, PMP `a6000001-...`; suffix 1/2/3 = BASIC/PRO/PREMIUM.
+- `plan_content_map` links via JOIN on `exam_categories.name` (not hardcoded IDs) for category plans.
+- max_attempts=5 on all 18 plans (1 free always included → 6 total visible to learner).
+
+**Build:** `npm run build` passed clean.
+
+---
+
 ### April 18, 2026 — Category Plan Gating & Demo Infrastructure (KSS-SA-039)
 
 **Ticket:** KSS-SA-039 | **PRDs:** `prds/super-admin/PRD-SA-PLANS-PRICING.md`, `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md`

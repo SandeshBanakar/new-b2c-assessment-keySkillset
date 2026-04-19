@@ -34,9 +34,29 @@ Plan tier badge colours (Assessment plans only — BASIC/PRO/PREMIUM/ENTERPRISE 
 Single Course Plan rules (KSS-SA-026):
 - `is_free=true` → Pricing Mode = "Free Plan". Price fields hidden. tier='FREE', price=0, price_usd=0, stripe_price_id=NULL.
 - `is_free=false` → Pricing Mode = "Paid Plan". tier=NULL (never BASIC/PRO/PREMIUM for courses).
-- One active (DRAFT or PUBLISHED) plan per course — enforced in create form via `checkCourseHasActivePlan()`. Error shown inline.
+- One active (DRAFT or LIVE) plan per course — enforced in create form via `checkCourseHasActivePlan()`. Error shown inline.
 - Switching paid→free on edit triggers a warning modal before applying.
 - `syncCourseFromPlan` is unchanged — free plans sync price=0, price_usd=0, stripe_price_id=NULL + is_individually_purchasable=true.
+
+**B2C Assessment Plan Rules (Locked — KSS-SA-040, Apr 19 2026):**
+
+Plan status: `LIVE | DRAFT | DELETED` ONLY. `PUBLISHED` is permanently deprecated — do NOT use it in code or SQL for B2C assessment plans. DB migration standardizes all former PUBLISHED rows to LIVE.
+
+Button / CTA label: "Make Live" (never "Publish Plan"). Status badge: "LIVE" (never "Published").
+
+`allowed_assessment_types` is derived from `tier` at plan creation and is read-only thereafter:
+- `BASIC` → `['FULL_TEST']`
+- `PRO` → `['FULL_TEST', 'SUBJECT_TEST']`
+- `PREMIUM` → `['FULL_TEST', 'SUBJECT_TEST', 'CHAPTER_TEST']`
+
+This is enforced in both the Create form (`/plans-pricing/new`) and the Edit slideover (`EditPlanSlideOver`). The UI shows read-only tiles (highlighted = included, dim = excluded). No free-form toggle.
+
+`Tier` field on EditPlanSlideOver: displayed as a read-only coloured badge. Not editable.
+
+Uniqueness guard (`checkLivePlanExistsForTierScope`): Before making any B2C ASSESSMENT plan LIVE, the system checks that no other LIVE plan already occupies the same tier+scope slot. If a conflict exists, the "Make Live" action is blocked with an inline error — never silently allowed.
+- PLATFORM_WIDE uniqueness: one LIVE plan per tier
+- CATEGORY_BUNDLE uniqueness: one LIVE plan per tier+category
+- Checked at: (1) Create form "Make Live" click, (2) PlanOverviewTab "Make Live" button. `excludePlanId` param on detail page prevents self-conflict.
 
 Feature Mode chips (Tenant detail header):
 - `FULL_CREATOR` = amber chip

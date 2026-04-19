@@ -194,10 +194,15 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
   const [scope, setScope]             = useState<'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'>(plan.scope)
   const [category, setCategory]       = useState<string | null>(plan.category)
   const [price, setPrice]             = useState(plan.price)
-  const [allowedTypes, setAllowedTypes] = useState<AssessmentType[]>(
-    (plan.allowed_assessment_types ?? []) as AssessmentType[]
-  )
   const [maxAttempts, setMaxAttempts] = useState(plan.max_attempts_per_assessment ?? 5)
+
+  // Allowed types are derived from tier — read-only, not editable
+  const TIER_ALLOWED_TYPES: Record<string, AssessmentType[]> = {
+    BASIC:   ['FULL_TEST'],
+    PRO:     ['FULL_TEST', 'SUBJECT_TEST'],
+    PREMIUM: ['FULL_TEST', 'SUBJECT_TEST', 'CHAPTER_TEST'],
+  }
+  const allowedTypes: AssessmentType[] = plan.tier ? (TIER_ALLOWED_TYPES[plan.tier] ?? []) : []
   const initialBullets = Array.isArray(plan.feature_bullets) && plan.feature_bullets.length > 0
     ? plan.feature_bullets
     : ['', '', '']
@@ -218,12 +223,6 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
       .finally(() => setAssessmentsLoading(false))
   }, [])
 
-  function toggleType(type: AssessmentType) {
-    setAllowedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    )
-  }
-
   function toggleAssessment(id: string) {
     setSelectedAssessments((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
@@ -243,7 +242,6 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
 
   async function handleSave() {
     if (!name.trim()) { setError('Plan name is required.'); return }
-    if (allowedTypes.length === 0) { setError('Select at least one assessment type.'); return }
     if (scope === 'CATEGORY_BUNDLE' && !category) { setError('Select an exam category.'); return }
 
     setSaving(true)
@@ -326,6 +324,20 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
                   className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 />
               </div>
+              {plan.tier && (
+                <div>
+                  <FieldLabel label="Tier" />
+                  <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-md">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                      plan.tier === 'BASIC'   ? 'bg-zinc-100 text-zinc-600' :
+                      plan.tier === 'PRO'     ? 'bg-blue-50 text-blue-700' :
+                      plan.tier === 'PREMIUM' ? 'bg-amber-50 text-amber-700' :
+                                                'bg-zinc-100 text-zinc-600'
+                    }`}>{plan.tier}</span>
+                    <span className="text-xs text-zinc-400">Tier cannot be changed after creation</span>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-zinc-600">Most Popular badge</p>
@@ -436,29 +448,27 @@ function B2CEditForm({ plan, onClose, onSaved }: Props) {
 
           {/* Section 4 — Access Rules */}
           <div>
-            <SectionHeading number="4" title="Access Rules" />
+            <SectionHeading number="4" title="Access Rules" subtitle="Allowed types are derived from tier and cannot be changed." />
             <div className="space-y-4">
               <div>
-                <FieldLabel label="Allowed assessment types" required />
+                <FieldLabel label="Allowed assessment types" />
                 <div className="grid grid-cols-3 gap-2">
                   {ASSESSMENT_TYPE_OPTIONS.map((opt) => {
-                    const selected = allowedTypes.includes(opt.value)
+                    const isIncluded = allowedTypes.includes(opt.value)
                     return (
-                      <button
+                      <div
                         key={opt.value}
-                        type="button"
-                        onClick={() => toggleType(opt.value)}
-                        className={`flex flex-col items-start px-3 py-2.5 rounded-md border text-left transition-colors ${
-                          selected
+                        className={`flex flex-col items-start px-3 py-2.5 rounded-md border text-left ${
+                          isIncluded
                             ? 'border-blue-600 bg-blue-50'
-                            : 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50'
+                            : 'border-zinc-100 bg-zinc-50 opacity-50'
                         }`}
                       >
-                        <span className={`text-sm font-medium ${selected ? 'text-blue-900' : 'text-zinc-700'}`}>
+                        <span className={`text-sm font-medium ${isIncluded ? 'text-blue-900' : 'text-zinc-400'}`}>
                           {opt.label}
                         </span>
                         <span className="text-xs text-zinc-400 mt-0.5">{opt.desc}</span>
-                      </button>
+                      </div>
                     )
                   })}
                 </div>
@@ -900,7 +910,7 @@ export function SingleCoursePlanEditSlideOver({
         billing_cycle:       billingCycle,
         compare_at_price:    hasCompareAt ? Number(compareAtPrice) : null,
         compare_at_price_usd: hasCompareAt ? Number(compareAtPriceUsd) : null,
-        status:              plan.status as 'DRAFT' | 'PUBLISHED' | 'DELETED',
+        status:              plan.status as 'DRAFT' | 'LIVE' | 'DELETED',
       })
       onSaved()
     } catch (e: unknown) {

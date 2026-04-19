@@ -48,6 +48,35 @@
 
 ---
 
+## B2C ASSESSMENT PLAN TIER CASCADE (Locked — KSS-SA-040, Apr 19 2026)
+
+`allowed_assessment_types` on B2C ASSESSMENT plans is **always derived from tier** — it is never free-form.
+
+| Tier | `allowed_assessment_types` |
+|------|---------------------------|
+| BASIC | `['FULL_TEST']` |
+| PRO | `['FULL_TEST', 'SUBJECT_TEST']` |
+| PREMIUM | `['FULL_TEST', 'SUBJECT_TEST', 'CHAPTER_TEST']` |
+
+**Why:** Product guarantees that a BASIC plan holder only sees full tests. Letting SAs override this creates access inconsistency between the plan tile on `/plans` and what the learner can actually access post-subscribe.
+
+**How to apply:** Wherever `allowed_assessment_types` is set (create form, edit slideover, plan lib), compute it from `TIER_ALLOWED_TYPES[tier]`. Never read it from form state. Never show a free-form toggle. `EditPlanSlideOver` displays tier as read-only — tier itself is not editable post-creation.
+
+## ASSESSMENT PLAN UNIQUENESS GUARD (Locked — KSS-SA-040, Apr 19 2026)
+
+Only **one LIVE B2C ASSESSMENT plan** may occupy each tier+scope slot at a time.
+
+- PLATFORM_WIDE: unique on `(tier, scope='PLATFORM_WIDE', plan_audience='B2C', plan_category='ASSESSMENT', status='LIVE')`
+- CATEGORY_BUNDLE: unique on `(tier, scope='CATEGORY_BUNDLE', category, plan_audience='B2C', plan_category='ASSESSMENT', status='LIVE')`
+
+Guard function: `checkLivePlanExistsForTierScope(tier, scope, category, excludePlanId?)` in `src/lib/supabase/plans.ts`. Returns `boolean`. Called before making a plan LIVE in both the Create form and the PlanOverviewTab "Make Live" button. If `true`, the action is blocked and an inline error is shown. `excludePlanId` prevents self-conflict on the detail page.
+
+**Why:** Prevents two BASIC PLATFORM plans being LIVE simultaneously, which would cause ambiguous access rules for subscribers.
+
+**How to apply:** Never skip this check when transitioning a plan to LIVE. Drafts are exempt — the guard only fires on the LIVE transition, not on save-as-draft.
+
+---
+
 ## ASSESSMENT PLAN MUTUAL EXCLUSIVITY (Locked — KSS-SA-039, Apr 18 2026)
 
 A B2C user holds **at most one** active assessment plan at a time — either a PLATFORM_WIDE plan OR a CATEGORY_BUNDLE plan, never both simultaneously.

@@ -311,3 +311,60 @@ Where `assessmentExamCategory` = `assessment.exam` from the `assessments` table 
 - `/checkout` blocks a second subscription attempt with clear message
 - `/plans?highlight=NEET` scrolls to NEET section and plays 2s ring animation
 - `npm run build` and `npm run lint` pass with zero errors
+
+---
+
+## 11. Addendum — KSS-SA-040 (Apr 19 2026): Plan Status + Tier Cascade + Seeding
+
+**Follow-on ticket to KSS-SA-039. Covers four shipped tasks:**
+
+### 11.1 Plan Status Standardization
+
+**Problem:** All B2C assessment plan cards showed "Draft" badge despite plans being live. Root cause: `PlanStatusBadge` had no `PUBLISHED` config key, so `status='PUBLISHED'` fell through to the Draft fallback. Additionally, `fetchLivePlatformPlans` and `fetchLiveCategoryPlansGrouped` queried `.eq('status','PUBLISHED')` — the end-user `/plans` page returned zero plans.
+
+**Fix:** Standardized the entire platform to `LIVE | DRAFT | DELETED`. All code references to `PUBLISHED` replaced with `LIVE`. DB migration: `UPDATE plans SET status = 'LIVE' WHERE status = 'PUBLISHED'`. New DB column: `allowed_assessment_types text[] DEFAULT '{}'`.
+
+### 11.2 Tier Cascade for `allowed_assessment_types`
+
+When a SA creates or views a B2C ASSESSMENT plan, the allowed test types are automatically derived from tier — the SA cannot freely toggle them.
+
+| Tier | Allowed Types |
+|------|--------------|
+| BASIC | `['FULL_TEST']` |
+| PRO | `['FULL_TEST', 'SUBJECT_TEST']` |
+| PREMIUM | `['FULL_TEST', 'SUBJECT_TEST', 'CHAPTER_TEST']` |
+
+In the Create form: Section 4 shows read-only tiles (blue = included, dim = excluded). In EditPlanSlideOver: same read-only tiles with subtitle "Allowed types are derived from tier and cannot be changed." Tier field added to Edit form as read-only coloured badge.
+
+### 11.3 Uniqueness Guard
+
+Before any B2C ASSESSMENT plan is made LIVE, `checkLivePlanExistsForTierScope(tier, scope, category, excludePlanId?)` is called:
+- Returns `true` if a conflict exists → action blocked with inline error
+- PLATFORM_WIDE: unique on tier
+- CATEGORY_BUNDLE: unique on tier+category
+- `excludePlanId` prevents self-conflict on the detail page
+- Guard fires at: Create form "Make Live" + PlanOverviewTab "Make Live"
+- Drafts are exempt — guard only fires on the LIVE transition
+
+### 11.4 Plan Seeding — 18 Plans
+
+18 fresh B2C ASSESSMENT plans seeded (`docs/SQL-SEED-PLANS.txt`):
+
+| Scope | Category | BASIC UUID | PRO UUID | PREMIUM UUID |
+|-------|----------|-----------|----------|-------------|
+| PLATFORM_WIDE | — | `a1000001-...-0001` | `a1000001-...-0002` | `a1000001-...-0003` |
+| CATEGORY_BUNDLE | NEET | `a2000001-...-0001` | `a2000001-...-0002` | `a2000001-...-0003` |
+| CATEGORY_BUNDLE | JEE | `a3000001-...-0001` | `a3000001-...-0002` | `a3000001-...-0003` |
+| CATEGORY_BUNDLE | SAT | `a4000001-...-0001` | `a4000001-...-0002` | `a4000001-...-0003` |
+| CATEGORY_BUNDLE | CLAT | `a5000001-...-0001` | `a5000001-...-0002` | `a5000001-...-0003` |
+| CATEGORY_BUNDLE | PMP | `a6000001-...-0001` | `a6000001-...-0002` | `a6000001-...-0003` |
+
+Pricing: Platform BASIC=₹299/PRO=₹499/PREMIUM=₹699. Category BASIC=₹99/PRO=₹299/PREMIUM=₹499. max_attempts=5 (1 free always included). Assessments linked via `plan_content_map` using JOIN on `exam_categories.name`.
+
+### 11.5 DB Migrations Required (PENDING — user to run)
+
+| Key | SQL |
+|-----|-----|
+| KSS-DB-040a | `ALTER TABLE plans ADD COLUMN IF NOT EXISTS allowed_assessment_types text[] DEFAULT '{}'` |
+| KSS-DB-040b | `UPDATE plans SET status = 'LIVE' WHERE status = 'PUBLISHED'` |
+| KSS-DB-040c | Full 18-plan seed from `docs/SQL-SEED-PLANS.txt` |

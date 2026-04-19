@@ -142,9 +142,9 @@ export type CreatePlanPayload = {
   tier: 'BASIC' | 'PRO' | 'PREMIUM'
   price: number
   billing_cycle: string
-  status: 'DRAFT' | 'PUBLISHED'
+  status: 'DRAFT' | 'LIVE'
   max_attempts_per_assessment: number
-  // allowed_assessment_types is not a DB column — UI-only, not persisted
+  allowed_assessment_types: string[]
   scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE'
   category: string | null
   feature_bullets: string[]
@@ -177,6 +177,7 @@ export async function createPlan(
       category:                      payload.category,
       feature_bullets:               payload.feature_bullets,
       footnote:                      payload.footnote,
+      allowed_assessment_types:      payload.allowed_assessment_types,
     })
     .select('id')
     .single()
@@ -319,7 +320,7 @@ export async function fetchAllAssessmentsForPlan(): Promise<
 export async function updatePlan(
   id: string,
   fields: Partial<Omit<CreatePlanPayload, 'status'>> & {
-    status?: 'DRAFT' | 'LIVE' | 'PUBLISHED' | 'DELETED'
+    status?: 'DRAFT' | 'LIVE' | 'DELETED'
     was_live?: boolean
   }
 ): Promise<void> {
@@ -361,7 +362,7 @@ export async function fetchPublishedPlans(): Promise<PublishedPlanOption[]> {
   const { data, error } = await supabase
     .from('plans')
     .select('id, name, price, scope')
-    .in('status', ['LIVE', 'PUBLISHED'])
+    .eq('status', 'LIVE')
     .order('price', { ascending: true })
   if (error) throw new Error(error.message)
   return data as PublishedPlanOption[]
@@ -915,7 +916,7 @@ export type CreateB2BPlanPayload = {
   name: string
   description: string
   max_attempts_per_assessment: number
-  status: 'DRAFT' | 'PUBLISHED'
+  status: 'DRAFT' | 'LIVE'
 }
 
 export async function createB2BPlan(payload: CreateB2BPlanPayload): Promise<string> {
@@ -1089,7 +1090,7 @@ export type CreateCourseBundlePlanPayload = {
   billing_cycle: 'ANNUAL' | 'MONTHLY'
   feature_bullets: string[]
   stripe_price_id: string | null
-  status: 'DRAFT' | 'PUBLISHED'
+  status: 'DRAFT' | 'LIVE'
 }
 
 export async function createCourseBundlePlan(
@@ -1189,7 +1190,7 @@ export type CreateSingleCoursePlanPayload = {
   price_usd: number
   stripe_price_id: string | null
   billing_cycle: 'ANNUAL' | 'MONTHLY'
-  status: 'DRAFT' | 'PUBLISHED'
+  status: 'DRAFT' | 'LIVE'
   is_free: boolean
   compare_at_price: number | null
   compare_at_price_usd: number | null
@@ -1202,7 +1203,7 @@ export type UpdateSingleCoursePlanPayload = {
   price_usd: number
   stripe_price_id: string | null
   billing_cycle: 'ANNUAL' | 'MONTHLY'
-  status: 'DRAFT' | 'PUBLISHED' | 'DELETED'
+  status: 'DRAFT' | 'LIVE' | 'DELETED'
   is_free: boolean
   compare_at_price: number | null
   compare_at_price_usd: number | null
@@ -1212,7 +1213,7 @@ export async function syncCourseFromPlan(
   courseId: string,
   plan: { price: number; price_usd: number; stripe_price_id: string | null; status: string }
 ) {
-  if (plan.status === 'LIVE' || plan.status === 'PUBLISHED') {
+  if (plan.status === 'LIVE') {
     await supabase
       .from('courses')
       .update({
@@ -1233,11 +1234,11 @@ export async function syncCourseFromPlan(
 // Handles plan status transition + course sync for SINGLE_COURSE_PLAN lifecycle
 export async function transitionSingleCoursePlanStatus(
   planId: string,
-  newStatus: 'PUBLISHED' | 'DRAFT' | 'DELETED',
+  newStatus: 'LIVE' | 'DRAFT' | 'DELETED',
   pricingSnapshot: { price: number; price_usd: number | null; stripe_price_id: string | null },
   currentWasLive: boolean
 ): Promise<void> {
-  const setWasLive = newStatus === 'PUBLISHED' ? true : currentWasLive
+  const setWasLive = newStatus === 'LIVE' ? true : currentWasLive
   const { error } = await supabase
     .from('plans')
     .update({ status: newStatus, was_live: setWasLive })
@@ -1621,7 +1622,7 @@ export async function checkCourseHasActivePlan(courseId: string): Promise<boolea
     .select('id')
     .in('id', planIds)
     .eq('plan_category', 'SINGLE_COURSE_PLAN')
-    .in('status', ['DRAFT', 'LIVE', 'PUBLISHED'])
+    .in('status', ['DRAFT', 'LIVE'])
 
   return (activePlans ?? []).length > 0
 }
@@ -1742,6 +1743,36 @@ export async function fetchAssessmentCountsForPlans(
   return counts
 }
 
+// ─── Uniqueness guard — one LIVE plan per tier+scope(+category) ───────────────
+// Returns true if a LIVE plan already occupies this tier+scope slot.
+// Pass excludePlanId when checking from the detail page so the current plan is excluded.
+export async function checkLivePlanExistsForTierScope(
+  tier: string,
+  scope: 'PLATFORM_WIDE' | 'CATEGORY_BUNDLE',
+  category: string | null,
+  excludePlanId?: string
+): Promise<boolean> {
+  let q = supabase
+    .from('plans')
+    .select('id', { count: 'exact', head: true })
+    .eq('plan_audience', 'B2C')
+    .eq('plan_category', 'ASSESSMENT')
+    .eq('tier', tier)
+    .eq('scope', scope)
+    .eq('status', 'LIVE')
+
+  if (scope === 'CATEGORY_BUNDLE' && category) {
+    q = q.eq('category', category)
+  }
+  if (excludePlanId) {
+    q = q.neq('id', excludePlanId)
+  }
+
+  const { count, error } = await q
+  if (error) throw new Error(error.message)
+  return (count ?? 0) > 0
+}
+
 // ─── End-user /plans page — DB-first helpers ──────────────────────────────────
 
 const PLAN_SELECT = `
@@ -1759,7 +1790,7 @@ export async function fetchLivePlatformPlans(): Promise<PlanRow[]> {
     .eq('plan_audience', 'B2C')
     .eq('plan_category', 'ASSESSMENT')
     .eq('scope', 'PLATFORM_WIDE')
-    .eq('status', 'PUBLISHED')
+    .eq('status', 'LIVE')
     .order('price', { ascending: true })
 
   if (error) throw new Error(error.message)
@@ -1773,7 +1804,7 @@ export async function fetchLiveCategoryPlansGrouped(): Promise<Record<string, Pl
     .eq('plan_audience', 'B2C')
     .eq('plan_category', 'ASSESSMENT')
     .eq('scope', 'CATEGORY_BUNDLE')
-    .eq('status', 'PUBLISHED')
+    .eq('status', 'LIVE')
     .not('feature_bullets', 'eq', '[]')
     .order('price', { ascending: true })
 

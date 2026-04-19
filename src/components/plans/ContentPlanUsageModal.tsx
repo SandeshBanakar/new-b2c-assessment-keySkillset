@@ -31,9 +31,9 @@ function AudienceBadge({ audience }: { audience: 'B2C' | 'B2B' }) {
 function StatusBadge({ status }: { status: string }) {
   const s = status.toUpperCase()
   const cls =
-    s === 'PUBLISHED' ? 'bg-green-50 text-green-700 border-green-200' :
-    s === 'DRAFT'     ? 'bg-zinc-50 text-zinc-500 border-zinc-200' :
-                        'bg-amber-50 text-amber-700 border-amber-200'
+    s === 'LIVE'  ? 'bg-green-50 text-green-700 border-green-200' :
+    s === 'DRAFT' ? 'bg-zinc-50 text-zinc-500 border-zinc-200' :
+                    'bg-amber-50 text-amber-700 border-amber-200'
   return (
     <span className={`text-xs font-medium border rounded-full px-2 py-0.5 ${cls}`}>
       {status}

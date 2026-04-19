@@ -15,6 +15,7 @@ import {
   fetchAllLiveB2CAssessments,
   fetchAllLiveB2CCoursesForBundle,
   checkCourseHasActivePlan,
+  checkLivePlanExistsForTierScope,
   type B2CCourseBundlePickerItem,
 } from '@/lib/supabase/plans'
 
@@ -77,8 +78,13 @@ function B2CForm() {
   // Section 3 — Pricing
   const [price, setPrice] = useState<number | ''>('')
 
-  // Section 4 — Access Rules
-  const [allowedTypes, setAllowedTypes] = useState<AssessmentType[]>([])
+  // Section 4 — Access Rules (derived from tier — not free-form)
+  const TIER_ALLOWED_TYPES: Record<string, AssessmentType[]> = {
+    BASIC:   ['FULL_TEST'],
+    PRO:     ['FULL_TEST', 'SUBJECT_TEST'],
+    PREMIUM: ['FULL_TEST', 'SUBJECT_TEST', 'CHAPTER_TEST'],
+  }
+  const allowedTypes = TIER_ALLOWED_TYPES[tier] ?? []
   const [maxAttempts, setMaxAttempts]   = useState<number>(5)
 
   // Section 5 — Feature Bullets + Footnote
@@ -101,12 +107,6 @@ function B2CForm() {
       .finally(() => setAssessmentsLoading(false))
   }, [])
 
-  function toggleAssessmentType(type: AssessmentType) {
-    setAllowedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    )
-  }
-
   function toggleAssessment(id: string) {
     setSelectedAssessments((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
@@ -127,19 +127,30 @@ function B2CForm() {
   function validate(): string | null {
     if (!name.trim()) return 'Plan name is required.'
     if (price === '' || price < 0) return 'Price must be 0 or a positive number.'
-    if (allowedTypes.length === 0) return 'Select at least one allowed assessment type.'
     if (scope === 'CATEGORY_BUNDLE' && !category)
       return 'Select an exam category for this Category Plan.'
     if (maxAttempts < 1 || maxAttempts > 99) return 'Max attempts must be between 1 and 99.'
     return null
   }
 
-  async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
+  async function handleSubmit(status: 'DRAFT' | 'LIVE') {
     const err = validate()
     if (err) { setError(err); return }
     setError(null)
     setSubmitting(true)
     try {
+      if (status === 'LIVE') {
+        const planCategory = scope === 'CATEGORY_BUNDLE' ? category : null
+        const conflict = await checkLivePlanExistsForTierScope(tier, scope, planCategory)
+        if (conflict) {
+          const label = scope === 'CATEGORY_BUNDLE'
+            ? `a Live ${tier} plan for ${planCategory}`
+            : `a Live ${tier} Platform Plan`
+          setError(`Cannot make live: ${label} already exists. Archive or delete it first.`)
+          setSubmitting(false)
+          return
+        }
+      }
       const planId = await createPlan({
         name:                        name.trim(),
         display_name:                displayName.trim() || null,
@@ -154,6 +165,7 @@ function B2CForm() {
         billing_cycle:               'MONTHLY',
         status,
         max_attempts_per_assessment: maxAttempts,
+        allowed_assessment_types:    allowedTypes,
         feature_bullets:             bullets.filter((b) => b.trim()),
         footnote:                    footnote.trim() || null,
         plan_audience:               'B2C',
@@ -163,7 +175,7 @@ function B2CForm() {
           Array.from(selectedAssessments).map((id) => addContentToPlan(planId, id, 'ASSESSMENT'))
         )
       }
-      if (status === 'PUBLISHED') {
+      if (status === 'LIVE') {
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
@@ -374,33 +386,35 @@ function B2CForm() {
           <SectionHeading
             number="4"
             title="Access Rules"
-            subtitle="Define allowed assessment types and attempt limits."
+            subtitle="Allowed assessment types are determined by tier and cannot be changed independently."
           />
           <div className="space-y-5">
             <div>
-              <FieldLabel label="Allowed assessment types" required />
+              <FieldLabel label="Allowed assessment types" />
               <div className="grid grid-cols-3 gap-2 mt-1">
                 {ASSESSMENT_TYPE_OPTIONS.map((opt) => {
-                  const isSelected = allowedTypes.includes(opt.value)
+                  const isIncluded = allowedTypes.includes(opt.value)
                   return (
-                    <button
+                    <div
                       key={opt.value}
-                      type="button"
-                      onClick={() => toggleAssessmentType(opt.value)}
-                      className={`flex flex-col items-start px-3 py-2.5 rounded-md border text-left transition-colors ${
-                        isSelected
+                      className={`flex flex-col items-start px-3 py-2.5 rounded-md border text-left ${
+                        isIncluded
                           ? 'border-blue-600 bg-blue-50'
-                          : 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50'
+                          : 'border-zinc-100 bg-zinc-50 opacity-50'
                       }`}
                     >
-                      <span className={`text-sm font-medium ${isSelected ? 'text-blue-900' : 'text-zinc-700'}`}>
+                      <span className={`text-sm font-medium ${isIncluded ? 'text-blue-900' : 'text-zinc-400'}`}>
                         {opt.label}
                       </span>
                       <span className="text-xs text-zinc-400 mt-0.5">{opt.description}</span>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
+              <p className="text-xs text-zinc-400 mt-2 flex items-center gap-1">
+                <Info className="w-3 h-3" />
+                Auto-set by tier: BASIC = Full Tests only · PRO = Full + Subject · PREMIUM = All types
+              </p>
             </div>
             <div>
               <FieldLabel label="Max paid attempts per assessment" />
@@ -571,10 +585,10 @@ function B2CForm() {
             <button
               type="button"
               disabled={submitting}
-              onClick={() => handleSubmit('PUBLISHED')}
+              onClick={() => handleSubmit('LIVE')}
               className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? 'Publishing...' : 'Publish Plan'}
+              {submitting ? 'Going Live...' : 'Make Live'}
             </button>
           </div>
         </div>
@@ -697,7 +711,7 @@ function B2BForm() {
     return null
   }
 
-  async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
+  async function handleSubmit(status: 'DRAFT' | 'LIVE') {
     const err = validate()
     if (err) { setError(err); return }
     setError(null)
@@ -878,10 +892,10 @@ function B2BForm() {
           <button
             type="button"
             disabled={submitting}
-            onClick={() => handleSubmit('PUBLISHED')}
+            onClick={() => handleSubmit('LIVE')}
             className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Publishing...' : 'Publish Plan'}
+            {submitting ? 'Going Live...' : 'Make Live'}
           </button>
         </div>
       </div>
@@ -943,7 +957,7 @@ function CourseBundleForm() {
     return null
   }
 
-  async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
+  async function handleSubmit(status: 'DRAFT' | 'LIVE') {
     const err = validate()
     if (err) { setError(err); return }
     setError(null)
@@ -1185,10 +1199,10 @@ function CourseBundleForm() {
             Save as Draft
           </button>
           <button
-            type="button" disabled={submitting} onClick={() => handleSubmit('PUBLISHED')}
+            type="button" disabled={submitting} onClick={() => handleSubmit('LIVE')}
             className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Publishing...' : 'Publish Plan'}
+            {submitting ? 'Going Live...' : 'Make Live'}
           </button>
         </div>
       </div>
@@ -1256,7 +1270,7 @@ function SingleCoursePlanForm() {
     return null
   }
 
-  async function handleSubmit(status: 'DRAFT' | 'PUBLISHED') {
+  async function handleSubmit(status: 'DRAFT' | 'LIVE') {
     const err = validate()
     if (err) { setError(err); return }
 
@@ -1292,13 +1306,13 @@ function SingleCoursePlanForm() {
       })
       if (selectedCourse) {
         await addContentToPlan(planId, selectedCourse, 'COURSE')
-        if (status === 'PUBLISHED') {
+        if (status === 'LIVE') {
           const { syncCourseFromPlan } = await import('@/lib/supabase/plans')
           await syncCourseFromPlan(selectedCourse, {
             price:           effectivePrice,
             price_usd:       effectivePriceUsd,
             stripe_price_id: effectiveStripeId,
-            status:          'PUBLISHED',
+            status:          'LIVE',
           })
         }
       }
@@ -1521,10 +1535,10 @@ function SingleCoursePlanForm() {
             Save as Draft
           </button>
           <button
-            type="button" disabled={submitting} onClick={() => handleSubmit('PUBLISHED')}
+            type="button" disabled={submitting} onClick={() => handleSubmit('LIVE')}
             className="px-4 py-2 text-sm font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Saving...' : 'Set Live'}
+            {submitting ? 'Going Live...' : 'Make Live'}
           </button>
         </div>
       </div>

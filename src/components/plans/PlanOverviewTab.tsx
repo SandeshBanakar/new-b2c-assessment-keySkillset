@@ -10,6 +10,7 @@ import {
   writePlanAuditLog,
   derivePlanType,
   transitionSingleCoursePlanStatus,
+  checkLivePlanExistsForTierScope,
 } from '@/lib/supabase/plans'
 import type { PlanDetail, SingleCoursePlanRow } from '@/lib/supabase/plans'
 
@@ -32,10 +33,11 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
   const [showSetToDraftModal, setShowSetToDraftModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal]       = useState(false)
   const [transitioning, setTransitioning]           = useState(false)
+  const [liveConflictError, setLiveConflictError]   = useState<string | null>(null)
 
   const isB2B          = plan.plan_audience === 'B2B'
   const isSingleCourse = plan.plan_category === 'SINGLE_COURSE_PLAN'
-  const isLive         = plan.status === 'LIVE' || plan.status === 'PUBLISHED'
+  const isLive         = plan.status === 'LIVE'
   const isDraft        = plan.status === 'DRAFT'
   const wasLive        = (plan as PlanDetail).was_live === true
 
@@ -46,16 +48,33 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
   // ── Status transition helpers ──────────────────────────────────────────────
 
   async function handleSetLive() {
+    setLiveConflictError(null)
+    // Uniqueness guard: only one LIVE plan per tier+scope(+category) for B2C assessment plans
+    if (!isB2B && !isSingleCourse && plan.plan_category === 'ASSESSMENT' && plan.tier) {
+      const conflict = await checkLivePlanExistsForTierScope(
+        plan.tier,
+        plan.scope,
+        plan.scope === 'CATEGORY_BUNDLE' ? plan.category : null,
+        plan.id
+      )
+      if (conflict) {
+        const label = plan.scope === 'CATEGORY_BUNDLE'
+          ? `a Live ${plan.tier} plan for ${plan.category}`
+          : `a Live ${plan.tier} Platform Plan`
+        setLiveConflictError(`Cannot make live: ${label} already exists. Archive or delete it first.`)
+        return
+      }
+    }
     setTransitioning(true)
     try {
       if (isSingleCourse) {
-        await transitionSingleCoursePlanStatus(plan.id, 'PUBLISHED', {
+        await transitionSingleCoursePlanStatus(plan.id, 'LIVE', {
           price:           plan.price,
           price_usd:       (plan as PlanDetail).price_usd ?? null,
           stripe_price_id: (plan as PlanDetail).stripe_price_id ?? null,
         }, wasLive)
       } else {
-        await updatePlan(plan.id, { status: isB2B ? 'LIVE' : 'PUBLISHED', was_live: true })
+        await updatePlan(plan.id, { status: 'LIVE', was_live: true })
       }
       await writePlanAuditLog(plan.id, 'LIVE', {
         stripe_product_id: `stripe_prod_DEMO_${plan.id.slice(0, 8)}`,
@@ -178,6 +197,13 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
         </div>
       )}
 
+      {liveConflictError && (
+        <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded-md px-4 py-3">
+          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-rose-700">{liveConflictError}</p>
+        </div>
+      )}
+
       {/* Status + actions strip */}
       <div className="flex items-center justify-between bg-white border border-zinc-200 rounded-md px-5 py-4">
         <div className="flex items-center gap-3">
@@ -212,7 +238,7 @@ export function PlanOverviewTab({ plan, onRefresh }: Props) {
               disabled={transitioning}
               className="px-3 py-1.5 text-xs font-medium bg-blue-700 hover:bg-blue-800 text-white rounded-md transition-colors disabled:opacity-50"
             >
-              {transitioning ? 'Saving...' : 'Set Live'}
+              {transitioning ? 'Going Live...' : 'Make Live'}
             </button>
           )}
 

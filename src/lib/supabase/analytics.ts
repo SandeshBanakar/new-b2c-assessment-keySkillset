@@ -173,7 +173,7 @@ export async function fetchRevenue(range: DateRange): Promise<RevenueData> {
       .from('plans')
       .select('id, name, price, billing_cycle, created_at')
       .eq('plan_audience', 'B2C')
-      .eq('status', 'PUBLISHED')
+      .eq('status', 'LIVE')
       .order('created_at', { ascending: false }),
 
     supabase.from('plan_subscribers').select('plan_id, subscriber_count'),
