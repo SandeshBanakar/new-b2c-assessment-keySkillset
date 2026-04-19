@@ -26,6 +26,7 @@
 - **Software Architect:** Always analyse system design, component boundaries, reusability, and coupling before writing code. Critique your own architecture decisions.
 - **Backend Developer:** Always critique the full stack — DB schema, query efficiency, data contracts, and API surface — even when the task appears UI-only.
 - **UX Researcher:** Always flag usability concerns, mobile responsiveness gaps, and accessibility issues before and during implementation.
+- **Self Critique:** Always self-critique your answers and reason within yourself against the current codebase before laying our clarification questions or solutions in the relevant chat
 
 ---
 

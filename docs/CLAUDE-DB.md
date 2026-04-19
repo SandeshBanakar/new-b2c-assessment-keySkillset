@@ -105,6 +105,42 @@ unsuspended_by (uuid nullable → admin_users.id)
   - Category — CLAT Basic: `e3c4a5d6-7b8c-9d0e-1f2a-b3c4d5e6f7a8` (Preethi Nair) — KSS-DB-039c
   - 19 demo users total after KSS-DB-039c: 6 Free, 4 Basic, 3 Pro, 3 Premium, 3 Category-plan. 1 Suspended, 3 Inactive.
 
+**KSS-DB-043 additions (KSS-SAT-A02 — Apr 19 2026):**
+- `target_sat_score (integer nullable)` — composite SAT target (400–1600). Full test only.
+- `target_sat_subject_score (integer nullable)` — subject test target (200–800). Math OR R&W subject test.
+- Both nullable. Set via inline picker on HeroScore (Touch 2) or assessment card prompt (Touch 1). Never on login form.
+
+### sat_tier_bands (KSS-DB-041 — KSS-SAT-A02, Apr 19 2026)
+```
+id, name, label, min_score, max_score, color (Tailwind base token),
+display_order, created_at, updated_at
+```
+- 5 seeded rows: Accessible (zinc, 1000–1199), Top-100 (teal, 1200–1349), Top-50 (blue, 1350–1429), Top-20 (violet, 1430–1499), Elite (amber, 1500–1600)
+- Tier is auto-derived: `college.cutoff_score` bucketed to first band where `cutoff >= band.min_score`
+- SA-editable via Platform Config → SAT → Analytics Display → Tier Bands
+
+### sat_colleges (KSS-DB-042 — KSS-SAT-A02, Apr 19 2026)
+```
+id, name, country ('US'|'IN'), cutoff_score (int, 400–1600), aid_pct (int, 0–100),
+logo_initials (text, 2–4 chars), is_active (boolean DEFAULT true),
+display_order (int), created_by (FK→admin_users), created_at, updated_at
+```
+- 19 rows pre-seeded (MIT → Symbiosis SLS). See PRD §5 / KSS-DB-042 for full list.
+- Shown only on SAT Full Test analytics (`isFullTest === true`). Never on subject tests.
+- SA-manageable via Platform Config → SAT → Analytics Display → College Targets
+
+### platform_analytics_config (KSS-DB-044 — KSS-SAT-A02, Apr 19 2026)
+```
+id, exam_category_id (FK→exam_categories ON DELETE CASCADE),
+config_key (text), config_value (boolean DEFAULT true),
+updated_by (FK→admin_users), updated_at,
+UNIQUE(exam_category_id, config_key)
+```
+- Valid config_keys for SAT: `show_college_ladder`, `show_pacing_preview`, `show_mistake_taxonomy_preview`
+- Missing row = default true (fail-open — show section rather than hide)
+- SA-managed via Platform Config → SAT → Analytics Display → Section Visibility
+- Seeded with all 3 SAT keys = true
+
 ### attempts
 ```
 passed (boolean nullable)

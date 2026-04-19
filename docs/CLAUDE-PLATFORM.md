@@ -170,8 +170,26 @@ src/components/assessment-detail/ConceptMasteryPanel.tsx Shared concept mastery 
 src/components/assessment-detail/AnalyticsTab.tsx        Non-SAT full/subject tests (NEET, JEE, CLAT)
 src/components/assessment-detail/SATAnalyticsTab.tsx     SAT full-test + subject-test only
 src/components/assessment-detail/ChapterAnalyticsTab.tsx ALL chapter tests (SAT, NEET, JEE, CLAT)
-src/components/assessment-detail/SolutionsPanel.tsx      DELETED — never re-create
+src/components/assessment-detail/SolutionsPanel.tsx      LIVE — keep, do NOT delete (KSS-SAT-A02 correction)
 ```
+
+**SAT Analytics V2 components (KSS-SAT-A02 — Apr 19 2026):**
+```
+src/components/ui/ScoreTrajectoryChart.tsx               Shared SVG line chart — score over attempts
+src/components/ui/DifficultyBreakdownCard.tsx            Shared Easy/Medium/Hard bar card
+src/components/ui/PreviewSectionWrapper.tsx              Wraps demo sections with "Preview" badge
+src/components/assessment-detail/SATHeroScore.tsx        SAT hero — score + target + progress + edit
+src/components/assessment-detail/SATCollegeLadder.tsx    College eligibility ladder — full test only
+src/components/assessment-detail/SATLeveragePanel.tsx    Top-3 weak concepts + projected point gain
+src/components/assessment-detail/SATPacingChart.tsx      Pacing per question — demo data, Preview badge
+src/components/assessment-detail/SATMistakeTaxonomy.tsx  Mistake donut — demo data, Preview badge
+```
+
+**SolutionsPanel (corrected — KSS-SAT-A02):**
+- Status: LIVE. Located at `src/components/assessment-detail/SolutionsPanel.tsx`
+- Imported by `SATAnalyticsTab.tsx` — do NOT remove this import
+- The "DELETED" entry in prior docs was incorrect — this component exists and works
+- Props: `questions: DbQuestion[]`, `userAnswers: UserAnswer[]`, `isFullTest: boolean`
 
 **ConceptMasteryPanel rules (locked Apr 17 2026):**
 - Props: `conceptMastery`, `tagSectionMap: Record<string,string>`, `sections: string[]`,
@@ -188,7 +206,7 @@ src/components/assessment-detail/SolutionsPanel.tsx      DELETED — never re-cr
 - Section pill filters rows only — all attempt columns always visible; sort recomputes per section
 - In `SATAnalyticsTab`: parent builds `tagSectionMap` from `SAT_RW_DOMAIN_MAP`/`SAT_MATH_DOMAIN_MAP` keys
 
-NEVER re-create `SolutionsPanel.tsx`. Use the inline DB-driven accordion pattern from `AnalyticsTab.tsx`.
+Do NOT delete `SolutionsPanel.tsx` — it is a live component used by `SATAnalyticsTab.tsx`.
 
 Rich text editor: **Tiptap + KaTeX** — wired Apr 12 2026 (KSS-DB-018, KSS-DB-019).
 - Component: `src/components/ui/RichTextEditor.tsx` — import `RichTextEditor` (default) + `JSONContent`, `emptyDoc`, `isDocEmpty`, `ensureDoc`

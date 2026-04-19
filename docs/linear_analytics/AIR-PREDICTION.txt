@@ -1,0 +1,9 @@
+Step 1: Calculate student's percentile from mock score using NTA's score-to-percentile curve
+
+Step 2: Map percentile to AIR range using last 3 years' NTA rank distribution data
+
+Step 3: Apply confidence band based on score consistency (high variance = wider band, low variance = tighter)
+
+Step 4: Project trajectory — if student improves at current velocity, what AIR on exam day?
+
+Step 5: Show: Current AIR estimate | Target AIR | Gap + Projected AIR on exam day (if trend continues)

@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Analytics · keySkillset</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Inter+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+:root {
+  --bg: #f8f9fc;
+  --surface: #ffffff;
+  --surface2: #f1f3f8;
+  --border: #e5e9f2;
+  --text: #0f1623;
+  --text2: #4a5568;
+  --text3: #8892a4;
+  --accent: #4f6ef7;
+  --accent2: #7c3aed;
+  --green: #10b981;
+  --orange: #f59e0b;
+  --red: #ef4444;
+  --neet: #0ea5e9;
+  --jee: #8b5cf6;
+  --clat: #f97316;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.1), 0 8px 32px rgba(0,0,0,0.06);
+}
+.dark {
+  --bg: #0d1117;
+  --surface: #161b27;
+  --surface2: #1e2535;
+  --border: #2a3348;
+  --text: #e8edf5;
+  --text2: #94a3b8;
+  --text3: #4a5568;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+  --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.3);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
+  font-size: 14px;
+  line-height: 1.5;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+
+/* Animations */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+@keyframes countUp { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes drawLine { to { stroke-dashoffset: 0; } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+.fade-up { animation: fadeUp 0.5s ease both; }
+.live-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation: pulse 2s ease-in-out infinite; display:inline-block; }
+
+/* Card base */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.card:hover { box-shadow: var(--card-shadow-hover); }
+
+/* Stat pill */
+.stat-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 500;
+}
+.pill-green { background: #d1fae5; color: #065f46; }
+.pill-red { background: #fee2e2; color: #991b1b; }
+.pill-orange { background: #fef3c7; color: #92400e; }
+.pill-blue { background: #dbeafe; color: #1e40af; }
+.dark .pill-green { background: #064e3b; color: #6ee7b7; }
+.dark .pill-red { background: #7f1d1d; color: #fca5a5; }
+.dark .pill-orange { background: #78350f; color: #fcd34d; }
+.dark .pill-blue { background: #1e3a8a; color: #93c5fd; }
+
+/* Section label */
+.section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text3);
+  margin-bottom: 16px;
+}
+
+/* Tab styles */
+.exam-tab {
+  padding: 8px 20px; border-radius: 10px; font-weight: 600; font-size: 14px;
+  cursor: pointer; transition: all 0.2s; border: 2px solid transparent;
+  background: transparent; color: var(--text2);
+}
+.exam-tab.active-neet { background: #e0f2fe; color: #0369a1; border-color: #0ea5e9; }
+.exam-tab.active-jee { background: #ede9fe; color: #6d28d9; border-color: #8b5cf6; }
+.exam-tab.active-clat { background: #fff7ed; color: #c2410c; border-color: #f97316; }
+.dark .exam-tab.active-neet { background: #0c2d3e; color: #38bdf8; border-color: #0ea5e9; }
+.dark .exam-tab.active-jee { background: #2d1b69; color: #c4b5fd; border-color: #8b5cf6; }
+.dark .exam-tab.active-clat { background: #3d1a00; color: #fb923c; border-color: #f97316; }
+.exam-tab:hover:not(.active-neet):not(.active-jee):not(.active-clat) { background: var(--surface2); color: var(--text); }
+
+/* Progress bar */
+.progress-bar { height: 6px; border-radius: 99px; background: var(--surface2); overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 99px; transition: width 1s cubic-bezier(.4,0,.2,1); }
+
+/* Confidence band for AIR */
+.confidence-band {
+  position: relative; height: 48px; border-radius: 12px;
+  background: linear-gradient(90deg, #fef9c3, #fef3c7, #fed7aa, #fca5a5);
+  overflow: hidden;
+}
+.confidence-needle {
+  position: absolute; top: 0; width: 3px; height: 100%;
+  background: var(--text); border-radius: 2px;
+  transition: left 1s cubic-bezier(.4,0,.2,1);
+}
+
+/* SVG chart helpers */
+.chart-line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.chart-area { opacity: 0.12; }
+.grid-line { stroke: var(--border); stroke-width: 1; }
+.axis-label { font-size: 10px; fill: var(--text3); font-family: 'Inter', sans-serif; }
+
+/* Heatmap cell */
+.heatmap-cell {
+  border-radius: 6px; cursor: pointer; transition: transform 0.15s;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 500;
+}
+.heatmap-cell:hover { transform: scale(1.1); }
+.heat-0 { background: var(--surface2); color: var(--text3); }
+.heat-1 { background: #fef9c3; color: #854d0e; }
+.heat-2 { background: #fde68a; color: #92400e; }
+.heat-3 { background: #fca5a5; color: #7f1d1d; }
+.heat-4 { background: #f87171; color: #ffffff; }
+.heat-5 { background: #dc2626; color: #ffffff; }
+.heat-good { background: #bbf7d0; color: #065f46; }
+.heat-great { background: #34d399; color: #ffffff; }
+.dark .heat-0 { background: #1e2535; color: #4a5568; }
+.dark .heat-1 { background: #3d2e00; color: #fcd34d; }
+.dark .heat-2 { background: #5c3a00; color: #fbbf24; }
+.dark .heat-3 { background: #5c1a1a; color: #fca5a5; }
+.dark .heat-4 { background: #7f1d1d; color: #fecaca; }
+.dark .heat-5 { background: #991b1b; color: #ffffff; }
+.dark .heat-good { background: #064e3b; color: #6ee7b7; }
+.dark .heat-great { background: #065f46; color: #34d399; }
+
+/* Quadrant */
+.quadrant-cell {
+  border-radius: 12px; padding: 14px; position: relative; overflow: hidden;
+}
+
+/* Rank card */
+.rank-card-gradient {
+  background: linear-gradient(135deg, #1e3a8a 0%, #4f6ef7 40%, #7c3aed 100%);
+}
+
+/* Radar chart placeholder */
+.radar-wrap { position: relative; }
+
+/* Tooltip */
+.tooltip {
+  position: absolute; background: var(--text); color: var(--surface);
+  padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 500;
+  pointer-events: none; z-index: 100; white-space: nowrap;
+  transform: translate(-50%, -110%);
+}
+
+/* Badge */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600;
+}
+
+/* Navbar */
+.navbar {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+/* Recovery track */
+.recovery-track { position: relative; height: 8px; border-radius: 99px; background: var(--surface2); }
+.recovery-fill { height: 100%; border-radius: 99px; transition: width 1.2s cubic-bezier(.4,0,.2,1); }
+.recovery-marker {
+  position: absolute; top: 50%; width: 16px; height: 16px;
+  border-radius: 50%; transform: translate(-50%, -50%);
+  border: 2px solid var(--surface); box-shadow: 0 0 0 2px currentColor;
+}
+
+input[type=range] { -webkit-appearance: none; width: 100%; height: 4px; border-radius: 99px; background: var(--surface2); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.modal-card {
+  background: var(--surface); border-radius: 20px; padding: 32px;
+  max-width: 420px; width: 90%; box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+}
+
+/* Onboarding step */
+.onboard-option {
+  border: 2px solid var(--border); border-radius: 12px; padding: 12px 16px;
+  cursor: pointer; transition: all 0.15s; color: var(--text2);
+}
+.onboard-option:hover { border-color: var(--accent); color: var(--text); background: var(--surface2); }
+.onboard-option.selected { border-color: var(--accent); background: #eef2ff; color: var(--accent); }
+.dark .onboard-option.selected { background: #1e2a5e; }
+
+button.primary-btn {
+  background: var(--accent); color: white; border: none; border-radius: 10px;
+  padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: opacity 0.15s; font-family: inherit;
+}
+button.primary-btn:hover { opacity: 0.9; }
+button.ghost-btn {
+  background: transparent; color: var(--text2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 20px; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+button.ghost-btn:hover { background: var(--surface2); color: var(--text); }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script>
+// ─── MOCK DATA ─────────────────────────────────────────────────────────────
+
+const DATA = {
+  student: {
+    name: "Priya Sharma",
+    email: "priya@example.com",
+    attemptNumber: 2,
+    onboarded: true,
+    previousScores: { neet: 520, jee: 178, clat: 82 },
+    targets: { neet: { score: 650, air: 500 }, jee: { score: 260, air: 3000 }, clat: { score: 108, air: 200 } },
+    examDates: { neet: "2025-05-04", jee: "2025-04-02", clat: "2025-12-14" }
+  },
+
+  neet: {
+    mocks: [
+      { id:1, date:"2024-10-05", label:"Mock 1", score:520, physics:120, chemistry:135, biology:265, totalQ:180, correct:130, wrong:32, skipped:18, negMarks:32 },
+      { id:2, date:"2024-10-19", label:"Mock 2", score:541, physics:128, chemistry:140, biology:273, totalQ:180, correct:136, wrong:29, skipped:15, negMarks:29 },
+      { id:3, date:"2024-11-02", label:"Mock 3", score:558, physics:135, chemistry:142, biology:281, totalQ:180, correct:141, wrong:27, skipped:12, negMarks:27 },
+      { id:4, date:"2024-11-16", label:"Mock 4", score:549, physics:130, chemistry:138, biology:281, totalQ:180, correct:139, wrong:30, skipped:11, negMarks:30 },
+      { id:5, date:"2024-11-30", label:"Mock 5", score:571, physics:140, chemistry:148, biology:283, totalQ:180, correct:145, wrong:26, skipped:9, negMarks:26 },
+      { id:6, date:"2024-12-14", label:"Mock 6", score:583, physics:143, chemistry:152, biology:288, totalQ:180, correct:148, wrong:24, skipped:8, negMarks:24 },
+      { id:7, date:"2024-12-28", label:"Mock 7", score:591, physics:145, chemistry:155, biology:291, totalQ:180, correct:151, wrong:22, skipped:7, negMarks:22 },
+    ],
+    sections: {
+      physics: { name:"Physics", color:"#0ea5e9", maxMarks:180, avgScore:143, accuracy:74, avgTime:82, negMarks:12, trend:"+5", concepts:[
+        {name:"Mechanics",accuracy:82,timeRatio:0.9,marks:38,lost:8},{name:"Electrostatics",accuracy:61,timeRatio:1.3,marks:32,lost:12},
+        {name:"Optics",accuracy:55,timeRatio:1.4,marks:24,lost:11},{name:"Modern Physics",accuracy:78,timeRatio:0.95,marks:28,lost:6},
+        {name:"Thermodynamics",accuracy:68,timeRatio:1.1,marks:21,lost:9}
+      ]},
+      chemistry: { name:"Chemistry", color:"#10b981", maxMarks:180, avgScore:152, accuracy:79, avgTime:71, negMarks:8, trend:"+7", concepts:[
+        {name:"Organic Chemistry",accuracy:72,timeRatio:1.1,marks:44,lost:9},{name:"Inorganic Chem",accuracy:85,timeRatio:0.85,marks:36,lost:5},
+        {name:"Physical Chem",accuracy:76,timeRatio:1.0,marks:32,lost:8},{name:"Coordination Compounds",accuracy:62,timeRatio:1.25,marks:24,lost:9}
+      ]},
+      biology: { name:"Biology", color:"#f97316", maxMarks:360, avgScore:291, accuracy:76, avgTime:68, negMarks:18, trend:"+9", concepts:[
+        {name:"Cell Biology",accuracy:88,timeRatio:0.8,marks:54,lost:6},{name:"Genetics",accuracy:71,timeRatio:1.1,marks:48,lost:14},
+        {name:"Human Physiology",accuracy:65,timeRatio:1.2,marks:52,lost:18},{name:"Plant Physiology",accuracy:58,timeRatio:1.35,marks:38,lost:16},
+        {name:"Ecology",accuracy:82,timeRatio:0.9,marks:32,lost:6},{name:"Evolution",accuracy:74,timeRatio:1.0,marks:28,lost:7}
+      ]}
+    },
+    mistakes: { careless:28, conceptGap:41, panicSkip:12, knowledgeSkip:8, fragileCorrect:22 },
+    airData: { current:820, target:500, projected:580, best:720, worst:1050, confidence:68 },
+    peerPercentile: 74,
+    colleges: [
+      {name:"AIIMS New Delhi", cutoff:710, prob:12},
+      {name:"AIIMS Jodhpur", cutoff:680, prob:28},
+      {name:"JIPMER Puducherry", cutoff:660, prob:41},
+      {name:"AIIMS Bhopal", cutoff:645, prob:58},
+      {name:"Maulana Azad Medical", cutoff:620, prob:73},
+      {name:"Grant Medical College", cutoff:600, prob:84},
+    ]
+  },
+
+  jee: {
+    mocks: [
+      { id:1, date:"2024-10-05", label:"Mock 1", score:178, percentile:94.2, physics:58, chemistry:62, maths:58, totalQ:90, correct:72, wrong:18, skipped:0, negMarks:18, integerCorrect:8, integerTotal:15 },
+      { id:2, date:"2024-10-19", label:"Mock 2", score:185, percentile:94.8, physics:62, chemistry:63, maths:60, totalQ:90, correct:75, wrong:16, skipped:0, negMarks:16, integerCorrect:10, integerTotal:15 },
+      { id:3, date:"2024-11-02", label:"Mock 3", score:191, percentile:95.3, physics:64, chemistry:65, maths:62, totalQ:90, correct:77, wrong:14, skipped:1, negMarks:14, integerCorrect:11, integerTotal:15 },
+      { id:4, date:"2024-11-16", label:"Mock 4", score:188, percentile:95.1, physics:63, chemistry:64, maths:61, totalQ:90, correct:76, wrong:15, skipped:0, negMarks:15, integerCorrect:10, integerTotal:15 },
+      { id:5, date:"2024-11-30", label:"Mock 5", score:197, percentile:95.8, physics:67, chemistry:66, maths:64, totalQ:90, correct:79, wrong:12, skipped:1, negMarks:12, integerCorrect:12, integerTotal:15 },
+      { id:6, date:"2024-12-14", label:"Mock 6", score:204, percentile:96.2, physics:69, chemistry:68, maths:67, totalQ:90, correct:82, wrong:10, skipped:1, negMarks:10, integerCorrect:13, integerTotal:15 },
+      { id:7, date:"2024-12-28", label:"Mock 7", score:211, percentile:96.7, physics:71, chemistry:70, maths:70, totalQ:90, correct:85, wrong:9, skipped:1, negMarks:9, integerCorrect:14, integerTotal:15 },
+    ],
+    sections: {
+      physics: { name:"Physics", color:"#0ea5e9", maxMarks:100, avgScore:71, accuracy:76, avgTime:118, negMarks:6, trend:"+4", concepts:[
+        {name:"Mechanics",accuracy:82,timeRatio:0.9,marks:24,lost:4},{name:"Electricity & Magnetism",accuracy:63,timeRatio:1.35,marks:20,lost:7},
+        {name:"Waves & Optics",accuracy:70,timeRatio:1.1,marks:16,lost:5},{name:"Modern Physics",accuracy:77,timeRatio:0.95,marks:11,lost:3}
+      ]},
+      chemistry: { name:"Chemistry", color:"#10b981", maxMarks:100, avgScore:70, accuracy:79, avgTime:98, negMarks:4, trend:"+3", concepts:[
+        {name:"Organic Chemistry",accuracy:74,timeRatio:1.1,marks:26,lost:7},{name:"Physical Chemistry",accuracy:83,timeRatio:0.85,marks:22,lost:4},
+        {name:"Inorganic Chemistry",accuracy:78,timeRatio:0.9,marks:22,lost:5}
+      ]},
+      maths: { name:"Mathematics", color:"#8b5cf6", maxMarks:100, avgScore:70, accuracy:72, avgTime:142, negMarks:8, trend:"+6", concepts:[
+        {name:"Calculus",accuracy:68,timeRatio:1.2,marks:28,lost:9},{name:"Algebra",accuracy:76,timeRatio:1.05,marks:22,lost:6},
+        {name:"Coordinate Geometry",accuracy:74,timeRatio:1.1,marks:18,lost:5},{name:"Probability",accuracy:62,timeRatio:1.3,marks:12,lost:5}
+      ]}
+    },
+    mistakes: { careless:22, conceptGap:31, panicSkip:8, knowledgeSkip:5, fragileCorrect:18 },
+    airData: { current:3800, target:3000, projected:3200, best:3000, worst:5000, confidence:71 },
+    peerPercentile: 71,
+    integerStats: { correct:14, total:15, accuracy:93, opportunity:"+12 marks if all correct" },
+    colleges: [
+      {name:"IIT Bombay (CS)", cutoff:99.8, prob:8, type:"percentile"},
+      {name:"IIT Delhi (CS)", cutoff:99.7, prob:14, type:"percentile"},
+      {name:"IIT Madras", cutoff:99.2, prob:31, type:"percentile"},
+      {name:"IIT Kharagpur", cutoff:98.8, prob:47, type:"percentile"},
+      {name:"NIT Trichy", cutoff:97.5, prob:68, type:"percentile"},
+      {name:"NIT Surathkal", cutoff:97.0, prob:76, type:"percentile"},
+    ]
+  },
+
+  clat: {
+    mocks: [
+      { id:1, date:"2024-10-05", label:"Mock 1", score:82, english:18, gk:14, legal:22, logical:16, quant:12, totalQ:150, correct:98, wrong:48, skipped:4, negMarks:12 },
+      { id:2, date:"2024-10-19", label:"Mock 2", score:85, english:19, gk:14, legal:23, logical:17, quant:12, totalQ:150, correct:102, wrong:46, skipped:2, negMarks:11.5 },
+      { id:3, date:"2024-11-02", label:"Mock 3", score:88, english:20, gk:15, legal:24, logical:17, quant:12, totalQ:150, correct:106, wrong:44, skipped:0, negMarks:11 },
+      { id:4, date:"2024-11-16", label:"Mock 4", score:87, english:19, gk:15, legal:24, logical:17, quant:12, totalQ:150, correct:104, wrong:45, skipped:1, negMarks:11.25 },
+      { id:5, date:"2024-11-30", label:"Mock 5", score:91, english:21, gk:16, legal:25, logical:18, quant:11, totalQ:150, correct:110, wrong:42, skipped:0, negMarks:10.5 },
+      { id:6, date:"2024-12-14", label:"Mock 6", score:94, english:22, gk:16, legal:26, logical:18, quant:12, totalQ:150, correct:113, wrong:40, skipped:0, negMarks:10 },
+      { id:7, date:"2024-12-28", label:"Mock 7", score:97, english:23, gk:17, legal:27, logical:18, quant:12, totalQ:150, correct:116, wrong:38, skipped:0, negMarks:9.5 },
+    ],
+    sections: {
+      english: { name:"English", color:"#0ea5e9", maxMarks:28, avgScore:23, accuracy:78, avgTime:54, negMarks:1.5, trend:"+3", concepts:[
+        {name:"Reading Comprehension",accuracy:76,timeRatio:1.1,marks:12,lost:3},{name:"Vocabulary",accuracy:82,timeRatio:0.9,marks:8,lost:1},
+        {name:"Grammar",accuracy:79,timeRatio:0.95,marks:8,lost:2}
+      ]},
+      gk: { name:"General Knowledge", color:"#f59e0b", maxMarks:25, avgScore:17, accuracy:68, avgTime:38, negMarks:2, trend:"+2", concepts:[
+        {name:"Current Affairs",accuracy:62,timeRatio:0.8,marks:8,lost:5},{name:"Static GK",accuracy:74,timeRatio:0.85,marks:9,lost:2},
+        {name:"Legal GK",accuracy:70,timeRatio:0.9,marks:8,lost:3}
+      ]},
+      legal: { name:"Legal Reasoning", color:"#8b5cf6", maxMarks:35, avgScore:27, accuracy:74, avgTime:72, negMarks:2.5, trend:"+4", concepts:[
+        {name:"Principle-Fact Application",accuracy:71,timeRatio:1.15,marks:14,lost:4},{name:"Legal Maxims",accuracy:78,timeRatio:1.0,marks:10,lost:2},
+        {name:"Constitutional Law",accuracy:74,timeRatio:1.05,marks:13,lost:3}
+      ]},
+      logical: { name:"Logical Reasoning", color:"#10b981", maxMarks:28, avgScore:18, accuracy:64, avgTime:84, negMarks:2, trend:"+1", concepts:[
+        {name:"Analytical Reasoning",accuracy:60,timeRatio:1.3,marks:10,lost:4},{name:"Critical Reasoning",accuracy:66,timeRatio:1.2,marks:10,lost:3},
+        {name:"Assumption-Inference",accuracy:68,timeRatio:1.1,marks:8,lost:3}
+      ]},
+      quant: { name:"Quantitative Techniques", color:"#ef4444", maxMarks:14, avgScore:12, accuracy:82, avgTime:62, negMarks:0.5, trend:"+1", concepts:[
+        {name:"Data Interpretation",accuracy:84,timeRatio:0.9,marks:8,lost:1},{name:"Basic Maths",accuracy:80,timeRatio:0.95,marks:6,lost:1}
+      ]}
+    },
+    mistakes: { careless:32, conceptGap:28, panicSkip:6, knowledgeSkip:14, fragileCorrect:16 },
+    airData: { current:280, target:200, projected:230, best:190, worst:380, confidence:64 },
+    peerPercentile: 68,
+    passageStats: { avgTimePerPassage:4.2, idealTime:3.5, fastestSection:"English", slowestSection:"Logical Reasoning" },
+    colleges: [
+      {name:"NLU Delhi (NLSIU Equiv.)", cutoff:110, prob:22},
+      {name:"NALSAR Hyderabad", cutoff:107, prob:34},
+      {name:"NLU Jodhpur", cutoff:104, prob:49},
+      {name:"NLU Bangalore", cutoff:101, prob:61},
+      {name:"NLU Bhopal", cutoff:98, prob:74},
+      {name:"NLU Patna", cutoff:95, prob:86},
+    ]
+  }
+};
+
+// ─── UTILITIES ─────────────────────────────────────────────────────────────
+
+function daysUntil(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.max(0, Math.ceil((d - now) / 86400000));
+}
+
+function getExamColor(exam) {
+  return exam === 'neet' ? '#0ea5e9' : exam === 'jee' ? '#8b5cf6' : '#f97316';
+}
+
+function getExamLabel(exam) {
+  return exam === 'neet' ? 'NEET UG' : exam === 'jee' ? 'JEE Mains' : 'CLAT UG';
+}
+
+function getExamMax(exam) {
+  return exam === 'neet' ? 720 : exam === 'jee' ? 300 : 120;
+}
+
+function formatAIR(n) {
+  if (n >= 100000) return (n/100000).toFixed(1) + 'L';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+  return n.toString();
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+// ─── SVG CHARTS ────────────────────────────────────────────────────────────
+
+function sparklinePath(values, w, h, pad=8) {
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => ({
+    x: pad + (i / (values.length - 1)) * (w - pad * 2),
+    y: h - pad - ((v - min) / range) * (h - pad * 2)
+  }));
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length; i++) {
+    const cx = (pts[i-1].x + pts[i].x) / 2;
+    d += ` C ${cx} ${pts[i-1].y} ${cx} ${pts[i].y} ${pts[i].x} ${pts[i].y}`;
+  }
+  return { path: d, pts };
+}
+
+function areaPath(linePath, pts, w, h) {
+  return linePath + ` L ${pts[pts.length-1].x} ${h} L ${pts[0].x} ${h} Z`;
+}
+
+// ─── MAIN APP ──────────────────────────────────────────────────────────────
+
+let state = {
+  exam: 'neet',
+  dark: false,
+  onboarded: DATA.student.onboarded,
+  onboardStep: 0,
+  onboardExam: 'neet',
+  onboardAttempt: null,
+  onboardTarget: '',
+  onboardPrevScore: '',
+  showRankCard: false,
+  tooltip: null,
+  recoveryInput: { neet: DATA.student.previousScores.neet, jee: DATA.student.previousScores.jee, clat: DATA.student.previousScores.clat },
+  targetInput: { neet: DATA.student.targets.neet.score, jee: DATA.student.targets.jee.score, clat: DATA.student.targets.clat.score },
+};
+
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+}
+
+// ─── COMPONENTS ────────────────────────────────────────────────────────────
+
+function Navbar() {
+  const ex = state.exam;
+  const color = getExamColor(ex);
+  return `
+  <nav class="navbar px-6 py-3 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div style="width:32px;height:32px;background:linear-gradient(135deg,#4f6ef7,#7c3aed);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <span style="font-family:'Inter Display',sans-serif;font-weight:700;font-size:15px;color:var(--text)">keySkillset</span>
+      <span style="font-size:11px;font-weight:600;letter-spacing:0.06em;color:var(--text3);padding:2px 8px;background:var(--surface2);border-radius:99px;">ANALYTICS</span>
+    </div>
+
+    <div class="flex items-center gap-2" id="exam-tabs">
+      ${['neet','jee','clat'].map(e => `
+        <button class="exam-tab ${state.exam === e ? 'active-'+e : ''}" onclick="setState({exam:'${e}'})">
+          ${getExamLabel(e)}
+        </button>
+      `).join('')}
+    </div>
+
+    <div class="flex items-center gap-3">
+      <span class="flex items-center gap-1.5" style="font-size:12px;color:var(--text3)">
+        <span class="live-dot"></span> Live
+      </span>
+      <button onclick="setState({dark:!state.dark});document.documentElement.classList.toggle('dark')"
+        style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;">
+        ${state.dark
+          ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
+          : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`
+        }
+      </button>
+      <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,${color},${color}99);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;">P</div>
+    </div>
+  </nav>`;
+}
+
+function HeroSection() {
+  const ex = state.exam;
+  const d = DATA[ex];
+  const color = getExamColor(ex);
+  const air = d.airData;
+  const latest = d.mocks[d.mocks.length - 1];
+  const target = state.targetInput[ex];
+  const maxScore = getExamMax(ex);
+  const days = daysUntil(DATA.student.examDates[ex]);
+  const pct = Math.round((latest.score / maxScore) * 100);
+  const targetPct = Math.round((target / maxScore) * 100);
+  const gap = target - latest.score;
+  const needlePos = ex === 'jee'
+    ? Math.round((1 - (air.projected - air.best) / (air.worst - air.best)) * 100)
+    : Math.round((1 - (air.projected - air.best) / (air.worst - air.best)) * 100);
+
+  // Improvement per mock
+  const first = d.mocks[0];
+  const improvement = latest.score - first.score;
+  const weeksElapsed = Math.round((new Date(latest.date) - new Date(first.date)) / (7 * 86400000)) || 1;
+  const velocity = (improvement / weeksElapsed).toFixed(1);
+
+  const airLabel = ex === 'jee' ? 'Percentile' : 'AIR';
+  const airCurrent = ex === 'jee' ? latest.percentile : air.current;
+  const airTarget = ex === 'jee' ? 99.5 : air.target;
+  const airProjected = ex === 'jee' ? (latest.percentile + 0.4).toFixed(1) : air.projected;
+
+  return `
+  <div class="fade-up" style="animation-delay:0.1s">
+  <div style="display:grid;grid-template-columns:1.4fr 1fr 0.8fr;gap:16px;margin-bottom:16px">
+
+    <!-- AIR Prediction Hero -->
+    <div class="card" style="border-top:3px solid ${color};padding:24px">
+      <div class="section-label">📍 ${airLabel} Prediction</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+        <span style="font-family:'Inter Display',sans-serif;font-size:42px;font-weight:800;color:${color};line-height:1">${ex === 'jee' ? airProjected+'%ile' : formatAIR(air.projected)}</span>
+        <span class="stat-pill pill-green">▲ Projected</span>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">
+        Target: <strong style="color:var(--text)">${ex === 'jee' ? airTarget+'%ile' : formatAIR(airTarget)}</strong> &nbsp;·&nbsp;
+        Current estimate: <strong style="color:var(--text)">${ex === 'jee' ? airCurrent+'%ile' : formatAIR(airCurrent)}</strong>
+      </div>
+
+      <!-- Confidence Band -->
+      <div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px">
+          <span>${ex === 'jee' ? 'Best: '+air.best+'%ile' : 'Best: AIR '+formatAIR(air.best)}</span>
+          <span style="font-weight:600;color:${color}">${air.confidence}% confidence</span>
+          <span>${ex === 'jee' ? 'Worst: '+air.worst+'%ile' : 'Worst: AIR '+formatAIR(air.worst)}</span>
+        </div>
+        <div class="confidence-band">
+          <div class="confidence-needle" style="left:${needlePos}%"></div>
+          <div style="position:absolute;top:50%;left:${needlePos}%;transform:translate(-50%,-50%);background:var(--text);color:var(--surface);padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap">
+            You're here
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px">
+          <span style="color:#16a34a">✦ Best case</span>
+          <span style="color:#dc2626">✦ Worst case</span>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:8px;padding:8px 12px;line-height:1.5">
+        📈 At current velocity of <strong>+${velocity} marks/week</strong>, you'll reach
+        <strong style="color:${color}">${ex === 'jee' ? airTarget+'%ile' : 'AIR '+formatAIR(airTarget)}</strong> by exam day.
+      </div>
+    </div>
+
+    <!-- Score Gauge -->
+    <div class="card" style="padding:24px">
+      <div class="section-label">🎯 Score vs Target</div>
+      <div style="position:relative;margin:8px 0 16px">
+        <svg viewBox="0 0 200 110" width="100%">
+          <defs>
+            <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#ef4444"/>
+              <stop offset="50%" stop-color="#f59e0b"/>
+              <stop offset="100%" stop-color="#10b981"/>
+            </linearGradient>
+          </defs>
+          <!-- Track -->
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--surface2)" stroke-width="14" stroke-linecap="round"/>
+          <!-- Fill -->
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#arcGrad)" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="${Math.PI * 80}" stroke-dashoffset="${Math.PI * 80 * (1 - pct / 100)}"
+            style="transition:stroke-dashoffset 1s ease"/>
+          <!-- Target marker -->
+          <circle cx="${100 + 80 * Math.cos(Math.PI * (1 - targetPct / 100))}" cy="${100 - 80 * Math.sin(Math.PI * (1 - targetPct / 100))}" r="5" fill="${color}" opacity="0.8"/>
+          <!-- Score text -->
+          <text x="100" y="88" text-anchor="middle" font-family="Inter Display,sans-serif" font-size="26" font-weight="800" fill="${color}">${latest.score}</text>
+          <text x="100" y="104" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="var(--text3)">of ${maxScore}</text>
+        </svg>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="text-align:center;padding:8px;background:var(--surface2);border-radius:10px">
+          <div style="font-size:18px;font-weight:700;color:${gap <= 0 ? '#10b981' : '#ef4444'}">${gap > 0 ? '-'+gap : '+'+Math.abs(gap)}</div>
+          <div style="font-size:11px;color:var(--text3)">Score gap</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--surface2);border-radius:10px">
+          <div style="font-size:18px;font-weight:700;color:var(--text)">${pct}%</div>
+          <div style="font-size:11px;color:var(--text3)">Percentile est.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exam Countdown -->
+    <div class="card" style="padding:24px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+      <div class="section-label" style="margin-bottom:0">⏳ Exam Countdown</div>
+      <div style="font-family:'Inter Display',sans-serif;font-size:52px;font-weight:800;color:${color};line-height:1">${days}</div>
+      <div style="font-size:13px;color:var(--text2);font-weight:500">days remaining</div>
+      <div style="font-size:11px;color:var(--text3)">${getExamLabel(ex)} ${new Date(DATA.student.examDates[ex]).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+      <div style="width:100%;height:4px;background:var(--surface2);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${Math.max(5,100 - Math.round(days/180*100))}%;background:${color};border-radius:99px;transition:width 1s ease"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text3)">Prep progress estimate</div>
+    </div>
+
+  </div>
+  </div>`;
+}
+
+function RecoveryJourney() {
+  const ex = state.exam;
+  const color = getExamColor(ex);
+  const maxScore = getExamMax(ex);
+  const prevScore = state.recoveryInput[ex];
+  const latest = DATA[ex].mocks[DATA[ex].mocks.length - 1];
+  const target = state.targetInput[ex];
+  const recovered = latest.score - prevScore;
+  const totalGap = target - prevScore;
+  const pct = Math.min(100, Math.round((recovered / totalGap) * 100));
+
+  return `
+  <div class="card fade-up" style="animation-delay:0.15s;margin-bottom:16px;border-left:4px solid ${color};background:linear-gradient(90deg,${color}08,transparent)">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px">
+          🔄 Recovery Journey — ${getExamLabel(ex)} Repeater
+        </div>
+        <div style="font-size:12px;color:var(--text2)">
+          You scored <strong>${prevScore}</strong> in your last real exam.
+          You're now averaging <strong style="color:${color}">${latest.score}</strong> in mocks.
+          ${recovered > 0
+            ? `<span class="stat-pill pill-green" style="margin-left:6px">+${recovered} marks recovered 🚀</span>`
+            : `<span class="stat-pill pill-red" style="margin-left:6px">${recovered} marks to recover</span>`}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3)">
+        <label>Previous real score:</label>
+        <input type="number" value="${prevScore}" min="0" max="${maxScore}"
+          onchange="state.recoveryInput['${ex}']=+this.value;render()"
+          style="width:70px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-family:inherit"/>
+        <span>/ ${maxScore}</span>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:6px">
+        <span>Previous: ${prevScore}</span>
+        <span style="color:${color};font-weight:600">${pct}% of gap closed</span>
+        <span>Target: ${target}</span>
+      </div>
+      <div class="recovery-track">
+        <div class="recovery-fill" style="width:${Math.round((prevScore/maxScore)*100)}%;background:var(--surface2)"></div>
+        <div class="recovery-fill" style="position:absolute;top:0;left:${Math.round((prevScore/maxScore)*100)}%;width:${Math.round((recovered/maxScore)*100)}%;background:${color}"></div>
+        <!-- Markers -->
+        <div class="recovery-marker" style="left:${Math.round((prevScore/maxScore)*100)}%;color:#f59e0b"></div>
+        <div class="recovery-marker" style="left:${Math.round((latest.score/maxScore)*100)}%;color:${color}"></div>
+        <div class="recovery-marker" style="left:${Math.round((target/maxScore)*100)}%;color:#10b981"></div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.6">
+        ${recovered >= 60 ? `🏆 You're outpacing the average repeater improvement of 40–60 marks. Excellent trajectory.` :
+          recovered >= 30 ? `📈 You're making solid progress. Average repeater improves 40–60 marks. Keep pushing.` :
+          `💪 Keep going. Most repeaters hit a breakthrough after Mock 5–6. Stay consistent.`}
+      </div>
+    </div>
+  </div>`;
+}
+
+function ScoreTrajectory() {
+  const ex = state.exam;
+  const d = DATA[ex];
+  const color = getExamColor(ex);
+  const maxScore = getExamMax(ex);
+  const scores = d.mocks.map(m => m.score);
+  const target = state.targetInput[ex];
+  const prevScore = state.recoveryInput[ex];
+
+  const W = 560, H = 160, PAD = 40;
+  const { path, pts } = sparklinePath(scores, W, H);
+  const area = areaPath(path, pts, W, H);
+
+  // Target line y
+  const minS = Math.min(...scores, prevScore) - 10;
+  const maxS = Math.max(...scores, target) + 20;
+  const range = maxS - minS;
+  const targetY = H - PAD - ((target - minS) / range) * (H - PAD * 2 + 8);
+  const prevY = H - PAD - ((prevScore - minS) / range) * (H - PAD * 2 + 8);
+
+  // Recompute with correct scale
+  const pts2 = d.mocks.map((m, i) => ({
+    x: PAD + (i / (d.mocks.length - 1)) * (W - PAD * 2),
+    y: H - PAD - ((m.score - minS) / range) * (H - PAD * 2 + 8)
+  }));
+  let linePath = `M ${pts2[0].x} ${pts2[0].y}`;
+  for (let i = 1; i < pts2.length; i++) {
+    const cx = (pts2[i-1].x + pts2[i].x) / 2;
+    linePath += ` C ${cx} ${pts2[i-1].y} ${cx} ${pts2[i].y} ${pts2[i].x} ${pts2[i].y}`;
+  }
+  const areaPath2 = linePath + ` L ${pts2[pts2.length-1].x} ${H} L ${pts2[0].x} ${H} Z`;
+
+  return `
+  <div class="card fade-up" style="animation-delay:0.2s;margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div class="section-label" style="margin-bottom:4px">📈 Score Trajectory</div>
+        <div style="font-size:13px;color:var(--text2)">All ${d.mocks.length} mocks · ${getExamLabel(ex)}</div>
+      </div>
+      <div style="display:flex;gap:16px;font-size:11px;color:var(--text3)">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:20px;height:2px;background:${color};display:inline-block;border-radius:2px"></span>Your scores</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:20px;height:2px;background:#10b981;display:inline-block;border-radius:2px;border-top:2px dashed #10b981;border-bottom:none"></span>Target</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:20px;height:2px;background:#f59e0b;display:inline-block;border-radius:2px;border-top:2px dashed #f59e0b;border-bottom:none"></span>Previous real</span>
+      </div>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible">
+      <!-- Grid lines -->
+      ${[0,1,2,3].map(i => {
+        const y = PAD + (i / 3) * (H - PAD * 2);
+        const val = Math.round(maxS - (i / 3) * range);
+        return `<line x1="${PAD}" y1="${y}" x2="${W-PAD/2}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,4"/>
+                <text x="${PAD-6}" y="${y+4}" text-anchor="end" class="axis-label">${val}</text>`;
+      }).join('')}
+
+      <!-- Target line -->
+      <line x1="${PAD}" y1="${targetY}" x2="${W-PAD/2}" y2="${targetY}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <text x="${W-PAD/2+4}" y="${targetY+4}" class="axis-label" fill="#10b981">Target</text>
+
+      <!-- Previous score line -->
+      <line x1="${PAD}" y1="${prevY}" x2="${W-PAD/2}" y2="${prevY}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <text x="${W-PAD/2+4}" y="${prevY+4}" class="axis-label" fill="#f59e0b">Prev</text>
+
+      <!-- Area fill -->
+      <path d="${areaPath2}" fill="${color}" opacity="0.08"/>
+
+      <!-- Main line -->
+      <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Data points -->
+      ${pts2.map((pt, i) => `
+        <circle cx="${pt.x}" cy="${pt.y}" r="5" fill="${color}" stroke="var(--surface)" stroke-width="2"/>
+        <text x="${pt.x}" y="${pt.y - 10}" text-anchor="middle" class="axis-label" fill="${color}" font-weight="600">${d.mocks[i].score}</text>
+      `).join('')}
+
+      <!-- X axis labels -->
+      ${d.mocks.map((m, i) => `
+        <text x="${pts2[i].x}" y="${H - 2}" text-anchor="middle" class="axis-label">${m.label}</text>
+      `).join('')}
+    </svg>
+  </div>`;
+}
+
+function MistakeIntelligence() {
+  const ex = state.exam;
+  const d = DATA[ex];
+  const color = getExamColor(ex);
+  const m = d.mistakes;
+  const total = m.careless + m.conceptGap + m.panicSkip + m.knowledgeSkip;
+  const latest = d.mocks[d.mocks.length - 1];
+  const negMarks = latest.negMarks;
+
+  const quadrants = [
+    { label:"Careless Mistakes", val:m.careless, desc:"Low time + wrong answer", sub:"Rushed, didn't read carefully", color:"#f59e0b", icon:"⚡", action:"Slow down on first read-through", bg:"#fef9c3" },
+    { label:"Concept Gaps", val:m.conceptGap, desc:"High time + wrong answer", sub:"Spent time, still got it wrong", color:"#ef4444", icon:"🧩", action:"These concepts need targeted revision", bg:"#fee2e2" },
+    { label:"Panic Skips", val:m.panicSkip, desc:"Very low time + skipped", sub:"Saw it, fled — anxiety response", color:"#8b5cf6", icon:"😰", action:"Practice timed exposure to hard questions", bg:"#ede9fe" },
+    { label:"Fragile Corrects", val:m.fragileCorrect, desc:"Correct but very slow", sub:"Right answer, unsustainable time", color:"#0ea5e9", icon:"⏱", action:"These will break under real exam pressure", bg:"#dbeafe" },
+  ];
+
+  return `
+  <div class="fade-up" style="animation-delay:0.25s;margin-bottom:16px">
+    <div class="section-label">🔬 Mistake Intelligence</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      ${quadrants.map(q => `
+        <div class="quadrant-cell" style="background:${q.bg};border:1px solid ${q.color}22">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between">
+            <div>
+              <div style="font-size:22px;margin-bottom:2px">${q.icon}</div>
+              <div style="font-size:14px;font-weight:700;color:${q.color}">${q.val} questions</div>
+              <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:2px">${q.label}</div>
+              <div style="font-size:11px;color:#4a5568">${q.desc}</div>
+              <div style="font-size:11px;color:#4a5568;font-style:italic">${q.sub}</div>
+            </div>
+            <div style="font-size:22px;font-weight:800;color:${q.color};opacity:0.3">${Math.round(q.val/total*100)}%</div>
+          </div>
+          <div style="margin-top:10px;background:white;border-radius:8px;padding:6px 10px;border-left:3px solid ${q.color}">
+            <div style="font-size:11px;font-weight:600;color:${q.color}">💡 Fix: ${q.action}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Negative Marking Damage -->
+    <div class="card" style="padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">⚠️ Negative Marking Damage</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">
+            ${ex === 'neet' ? 'NEET: −1 per wrong MCQ' : ex === 'jee' ? 'JEE: −1 MCQ, 0 for integers' : 'CLAT: −0.25 per wrong answer'}
+          </div>
+        </div>
+        <div style="display:flex;gap:16px">
+          <div style="text-align:center">
+            <div style="font-size:24px;font-weight:800;color:#ef4444">${negMarks}</div>
+            <div style="font-size:11px;color:var(--text3)">marks lost</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:24px;font-weight:800;color:#f59e0b">${m.careless}</div>
+            <div style="font-size:11px;color:var(--text3)">avoidable</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:24px;font-weight:800;color:var(--text2)">${negMarks - m.careless < 0 ? 0 : negMarks - m.careless}</div>
+            <div style="font-size:11px;color:var(--text3)">unavoidable</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:8px 12px;background:#fef2f2;border-radius:8px;border-left:3px solid #ef4444">
+        <div style="font-size:12px;color:#991b1b">
+          If you eliminate careless mistakes, you gain <strong>+${m.careless}${ex==='clat'?'×0.25=+'+Math.round(m.careless*0.25):''} marks</strong> immediately. That's worth ~${ex==='neet'?Math.round(m.careless/6)+' AIR ranks improvement':ex==='jee'?Math.round(m.careless/3)+'k percentile points':'AIR +'+Math.round(m.careless*2)+' improvement'}.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function ConceptMastery() {
+  const ex = state.exam;
+  const d = DATA[ex];
+  const color = getExamColor(ex);
+  const sections = Object.values(d.sections);
+
+  // All concepts sorted by marks lost
+  const allConcepts = sections.flatMap(s =>
+    s.concepts.map(c => ({...c, section: s.name, sectionColor: s.color}))
+  ).sort((a,b) => b.lost - a.lost);
+
+  function heatClass(acc) {
+    if (acc >= 85) return 'heat-great';
+    if (acc >= 75) return 'heat-good';
+    if (acc >= 65) return 'heat-1';
+    if (acc >= 55) return 'heat-2';
+    if (acc >= 45) return 'heat-3';
+    if (acc >= 35) return 'heat-4';
+    return 'heat-5';
+  }
+
+  return `
+  <div class="fade-up" style="animation-delay:0.3s;margin-bottom:16px">
+    <div class="section-label">🗺️ Concept Mastery Map</div>
+    <div style="display:grid;grid-template-columns:repeat(${sections.length},1fr);gap:16px">
+      ${sections.map(s => `
+        <div class="card" style="padding:16px;border-top:3px solid ${s.color}">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">${s.name}</div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <span class="stat-pill pill-blue">${s.accuracy}% accuracy</span>
+            <span class="stat-pill ${s.negMarks > 10 ? 'pill-red' : 'pill-orange'}">${s.negMarks} neg marks</span>
+            <span class="stat-pill pill-green">${s.trend} trend</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${s.concepts.map(c => `
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="heatmap-cell ${heatClass(c.accuracy)}" style="width:36px;height:28px;flex-shrink:0;font-size:10px">${c.accuracy}%</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+                  <div class="progress-bar" style="margin-top:2px">
+                    <div class="progress-fill" style="width:${c.accuracy}%;background:${s.color}"></div>
+                  </div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                  <div style="font-size:11px;font-weight:600;color:#ef4444">−${c.lost}</div>
+                  <div style="font-size:10px;color:var(--text3)">marks lost</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+function SectionPerformance() {
+  const ex = state.exam;
+  const d = DATA[ex];
+  const color = getExamColor(ex);
+  const sections = Object.values(d.sections);
+
+  // CLAT radar
+  if (ex === 'clat') {
+    const W = 220, CX = 110, CY = 110, R = 80;
+    const n = sections.length;
+    const pts = sections.map((s, i) => {
+      const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const pct = s.avgScore / s.maxMarks;
+      return {
+        x: CX + R * pct * Math.cos(angle),
+        y: CY + R * pct * Math.sin(angle),
+        lx: CX + (R + 24) * Math.cos(angle),
+        ly: CY + (R + 24) * Math.sin(angle),
+        angle
+      };
+    });
+    const polyPoints = pts.map(p => `${p.x},${p.y}`).join(' ');
+    const gridPts = (scale) => sections.map((_, i) => {
+      const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+      return `${CX + R * scale * Math.cos(angle)},${CY + R * scale * Math.sin(angle)}`;
+    }).join(' ');
+
+    return `
+    <div class="fade-up" style="animation-delay:0.32s;margin-bottom:16px">
+      <div class="section-label">📊 CLAT 5-Section Radar</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center">
+        <svg viewBox="0 0 ${W} ${W}" width="240">
+          ${[0.25,0.5,0.75,1].map(s => `<polygon points="${gridPts(s)}" fill="none" stroke="var(--border)" stroke-width="1"/>`).join('')}
+          ${sections.map((_, i) => {
+            const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+            return `<line x1="${CX}" y1="${CY}" x2="${CX + R * Math.cos(angle)}" y2="${CY + R * Math.sin(angle)}" stroke="var(--border)" stroke-width="1"/>`;
+          }).join('')}
+          <polygon points="${polyPoints}" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2"/>
+          ${pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${color}"/>`).join('')}
+          ${pts.map((p, i) => `<text x="${p.lx}" y="${p.ly}" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="var(--text2)" font-family="Inter,sans-serif">${sections[i].name.split(' ')[0]}</text>`).join('')}
+        </svg>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${sections.map(s => `
+            <div style="padding:12px;background:var(--surface2);border-radius:12px;border-left:3px solid ${s.color}">
+              <div style="font-size:11px;font-weight:700;color:${s.color};margin-bottom:4px">${s.name}</div>
+              <div style="font-size:20px;font-weight:800;color:var(--text)">${s.avgScore}<span style="font-size:12px;color:var(--text3)">/${s.maxMarks}</span></div>
+              <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+                <span class="stat-pill pill-blue">${s.accuracy}% acc</span>
+                <span class="stat-pill pill-green">${s.trend}</span>
+              </div>
+              <div style="margin-top:8px;font-size:11px;color:var(--text3)">Avg time: ${s.avgTime}s/q</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return `
+  <div class="fade-up" style="animation-delay:0.32s;margin-bottom:16px">
+    <div class="section-label">📊 Section Performance</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      ${sections.map(s => {
+        const mockScores = ex === 'neet'
+          ? DATA.neet.mocks.map(m => m[s.name.toLowerCase()] || 0)
+          : ex === 'jee'
+          ? DATA.jee.mocks.map(m => m[s.name.toLowerCase() === 'mathematics' ? 'maths' : s.name.toLowerCase()] || 0)
+          : [];
+        const W2 = 160, H2 = 50;
+        const { path: sp } = sparklinePath(mockScores, W2, H2);
+        return `
+        <div class="card" style="padding:18px;border-top:3px solid ${s.color}">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px">${s.name}</div>
+          <div style="font-size:28px;font-weight:800;color:${s.color};margin:4px 0">${s.avgScore}<span style="font-size:14px;color:var(--text3)">/${s.maxMarks}</span></div>
+          <svg viewBox="0 0 ${W2} ${H2}" width="100%" style="margin:8px 0">
+            <path d="${sp}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+            <div style="padding:6px;background:var(--surface2);border-radius:8px;text-align:center">
+              <div style="font-size:14px;font-weight:700;color:var(--text)">${s.accuracy}%</div>
+              <div style="font-size:10px;color:var(--text3)">Accuracy</div>
+            </div>
+            <div style="padding:6px;background:var(--surface2);border-radius:8px;text-align:center">
+              <div style="font-size:14px;font-weight:700;color:#ef4444">${s.negMarks}</div>
+              <div style="font-size:10px;color:var(--text3)">Neg marks</div>
+            </div>
+            <div style="padding:6px;background:var(--surface2);border-radius:8px;text-align:center">
+              <div style="font-size:14px;font-weight:700;color:var(--text)">${s.avgTime}s</div>
+              <div style="font-size:10px;color:var(--text3)">Avg time/q</div>
+            </div>
+            <div style="padding:6px;background:var(--surface2);border-radius:8px;text-align:center">
+              <div style="font-size:14px;font-weight:700;color:#10b981">${s.trend}</div>
+              <div style="font-size:10px;color:var(--text3)">Trend</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+function ExamSpecificInsights() {
+  const ex = state.exam;
+  const color = getExamColor(ex);
+
+  if (ex === 'neet') {
+    const bio = DATA.neet.sections.biology;
+    const phy = DATA.neet.sections.physics;
+    const che = DATA.neet.sections.chemistry;
+    const botanyEst = Math.round(bio.avgScore * 0.48);
+    const zoologyEst = bio.avgScore - botanyEst;
+    return `
+    <div class="fade-up" style="animation-delay:0.35s;margin-bottom:16px">
+      <div class="section-label">🧬 NEET-Specific Insights</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+        <!-- Biology Dominance -->
+        <div class="card" style="padding:18px;grid-column:span 1">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">🌱 Biology Dominance</div>
+          <div style="text-align:center;margin-bottom:12px">
+            <div style="font-size:11px;color:var(--text3)">Biology is 50% of NEET</div>
+            <div style="font-size:32px;font-weight:800;color:#f97316;margin:4px 0">${Math.round(bio.avgScore/720*100)}%</div>
+            <div style="font-size:11px;color:var(--text2)">of your total score</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1;padding:8px;background:#fff7ed;border-radius:10px;text-align:center">
+              <div style="font-size:16px;font-weight:700;color:#c2410c">${botanyEst}</div>
+              <div style="font-size:10px;color:#92400e">Botany est.</div>
+            </div>
+            <div style="flex:1;padding:8px;background:#f0fdf4;border-radius:10px;text-align:center">
+              <div style="font-size:16px;font-weight:700;color:#15803d">${zoologyEst}</div>
+              <div style="font-size:10px;color:#166534">Zoology est.</div>
+            </div>
+          </div>
+        </div>
+        <!-- NCERT Coverage -->
+        <div class="card" style="padding:18px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">📚 NCERT Coverage</div>
+          ${[
+            {name:"Biology NCERT", pct:82, color:"#f97316"},
+            {name:"Physics NCERT", pct:71, color:"#0ea5e9"},
+            {name:"Chemistry NCERT", pct:79, color:"#10b981"},
+          ].map(c => `
+            <div style="margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+                <span style="color:var(--text2)">${c.name}</span>
+                <span style="font-weight:600;color:${c.color}">${c.pct}%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width:${c.pct}%;background:${c.color}"></div>
+              </div>
+            </div>
+          `).join('')}
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">95% of NEET questions are NCERT-based</div>
+        </div>
+        <!-- Subject Balance -->
+        <div class="card" style="padding:18px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">⚖️ Subject Balance</div>
+          <svg viewBox="0 0 160 160" width="100%">
+            ${(() => {
+              const total = phy.avgScore + che.avgScore + bio.avgScore;
+              const slices = [
+                {v:phy.avgScore, c:"#0ea5e9", label:"Phy"},
+                {v:che.avgScore, c:"#10b981", label:"Che"},
+                {v:bio.avgScore, c:"#f97316", label:"Bio"},
+              ];
+              let angle = -Math.PI/2;
+              return slices.map(s => {
+                const frac = s.v / total;
+                const a1 = angle, a2 = angle + frac * 2 * Math.PI;
+                const cx = 80, cy = 80, r = 60;
+                const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+                const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+                const large = frac > 0.5 ? 1 : 0;
+                const mid = (a1 + a2) / 2;
+                const lx = cx + (r+18) * Math.cos(mid), ly = cy + (r+18) * Math.sin(mid);
+                angle = a2;
+                return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${s.c}" opacity="0.85"/>
+                        <text x="${lx}" y="${ly}" text-anchor="middle" font-size="9" fill="var(--text2)" font-family="Inter,sans-serif">${s.label} ${Math.round(frac*100)}%</text>`;
+              }).join('');
+            })()}
+          </svg>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  if (ex === 'jee') {
+    const iStats = DATA.jee.integerStats;
+    const latest = DATA.jee.mocks[DATA.jee.mocks.length - 1];
+    return `
+    <div class="fade-up" style="animation-delay:0.35s;margin-bottom:16px">
+      <div class="section-label">⚙️ JEE-Specific Insights</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+        <!-- Integer Opportunity -->
+        <div class="card" style="padding:18px;border-top:3px solid #8b5cf6">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">🎯 Integer Question Opportunity</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:12px">No negative marking on integers — maximize these</div>
+          <div style="text-align:center;margin-bottom:12px">
+            <div style="font-size:36px;font-weight:800;color:#8b5cf6">${iStats.correct}/${iStats.total}</div>
+            <div style="font-size:12px;color:var(--text2)">integers correct · ${iStats.accuracy}% accuracy</div>
+          </div>
+          <div style="padding:8px 12px;background:#ede9fe;border-radius:8px;font-size:12px;color:#5b21b6">
+            💡 ${iStats.opportunity}
+          </div>
+        </div>
+        <!-- Percentile vs Score -->
+        <div class="card" style="padding:18px;border-top:3px solid #0ea5e9">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📊 Percentile Trajectory</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:12px">JEE uses normalised percentile, not raw marks</div>
+          ${DATA.jee.mocks.map(m => `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <div style="font-size:11px;color:var(--text3);width:44px">${m.label}</div>
+              <div class="progress-bar" style="flex:1">
+                <div class="progress-fill" style="width:${m.percentile}%;background:#0ea5e9"></div>
+              </div>
+              <div style="font-size:11px;font-weight:600;color:#0ea5e9;width:48px;text-align:right">${m.percentile}%ile</div>
+            </div>
+          `).join('')}
+        </div>
+        <!-- Maths Time Sink -->
+        <div class="card" style="padding:18px;border-top:3px solid #ef4444">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⏰ Maths Time Analysis</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Maths takes ${DATA.jee.sections.maths.avgTime}s/q avg vs Physics ${DATA.jee.sections.physics.avgTime}s/q</div>
+          ${Object.values(DATA.jee.sections).map(s => `
+            <div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+                <span style="color:var(--text2)">${s.name}</span>
+                <span style="font-weight:600;color:${s.avgTime > 130 ? '#ef4444' : '#10b981'}">${s.avgTime}s/q</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width:${Math.round(s.avgTime/160*100)}%;background:${s.color}"></div>
+              </div>
+            </div>
+          `).join('')}
+          <div style="font-size:11px;color:#ef4444;margin-top:8px">⚠️ Ideal: ≤120s/q for Maths</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // CLAT
+  const p = DATA.clat.passageStats;
+  return `
+  <div class="fade-up" style="animation-delay:0.35s;margin-bottom:16px">
+    <div class="section-label">⚖️ CLAT-Specific Insights</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <!-- Passage Pacing -->
+      <div class="card" style="padding:18px;border-top:3px solid #f97316">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📖 Passage Pacing</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px">CLAT is comprehension-based — passage time is critical</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <div style="padding:10px;background:var(--surface2);border-radius:10px;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#f97316">${p.avgTimePerPassage}m</div>
+            <div style="font-size:10px;color:var(--text3)">Avg per passage</div>
+          </div>
+          <div style="padding:10px;background:#f0fdf4;border-radius:10px;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#10b981">${p.idealTime}m</div>
+            <div style="font-size:10px;color:var(--text3)">Ideal target</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text2)">
+          ⚡ Fastest: <strong>${p.fastestSection}</strong><br>
+          🐌 Slowest: <strong style="color:#ef4444">${p.slowestSection}</strong>
+        </div>
+      </div>
+      <!-- Legal Reasoning -->
+      <div class="card" style="padding:18px;border-top:3px solid #8b5cf6">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚖️ Legal Reasoning Pattern</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Most differentiating section in CLAT</div>
+        ${DATA.clat.sections.legal.concepts.map(c => `
+          <div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+              <span style="color:var(--text2)">${c.name}</span>
+              <span style="font-weight:600;color:${c.accuracy >= 75 ? '#10b981' : '#ef4444'}">${c.accuracy}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:${c.accuracy}%;background:#8b5cf6"></div>
+            </div>
+          </div>
+        `).join('')}
+        <div style="font-size:11px;color:#5b21b6;margin-top:8px;padding:6px 10px;background:#ede9fe;border-radius:8px">
+          💡 Principle-Fact application is the highest-yield skill in legal reasoning
+        </div>
+      </div>
+      <!-- GK Recency -->
+      <div class="card" style="padding:18px;border-top:3px solid #f59e0b">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📰 GK Recency Tracker</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px">CLAT GK is current affairs heavy — last 12 months</div>
+        ${[
+          {period:"Last 1 month", coverage:62, color:"#ef4444"},
+          {period:"Last 3 months", coverage:74, color:"#f59e0b"},
+          {period:"Last 6 months", coverage:81, color:"#0ea5e9"},
+          {period:"Last 12 months", coverage:68, color:"#10b981"},
+        ].map(g => `
+          <div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+              <span style="color:var(--text2)">${g.period}</span>
+              <span style="font-weight:600;color:${g.color}">${g.coverage}% coverage</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:${g.coverage}%;background:${g.color}"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function LeverageActions() {
+  const ex = state.exam;
+  const d = DATA[ex];
+  const color = getExamColor(ex);
+  const sections = Object.values(d.sections);
+
+  const allConcepts = sections.flatMap(s =>
+    s.concepts.map(c => ({...c, section: s.name, sectionColor: s.color}))
+  ).sort((a,b) => b.lost - a.lost).slice(0, 3);
+
+  const totalLost = allConcepts.reduce((s,c) => s + c.lost, 0);
+
+  return `
+  <div class="card fade-up" style="animation-delay:0.4s;margin-bottom:16px;border-top:3px solid ${color}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div class="section-label" style="margin-bottom:4px">🚀 Top Leverage Actions</div>
+        <div style="font-size:13px;color:var(--text2)">Fix these 3 concepts to recover <strong style="color:${color}">+${totalLost} marks</strong></div>
+      </div>
+      <div style="padding:8px 16px;background:${color}15;border-radius:10px;text-align:center">
+        <div style="font-size:20px;font-weight:800;color:${color}">+${Math.round(totalLost * 0.7)}</div>
+        <div style="font-size:11px;color:var(--text3)">realistic gain</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      ${allConcepts.map((c, i) => `
+        <div style="padding:16px;background:var(--surface2);border-radius:14px;border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <div style="width:28px;height:28px;border-radius:50%;background:${c.sectionColor};color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${i+1}</div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text)">${c.name}</div>
+              <div style="font-size:11px;color:${c.sectionColor}">${c.section}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+            <div style="padding:6px;background:var(--surface);border-radius:8px;text-align:center">
+              <div style="font-size:16px;font-weight:700;color:#ef4444">−${c.lost}</div>
+              <div style="font-size:10px;color:var(--text3)">marks lost</div>
+            </div>
+            <div style="padding:6px;background:var(--surface);border-radius:8px;text-align:center">
+              <div style="font-size:16px;font-weight:700;color:var(--text)">${c.accuracy}%</div>
+              <div style="font-size:10px;color:var(--text3)">accuracy</div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text3);background:var(--surface);border-radius:8px;padding:6px 8px">
+            ${c.timeRatio > 1.2 ? '🧩 Concept gap — needs targeted revision' :
+              c.timeRatio < 0.8 ? '⚡ Likely careless — slow down & verify' :
+              '📖 Mixed pattern — revise + practice under time'}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="margin-top:12px;padding:12px 16px;background:${color}08;border-radius:12px;border:1px solid ${color}20;font-size:12px;color:var(--text2);line-height:1.6">
+      📅 <strong>This week's focus:</strong> Spend 70% of revision time on the #1 concept above.
+      At current improvement rate of <strong>${(d.mocks[d.mocks.length-1].score - d.mocks[0].score) / d.mocks.length}pts/mock</strong>,
+      fixing this alone could push your AIR by <strong style="color:${color}">~${Math.round(d.airData.current * 0.05)} ranks</strong>.
+    </div>
+  </div>`;
+}
+
+function PeerComparison() {
+  const ex = state.exam;
+  const d = DATA[ex];
+  const color = getExamColor(ex);
+  const pct = d.peerPercentile;
+  const latest = d.mocks[d.mocks.length - 1];
+
+  return `
+  <div class="fade-up" style="animation-delay:0.45s;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:16px">
+
+      <!-- Peer Percentile -->
+      <div class="card" style="padding:20px">
+        <div class="section-label">👥 Peer Percentile</div>
+        <div style="position:relative;margin:16px 0">
+          <svg viewBox="0 0 200 100" width="100%">
+            <!-- Normal distribution curve -->
+            <path d="M 10 90 Q 50 90 80 60 Q 100 40 120 20 Q 140 5 160 20 Q 180 40 190 90" fill="${color}" fill-opacity="0.1" stroke="${color}" stroke-width="2"/>
+            <!-- Shade up to percentile -->
+            <clipPath id="pctClip">
+              <rect x="0" y="0" width="${10 + (pct/100) * 180}" height="100"/>
+            </clipPath>
+            <path d="M 10 90 Q 50 90 80 60 Q 100 40 120 20 Q 140 5 160 20 Q 180 40 190 90" fill="${color}" fill-opacity="0.3" clip-path="url(#pctClip)"/>
+            <!-- Marker line -->
+            <line x1="${10 + (pct/100) * 180}" y1="10" x2="${10 + (pct/100) * 180}" y2="90" stroke="${color}" stroke-width="2" stroke-dasharray="4,2"/>
+            <text x="100" y="75" text-anchor="middle" font-size="22" font-weight="800" font-family="Inter Display,sans-serif" fill="${color}">${pct}th</text>
+            <text x="100" y="88" text-anchor="middle" font-size="9" fill="var(--text3)" font-family="Inter,sans-serif">percentile in cohort</text>
+          </svg>
+        </div>
+        <div style="font-size:12px;color:var(--text2);text-align:center;line-height:1.5">
+          You're scoring better than <strong style="color:${color}">${pct}%</strong> of students on this platform.
+        </div>
+      </div>
+
+      <!-- College Probability Ladder -->
+      <div class="card" style="padding:20px">
+        <div class="section-label">🏫 College Admission Probability</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${d.colleges.map(c => `
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+                <div style="font-size:10px;color:var(--text3)">Cutoff: ${c.type === 'percentile' ? c.cutoff+'%ile' : c.cutoff+' marks'}</div>
+              </div>
+              <div style="width:100px">
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width:${c.prob}%;background:${c.prob >= 70 ? '#10b981' : c.prob >= 40 ? '#f59e0b' : '#ef4444'}"></div>
+                </div>
+              </div>
+              <div style="width:36px;text-align:right;font-size:12px;font-weight:700;color:${c.prob >= 70 ? '#10b981' : c.prob >= 40 ? '#f59e0b' : '#ef4444'}">${c.prob}%</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+    </div>
+  </div>`;
+}
+
+function RankCard() {
+  if (!state.showRankCard) return '';
+  const ex = state.exam;
+  const d = DATA[ex];
+  const color = getExamColor(ex);
+  const latest = d.mocks[d.mocks.length - 1];
+  const air = d.airData;
+  const today = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'});
+
+  return `
+  <div class="modal-overlay" onclick="if(event.target===this)setState({showRankCard:false})">
+    <div style="max-width:380px;width:90%">
+      <!-- The shareable card -->
+      <div id="rankCardContent" style="border-radius:20px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,0.3)">
+        <div class="rank-card-gradient" style="padding:32px;text-align:center;position:relative">
+          <div style="position:absolute;top:0;left:0;right:0;bottom:0;opacity:0.05;background-image:repeating-linear-gradient(45deg,white 0,white 1px,transparent 0,transparent 50%);background-size:20px 20px"></div>
+          <div style="position:relative">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;color:rgba(255,255,255,0.7);margin-bottom:4px">keySkillset · ${getExamLabel(ex)}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.9);margin-bottom:16px">${DATA.student.name}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px">Predicted ${ex === 'jee' ? 'Percentile' : 'All India Rank'}</div>
+            <div style="font-family:'Inter Display',sans-serif;font-size:56px;font-weight:800;color:white;line-height:1;margin-bottom:4px">
+              ${ex === 'jee' ? latest.percentile+'%ile' : formatAIR(air.projected)}
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:24px">
+              Mock avg: ${latest.score}/${getExamMax(ex)} · ${d.mocks.length} tests taken
+            </div>
+            <div style="display:flex;justify-content:center;gap:24px">
+              <div>
+                <div style="font-size:18px;font-weight:700;color:white">${d.mocks[d.mocks.length-1].score - d.mocks[0].score > 0 ? '+' : ''}${d.mocks[d.mocks.length-1].score - d.mocks[0].score}</div>
+                <div style="font-size:10px;color:rgba(255,255,255,0.6)">marks improved</div>
+              </div>
+              <div>
+                <div style="font-size:18px;font-weight:700;color:white">${d.peerPercentile}th</div>
+                <div style="font-size:10px;color:rgba(255,255,255,0.6)">peer percentile</div>
+              </div>
+              <div>
+                <div style="font-size:18px;font-weight:700;color:white">${air.confidence}%</div>
+                <div style="font-size:10px;color:rgba(255,255,255,0.6)">confidence</div>
+              </div>
+            </div>
+            <div style="margin-top:20px;font-size:10px;color:rgba(255,255,255,0.5)">${today} · keyskillset.com</div>
+          </div>
+        </div>
+      </div>
+      <!-- Actions -->
+      <div style="display:flex;gap:12px;margin-top:16px">
+        <button class="primary-btn" style="flex:1" onclick="setState({showRankCard:false})">
+          📱 Share on WhatsApp
+        </button>
+        <button class="ghost-btn" onclick="setState({showRankCard:false})">Close</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function OnboardingModal() {
+  if (state.onboarded) return '';
+  const step = state.onboardStep;
+  const color = '#4f6ef7';
+
+  const steps = [
+    // Step 0: Exam selection
+    `<div>
+      <div style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:6px">Welcome to keySkillset Analytics</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:24px">Let's set up your dashboard in 3 quick steps.</div>
+      <div class="section-label">Which exam are you preparing for?</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
+        ${[['neet','NEET UG','720 marks · 180 questions · 3 sections'],
+           ['jee','JEE Mains','300 marks · 90 questions · 3 sections'],
+           ['clat','CLAT UG','120 marks · 150 questions · 5 sections']].map(([v,l,sub]) => `
+          <div class="onboard-option ${state.onboardExam===v?'selected':''}" onclick="setState({onboardExam:'${v}'})">
+            <div style="font-size:14px;font-weight:600">${l}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px">${sub}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`,
+
+    // Step 1: Attempt number
+    `<div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Which attempt is this?</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:24px">This helps us personalise your analytics and benchmarks.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
+        ${[['1','1st Attempt','First time appearing for this exam'],
+           ['2','Repeater — 2nd Attempt','Appeared once, taking it again'],
+           ['3+','Long-term Repeater — 3rd+','Multiple attempts, highly experienced']].map(([v,l,sub]) => `
+          <div class="onboard-option ${state.onboardAttempt===v?'selected':''}" onclick="setState({onboardAttempt:'${v}'})">
+            <div style="font-size:14px;font-weight:600">${l}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px">${sub}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`,
+
+    // Step 2: Target
+    `<div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Set your north star 🎯</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:24px">This is what every metric on your dashboard will be measured against.</div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">Target Score (out of ${getExamMax(state.onboardExam)})</label>
+        <input type="number" id="targetInput" value="${state.onboardTarget || ''}" placeholder="e.g. ${state.onboardExam==='neet'?650:state.onboardExam==='jee'?250:105}"
+          min="0" max="${getExamMax(state.onboardExam)}"
+          onchange="setState({onboardTarget:this.value})"
+          style="width:100%;padding:10px 14px;border-radius:10px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:16px;font-family:inherit;outline:none"/>
+      </div>
+      <div style="margin-bottom:24px">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">Previous Real Exam Score (optional — unlocks Recovery Journey)</label>
+        <input type="number" id="prevScoreInput" value="${state.onboardPrevScore || ''}" placeholder="Leave blank if 1st attempt"
+          min="0" max="${getExamMax(state.onboardExam)}"
+          onchange="setState({onboardPrevScore:this.value})"
+          style="width:100%;padding:10px 14px;border-radius:10px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;outline:none"/>
+      </div>
+    </div>`,
+  ];
+
+  return `
+  <div class="modal-overlay">
+    <div class="modal-card">
+      <!-- Progress dots -->
+      <div style="display:flex;gap:6px;margin-bottom:24px">
+        ${[0,1,2].map(i => `<div style="height:4px;border-radius:99px;flex:1;background:${i<=step?color:'var(--border)'}"></div>`).join('')}
+      </div>
+
+      ${steps[step]}
+
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        ${step > 0
+          ? `<button class="ghost-btn" onclick="setState({onboardStep:${step-1}})">← Back</button>`
+          : `<div></div>`}
+        <button class="primary-btn" onclick="${
+          step < 2
+            ? `setState({onboardStep:${step+1}})`
+            : `setState({onboarded:true,exam:state.onboardExam})`
+        }">
+          ${step < 2 ? 'Continue →' : 'View My Analytics 🚀'}
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+
+function render() {
+  const root = document.getElementById('root');
+  root.innerHTML = `
+    ${OnboardingModal()}
+    ${RankCard()}
+    ${Navbar()}
+    <div style="max-width:1200px;margin:0 auto;padding:24px 24px 64px">
+
+      ${HeroSection()}
+      ${RecoveryJourney()}
+      ${ScoreTrajectory()}
+      ${MistakeIntelligence()}
+      ${ConceptMastery()}
+      ${SectionPerformance()}
+      ${ExamSpecificInsights()}
+      ${LeverageActions()}
+      ${PeerComparison()}
+
+      <!-- Share Rank Card CTA -->
+      <div class="card fade-up" style="text-align:center;padding:28px;background:linear-gradient(135deg,${getExamColor(state.exam)}10,transparent);border:1px dashed ${getExamColor(state.exam)}40">
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Share Your Progress 📤</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Generate a rank card with your predicted AIR and share with friends or family.</div>
+        <button class="primary-btn" onclick="setState({showRankCard:true})" style="background:${getExamColor(state.exam)}">
+          Generate Rank Card
+        </button>
+      </div>
+
+    </div>`;
+}
+
+// Init
+window.setState = setState;
+render();
+</script>
+</body>
+</html>
