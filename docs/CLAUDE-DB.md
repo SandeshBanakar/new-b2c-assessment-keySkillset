@@ -9,8 +9,9 @@
 - Never modify schema without `KSS-DB-XXX` authorisation confirmed in Claude.ai project chat
 - Schema changes via `execute_sql` ONLY (project_id: uqweguyeaqkbxgtpkhez)
 - Write the SQL query manually as the Supabase project query is turned off via mcp
-- All the query and results after the query is asked to run manually in Supabase for any task that has DB or schema change, it will be updated in `/docs/SQL-RESPONSE.txt`.
-- `/docs/SQL-RESPONSE.txt`is a dynamic file and should only be considered as RAM storage for SQL queries executed for this project
+- All the query and results after the query is asked to run manually in Supabase for any task that has DB or schema change, it will be updated in `@docs/SQL-RESPONSE-1.txt`.
+- If `/docs/SQL-RESPONSE-1.txt` file is filled, then write in `@docs/SQL-RESPONSE-2.txt`
+- `@docs/SQL-RESPONSE-1.txt` and `@docs/SQL-RESPONSE-2.txt` are two dynamic files and should only be considered as RAM storage for SQL queries executed for this project
 - Always use `IF NOT EXISTS` in CREATE statements
 - After any schema change: verify → update this file → run `npm run build`
 
@@ -683,13 +684,32 @@ All seeding is data-only. No schema changes.
 - `user_concept_mastery`: concept tag mastery rows for those 5 attempts
 - `attempt_ai_insights`: 5 static AI insight rows (model_used='static_demo')
 
-### SAT Analytics (seeded KSS-SA-031 extension, Apr 13 2026)
+### SAT Analytics (seeded KSS-SA-031 extension, Apr 13 2026; updated KSS-SAT-A02, Apr 20 2026)
 Premium user: `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
 
 **Assessments seeded (3 SAT assessments — 2 attempts each = 6 attempt rows):**
-- SAT Full Test (full-test, score_max=1600): 2 attempts. Scores: 1150 → 1240. score_rw + score_math columns used.
+- SAT Full Test (full-test, score_max=1600): 2 attempts. Scores: 1130 → 1240. score_rw + score_math columns used.
+  - **Attempt 1** (`ece53ced-7d61-4419-920e-ae1f68780f66`): score_rw=570, score_math=560, composite=1130
 - SAT Math Subject Test (subject-test, score_max=800): 2 attempts. Scores: 560 → 620.
 - SAT R&W Subject Test (subject-test, score_max=800): 2 attempts. Scores: 580 → 630.
+
+**assessment_question_map trimmed (Apr 20 2026):**
+- Digital SAT correct counts: rw_module_1=27Q, rw_module_2=27Q, math_module_1=22Q, math_module_2=22Q (was 33/33/27/27)
+- SAT Full Test total_questions=98, SAT R&W Subject Test=54, SAT Math Subject Test=44
+- DELETE by question_id covers all 3 assessments (FT + both subject tests share same questions)
+- SQL: `docs/requirements/SQL-RESPONSE-1.txt` STEP 1-2
+
+**attempt_answers seeded for SAT FT Attempt 1 (Apr 20 2026):**
+- 98 rows total: rw_module_1=27(18C/6W/3S), rw_module_2=27(17C/7W/3S), math_module_1=22(14C/5W/3S), math_module_2=22(13C/6W/3S)
+- Realistic time_spent_seconds per question; marks_awarded=1 correct, 0 wrong/skipped
+- SQL: `docs/requirements/SQL-RESPONSE-1.txt` STEP 5-9
+
+**attempt_section_results updated for Attempt 1 (Apr 20 2026):**
+- rw_module_1: correct=18, wrong=6, skipped=3, marks_scored=18/27, time=1872s, accuracy=75.00%
+- rw_module_2: correct=17, wrong=7, skipped=3, marks_scored=17/27, time=1885s, accuracy=70.83%
+- math_module_1: correct=14, wrong=5, skipped=3, marks_scored=14/22, time=1993s, accuracy=73.68%
+- math_module_2: correct=13, wrong=6, skipped=3, marks_scored=13/22, time=2012s, accuracy=68.42%
+- SQL: `docs/requirements/SQL-RESPONSE-1.txt` STEP 3-4
 
 **attempt_section_results:** 4 module rows per full-test attempt (rw_module_1, rw_module_2, math_module_1, math_module_2), 4 domain rows per subject-test attempt. Total: 24 rows.
 

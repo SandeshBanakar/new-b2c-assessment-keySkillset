@@ -9,6 +9,7 @@ interface AppContextValue {
   user: User | null;
   switchPersona: (userId: string) => void;
   simulateTierChange: (newTier: string) => void;
+  updateUser: (fields: Partial<User>) => void;
   logout: () => void;
   isSubscribed: (assessmentId: string) => boolean;
   subscribeToAssessment: (assessmentId: string) => void;
@@ -37,6 +38,8 @@ function demoUserToUser(demo: (typeof DEMO_USERS)[number]): User {
     createdAt: '',
     updatedAt: '',
     activePlanInfo: (demo.active_plan_info ?? null) as ActivePlanInfo | null,
+    targetSatScore: demo.target_sat_score ?? null,
+    targetSatSubjectScore: demo.target_sat_subject_score ?? null,
   };
 }
 
@@ -73,6 +76,10 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const updateUser = (fields: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...fields } : prev));
+  };
+
   const logout = () => {
     localStorage.removeItem(STORAGE_KEY);
     setUser(null);
@@ -98,6 +105,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         user,
         switchPersona,
         simulateTierChange,
+        updateUser,
         logout,
         isSubscribed,
         subscribeToAssessment,

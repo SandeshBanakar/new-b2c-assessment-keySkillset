@@ -1,16 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  CircleAlert as AlertCircle,
   ChartBar as BarChart2,
   CircleCheck as CheckCircle,
   Lightbulb,
   Target,
-  TrendingUp,
-  TrendingDown,
-  Minus,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
@@ -21,6 +17,13 @@ import SolutionsPanel, {
 import SATScoringTable from '@/components/assessment-detail/SATScoringTable';
 import ConceptMasteryPanel from '@/components/assessment-detail/ConceptMasteryPanel';
 import AttemptPillFilter from '@/components/ui/AttemptPillFilter';
+import SATHeroScore from '@/components/assessment-detail/SATHeroScore';
+import SATCollegeLadder, { type TierBand, type College } from '@/components/assessment-detail/SATCollegeLadder';
+import SATLeveragePanel from '@/components/assessment-detail/SATLeveragePanel';
+import SATPacingChart from '@/components/assessment-detail/SATPacingChart';
+import SATMistakeTaxonomy from '@/components/assessment-detail/SATMistakeTaxonomy';
+import DifficultyBreakdownCard, { type DiffMap } from '@/components/ui/DifficultyBreakdownCard';
+import PreviewSectionWrapper from '@/components/ui/PreviewSectionWrapper';
 import type { Assessment } from '@/types';
 
 // ─── SAT domain taxonomy ───────────────────────────────────────────────────────
@@ -139,9 +142,10 @@ function sectionBarClass(pct: number): string {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatScore(score: number | null): string {
-  if (score === null) return '—';
-  return `${score}`;
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
 }
 
 function scoreDelta(a: number | null, b: number | null): number | null {
@@ -150,25 +154,6 @@ function scoreDelta(a: number | null, b: number | null): number | null {
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
-
-function DeltaBadge({ delta }: { delta: number | null }) {
-  if (delta === null) return null;
-  if (delta > 0) return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
-      <TrendingUp className="w-3 h-3" />+{delta}
-    </span>
-  );
-  if (delta < 0) return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5">
-      <TrendingDown className="w-3 h-3" />{delta}
-    </span>
-  );
-  return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 bg-zinc-100 border border-zinc-200 rounded-full px-2 py-0.5">
-      <Minus className="w-3 h-3" />No change
-    </span>
-  );
-}
 
 function SectionRow({ sec }: { sec: SectionResult }) {
   const pct =
@@ -190,10 +175,13 @@ function SectionRow({ sec }: { sec: SectionResult }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className="flex gap-4 text-xs">
+      <div className="flex flex-wrap gap-3 text-xs">
         <span className="text-emerald-600">{sec.correct_count} correct</span>
         <span className="text-rose-600">{sec.incorrect_count} wrong</span>
         <span className="text-zinc-400">{sec.skipped_count} skipped</span>
+        {sec.time_spent_seconds > 0 && (
+          <span className="text-zinc-400">{formatTime(sec.time_spent_seconds)}</span>
+        )}
         <span className="ml-auto text-zinc-500">{pct}%</span>
       </div>
     </div>
@@ -208,7 +196,7 @@ export default function SATAnalyticsTab({
   onSwitchToAttempts,
 }: SATAnalyticsTabProps) {
   const router = useRouter();
-  const { user } = useAppContext();
+  const { user, updateUser } = useAppContext();
   const [loading, setLoading]                         = useState(true);
   const [attempts, setAttempts]                       = useState<DbAttempt[]>([]);
   const [allSections, setAllSections]                 = useState<Record<string, SectionResult[]>>({});
@@ -217,12 +205,13 @@ export default function SATAnalyticsTab({
   const [selectedAttemptId, setSelectedAttemptId]     = useState<string>('');
   const [assessmentQuestions, setAssessmentQuestions] = useState<DbQuestion[]>([]);
   const [allUserAnswers, setAllUserAnswers]            = useState<Record<string, UserAnswer[]>>({});
+  const [tierBands, setTierBands]                     = useState<TierBand[]>([]);
+  const [colleges, setColleges]                       = useState<College[]>([]);
+  const [analyticsConfig, setAnalyticsConfig]         = useState<Record<string, boolean>>({});
 
   const isAiEligible =
     user?.subscriptionTier === 'professional' ||
     user?.subscriptionTier === 'premium';
-
-  const isUpgradeGateVisible = !isAiEligible;
 
   const isFullTest   = assessment.type === 'full-test';
   const scoreMax     = isFullTest ? 1600 : 800;
@@ -231,6 +220,13 @@ export default function SATAnalyticsTab({
     : assessment.subject === 'Math'
       ? MATH_SECTION_ORDER
       : RW_SECTION_ORDER;
+
+  const targetScore = isFullTest
+    ? (user?.targetSatScore ?? null)
+    : (user?.targetSatSubjectScore ?? null);
+
+  const showPacing       = analyticsConfig['show_pacing_preview'] !== false;
+  const showMistakeTax   = analyticsConfig['show_mistake_taxonomy_preview'] !== false;
 
   useEffect(() => {
     if (!user?.id) return;
@@ -257,21 +253,56 @@ export default function SATAnalyticsTab({
         return;
       }
 
-      // Pre-select most recent attempt
       setSelectedAttemptId(completed[completed.length - 1].id);
-
       const attemptIds = completed.map((a) => a.id);
 
-      // 2. Section results for ALL attempts
-      const { data: sectionsData } = await supabase
-        .from('attempt_section_results')
-        .select(
-          'attempt_id, section_id, section_label, correct_count, incorrect_count, skipped_count, marks_scored, marks_possible, time_spent_seconds, accuracy_percent',
-        )
-        .in('attempt_id', attemptIds);
+      // 2–6. Core analytics data in parallel
+      const [
+        sectionsResult,
+        masteryResult,
+        insightsResult,
+        questionsResult,
+        answersResult,
+      ] = await Promise.all([
+        // 2. Section results
+        supabase
+          .from('attempt_section_results')
+          .select('attempt_id, section_id, section_label, correct_count, incorrect_count, skipped_count, marks_scored, marks_possible, time_spent_seconds, accuracy_percent')
+          .in('attempt_id', attemptIds),
 
+        // 3. Concept mastery
+        supabase
+          .from('user_concept_mastery')
+          .select('concept_tag, attempt_number, correct_count, total_count, mastery_percent')
+          .eq('user_id', user!.id)
+          .eq('assessment_id', assessmentId)
+          .order('concept_tag'),
+
+        // 4. AI insights (pro/premium only)
+        isAiEligible
+          ? supabase
+              .from('attempt_ai_insights')
+              .select('attempt_id, what_went_well, next_steps')
+              .in('attempt_id', attemptIds)
+          : Promise.resolve({ data: null }),
+
+        // 5. Assessment questions with difficulty
+        supabase
+          .from('assessment_question_map')
+          .select('question_id, order_index, questions(id, question_type, difficulty, module_name, question_order, question_text, passage_text, options, correct_answer, explanation, concept_tag)')
+          .eq('assessment_id', assessmentId)
+          .order('order_index', { ascending: true }),
+
+        // 6. User answers
+        supabase
+          .from('attempt_answers')
+          .select('attempt_id, question_id, section_id, user_answer, is_correct, is_skipped, time_spent_seconds, marks_awarded')
+          .in('attempt_id', attemptIds),
+      ]);
+
+      // Process sections
       const sectionsMap: Record<string, SectionResult[]> = {};
-      for (const row of sectionsData ?? []) {
+      for (const row of sectionsResult.data ?? []) {
         const aid = row.attempt_id as string;
         if (!sectionsMap[aid]) sectionsMap[aid] = [];
         sectionsMap[aid].push(row as unknown as SectionResult);
@@ -284,70 +315,73 @@ export default function SATAnalyticsTab({
       }
       setAllSections(sectionsMap);
 
-      // 3. Concept mastery (all attempts)
-      const { data: masteryData } = await supabase
-        .from('user_concept_mastery')
-        .select('concept_tag, attempt_number, correct_count, total_count, mastery_percent')
-        .eq('user_id', user!.id)
-        .eq('assessment_id', assessmentId)
-        .order('concept_tag');
-      setConceptMastery(masteryData ?? []);
+      // Process mastery
+      setConceptMastery(masteryResult.data ?? []);
 
-      // 4. AI insights (pro/premium only)
-      if (isAiEligible) {
-        const { data: insightsData } = await supabase
-          .from('attempt_ai_insights')
-          .select('attempt_id, what_went_well, next_steps')
-          .in('attempt_id', attemptIds);
-
+      // Process insights
+      if (isAiEligible && insightsResult.data) {
         const insightsMap: Record<string, AiInsight> = {};
-        for (const row of insightsData ?? []) {
+        for (const row of insightsResult.data) {
           insightsMap[row.attempt_id as string] = {
             what_went_well: row.what_went_well as string,
             next_steps: row.next_steps as string,
           };
         }
         setAllInsights(insightsMap);
-      } else {
-        setAllInsights({});
       }
 
-      // 5. Assessment questions via assessment_question_map
-      const { data: questionsData } = await supabase
-        .from('assessment_question_map')
-        .select(
-          'question_id, order_index, questions(id, question_type, module_name, question_order, question_text, passage_text, options, correct_answer, explanation, concept_tag)',
-        )
-        .eq('assessment_id', assessmentId)
-        .order('order_index', { ascending: true });
-
-      const questions: DbQuestion[] = (questionsData ?? [])
+      // Process questions
+      const questions: DbQuestion[] = (questionsResult.data ?? [])
         .map((row) => {
           const q = row.questions as unknown as DbQuestion | null;
-          return q ? q : null;
+          return q ?? null;
         })
         .filter(Boolean) as DbQuestion[];
       setAssessmentQuestions(questions);
 
-      // 6. User answers for all attempts
-      if (attemptIds.length > 0) {
-        const { data: answersData } = await supabase
-          .from('attempt_answers')
-          .select('attempt_id, question_id, user_answer, is_correct, is_skipped')
-          .in('attempt_id', attemptIds);
+      // Process answers
+      const answersMap: Record<string, UserAnswer[]> = {};
+      for (const row of answersResult.data ?? []) {
+        const aid = row.attempt_id as string;
+        if (!answersMap[aid]) answersMap[aid] = [];
+        answersMap[aid].push({
+          question_id: row.question_id as string,
+          section_id: row.section_id as string | null,
+          user_answer: row.user_answer as string | null,
+          is_correct: row.is_correct as boolean | null,
+          is_skipped: row.is_skipped as boolean | null,
+          time_spent_seconds: row.time_spent_seconds as number | null,
+          marks_awarded: row.marks_awarded as number | null,
+        });
+      }
+      setAllUserAnswers(answersMap);
 
-        const answersMap: Record<string, UserAnswer[]> = {};
-        for (const row of answersData ?? []) {
-          const aid = row.attempt_id as string;
-          if (!answersMap[aid]) answersMap[aid] = [];
-          answersMap[aid].push({
-            question_id: row.question_id as string,
-            user_answer: row.user_answer as string | null,
-            is_correct: row.is_correct as boolean | null,
-            is_skipped: row.is_skipped as boolean | null,
-          });
+      // 7. Tier bands + colleges (Full Test only) + platform config in parallel
+      const extraLoads = await Promise.all([
+        isFullTest
+          ? supabase.from('sat_tier_bands').select('*').order('display_order')
+          : Promise.resolve({ data: [] }),
+        isFullTest
+          ? supabase.from('sat_colleges').select('*').eq('is_active', true).order('cutoff_score', { ascending: false })
+          : Promise.resolve({ data: [] }),
+        supabase.from('exam_categories').select('id').eq('name', 'SAT').maybeSingle(),
+      ]);
+
+      setTierBands((extraLoads[0].data as TierBand[] | null) ?? []);
+      setColleges((extraLoads[1].data as College[] | null) ?? []);
+
+      const catRow = extraLoads[2].data as { id: string } | null;
+      if (catRow) {
+        const { data: configRows } = await supabase
+          .from('platform_analytics_config')
+          .select('config_key, config_value')
+          .eq('exam_category_id', catRow.id);
+
+        const configMap: Record<string, boolean> = {};
+        for (const row of configRows ?? []) {
+          configMap[row.config_key as string] = row.config_value as boolean;
         }
-        setAllUserAnswers(answersMap);
+        setAnalyticsConfig(configMap);
       }
 
       setLoading(false);
@@ -356,6 +390,51 @@ export default function SATAnalyticsTab({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, assessmentId, isAiEligible]);
+
+  // ── Save target score ──────────────────────────────────────────────────────
+  async function onSaveTarget(score: number | null) {
+    if (!user?.id) return;
+    const col = isFullTest ? 'target_sat_score' : 'target_sat_subject_score';
+    await supabase.from('users').update({ [col]: score }).eq('id', user.id);
+    updateUser(
+      isFullTest
+        ? { targetSatScore: score }
+        : { targetSatSubjectScore: score },
+    );
+  }
+
+  // ── Hooks that must be declared before early returns ──────────────────────
+  // Derive the active attempt ID without creating a nullable selectedAttempt
+  const _activeId = selectedAttemptId || (attempts.length > 0 ? attempts[attempts.length - 1].id : '');
+  const sectionResults  = allSections[_activeId] ?? [];
+  const selectedAnswers = allUserAnswers[_activeId] ?? [];
+
+  const derivedSectionResults = useMemo<SectionResult[]>(() => {
+    if (selectedAnswers.length === 0) return sectionResults;
+    const stats: Record<string, { correct: number; wrong: number; skipped: number; time: number }> = {};
+    for (const a of selectedAnswers) {
+      const sid = a.section_id;
+      if (!sid) continue;
+      if (!stats[sid]) stats[sid] = { correct: 0, wrong: 0, skipped: 0, time: 0 };
+      if (a.is_skipped) stats[sid].skipped++;
+      else if (a.is_correct) stats[sid].correct++;
+      else stats[sid].wrong++;
+      stats[sid].time += a.time_spent_seconds ?? 0;
+    }
+    return sectionResults.map((sec) => {
+      const d = stats[sec.section_id];
+      if (!d) return sec;
+      const total = d.correct + d.wrong;
+      return {
+        ...sec,
+        correct_count: d.correct,
+        incorrect_count: d.wrong,
+        skipped_count: d.skipped,
+        time_spent_seconds: d.time > 0 ? d.time : sec.time_spent_seconds,
+        accuracy_percent: total > 0 ? Math.round((d.correct / total) * 10000) / 100 : sec.accuracy_percent,
+      };
+    });
+  }, [selectedAnswers, sectionResults]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -384,25 +463,32 @@ export default function SATAnalyticsTab({
     );
   }
 
-  // ── Derived values ──────────────────────────────────────────────────────────
+  // ── Post-early-return derived values ───────────────────────────────────────
+  // selectedAttempt is non-null here — attempts.length === 0 already returned early
   const selectedAttempt = attempts.find((a) => a.id === selectedAttemptId) ?? attempts[attempts.length - 1];
-  const sectionResults  = allSections[selectedAttempt.id] ?? [];
-  const aiInsight       = allInsights[selectedAttempt.id] ?? null;
-  const selectedAnswers = allUserAnswers[selectedAttempt.id] ?? [];
-
-  const weakConcepts = conceptMastery
-    .filter(
-      (m) =>
-        m.attempt_number === selectedAttempt.attempt_number &&
-        m.mastery_percent !== null &&
-        (m.mastery_percent as number) < 60,
-    )
-    .sort((a, b) => (a.mastery_percent ?? 0) - (b.mastery_percent ?? 0))
-    .slice(0, 6);
+  const aiInsight = allInsights[selectedAttempt.id] ?? null;
 
   const firstAttempt  = attempts[0];
   const lastAttempt   = attempts[attempts.length - 1];
   const compositeGain = scoreDelta(firstAttempt.score, lastAttempt.score);
+
+  // Difficulty breakdown from attempt_answers + question difficulty
+  const difficultyMap: DiffMap = { easy: { correct: 0, total: 0 }, medium: { correct: 0, total: 0 }, hard: { correct: 0, total: 0 } };
+  for (const answer of selectedAnswers) {
+    const q = assessmentQuestions.find((q) => q.id === answer.question_id);
+    if (!q) continue;
+    const d = ((q.difficulty ?? 'medium') as string).toLowerCase() as keyof DiffMap;
+    if (d in difficultyMap) {
+      difficultyMap[d].total++;
+      if (answer.is_correct) difficultyMap[d].correct++;
+    }
+  }
+  const hasDiffData = Object.values(difficultyMap).some((v) => v.total > 0);
+
+  // Concept mastery for selected attempt
+  const selectedConceptMastery = conceptMastery.filter(
+    (m) => m.attempt_number === selectedAttempt?.attempt_number,
+  );
 
   // Build tagSectionMap and sections for ConceptMasteryPanel
   const tagSectionMap: Record<string, string> = {};
@@ -418,69 +504,18 @@ export default function SATAnalyticsTab({
   return (
     <div className="space-y-4">
 
-      {/* ── Block 1: Score Progression ───────────────────────────────────────── */}
-      <div className="bg-white shadow-sm rounded-md p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <TrendingUp className="w-4 h-4 text-blue-600" />
-          <h3 className="text-base font-medium text-zinc-900">Score Progression</h3>
-          {attempts.length >= 2 && compositeGain !== null && (
-            <div className="ml-auto">
-              <DeltaBadge delta={compositeGain} />
-            </div>
-          )}
-        </div>
+      {/* ── Block 1: Hero Score ───────────────────────────────────────────────── */}
+      <SATHeroScore
+        attempts={attempts}
+        selectedAttempt={selectedAttempt}
+        isFullTest={isFullTest}
+        scoreMax={scoreMax}
+        targetScore={targetScore}
+        onSaveTarget={onSaveTarget}
+        compositeGain={compositeGain}
+      />
 
-        <div className={`grid gap-4 ${attempts.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2'}`}>
-          {attempts.map((a) => (
-            <div key={a.id} className="border border-zinc-100 rounded-md p-4 bg-zinc-50">
-              <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2">
-                Attempt {a.attempt_number}
-              </p>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-3xl font-semibold text-zinc-900">
-                  {formatScore(a.score)}
-                </span>
-                <span className="text-sm text-zinc-400">/ {scoreMax}</span>
-              </div>
-
-              {isFullTest && (a.score_rw !== null || a.score_math !== null) && (
-                <div className="flex gap-3 mt-2">
-                  <div className="text-center">
-                    <p className="text-xs text-zinc-400">Reading &amp; Writing</p>
-                    <p className="text-base font-medium text-zinc-700">
-                      {a.score_rw ?? '—'}
-                      <span className="text-xs font-normal text-zinc-400">/800</span>
-                    </p>
-                  </div>
-                  <div className="w-px bg-zinc-200 self-stretch" />
-                  <div className="text-center">
-                    <p className="text-xs text-zinc-400">Math</p>
-                    <p className="text-base font-medium text-zinc-700">
-                      {a.score_math ?? '—'}
-                      <span className="text-xs font-normal text-zinc-400">/800</span>
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {isFullTest && attempts.length >= 2 && (
-          <div className="flex gap-6 mt-4 pt-4 border-t border-zinc-100">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500">R&amp;W</span>
-              <DeltaBadge delta={scoreDelta(firstAttempt.score_rw, lastAttempt.score_rw)} />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500">Math</span>
-              <DeltaBadge delta={scoreDelta(firstAttempt.score_math, lastAttempt.score_math)} />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Block 2: Attempt Pill Filter ─────────────────────────────────────── */}
+      {/* ── Block 2: Attempt Pill Filter ──────────────────────────────────────── */}
       {attempts.length > 1 && (
         <AttemptPillFilter
           attempts={attempts}
@@ -489,38 +524,48 @@ export default function SATAnalyticsTab({
         />
       )}
 
-      {/* ── Block 3: Section Breakdown ───────────────────────────────────────── */}
+      {/* ── Block 3: College Ladder (Full Test only) ──────────────────────────── */}
+      {isFullTest && tierBands.length > 0 && lastAttempt.score !== null && (
+        <SATCollegeLadder
+          score={lastAttempt.score}
+          target={targetScore}
+          tiers={tierBands}
+          colleges={colleges}
+        />
+      )}
+
+      {/* ── Block 4: Section Breakdown ────────────────────────────────────────── */}
       <div className="bg-white shadow-sm rounded-md p-6">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-medium text-zinc-900">Section Breakdown</h3>
           <span className="text-xs text-zinc-400">Attempt {selectedAttempt.attempt_number}</span>
         </div>
 
-        {sectionResults.length === 0 ? (
+        {derivedSectionResults.length === 0 ? (
           <p className="text-sm text-zinc-400">No section data for this attempt.</p>
         ) : (
           <div className="space-y-5">
             {isFullTest ? (
               <>
-                {sectionResults.filter((s) => s.section_id.startsWith('rw')).length > 0 && (
+                {derivedSectionResults.filter((s) => s.section_id.startsWith('rw')).length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
                       Reading &amp; Writing
                     </p>
                     <div className="space-y-4 pl-0.5">
-                      {sectionResults
+                      {derivedSectionResults
                         .filter((s) => s.section_id.startsWith('rw'))
                         .map((sec) => <SectionRow key={sec.section_id} sec={sec} />)}
                     </div>
                   </div>
                 )}
-                {sectionResults.filter((s) => s.section_id.startsWith('math')).length > 0 && (
+                {derivedSectionResults.filter((s) => s.section_id.startsWith('math')).length > 0 && (
                   <div className="pt-2 border-t border-zinc-100">
                     <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
                       Math
                     </p>
                     <div className="space-y-4 pl-0.5">
-                      {sectionResults
+                      {derivedSectionResults
                         .filter((s) => s.section_id.startsWith('math'))
                         .map((sec) => <SectionRow key={sec.section_id} sec={sec} />)}
                     </div>
@@ -529,14 +574,32 @@ export default function SATAnalyticsTab({
               </>
             ) : (
               <div className="space-y-5">
-                {sectionResults.map((sec) => <SectionRow key={sec.section_id} sec={sec} />)}
+                {derivedSectionResults.map((sec) => <SectionRow key={sec.section_id} sec={sec} />)}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* ── Block 4: Concept Mastery (shared component, all attempts in columns) */}
+      {/* ── Block 5: Difficulty Breakdown ─────────────────────────────────────── */}
+      {hasDiffData && (
+        <DifficultyBreakdownCard
+          diffMap={difficultyMap}
+          attemptNumber={selectedAttempt.attempt_number}
+        />
+      )}
+
+      {/* ── Block 6: Leverage Panel (replaces "Where You Lost Points") ────────── */}
+      {selectedConceptMastery.length > 0 && (
+        <SATLeveragePanel
+          conceptMastery={selectedConceptMastery}
+          totalQuestions={selectedAttempt.total_questions}
+          isFullTest={isFullTest}
+          attemptNumber={selectedAttempt.attempt_number}
+        />
+      )}
+
+      {/* ── Block 7: Concept Mastery ──────────────────────────────────────────── */}
       {conceptMastery.length > 0 && (
         <ConceptMasteryPanel
           conceptMastery={conceptMastery}
@@ -549,65 +612,31 @@ export default function SATAnalyticsTab({
         />
       )}
 
-      {/* ── Block 5: Where You Lost Points ──────────────────────────────────── */}
-      {weakConcepts.length > 0 && (
-        <div className="bg-white shadow-sm rounded-md p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertCircle className="w-4 h-4 text-rose-500" />
-            <h3 className="text-base font-medium text-zinc-900">Where You Lost Points</h3>
-            <span className="ml-auto text-xs text-zinc-400">
-              Attempt {selectedAttempt.attempt_number} — sub-skills below 60%
-            </span>
-          </div>
-          <div className="space-y-4">
-            {weakConcepts.map((c) => {
-              const domain =
-                SAT_MATH_DOMAIN_MAP[c.concept_tag] ??
-                SAT_RW_DOMAIN_MAP[c.concept_tag] ??
-                '';
-              const pct = Math.round(c.mastery_percent ?? 0);
-              return (
-                <div key={c.concept_tag}>
-                  <div className="flex items-start justify-between mb-1">
-                    <div>
-                      <span className="text-sm font-medium text-zinc-800">
-                        {c.concept_tag}
-                      </span>
-                      {domain && (
-                        <span className="ml-2 text-xs text-zinc-400">{domain}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="text-xs text-zinc-500">
-                        {c.correct_count}/{c.total_count} correct
-                      </span>
-                      <span className="text-xs font-medium text-rose-600">{pct}%</span>
-                    </div>
-                  </div>
-                  <div className="w-full bg-zinc-100 rounded-full h-1.5">
-                    <div
-                      className="h-1.5 rounded-full bg-rose-400 transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* ── Block 8: Pacing Analysis (Preview, gated by platform config) ─────── */}
+      {showPacing && (
+        <PreviewSectionWrapper>
+          <SATPacingChart />
+        </PreviewSectionWrapper>
       )}
 
-      {/* ── Block 6: SAT Scoring Reference ──────────────────────────────────── */}
-      <SATScoringTable />
+      {/* ── Block 9: Mistake Taxonomy (Preview, gated by platform config) ────── */}
+      {showMistakeTax && (
+        <PreviewSectionWrapper>
+          <SATMistakeTaxonomy />
+        </PreviewSectionWrapper>
+      )}
 
-      {/* ── Block 7: Solutions Panel (DB-driven, module tabs, 25Q pagination) ── */}
+      {/* ── Block 10: SAT Scoring Reference (Full Test only) ─────────────────── */}
+      {isFullTest && <SATScoringTable />}
+
+      {/* ── Block 11: Solutions Panel ─────────────────────────────────────────── */}
       <SolutionsPanel
         questions={assessmentQuestions}
         userAnswers={selectedAnswers}
         isFullTest={isFullTest}
       />
 
-      {/* ── Block 8: AI Insight Panel ────────────────────────────────────────── */}
+      {/* ── Block 12: AI Insight Panel ────────────────────────────────────────── */}
       <div className="bg-white shadow-sm rounded-md p-6">
         <div className="flex items-center gap-2 mb-5">
           <Lightbulb className="w-4 h-4 text-blue-600" />
@@ -657,7 +686,7 @@ export default function SATAnalyticsTab({
               </p>
             </div>
           </div>
-        ) : isUpgradeGateVisible ? (
+        ) : (
           <div className="space-y-4">
             <div className="rounded-md bg-emerald-50 border border-emerald-100 p-4">
               <div className="flex items-center gap-1.5 mb-2">
@@ -684,7 +713,7 @@ export default function SATAnalyticsTab({
               </button>
             </div>
           </div>
-        ) : null}
+        )}
       </div>
 
     </div>

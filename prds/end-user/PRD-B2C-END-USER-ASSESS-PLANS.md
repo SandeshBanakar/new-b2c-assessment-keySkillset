@@ -32,7 +32,7 @@ Fetched via `fetchLivePlatformPlans()`:
 plan_audience = 'B2C'
 plan_category = 'ASSESSMENT'
 scope = 'PLATFORM_WIDE'
-status = 'PUBLISHED'
+status = 'LIVE'
 ORDER BY price ASC
 ```
 
@@ -44,12 +44,12 @@ Fetched via `fetchLiveCategoryPlansGrouped()`:
 plan_audience = 'B2C'
 plan_category = 'ASSESSMENT'
 scope = 'CATEGORY_BUNDLE'
-status = 'PUBLISHED'
+status = 'LIVE'
 feature_bullets != '[]'
 ORDER BY price ASC
 ```
 
-> **Guard:** A category is only shown if all 3 tiers (BASIC, PRO, PREMIUM) exist and are PUBLISHED. Partial categories are silently excluded from the page. This is intentional — showing 1 or 2 tier cards with no upgrade path creates a confusing UX.
+> **Guard:** A category is only shown if all 3 tiers (BASIC, PRO, PREMIUM) exist and are LIVE. Partial categories are silently excluded from the page. This is intentional — showing 1 or 2 tier cards with no upgrade path creates a confusing UX.
 
 ---
 
@@ -130,15 +130,90 @@ If `fetchLivePlatformPlans` returns an empty array AND `fetchLiveCategoryPlansGr
 
 ## Section 2: Assessment Card Gating
 
-**[PLACEHOLDER — Ticket KSS-SA-039 covers State 3 (category mismatch). Full gating spec across all states and plan types to be written in a future ticket.]**
+**Status:** LOCKED (KSS-B2C-001, Apr 20 2026)
 
-Key rules locked in KSS-SA-039:
+---
 
-| Rule | Detail |
-|------|--------|
-| Platform plan gating | `assessments.min_tier` vs `activePlanInfo.tier` (cumulative coverage: BASIC ⊂ PRO ⊂ PREMIUM) |
-| Category plan gating | `assessment.exam` (exam category) must equal `activePlanInfo.category`, then tier coverage applies within that category |
-| State 3 — Category Mismatch | Category plan user on wrong-category assessment. Primary: "Take Free Test" (if unused). Secondary: "Switch Plan" → `/plans?highlight={examCategory}`. |
+### 2.1 Assessment Min-Tier Assignment
+
+Each assessment has a `min_tier` column that controls which subscription tier unlocks paid attempts. The canonical mapping (applied unconditionally via DB migration KSS-DB-045):
+
+| `assessment_type` | `min_tier` |
+|-------------------|-----------|
+| `full-test`       | `basic`   |
+| `subject-test`    | `professional` |
+| `chapter-test`    | `premium` |
+
+This implements cumulative coverage: BASIC unlocks full-tests only; PRO unlocks full + subject; PREMIUM unlocks all three types.
+
+---
+
+### 2.2 Effective Tier Resolution
+
+Access is granted when `effectiveTierAllows` is true. Resolution order:
+
+1. **Platform plan:** `TIER_ORDER[userSubscriptionTier] >= TIER_ORDER[assessment.min_tier]`  
+   `TIER_ORDER = { free: 0, basic: 1, professional: 2, premium: 3 }`
+
+2. **Category plan (if platform check fails and `activePlanInfo.scope === 'CATEGORY_BUNDLE'`):**
+   - `activePlanInfo.category` must equal `normalizeExam(assessment.exam_type)` (normalise: `IIT-JEE` → `JEE`)
+   - Map plan tier to platform tier: `{ BASIC→basic, PRO→professional, PREMIUM→premium }`
+   - Then apply same `TIER_ORDER` check
+
+If either check passes, the user has paid access for that assessment.
+
+---
+
+### 2.3 Card States (7 total)
+
+`deriveCardState()` returns a `CardState` value `1–7`. States are evaluated in priority order:
+
+| State | Name | Condition | Primary CTA | Secondary CTA |
+|-------|------|-----------|-------------|---------------|
+| 7 | All attempts used | `attemptsUsed >= 6` | "View Analysis" | — |
+| 3 | Category mismatch | `activePlanInfo.scope === 'CATEGORY_BUNDLE'` AND `exam !== activePlanInfo.category` | "Take Free Test" (or "Resume" / "View Analysis" if prior attempts) | "Switch Plan" → `/plans?highlight={exam}` |
+| 4 | Subscribed, not started | `effectiveTierAllows` AND `attemptsUsed === 0` | "Start Your Test" | Optional: score target widget (SAT full-test only, first time) |
+| 5 | Subscribed, in progress | `effectiveTierAllows` AND `status === 'inprogress'` | "Resume Test" | — |
+| 6 | Subscribed, completed (attempts remain) | `effectiveTierAllows` AND `attemptsUsed > 0 && < 6` | "View Analysis" | — |
+| 1 | Locked, free attempt available | `!effectiveTierAllows` AND `!freeAttemptUsed` | "Take Free Test" | "Upgrade to Access" → `/plans` |
+| 2 | Locked, free attempt exhausted | `!effectiveTierAllows` AND `freeAttemptUsed` | "Continue Your Test" (leads to locked gate) | "Upgrade to Access" → `/plans` |
+
+> State 3 fires before the effective-tier check. A category plan user on a wrong-exam assessment always lands in State 3, even if that exam's assessment has a `min_tier` their tier would satisfy.
+
+---
+
+### 2.4 Attempts Tab — 6-Row Rule
+
+The Attempts tab always renders **exactly 6 rows**: 1 Free Attempt row + 5 paid Attempt rows. This applies to ALL users regardless of tier, plan scope, or attempt history.
+
+**Free Attempt row:**
+- Always visible
+- States: `not_started` (show "Start Free Attempt"), `in_progress` (show "Resume Test"), `completed` (show "View Analysis"), `abandoned` (show status badge, no action)
+
+**Paid Attempt rows 1–5:**
+Sequential unlock: Attempt N is unlocked only after Attempt N-1 is `completed` or `abandoned`.  
+The free attempt is the prerequisite for Attempt 1.
+
+Row states for each paid row:
+
+| Condition | Display | Button |
+|-----------|---------|--------|
+| `!hasPaidAccess` (no plan for this exam/tier) | Dimmed (opacity-60) + Lock icon | "Upgrade to Unlock" → `/plans` |
+| `hasPaidAccess` AND prev not complete/abandoned | Dimmed + "Complete [prev] to unlock" label | — |
+| `hasPaidAccess` AND unlocked AND `not_started` | Full opacity | "Start Now" |
+| `hasPaidAccess` AND `in_progress` | Full opacity | "Resume Test" + "Abandon" link |
+| `hasPaidAccess` AND `completed` | Full opacity | "View Analysis" |
+| `hasPaidAccess` AND `abandoned` | Full opacity + badge | — |
+
+**`hasPaidAccess`** uses the same effective-tier resolution as §2.2 (checks platform tier, then category plan for matching exam).
+
+**Data source:** DB rows from `attempts` table when available; mock fallback from `mockAttempts` dataset when no DB rows exist (demo users and pre-launch).
+
+---
+
+### 2.5 `selected_exams` Filter
+
+Not used as a dashboard visibility gate. The `selected_exams` user preference is onboarding/profile-only. All exam assessments are always shown on the dashboard regardless of `selected_exams`. Filtering by exam is a future V2 feature.
 
 ---
 

@@ -116,7 +116,9 @@
       "Bash(ls ~/.claude/settings*)",
       "Bash(npx -y @supabase/mcp-server-supabase@latest --help)",
       "Bash(npm --version)",
-      "WebFetch(domain:api.anthropic.com)"
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(npx kill-port *)",
+      "Bash(rm -f .next/lock)"
     ]
   },
   "enabledMcpjsonServers": [

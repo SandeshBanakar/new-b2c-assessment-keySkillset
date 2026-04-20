@@ -6,6 +6,79 @@
 
 ## COMPLETED WORK LOG
 
+### April 20, 2026 — KSS-B2C-001: End User Persona + Assessment Access Fixes
+
+**Ticket:** KSS-B2C-001 | **PRD:** `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md`
+
+**Root causes fixed:**
+- Category plan users (NEET/JEE/CLAT BASIC) had `subscription_tier: 'free'` — deriveCardState never granted them paid access
+- Plans page called `fetchActivePlanForUser` which returns null for demo users (no DB subscription rows)
+- AttemptsTab only showed rows when `isSubscribed()` returned true, which always returned false for demo users
+- PlanSubscribersTab used DB count (0) for summary cards but rendered 5 mock rows → "Showing 5 of 0"
+
+**Files changed:**
+- `src/components/assessment/AssessmentCard.tsx` — Added `CATEGORY_TIER_MAP`, `effectiveTierAllows` in `deriveCardState` (checks category plan tier for matching exam after platform check fails). `normalizeExam` handles `IIT-JEE`→`JEE`.
+- `src/app/plans/page.tsx` — Added `UserActivePlanInfo` import alias; demo user fallback using `planId=''` sentinel after `fetchActivePlanForUser` returns null; `getPlanCTA` `isCurrentPlan` now matches by scope+tier+category when `planId===''`; same-rank safety net.
+- `src/components/assessment-detail/AttemptsTab.tsx` — Full rewrite. Always renders 6 rows (1 free + 5 paid). `computeHasPaidAccess` checks platform tier + category plan. Locked rows: opacity-60 + Lock icon + "Upgrade to Unlock". Sequentially locked rows: opacity-60 + "Complete [prev] to unlock". Both DB path and mock fallback path emit 6 rows. Removed `isSubscribed` dependency entirely.
+- `src/app/assessments/[id]/page.tsx` — Added `assessment={assessment}` prop to `<AttemptsTab>` call.
+- `src/components/plans/PlanSubscribersTab.tsx` — When DB count = 0, `count` falls back to `MOCK_SUBSCRIBERS.length` so summary cards stay consistent with mock table.
+- `eslint.config.mjs` — Added `docs/**` to globalIgnores (reference JSX files were causing pre-existing lint failures).
+
+**DB migration confirmed (Apr 20 2026):**
+- `docs/requirements/SQL-RESPONSE-3.txt` — KSS-DB-045: `full-test→basic` (5 rows), `subject-test→professional` (8 rows), `chapter-test→premium` (9 rows). Verified via GROUP BY query.
+
+**PRD updated:**
+- `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md` — §1.1 PUBLISHED→LIVE; §2 fully written (min_tier mapping, effective tier resolution, 7 card states, 6-row AttemptsTab rule, selected_exams gate dropped).
+
+**Build:** `npm run build` ✅ | **Lint (changed files):** ✅
+
+---
+
+### April 19, 2026 — KSS-SAT-A02: SAT Analytics V2 + Platform Config Restructure (Phases 1–6)
+
+**Ticket:** KSS-SAT-A02 | **PRD:** `prds/super-admin/PRD-SAT-ANALYTICS-V2.md`
+
+**DB migrations applied (all confirmed in SQL-RESPONSE-1.txt):**
+- KSS-DB-041: `sat_tier_bands` table + 5 tier rows (Accessible/Top-100/Top-50/Top-20/Elite)
+- KSS-DB-042: `sat_colleges` table + 19 colleges (US + India)
+- KSS-DB-043: `users.target_sat_score` + `users.target_sat_subject_score` columns
+- KSS-DB-044: `platform_analytics_config` table + SAT defaults (3 show_* rows)
+
+**Platform Config page (Phase 2 — previous session):**
+- Full rewrite to exam-category tabs (dynamic from DB), each with [Concept Tags] + [Analytics Display] sub-tabs
+- SAT Analytics Display: Section Visibility toggles, Tier Bands inline-edit, College Targets CRUD with Add/Edit modal + delete confirm
+- NEET/JEE/CLAT: "Coming Soon" placeholder
+
+**Types & Context (this session):**
+- `src/types/index.ts` — Added `targetSatScore`, `targetSatSubjectScore` to User interface
+- `src/data/demoUsers.ts` — Added fields to DemoUser; Priya Sharma seeded with `target_sat_score: 1500`
+- `src/context/AppContext.tsx` — Added `updateUser(fields)` partial update function; mapped new fields in demoUserToUser
+- `src/components/assessment-detail/SolutionsPanel.tsx` — Added `difficulty?` to DbQuestion interface
+
+**New shared components (Phase 3):**
+- `src/components/ui/ScoreTrajectoryChart.tsx` — SVG line chart, attempts × score, optional target dashed line
+- `src/components/ui/DifficultyBreakdownCard.tsx` — Easy/Medium/Hard progress bars from DiffMap
+- `src/components/ui/PreviewSectionWrapper.tsx` — Absolute "Preview" badge overlay (violet)
+
+**New SAT analytics components (Phase 4):**
+- `src/components/assessment-detail/SATHeroScore.tsx` — Hero score display + trajectory chart + 3-touch target score (Touch 2 inline pill picker, Touch 3 progress bar + edit/remove)
+- `src/components/assessment-detail/SATCollegeLadder.tsx` — Tier-grouped college cards, score + target ring highlight, Full Test only
+- `src/components/assessment-detail/SATLeveragePanel.tsx` — Dark card, top-3 concepts by impact (formula: `min(50, round((0.9 - mastery/100) × total_count × multiplier))`)
+- `src/components/assessment-detail/SATPacingChart.tsx` — Demo data, 4 module dot grids (on-pace/slow/wrong by color)
+- `src/components/assessment-detail/SATMistakeTaxonomy.tsx` — Demo data, 4 root-cause categories with example chips
+
+**SATAnalyticsTab rewrite (Phase 5):**
+- Block order: HeroScore → PillFilter → CollegeLadder (FT only) → SectionBreakdown + time → DifficultyBreakdown → LeveragePanel → ConceptMastery → Pacing (Preview gated) → MistakeTaxonomy (Preview gated) → SATScoringTable (FT only) → SolutionsPanel → AI Insight
+- Added `difficulty` to questions select; DiffMap computed from attempt_answers JOIN assessmentQuestions
+- Tier bands + colleges + platform_analytics_config loaded in parallel on mount
+- `onSaveTarget` writes to `users` table and calls `updateUser()` for optimistic local update
+- SectionRow enhanced with `formatTime(time_spent_seconds)` display
+
+**AssessmentCard Touch 1 (Phase 6):**
+- `src/components/assessment/AssessmentCard.tsx` — SAT full-test, State 4, target null → shows "Set a score target" dashed box with select + save below the CTA
+
+---
+
 ### April 19, 2026 — B2C Plan Status Standardization + Tier Cascade + Plan Seeding (KSS-SA-040)
 
 **Ticket:** KSS-SA-040 | **PRD:** `prds/super-admin/PRD-SA-PLANS-PRICING.md` (addendum §11)

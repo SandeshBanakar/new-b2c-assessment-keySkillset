@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, FileText, Trophy } from 'lucide-react';
+import { Clock, FileText, Trophy, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,12 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
-import { getAssessments } from '@/utils/assessmentUtils';
-import type { Assessment, MockAttempt } from '@/types';
+import { TIER_ORDER } from '@/types/assessment';
+import type { Assessment, MockAttempt, Tier, Exam, ActivePlanInfo } from '@/types';
 
 interface AttemptsTabProps {
-  attempts: MockAttempt[];   // mock fallback — used when DB has no rows
+  attempts: MockAttempt[];
   assessmentId: string;
+  assessment: Assessment;
   onSwitchToAnalytics?: (attemptId?: string) => void;
 }
 
@@ -70,22 +71,50 @@ function durationLabel(seconds: number | null): string {
   return `${mins} min`;
 }
 
-export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSwitchToAnalytics }: AttemptsTabProps) {
+function computeHasPaidAccess(
+  userTier: Tier,
+  activePlanInfo: ActivePlanInfo | null | undefined,
+  assessmentMinTier: Tier,
+  assessmentExam: Exam,
+): boolean {
+  if (TIER_ORDER[userTier] >= TIER_ORDER[assessmentMinTier]) return true;
+  if (
+    activePlanInfo?.scope === 'CATEGORY_BUNDLE' &&
+    activePlanInfo.category === assessmentExam
+  ) {
+    const catTierMap: Record<string, Tier> = {
+      BASIC: 'basic',
+      PRO: 'professional',
+      PREMIUM: 'premium',
+    };
+    const effectiveTier = (catTierMap[activePlanInfo.tier ?? ''] ?? 'free') as Tier;
+    return TIER_ORDER[effectiveTier] >= TIER_ORDER[assessmentMinTier];
+  }
+  return false;
+}
+
+export default function AttemptsTab({
+  attempts: mockFallback,
+  assessmentId,
+  assessment,
+  onSwitchToAnalytics,
+}: AttemptsTabProps) {
   const router = useRouter();
-  const { user, isSubscribed } = useAppContext();
+  const { user } = useAppContext();
   const [dbAttempts, setDbAttempts] = useState<DbAttempt[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!user?.id);
   const [abandonTarget, setAbandonTarget] = useState<DbAttempt | null>(null);
   const [abandoning, setAbandoning] = useState(false);
-  const [assessmentMeta, setAssessmentMeta] = useState<Assessment | undefined>(undefined);
-  const subscribed = isSubscribed(assessmentId);
+
+  const hasPaidAccess = computeHasPaidAccess(
+    user?.subscriptionTier ?? 'free',
+    user?.activePlanInfo,
+    assessment.tier,
+    assessment.exam,
+  );
 
   useEffect(() => {
-    getAssessments().then((all) => setAssessmentMeta(all.find((a) => a.id === assessmentId)));
-  }, [assessmentId]);
-
-  useEffect(() => {
-    if (!user?.id) { setLoading(false); return; }
+    if (!user?.id) return;
 
     supabase
       .from('attempts')
@@ -125,15 +154,27 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
     );
   }
 
-  // ── DB-first: if DB has rows, render those. Otherwise fall back to mock. ──
   const useDb = dbAttempts !== null && dbAttempts.length > 0;
 
+  // ── DB path: real attempt rows exist ─────────────────────────────────────────
   if (useDb) {
-    const completedDb = dbAttempts!.filter((a) => a.status.toLowerCase() === 'completed');
+    const dbFreeRow =
+      dbAttempts.find((a) => a.is_free_attempt === true || a.attempt_number === 0) ?? null;
+
+    const dbPaidMap: Record<number, DbAttempt> = {};
+    dbAttempts.forEach((a) => {
+      if (!(a.is_free_attempt === true || a.attempt_number === 0)) {
+        dbPaidMap[a.attempt_number] = a;
+      }
+    });
+
+    const allCompleted = dbAttempts.filter((a) => a.status.toLowerCase() === 'completed');
     const bestScore =
-      completedDb.length > 0
-        ? Math.max(...completedDb.map((a) => a.score ?? 0))
+      allCompleted.length > 0
+        ? Math.max(...allCompleted.map((a) => a.score ?? 0))
         : null;
+
+    const freeStatus = dbFreeRow?.status?.toLowerCase() ?? 'not_started';
 
     return (
       <div>
@@ -148,37 +189,148 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
         </div>
 
         <div className="bg-white shadow-sm rounded-md divide-y divide-zinc-100">
-          {dbAttempts!.map((attempt) => {
-            const statusLower = attempt.status.toLowerCase();
-            const label = attempt.is_free_attempt
-              ? 'Free Attempt'
-              : `Attempt ${attempt.attempt_number}`;
+          {/* Free attempt row */}
+          <div className="flex flex-wrap items-center gap-4 py-4 px-6">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
+                Free Attempt
+              </span>
+              {dbFreeRow && freeStatus !== 'not_started' && (
+                <StatusBadge status={dbFreeRow.status} />
+              )}
+            </div>
+            <div className="hidden md:flex items-center gap-4 text-xs text-zinc-500">
+              <span className="flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5" />
+                {dbFreeRow?.total_questions ?? assessment.questionCount} Questions
+              </span>
+              <span className="flex items-center gap-1">
+                <Trophy className="w-3.5 h-3.5" />
+                Score: {freeStatus === 'completed' && dbFreeRow?.score != null ? dbFreeRow.score : '—'}
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                {durationLabel(dbFreeRow?.time_spent_seconds ?? null)}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {freeStatus === 'completed' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    onSwitchToAnalytics
+                      ? onSwitchToAnalytics(dbFreeRow?.id)
+                      : router.push(`/assessments/${assessmentId}?tab=analytics`)
+                  }
+                  className="rounded-md border-zinc-200 text-zinc-700 text-sm"
+                >
+                  View Analysis
+                </Button>
+              )}
+              {freeStatus === 'in_progress' && (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
+                    className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
+                  >
+                    Resume Test
+                  </Button>
+                  {dbFreeRow && (
+                    <button
+                      onClick={() => setAbandonTarget(dbFreeRow)}
+                      className="text-xs text-rose-600 hover:text-rose-700 underline"
+                    >
+                      Abandon
+                    </button>
+                  )}
+                </>
+              )}
+              {!dbFreeRow && (
+                <Button
+                  size="sm"
+                  onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
+                  className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
+                >
+                  Start Free Attempt
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Paid attempt rows 1–5 */}
+          {Array.from({ length: 5 }, (_, i) => {
+            const num = i + 1;
+            const dbRow = dbPaidMap[num] ?? null;
+            const prevStatus =
+              i === 0
+                ? freeStatus
+                : (dbPaidMap[i]?.status?.toLowerCase() ?? 'not_started');
+
+            const isLocked = !hasPaidAccess;
+            const isSequentiallyLocked =
+              hasPaidAccess && !dbRow &&
+              prevStatus !== 'completed' && prevStatus !== 'abandoned';
+            const rowStatus = dbRow?.status?.toLowerCase() ?? 'not_started';
             const scoreDisplay =
-              statusLower === 'completed' && attempt.score !== null
-                ? String(attempt.score)
-                : '—';
+              rowStatus === 'completed' && dbRow?.score != null ? String(dbRow.score) : '—';
+
+            if (isLocked) {
+              return (
+                <div key={num} className="flex flex-wrap items-center gap-4 py-4 px-6 opacity-60">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
+                      Attempt {num}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
+                      <Lock className="w-3 h-3" />
+                      Locked
+                    </span>
+                  </div>
+                  <div className="shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => router.push('/plans')}
+                      className="rounded-md border-zinc-300 text-zinc-600 text-sm"
+                    >
+                      Upgrade to Unlock
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+
+            if (isSequentiallyLocked) {
+              return (
+                <div key={num} className="flex flex-wrap items-center gap-4 py-4 px-6 opacity-60">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
+                      Attempt {num}
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      Complete {num === 1 ? 'Free Attempt' : `Attempt ${num - 1}`} to unlock
+                    </span>
+                  </div>
+                </div>
+              );
+            }
 
             return (
-              <div key={attempt.id} className="flex flex-wrap items-center gap-4 py-4 px-6">
-                {/* Left */}
+              <div key={num} className="flex flex-wrap items-center gap-4 py-4 px-6">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
-                    {label}
+                    Attempt {num}
                   </span>
-                  {statusLower !== 'not_started' && (
-                    <StatusBadge status={attempt.status} />
+                  {dbRow && rowStatus !== 'not_started' && (
+                    <StatusBadge status={dbRow.status} />
                   )}
                 </div>
-
-                {/* Middle */}
                 <div className="hidden md:flex items-center gap-4 text-xs text-zinc-500">
                   <span className="flex items-center gap-1">
                     <FileText className="w-3.5 h-3.5" />
-                    {attempt.total_questions
-                      ? `${attempt.total_questions} Questions`
-                      : assessmentMeta
-                        ? `${assessmentMeta.questionCount} Questions`
-                        : '— Questions'}
+                    {dbRow?.total_questions ?? assessment.questionCount} Questions
                   </span>
                   <span className="flex items-center gap-1">
                     <Trophy className="w-3.5 h-3.5" />
@@ -186,46 +338,49 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
                   </span>
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
-                    {durationLabel(attempt.time_spent_seconds)}
+                    {durationLabel(dbRow?.time_spent_seconds ?? null)}
                   </span>
                 </div>
-
-                {/* Actions */}
                 <div className="flex items-center gap-3 shrink-0">
-                  {statusLower === 'completed' && (
+                  {rowStatus === 'completed' && dbRow && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() =>
                         onSwitchToAnalytics
-                          ? onSwitchToAnalytics(attempt.id)
-                          : router.push(
-                              `/assessments/${assessmentId}?tab=analytics&attemptId=${attempt.id}`,
-                            )
+                          ? onSwitchToAnalytics(dbRow.id)
+                          : router.push(`/assessments/${assessmentId}?tab=analytics&attemptId=${dbRow.id}`)
                       }
                       className="rounded-md border-zinc-200 text-zinc-700 text-sm"
                     >
                       View Analysis
                     </Button>
                   )}
-                  {statusLower === 'in_progress' && (
+                  {rowStatus === 'in_progress' && dbRow && (
                     <>
                       <Button
                         size="sm"
-                        onClick={() =>
-                          router.push(`/assessments/${assessmentId}/instructions`)
-                        }
+                        onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
                         className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
                       >
                         Resume Test
                       </Button>
                       <button
-                        onClick={() => setAbandonTarget(attempt)}
+                        onClick={() => setAbandonTarget(dbRow)}
                         className="text-xs text-rose-600 hover:text-rose-700 underline"
                       >
                         Abandon
                       </button>
                     </>
+                  )}
+                  {rowStatus === 'not_started' && !dbRow && (
+                    <Button
+                      size="sm"
+                      onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
+                      className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
+                    >
+                      Start Now
+                    </Button>
                   )}
                 </div>
               </div>
@@ -233,15 +388,8 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
           })}
         </div>
 
-        {/* Ghost locked rows removed: DB data is source of truth.
-            When useDb=true the user's real attempts are shown above.
-            Locking future attempts is handled at the assessment-card level. */}
-
         {/* Abandon confirmation */}
-        <Dialog
-          open={!!abandonTarget}
-          onOpenChange={(open) => !open && setAbandonTarget(null)}
-        >
+        <Dialog open={!!abandonTarget} onOpenChange={(open) => !open && setAbandonTarget(null)}>
           <DialogContent className="max-w-sm rounded-lg">
             <DialogHeader>
               <DialogTitle className="text-base font-semibold text-zinc-900">
@@ -253,8 +401,7 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
               </DialogTitle>
             </DialogHeader>
             <p className="text-sm text-zinc-600 leading-relaxed">
-              This will forfeit this attempt. Your score will be recorded as 0. This
-              cannot be undone.
+              This will forfeit this attempt. Your score will be recorded as 0. This cannot be undone.
             </p>
             <div className="flex gap-3 mt-2">
               <Button
@@ -278,7 +425,7 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
     );
   }
 
-  // ── Mock fallback — no DB rows for this assessment ────────────────────────
+  // ── Mock fallback: no DB rows for this assessment ─────────────────────────────
   const freeAttempt: MockAttempt =
     mockFallback.find((a) => a.attemptNumber === 0) ?? {
       id: `free-${assessmentId}`,
@@ -293,21 +440,22 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
       completedAt: null,
     };
 
-  const paidAttempts = mockFallback.filter((a) => a.attemptNumber > 0);
-  const completedMock = [freeAttempt, ...paidAttempts].filter(
-    (a) => a.status === 'completed',
-  );
+  const paidMockMap: Record<number, MockAttempt> = {};
+  mockFallback.filter((a) => a.attemptNumber > 0).forEach((a) => {
+    paidMockMap[a.attemptNumber] = a;
+  });
+
+  const allMockAttempts = [freeAttempt, ...Object.values(paidMockMap)];
+  const completedMock = allMockAttempts.filter((a) => a.status === 'completed');
   const bestScoreMock =
     completedMock.length > 0
       ? Math.max(...completedMock.map((a) => a.score ?? 0))
       : null;
 
   const freeScoreDisplay =
-    freeAttempt.status === 'not_started' ||
-    freeAttempt.status === 'in_progress' ||
-    freeAttempt.score === null
-      ? '—'
-      : String(freeAttempt.score);
+    freeAttempt.status === 'completed' && freeAttempt.score != null
+      ? String(freeAttempt.score)
+      : '—';
 
   return (
     <div>
@@ -335,7 +483,7 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
           <div className="hidden md:flex items-center gap-4 text-xs text-zinc-500">
             <span className="flex items-center gap-1">
               <FileText className="w-3.5 h-3.5" />
-              {assessmentMeta ? `${assessmentMeta.questionCount} Questions` : '—'}
+              {assessment.questionCount} Questions
             </span>
             <span className="flex items-center gap-1">
               <Trophy className="w-3.5 h-3.5" />
@@ -361,7 +509,6 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
                 View Analysis
               </Button>
             )}
-
             {freeAttempt.status === 'in_progress' && (
               <Button
                 size="sm"
@@ -374,9 +521,7 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
             {freeAttempt.status === 'not_started' && (
               <Button
                 size="sm"
-                onClick={() =>
-                  router.push(`/assessments/${assessmentId}/instructions`)
-                }
+                onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
                 className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
               >
                 Start Free Attempt
@@ -385,90 +530,130 @@ export default function AttemptsTab({ attempts: mockFallback, assessmentId, onSw
           </div>
         </div>
 
-        {/* Paid attempts */}
-        {subscribed &&
-          paidAttempts.map((attempt, idx) => {
-            const prev = idx === 0 ? freeAttempt : paidAttempts[idx - 1];
-            const isLocked =
-              attempt.status === 'not_started' &&
-              prev.status !== 'completed' &&
-              prev.status !== 'abandoned';
-            const scoreDisplay =
-              attempt.status === 'not_started' ||
-              attempt.status === 'in_progress' ||
-              attempt.score === null
-                ? '—'
-                : String(attempt.score);
+        {/* Paid attempts 1–5 — always rendered */}
+        {Array.from({ length: 5 }, (_, i) => {
+          const num = i + 1;
+          const existing = paidMockMap[num] ?? null;
+          const prevAttempt =
+            i === 0 ? freeAttempt : (paidMockMap[i] ?? null);
+          const prevStatus = prevAttempt?.status ?? 'not_started';
 
+          const isLocked = !hasPaidAccess;
+          const isSequentiallyLocked =
+            hasPaidAccess &&
+            !existing &&
+            prevStatus !== 'completed' &&
+            prevStatus !== 'abandoned';
+
+          const rowStatus = existing?.status ?? 'not_started';
+          const scoreDisplay =
+            rowStatus === 'completed' && (existing?.score ?? null) != null
+              ? String(existing!.score)
+              : '—';
+
+          if (isLocked) {
             return (
-              <div key={attempt.id} className="flex flex-wrap items-center gap-4 py-4 px-6">
+              <div key={num} className="flex flex-wrap items-center gap-4 py-4 px-6 opacity-60">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
-                    Attempt {attempt.attemptNumber}
+                    Attempt {num}
                   </span>
-                  {!isLocked && attempt.status !== 'not_started' && (
-                    <StatusBadge status={attempt.status} />
-                  )}
-                  {isLocked && (
-                    <span className="text-xs text-zinc-400">
-                      Complete Attempt {attempt.attemptNumber - 1} to unlock
-                    </span>
-                  )}
+                  <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
+                    <Lock className="w-3 h-3" />
+                    Locked
+                  </span>
                 </div>
-                {!isLocked && (
-                  <div className="hidden md:flex items-center gap-4 text-xs text-zinc-500">
-                    <span className="flex items-center gap-1">
-                      <FileText className="w-3.5 h-3.5" />
-                      {assessmentMeta ? `${assessmentMeta.questionCount} Questions` : '—'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Trophy className="w-3.5 h-3.5" />
-                      Score: {scoreDisplay}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      {attempt.durationMinutes ? `${attempt.durationMinutes} min` : '—'}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center gap-3 shrink-0">
-                  {attempt.status === 'completed' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        onSwitchToAnalytics
-                          ? onSwitchToAnalytics()
-                          : router.push(`/assessments/${assessmentId}?tab=analytics`)
-                      }
-                      className="rounded-md border-zinc-200 text-zinc-700 text-sm"
-                    >
-                      View Analysis
-                    </Button>
-                  )}
-                  {attempt.status === 'in_progress' && (
-                    <Button
-                      size="sm"
-                      className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
-                    >
-                      Resume Test
-                    </Button>
-                  )}
-                  {attempt.status === 'not_started' && !isLocked && (
-                    <Button
-                      size="sm"
-                      className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
-                    >
-                      Start Now
-                    </Button>
-                  )}
+                <div className="shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push('/plans')}
+                    className="rounded-md border-zinc-300 text-zinc-600 text-sm"
+                  >
+                    Upgrade to Unlock
+                  </Button>
                 </div>
               </div>
             );
-          })}
-      </div>
+          }
 
-      {/* Ghost locked rows removed: access gating is handled at assessment-card level. */}
+          if (isSequentiallyLocked) {
+            return (
+              <div key={num} className="flex flex-wrap items-center gap-4 py-4 px-6 opacity-60">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
+                    Attempt {num}
+                  </span>
+                  <span className="text-xs text-zinc-400">
+                    Complete {num === 1 ? 'Free Attempt' : `Attempt ${num - 1}`} to unlock
+                  </span>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={num} className="flex flex-wrap items-center gap-4 py-4 px-6">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-sm font-medium text-zinc-900 whitespace-nowrap">
+                  Attempt {num}
+                </span>
+                {existing && rowStatus !== 'not_started' && (
+                  <StatusBadge status={existing.status} />
+                )}
+              </div>
+              <div className="hidden md:flex items-center gap-4 text-xs text-zinc-500">
+                <span className="flex items-center gap-1">
+                  <FileText className="w-3.5 h-3.5" />
+                  {assessment.questionCount} Questions
+                </span>
+                <span className="flex items-center gap-1">
+                  <Trophy className="w-3.5 h-3.5" />
+                  Score: {scoreDisplay}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {existing?.durationMinutes ? `${existing.durationMinutes} min` : '—'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {rowStatus === 'completed' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      onSwitchToAnalytics
+                        ? onSwitchToAnalytics()
+                        : router.push(`/assessments/${assessmentId}?tab=analytics`)
+                    }
+                    className="rounded-md border-zinc-200 text-zinc-700 text-sm"
+                  >
+                    View Analysis
+                  </Button>
+                )}
+                {rowStatus === 'in_progress' && (
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
+                    className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
+                  >
+                    Resume Test
+                  </Button>
+                )}
+                {rowStatus === 'not_started' && !isSequentiallyLocked && (
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/assessments/${assessmentId}/instructions`)}
+                    className="rounded-md bg-blue-700 hover:bg-blue-800 text-white text-sm"
+                  >
+                    Start Now
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

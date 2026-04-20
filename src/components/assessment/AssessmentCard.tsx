@@ -2,10 +2,20 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Check } from 'lucide-react';
 import { tierAllows } from '@/types/assessment';
 import type { SupabaseAssessment } from '@/types/assessment';
 import type { MockAttemptData } from '@/data/mockAttempts';
 import type { Tier, ActivePlanInfo } from '@/types';
+
+// Maps category plan tier labels → platform Tier values for access checks
+const CATEGORY_TIER_MAP: Record<string, Tier> = {
+  BASIC: 'basic',
+  PRO: 'professional',
+  PREMIUM: 'premium',
+};
+import { useAppContext } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase/client';
 
 // -------------------------------------------------------
 // Badge tokens
@@ -59,7 +69,6 @@ export function deriveCardState({
   attemptData: MockAttemptData;
   activePlanInfo?: ActivePlanInfo | null;
 }): CardState {
-  const tierAllowsAccess = tierAllows(userTier, assessment.min_tier);
   const attemptsUsed = attemptData.attemptsUsed;
   const freeAttemptUsed = attemptData.isFreeAttempt && attemptsUsed > 0;
   const status = attemptData.status;
@@ -67,7 +76,7 @@ export function deriveCardState({
   // State 7: all 6 attempts consumed
   if (attemptsUsed >= 6) return 7;
 
-  // State 3: user holds a category plan but this assessment is outside their category
+  // State 3: category plan but this assessment is outside the plan's exam category
   if (
     activePlanInfo?.scope === 'CATEGORY_BUNDLE' &&
     normalizeExam(assessment.exam_type) !== activePlanInfo.category
@@ -75,8 +84,15 @@ export function deriveCardState({
     return 3;
   }
 
+  // Effective tier: platform subscription tier OR category plan tier for matching exam
+  let effectiveTierAllows = tierAllows(userTier, assessment.min_tier);
+  if (!effectiveTierAllows && activePlanInfo?.scope === 'CATEGORY_BUNDLE') {
+    const catTier = CATEGORY_TIER_MAP[activePlanInfo.tier ?? ''] ?? 'free';
+    effectiveTierAllows = tierAllows(catTier, assessment.min_tier);
+  }
+
   // Tier allows → subscribed states 4–6
-  if (tierAllowsAccess) {
+  if (effectiveTierAllows) {
     if (attemptsUsed === 0) return 4;
     if (status === 'inprogress') return 5;
     return 6; // completed, attempts remain
@@ -102,6 +118,8 @@ export interface AssessmentCardProps {
 // Component
 // -------------------------------------------------------
 
+const SAT_TARGET_OPTIONS = [1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600];
+
 export default function AssessmentCard({
   assessment,
   attemptData,
@@ -109,7 +127,22 @@ export default function AssessmentCard({
   activePlanInfo,
 }: AssessmentCardProps) {
   const router = useRouter();
-  const [imgError, setImgError] = useState(false);
+  const { user, updateUser } = useAppContext();
+  const [imgError, setImgError]       = useState(false);
+  const [targetPick, setTargetPick]   = useState(1500);
+  const [savingTarget, setSavingTarget] = useState(false);
+
+  const isSatFullTest = assessment.exam_type === 'SAT' && assessment.assessment_type === 'full-test';
+  const showTargetTouch1 = isSatFullTest && (user?.targetSatScore ?? null) === null;
+
+  async function handleSaveTouch1(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!user?.id) return;
+    setSavingTarget(true);
+    await supabase.from('users').update({ target_sat_score: targetPick }).eq('id', user.id);
+    updateUser({ targetSatScore: targetPick });
+    setSavingTarget(false);
+  }
 
   const cardState = deriveCardState({ userTier, assessment, attemptData, activePlanInfo });
   const detailHref = `/assessments/${assessment.slug ?? assessment.id}?from=assessments`;
@@ -271,12 +304,41 @@ export default function AssessmentCard({
 
         {/* STATE 4: Tier allows, 0 attempts */}
         {cardState === 4 && (
-          <button
-            onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
-            className="bg-blue-600 hover:bg-blue-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
-          >
-            Start Your Test
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); router.push(detailHref); }}
+              className="bg-blue-600 hover:bg-blue-700 text-white w-full rounded-lg py-2.5 text-sm font-semibold transition-colors"
+            >
+              Start Your Test
+            </button>
+            {showTargetTouch1 && (
+              <div
+                className="border border-dashed border-zinc-200 rounded-lg px-3 py-2.5 bg-zinc-50"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="text-xs text-zinc-500 mb-1.5">Set a score target</p>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="flex-1 text-xs border border-zinc-200 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                    value={targetPick}
+                    onChange={(e) => setTargetPick(Number(e.target.value))}
+                  >
+                    {SAT_TARGET_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  <button
+                    disabled={savingTarget}
+                    onClick={handleSaveTouch1}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-700 text-white text-xs font-medium rounded hover:bg-blue-800 transition-colors disabled:opacity-60 shrink-0"
+                  >
+                    <Check className="w-3 h-3" />
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* STATE 5: Tier allows, in progress */}

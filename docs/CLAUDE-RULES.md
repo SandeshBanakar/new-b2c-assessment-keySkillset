@@ -108,15 +108,20 @@ Never remove or loosen this gate without an explicit "Override mutual exclusivit
 - Component: `src/components/assessment-detail/AnalyticsTab.tsx` — `userTier` prop drives all gating.
 
 ### Solutions Panel — All Tiers
-- Solutions panel (Block 7) is visible to **all tiers** with completed attempts.
-- Collapsed row always shows: status icon + answer summary.
-  - Correct:  `✓ Correct · Your answer: A`
-  - Wrong:    `✗ Wrong · Your answer: B · Correct: A`
-  - Skipped:  `— Skipped · Correct: A`
-  - NUMERIC:  uses `acceptable_answers[0]` as the correct value display.
-  - No data:  `No answer data` (neutral grey, no badge)
-- Expanded accordion shows: full question, options (colour-coded), **Marks Earned / Marks Lost two-column**, explanation.
-- `marks_awarded` from `attempt_answers` is signed: positive = earned, negative = lost.
+- Solutions panel (Block 11 in SAT Analytics) is visible to **all tiers** with completed attempts.
+- **Accordion/table-row design** (reference images: `reference_images/b2c_user_prod/`).
+- **Module tabs** at top (R&W Module 1, R&W Module 2, Math Module 1, Math Module 2 for Full Test).
+- **Collapsed row** (desktop grid, mobile stacked): `Q{n} | Status badge | Time | Your Ans | Correct | [View Q & Explanation ▸]`
+  - Status badges: `✓ Correct` (emerald), `✗ Incorrect` (rose), `— Skipped` (zinc), `· No data` (zinc-400)
+  - Time: `{seconds}s` from `attempt_answers.time_spent_seconds`; `—` if no data
+  - Your Ans: the letter/value the user selected; `—` for skipped or no data
+  - Correct: the first value of `questions.correct_answer[]`
+  - View button toggles expanded state per question; label flips to "Hide" when open
+- **Expanded detail** (inside accordion, bg-zinc-50): passage → question text → options (colour-coded) → Marks Earned / Marks Lost two-column → explanation.
+  - Options: no inline `(Correct)` or `(Your answer)` text — colour only (emerald = correct, rose = user wrong)
+  - Marks panel: `marks_awarded` from `attempt_answers` (1 = correct, 0 = wrong/skipped, no negative marking in SAT).
+- Pagination: PAGE_SIZE = 25 per module tab.
+- `(Correct)` inline label in option rows is NEVER rendered — color-coding only.
 
 ### Attempt Count Per Tier (Product Rules)
 | Tier | Full Tests | Subject Tests | Chapter Tests |

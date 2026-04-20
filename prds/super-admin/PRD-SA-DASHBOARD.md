@@ -2,7 +2,7 @@
 
 **Status:** LOCKED  
 **Author:** Sandesh Banakar I  
-**Stakeholders:** Engineering (Radhika, Yashwanthkrishna), Product, QA, Design  
+**Stakeholders:** Engineering, QA, Design  
 **Target Version:** V1 (Current)
 
 ---

@@ -1,5 +1,38 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 19 2026 — KSS-SAT-A02 PRD locked. Active tasks only. Completed work → CLAUDE-HISTORY.md.
+# Last updated: Apr 20 2026 — KSS-B2C-001 complete. Active tasks only. Completed work → CLAUDE-HISTORY.md.
+
+---
+
+## [IN-PROGRESS] KSS-CC-SA-QB-001 — Question Bank (SA + CC)
+
+| # | Task | Status |
+|---|------|--------|
+| QB-DB-001 | KSS-DB-020 migration — numeric_answer_type/min/max on questions, marks/negative_marks on passage_sub_questions | [x] DONE — confirmed Apr 20 2026 |
+| QB-DB-002 | KSS-DB-021 — Add `concept_tag_id UUID REFERENCES concept_tags(id) ON DELETE RESTRICT` (nullable) to `questions`. Backfill by name-match (`concept_tag` text → `concept_tags.concept_name`). Drop legacy `concept_tag` text column. Replace `question_concept_mappings` count query in platform-config with `COUNT(*) FROM questions WHERE concept_tag_id=x`. Retire `question_concept_mappings` table. SQL → SQL-RESPONSE-2.txt | [ ] PENDING — all decisions locked, ready to build |
+| QB-001 | Write `prds/content_creation/PRD-SA-QUESTIONS.md` — after all QB decisions finalised | [ ] PENDING — all decisions locked, ready to write |
+| QB-002 | Update CLAUDE-DB.md to reflect KSS-DB-020 + KSS-DB-021 new columns | [ ] PENDING — after both migrations confirmed |
+| QB-003 | Create Assessment question-picker UI — SA picks sources/chapters, system randomly assigns questions at runtime | [ ] PENDING — separate ticket |
+| QB-004 | `categories` column on `questions` table — legacy/redundant. Leave as DEFAULT '[]', never write to it. Drop in future cleanup | [ ] DEFERRED |
+| QB-005 | TIPTAP-001/002 — Exam player rendering of Tiptap JSONB question_text and options[].text | [ ] PENDING — pre-existing ticket |
+| QB-006 | **QuestionForm — options 4–6, drag-to-reorder** | [x] DONE — Apr 20 2026 |
+| QB-007 | **PASSAGE_SINGLE stem label fix** | [x] DONE — Apr 20 2026 |
+| QB-008 | **PASSAGE_SINGLE marks validation bug** | [x] DONE — Apr 20 2026 |
+| QB-009 | **filteredSources race condition** | [x] DONE — Apr 20 2026 |
+| QB-010 | **Platform Config concept tag delete fix** — catch FK RESTRICT violation, show "Cannot delete — X questions reference this tag" | [ ] PENDING — separate ticket, must ship before QB-DB-002 goes live |
+
+**All decisions locked (Apr 20 2026):**
+- Concept tag: ONE tag per question. `questions.concept_tag_id` UUID FK, ON DELETE RESTRICT, nullable. Backfill by name-match. Drop `concept_tag` text column post-migration. `question_concept_mappings` retired (only reader = platform-config count, replaceable with direct COUNT).
+- MCQ options: min 4, max 6 (A–F). Drag reorder via @dnd-kit/sortable. Alphabetical key reflow on drop + correct_answer auto-updates to new key assignments.
+- Option removal: disabled at min=4. Also disabled if option is the current correct answer — SA changes answer first.
+- Sub-questions: same 4–6 option rules.
+- PASSAGE_SINGLE marks: same validation rules as PASSAGE_MULTI sub-questions.
+- PASSAGE_SINGLE stem: label updated, shown in exam player only, not in admin preview.
+
+**Built this session (Apr 19–20 2026):**
+- `src/components/ui/RichTextRenderer.tsx` — read-only Tiptap+KaTeX renderer
+- `src/app/super-admin/question-bank/page.tsx` — Serial #, Question, Type, Difficulty, Created by, Last edited by, Actions eye-only; removed status filter + pencil
+- `src/app/super-admin/question-bank/_components/QuestionPreviewModal.tsx` — MCQ/NUMERIC/PASSAGE split-pane preview, Delete warning, Edit routing
+- `src/app/super-admin/question-bank/_components/QuestionForm.tsx` — exam category filter, NUMERIC Exact/Range, sub-question marks (PASSAGE_MULTI), parent marks auto-sum, video_url, Edit/Preview tabs, save warning modal, marks validation; bug-fix: question_text always saved (not cleared for PASSAGE types)
 
 ---
 
@@ -7,59 +40,55 @@
 
 **PRD:** `prds/super-admin/PRD-SAT-ANALYTICS-V2.md`
 
-### Phase 1 — DB Migrations (run in Supabase before any code)
-| # | Migration | SQL | Status |
-|---|---|---|---|
-| KSS-DB-041 | Create `sat_tier_bands` + seed 5 rows | PRD §5 | [ ] PENDING |
-| KSS-DB-042 | Create `sat_colleges` + seed 19 colleges | PRD §5 | [ ] PENDING |
-| KSS-DB-043 | `ALTER TABLE users ADD target_sat_score + target_sat_subject_score` | PRD §5 | [ ] PENDING |
-| KSS-DB-044 | Create `platform_analytics_config` + seed SAT defaults | PRD §5 | [ ] PENDING |
+### Phase 1 — DB Migrations ✅ COMPLETE
+| # | Migration | Status |
+|---|---|---|
+| KSS-DB-041 | `sat_tier_bands` + 5 rows seeded | [x] DONE — SQL-RESPONSE-1.txt |
+| KSS-DB-042 | `sat_colleges` + 19 colleges seeded | [x] DONE — SQL-RESPONSE-1.txt |
+| KSS-DB-043 | `users.target_sat_score` + `target_sat_subject_score` columns | [x] DONE — SQL-RESPONSE-1.txt |
+| KSS-DB-044 | `platform_analytics_config` + SAT defaults seeded | [x] DONE — SQL-RESPONSE-1.txt |
 
-### Phase 2 — Platform Config Page Restructure
-| # | Task | File | Status |
-|---|---|---|---|
-| PC-001 | Refactor page to exam-category tabs (from `exam_categories` DB) | `src/app/super-admin/platform-config/page.tsx` | [ ] PENDING |
-| PC-002 | Add [Concept Tags] sub-tab per category (existing CRUD, filtered) | same | [ ] PENDING |
-| PC-003 | Add [Analytics Display] sub-tab per category | same | [ ] PENDING |
-| PC-004 | Build Analytics Display — SAT: Section Visibility toggles → `platform_analytics_config` | new component | [ ] PENDING |
-| PC-005 | Build Analytics Display — SAT: Tier Bands inline-edit table → `sat_tier_bands` | new component | [ ] PENDING |
-| PC-006 | Build Analytics Display — SAT: College Targets table + Add/Edit slideover + Delete | new component | [ ] PENDING |
-| PC-007 | Analytics Display — NEET/JEE/CLAT: "Coming Soon" placeholder | same | [ ] PENDING |
+### Phase 2 — Platform Config Page Restructure ✅ COMPLETE
+All tasks PC-001 through PC-007 done (previous session).
 
-### Phase 3 — New Shared Components
-| # | Task | File | Status |
-|---|---|---|---|
-| SC-001 | `ScoreTrajectoryChart` — SVG line chart, props: attempts, scoreMax, target? | `src/components/ui/ScoreTrajectoryChart.tsx` | [ ] PENDING |
-| SC-002 | `DifficultyBreakdownCard` — Easy/Medium/Hard bars from diffMap | `src/components/ui/DifficultyBreakdownCard.tsx` | [ ] PENDING |
-| SC-003 | `PreviewSectionWrapper` — Preview badge + explanatory copy wrapper | `src/components/ui/PreviewSectionWrapper.tsx` | [ ] PENDING |
+### Phase 3 — New Shared Components ✅ COMPLETE
+| # | File | Status |
+|---|---|---|
+| SC-001 | `src/components/ui/ScoreTrajectoryChart.tsx` | [x] DONE |
+| SC-002 | `src/components/ui/DifficultyBreakdownCard.tsx` | [x] DONE |
+| SC-003 | `src/components/ui/PreviewSectionWrapper.tsx` | [x] DONE |
 
-### Phase 4 — SAT Analytics Components
-| # | Task | File | Status |
-|---|---|---|---|
-| SA-001 | `SATHeroScore` — score + target progress bar + SVG chart + edit/remove target | `src/components/assessment-detail/SATHeroScore.tsx` | [ ] PENDING |
-| SA-002 | `SATCollegeLadder` — tier rail + college cards, full test only | `src/components/assessment-detail/SATCollegeLadder.tsx` | [ ] PENDING |
-| SA-003 | `SATLeveragePanel` — top-3 concepts + impact calc + dark card | `src/components/assessment-detail/SATLeveragePanel.tsx` | [ ] PENDING |
-| SA-004 | `SATPacingChart` — module pacing bars + target line, demo data | `src/components/assessment-detail/SATPacingChart.tsx` | [ ] PENDING |
-| SA-005 | `SATMistakeTaxonomy` — donut + 4 categories, demo data | `src/components/assessment-detail/SATMistakeTaxonomy.tsx` | [ ] PENDING |
+### Phase 4 — SAT Analytics Components ✅ COMPLETE
+| # | File | Status |
+|---|---|---|
+| SA-001 | `src/components/assessment-detail/SATHeroScore.tsx` | [x] DONE |
+| SA-002 | `src/components/assessment-detail/SATCollegeLadder.tsx` | [x] DONE |
+| SA-003 | `src/components/assessment-detail/SATLeveragePanel.tsx` | [x] DONE |
+| SA-004 | `src/components/assessment-detail/SATPacingChart.tsx` | [x] DONE — demo data |
+| SA-005 | `src/components/assessment-detail/SATMistakeTaxonomy.tsx` | [x] DONE — demo data |
 
-### Phase 5 — SATAnalyticsTab Wiring
-| # | Task | Notes | Status |
-|---|---|---|---|
-| AT-001 | Replace score-grid Block 1 with `SATHeroScore` | Reads target from user context | [ ] PENDING |
-| AT-002 | Add `SATCollegeLadder` after AttemptPillFilter, full test only | Reads `sat_colleges` + `sat_tier_bands` | [ ] PENDING |
-| AT-003 | Enhance Section Breakdown with time display | `time_spent_seconds` already in DB | [ ] PENDING |
-| AT-004 | Add `DifficultyBreakdownCard` — new data load step (JOIN attempt_answers → questions) | See PRD §6.4 | [ ] PENDING |
-| AT-005 | Replace "Where You Lost Points" with `SATLeveragePanel` | Impact formula in PRD §6.5 | [ ] PENDING |
-| AT-006 | Add `SATPacingChart` after ConceptMasteryPanel — conditionally shown via platform config | Preview badge | [ ] PENDING |
-| AT-007 | Add `SATMistakeTaxonomy` after Pacing — conditionally shown via platform config | Preview badge | [ ] PENDING |
-| AT-008 | Load `platform_analytics_config` for SAT on mount — gate Preview sections | See PRD §4.2 | [ ] PENDING |
-| AT-009 | Load `users.target_sat_score` / `target_sat_subject_score` on mount | From AppContext or direct query | [ ] PENDING |
+### Phase 5 — SATAnalyticsTab Wiring ✅ COMPLETE
+All AT-001 through AT-009 wired. `difficulty` added to questions select. Platform config + tier bands + colleges loaded in parallel. Target score from AppContext. build passes.
 
-### Phase 6 — Assessment Card Target Score Prompt (Touch 1)
-| # | Task | File | Status |
-|---|---|---|---|
-| TC-001 | Add soft target-score prompt below SAT Full Test card CTA when target is null | `AssessmentCard.tsx` | [ ] PENDING |
-| TC-002 | Save on dropdown select → `UPDATE users SET target_sat_score` | Supabase call | [ ] PENDING |
+### Phase 6 — Assessment Card Target Score Prompt ✅ COMPLETE
+| # | Task | Status |
+|---|---|---|
+| TC-001 | Touch 1 prompt below SAT full-test card CTA (State 4, target null) | [x] DONE |
+| TC-002 | Save target → Supabase `UPDATE users` + AppContext `updateUser` | [x] DONE |
+
+### Phase 7 — Solutions Panel Accordion + attempt_answers Seeding ✅ COMPLETE (Apr 20 2026)
+| # | Task | Status |
+|---|---|---|
+| FIX-001 | Trim assessment_question_map to correct Digital SAT counts (27/27/22/22) | [x] DONE — SQL-RESPONSE-1.txt STEP 1-2 (run in Supabase) |
+| FIX-002 | Seed attempt_answers for SAT FT Attempt 1 (98 rows with correct/wrong/skipped distribution) | [x] DONE — SQL-RESPONSE-1.txt STEP 5-9 (run in Supabase) |
+| FIX-003 | Update attempt_section_results + attempts.score_rw/math | [x] DONE — SQL-RESPONSE-1.txt STEP 3-4 (run in Supabase) |
+| FIX-004 | SolutionsPanel.tsx — accordion redesign, remove inline (Correct) label, Marks Earned/Lost panel | [x] DONE — code shipped |
+| FIX-005 | SATAnalyticsTab.tsx — add section_id/time_spent_seconds/marks_awarded to query + derivedSectionResults | [x] DONE — code shipped |
+| FIX-006 | CLAUDE-RULES.md — Solutions Panel spec updated to match reference image accordion format | [x] DONE |
+| FIX-007 | PRD-SAT-ANALYTICS-V2.md §10 — accordion spec + hybrid architecture + marks-per-question concept | [x] DONE |
+| FIX-008 | CLAUDE-DB.md — seeding notes for attempt_answers + updated module question counts | [x] DONE |
+
+**Pending (SA runs SQL):** SQL-RESPONSE-1.txt batch must be run in Supabase before DB-side data is live. Code changes are already deployed.
 
 ### Post-Exam-Engine (DEFERRED — do not build yet)
 | # | Task | Blocked on |

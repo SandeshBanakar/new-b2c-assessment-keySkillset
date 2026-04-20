@@ -167,6 +167,7 @@ function AssessmentDetailPageInner() {
           <AttemptsTab
             attempts={attempts}
             assessmentId={assessment.id}
+            assessment={assessment}
             onSwitchToAnalytics={(attemptId) => {
               setSelectedAttemptId(attemptId);
               setActiveTab('analytics');

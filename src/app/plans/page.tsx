@@ -14,6 +14,7 @@ import {
   type PlanRow,
   type ActivePlanInfo,
 } from '@/lib/supabase/plans'
+import type { ActivePlanInfo as UserActivePlanInfo } from '@/types'
 
 // ─── Tier rank for upgrade/downgrade comparisons ──────────────────────────────
 
@@ -34,8 +35,15 @@ function getPlanCTA(plan: PlanRow, active: ActivePlanInfo | null): CTAState {
     return { label: defaultLabel, disabled: false, style: 'primary' }
   }
 
-  // Current plan
-  if (active.planId === plan.id) {
+  // Current plan — match by planId (real DB users) OR by scope+tier+category (demo users with no planId)
+  const isCurrentPlan =
+    (active.planId !== '' && active.planId === plan.id) ||
+    (active.planId === '' &&
+      active.scope === plan.scope &&
+      active.tier === plan.tier &&
+      (plan.scope === 'PLATFORM_WIDE' || active.category === plan.category))
+
+  if (isCurrentPlan) {
     return { label: 'Current Plan', disabled: true, style: 'current' }
   }
 
@@ -47,8 +55,10 @@ function getPlanCTA(plan: PlanRow, active: ActivePlanInfo | null): CTAState {
   if (sameGroup) {
     const activeRank = TIER_RANK[active.tier ?? ''] ?? 0
     const planRank   = TIER_RANK[plan.tier ?? ''] ?? 0
-    if (planRank < activeRank)  return { label: 'Unable to Downgrade', disabled: true,  style: 'muted'    }
-    if (planRank > activeRank)  return { label: `Upgrade to ${plan.display_name ?? plan.tier}`, disabled: false, style: 'primary' }
+    if (planRank < activeRank) return { label: 'Unable to Downgrade', disabled: true,  style: 'muted'    }
+    if (planRank > activeRank) return { label: `Upgrade to ${plan.display_name ?? plan.tier}`, disabled: false, style: 'primary' }
+    // Same rank, same group — treat as current (safety net)
+    return { label: 'Current Plan', disabled: true, style: 'current' }
   }
 
   // Different scope or different category
@@ -146,11 +156,9 @@ function CategoryAccordion({
   const [ring, setRing] = useState(highlighted ?? false)
 
   useEffect(() => {
-    if (highlighted) {
-      setRing(true)
-      const t = setTimeout(() => setRing(false), 2000)
-      return () => clearTimeout(t)
-    }
+    if (!highlighted) return
+    const t = setTimeout(() => setRing(false), 2000)
+    return () => clearTimeout(t)
   }, [highlighted])
 
   const basicPlan  = plans.find((p) => p.tier === 'BASIC')
@@ -224,7 +232,26 @@ function PlansContent() {
       .then(([platform, category, active]) => {
         setPlatformPlans(platform)
         setCategoryPlans(category)
-        setActivePlan(active)
+
+        // Real DB subscription found — use it
+        if (active) {
+          setActivePlan(active)
+          return
+        }
+
+        // Fallback for demo users: build ActivePlanInfo from user context (no DB record)
+        // planId='' is a sentinel — matched by scope+tier+category in getPlanCTA
+        const upi = user.activePlanInfo as UserActivePlanInfo | null | undefined
+        if (upi) {
+          setActivePlan({
+            planId: '',
+            scope: upi.scope,
+            category: upi.category,
+            tier: upi.tier as ActivePlanInfo['tier'],
+          })
+        } else {
+          setActivePlan(null)
+        }
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))

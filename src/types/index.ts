@@ -177,6 +177,8 @@ export interface User {
   createdAt: string;                      // created_at (ISO 8601)
   updatedAt: string;                      // updated_at (ISO 8601)
   activePlanInfo?: ActivePlanInfo | null; // null = no active assessment plan
+  targetSatScore?: number | null;         // target_sat_score (full test)
+  targetSatSubjectScore?: number | null;  // target_sat_subject_score (subject test)
 }
 
 // ─── Assessment Creation (SA) ─────────────────────────────────────────────────

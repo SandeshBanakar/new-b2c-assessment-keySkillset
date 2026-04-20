@@ -11,7 +11,9 @@ const MOCK_SUBSCRIBERS = [
 ]
 
 export function PlanSubscribersTab({ plan }: Props) {
-  const count = plan.plan_subscribers?.subscriber_count ?? 0
+  const dbCount = plan.plan_subscribers?.subscriber_count ?? 0
+  // When DB returns 0 (no real subscribers yet), sync with mock table row count
+  const count = dbCount === 0 ? MOCK_SUBSCRIBERS.length : dbCount
   // Active = subscribers with last login within 30 days (mock: 4 of 5 sample rows = 80%)
   const activeCount = Math.round(count * 0.8)
   const activePct   = count > 0 ? Math.round((activeCount / count) * 100) : 0

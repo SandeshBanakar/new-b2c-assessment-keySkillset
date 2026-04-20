@@ -13,6 +13,8 @@ export type DemoUser = {
   streak: number
   role: string
   active_plan_info?: ActivePlanInfo | null
+  target_sat_score?: number | null
+  target_sat_subject_score?: number | null
 }
 
 export const DEMO_USERS: DemoUser[] = [
@@ -56,6 +58,7 @@ export const DEMO_USERS: DemoUser[] = [
     streak: 7,
     role: 'student',
     active_plan_info: { scope: 'PLATFORM_WIDE', tier: 'PRO', category: null },
+    target_sat_score: 1500,
   },
   {
     id: '191c894d-b532-4fa8-b1fe-746e5cdcdcc8',

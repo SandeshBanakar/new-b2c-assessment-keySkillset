@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface DbQuestion {
   id: string;
@@ -14,13 +14,17 @@ export interface DbQuestion {
   correct_answer: unknown;
   explanation: unknown;
   concept_tag: string | null;
+  difficulty?: string | null;
 }
 
 export interface UserAnswer {
   question_id: string;
+  section_id?: string | null;
   user_answer: string | null;
   is_correct: boolean | null;
   is_skipped: boolean | null;
+  time_spent_seconds?: number | null;
+  marks_awarded?: number | null;
 }
 
 const PAGE_SIZE = 25;
@@ -78,60 +82,77 @@ function extractCorrectAnswer(jsonb: unknown): string[] {
   }
 }
 
-function QuestionCard({
+function StatusBadge({
+  isCorrect,
+  isSkipped,
+  hasData,
+}: {
+  isCorrect: boolean | null;
+  isSkipped: boolean | null;
+  hasData: boolean;
+}) {
+  if (!hasData) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium bg-zinc-100 text-zinc-400 rounded-full px-2 py-0.5">
+        · No data
+      </span>
+    );
+  }
+  if (isSkipped) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium bg-zinc-100 text-zinc-500 rounded-full px-2 py-0.5">
+        — Skipped
+      </span>
+    );
+  }
+  if (isCorrect) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">
+        ✓ Correct
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-medium bg-rose-100 text-rose-700 rounded-full px-2 py-0.5">
+      ✗ Incorrect
+    </span>
+  );
+}
+
+function QuestionExpandedDetail({
   question,
-  questionNumber,
   userAnswer,
 }: {
   question: DbQuestion;
-  questionNumber: number;
   userAnswer?: UserAnswer;
 }) {
-  const questionText = extractText(question.question_text);
-  const passageText  = extractText(question.passage_text);
-  const options      = extractOptions(question.options);
-  const correctKeys  = extractCorrectAnswer(question.correct_answer);
+  const questionText    = extractText(question.question_text);
+  const passageText     = extractText(question.passage_text);
+  const options         = extractOptions(question.options);
+  const correctKeys     = extractCorrectAnswer(question.correct_answer);
   const explanationText = extractText(question.explanation);
-  const typeLabel    = QUESTION_TYPE_LABELS[question.question_type] ?? question.question_type;
+  const typeLabel       = QUESTION_TYPE_LABELS[question.question_type] ?? question.question_type;
 
-  const userKey     = userAnswer?.user_answer ?? null;
-  const isSkipped   = userAnswer?.is_skipped ?? false;
-  const isCorrect   = userAnswer?.is_correct ?? null;
+  const userKey   = userAnswer?.user_answer ?? null;
+  const isSkipped = userAnswer?.is_skipped ?? false;
+  const isCorrect = userAnswer?.is_correct ?? null;
+
+  const marksEarned   = userAnswer?.marks_awarded ?? (userAnswer?.is_correct ? 1 : 0);
+  const marksLost     = userAnswer ? 1 - marksEarned : 0;
 
   return (
-    <div className="border border-zinc-100 rounded-md p-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-        <div>
-          <p className="text-sm font-semibold text-zinc-900">Question {questionNumber}</p>
-          {question.concept_tag && (
-            <p className="text-xs text-zinc-500 mt-0.5">{typeLabel} · {question.concept_tag}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {isSkipped && (
-            <span className="text-xs font-medium bg-zinc-100 text-zinc-500 rounded-full px-2 py-0.5">
-              Skipped
-            </span>
-          )}
-          {!isSkipped && isCorrect !== null && (
-            <span
-              className={`text-xs font-medium rounded-full px-2 py-0.5 ${
-                isCorrect
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-rose-100 text-rose-700'
-              }`}
-            >
-              {isCorrect ? 'Correct' : 'Incorrect'}
-            </span>
-          )}
-          <span className="text-xs font-medium bg-zinc-100 text-zinc-600 rounded-full px-2 py-0.5">
-            {typeLabel}
-          </span>
-        </div>
+    <div className="border-t border-zinc-100 bg-zinc-50 px-5 py-5">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs font-medium bg-zinc-100 text-zinc-600 rounded-full px-2 py-0.5">
+          {typeLabel}
+        </span>
+        {question.concept_tag && (
+          <span className="text-xs text-zinc-500">{question.concept_tag}</span>
+        )}
       </div>
 
       {passageText && (
-        <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 mb-4 text-sm text-zinc-700">
+        <div className="rounded-lg bg-white border border-zinc-200 p-4 mb-4 text-sm text-zinc-700">
           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Passage</p>
           <p className="leading-relaxed">{passageText}</p>
         </div>
@@ -153,7 +174,9 @@ function QuestionCard({
             </div>
           )}
           {userKey && !isSkipped && (
-            <p className="text-xs text-zinc-500 mt-1">Your answer: {userKey}</p>
+            <p className={`text-sm mt-2 ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
+              Your answer: {userKey}
+            </p>
           )}
         </div>
       ) : (
@@ -169,17 +192,24 @@ function QuestionCard({
                 <div key={opt.key} className={`rounded-md border px-3 py-2 text-sm ${cls}`}>
                   <span className="font-medium mr-2">{opt.key}.</span>
                   {opt.text}
-                  {isCorrectOpt && (
-                    <span className="ml-2 text-xs font-medium text-emerald-600">(Correct)</span>
-                  )}
-                  {isUserOpt && !isCorrectOpt && (
-                    <span className="ml-2 text-xs font-medium text-rose-600">(Your answer)</span>
-                  )}
                 </div>
               );
             })}
           </div>
         )
+      )}
+
+      {userAnswer && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-center">
+            <p className="text-xs font-medium text-emerald-600 mb-1">Marks Earned</p>
+            <p className="text-lg font-semibold text-emerald-700">{marksEarned}</p>
+          </div>
+          <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-center">
+            <p className="text-xs font-medium text-rose-600 mb-1">Marks Lost</p>
+            <p className="text-lg font-semibold text-rose-700">{marksLost}</p>
+          </div>
+        </div>
       )}
 
       {explanationText && (
@@ -201,6 +231,7 @@ export default function SolutionsPanel({
   userAnswers?: UserAnswer[];
   isFullTest?: boolean;
 }) {
+  const [expandedQs, setExpandedQs] = useState<Set<string>>(new Set());
   const answerMap = Object.fromEntries(userAnswers.map((a) => [a.question_id, a]));
 
   const moduleOrder = isFullTest
@@ -218,9 +249,23 @@ export default function SolutionsPanel({
   );
 
   const fallbackModule = availableModules[0] ?? null;
-
   const [activeModule, setActiveModule] = useState<string | null>(fallbackModule);
   const [page, setPage] = useState(0);
+
+  function toggleExpanded(qId: string) {
+    setExpandedQs((prev) => {
+      const next = new Set(prev);
+      if (next.has(qId)) next.delete(qId);
+      else next.add(qId);
+      return next;
+    });
+  }
+
+  function handleModuleChange(mod: string) {
+    setActiveModule(mod);
+    setPage(0);
+    setExpandedQs(new Set());
+  }
 
   if (questions.length === 0) {
     return (
@@ -236,16 +281,11 @@ export default function SolutionsPanel({
     );
   }
 
-  const moduleKey    = activeModule ?? '__none__';
-  const moduleQs     = groupedByModule[moduleKey] ?? [];
-  const totalPages   = Math.ceil(moduleQs.length / PAGE_SIZE);
-  const pageQs       = moduleQs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const pageOffset   = page * PAGE_SIZE;
-
-  function handleModuleChange(mod: string) {
-    setActiveModule(mod);
-    setPage(0);
-  }
+  const moduleKey  = activeModule ?? '__none__';
+  const moduleQs   = groupedByModule[moduleKey] ?? [];
+  const totalPages = Math.ceil(moduleQs.length / PAGE_SIZE);
+  const pageQs     = moduleQs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const pageOffset = page * PAGE_SIZE;
 
   return (
     <div className="bg-white shadow-sm rounded-md p-6">
@@ -258,9 +298,9 @@ export default function SolutionsPanel({
       {availableModules.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-5 pb-4 border-b border-zinc-100">
           {availableModules.map((mod) => {
-            const key   = mod ?? '__none__';
-            const label = MODULE_LABELS[mod] ?? 'Questions';
-            const count = groupedByModule[key]?.length ?? 0;
+            const key      = mod ?? '__none__';
+            const label    = MODULE_LABELS[mod] ?? 'Questions';
+            const count    = groupedByModule[key]?.length ?? 0;
             const isActive = activeModule === mod;
             return (
               <button
@@ -286,15 +326,99 @@ export default function SolutionsPanel({
         </div>
       )}
 
-      <div className="space-y-5">
-        {pageQs.map((q, idx) => (
-          <QuestionCard
-            key={q.id}
-            question={q}
-            questionNumber={pageOffset + idx + 1}
-            userAnswer={answerMap[q.id]}
-          />
-        ))}
+      {/* Column headers — desktop only */}
+      <div className="hidden sm:grid sm:grid-cols-[2.5rem_1fr_5rem_6rem_6rem_10rem] gap-3 items-center px-4 py-2 mb-1 text-xs font-medium text-zinc-400 uppercase tracking-wide">
+        <span>#</span>
+        <span>Status</span>
+        <span>Time</span>
+        <span>Your Ans</span>
+        <span>Correct</span>
+        <span></span>
+      </div>
+
+      {/* Accordion rows */}
+      <div className="border border-zinc-100 rounded-md overflow-hidden">
+        {pageQs.map((q, idx) => {
+          const questionNumber = pageOffset + idx + 1;
+          const ua             = answerMap[q.id];
+          const hasData        = !!ua;
+          const correctKeys    = extractCorrectAnswer(q.correct_answer);
+          const correctDisplay = correctKeys.length > 0 ? correctKeys[0] : '—';
+          const userDisplay    = ua?.is_skipped ? '—' : (ua?.user_answer ?? '—');
+          const timeDisplay    = ua?.time_spent_seconds != null ? `${ua.time_spent_seconds}s` : '—';
+          const isExpanded     = expandedQs.has(q.id);
+
+          return (
+            <div key={q.id} className="border-b border-zinc-100 last:border-b-0">
+              {/* Desktop collapsed row */}
+              <div
+                className="hidden sm:grid sm:grid-cols-[2.5rem_1fr_5rem_6rem_6rem_10rem] gap-3 items-center px-4 py-3 hover:bg-zinc-50 transition-colors cursor-pointer"
+                onClick={() => toggleExpanded(q.id)}
+              >
+                <span className="text-xs font-semibold text-zinc-500">Q{questionNumber}</span>
+
+                <StatusBadge
+                  isCorrect={ua?.is_correct ?? null}
+                  isSkipped={ua?.is_skipped ?? null}
+                  hasData={hasData}
+                />
+
+                <span className="text-xs text-zinc-500">{timeDisplay}</span>
+
+                <span className={`text-xs font-medium ${
+                  !hasData || ua?.is_skipped
+                    ? 'text-zinc-400'
+                    : ua?.is_correct
+                      ? 'text-emerald-700'
+                      : 'text-rose-700'
+                }`}>
+                  {userDisplay}
+                </span>
+
+                <span className="text-xs font-medium text-emerald-700">{correctDisplay}</span>
+
+                <button
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-blue-700 border border-blue-200 hover:bg-blue-50 transition-colors whitespace-nowrap justify-self-start"
+                  onClick={(e) => { e.stopPropagation(); toggleExpanded(q.id); }}
+                >
+                  {isExpanded ? (
+                    <>Hide <ChevronUp className="w-3 h-3" /></>
+                  ) : (
+                    <>View Q &amp; Explanation <ChevronDown className="w-3 h-3" /></>
+                  )}
+                </button>
+              </div>
+
+              {/* Mobile collapsed row */}
+              <div
+                className="sm:hidden px-4 py-3 hover:bg-zinc-50 transition-colors cursor-pointer"
+                onClick={() => toggleExpanded(q.id)}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-zinc-500">Q{questionNumber}</span>
+                  <StatusBadge
+                    isCorrect={ua?.is_correct ?? null}
+                    isSkipped={ua?.is_skipped ?? null}
+                    hasData={hasData}
+                  />
+                </div>
+                <div className="flex items-center gap-3 text-xs text-zinc-500">
+                  <span>{timeDisplay}</span>
+                  <span>Your: <span className={`font-medium ${
+                    !hasData || ua?.is_skipped ? 'text-zinc-400' :
+                    ua?.is_correct ? 'text-emerald-700' : 'text-rose-700'
+                  }`}>{userDisplay}</span></span>
+                  <span>Correct: <span className="font-medium text-emerald-700">{correctDisplay}</span></span>
+                </div>
+              </div>
+
+              {/* Expanded detail */}
+              {isExpanded && (
+                <QuestionExpandedDetail question={q} userAnswer={ua} />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {totalPages > 1 && (
