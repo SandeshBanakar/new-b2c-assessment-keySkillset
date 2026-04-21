@@ -383,7 +383,7 @@ export async function fetchPlanAssessments(
   const [{ data: assessments, error: assErr }, { data: attempts, error: attErr }] = await Promise.all([
     supabase
       .from('assessments')
-      .select('id, title, exam_type')
+      .select('id, title, exam_categories!exam_category_id(name)')
       .in('tier', tiers),
     supabase
       .from('attempts')
@@ -432,13 +432,13 @@ export async function fetchPlanAssessments(
       attempted.push({
         assessmentId: a.id,
         title: a.title,
-        category: a.exam_type ?? '—',
+        category: ((a as { exam_categories?: { name: string } | { name: string }[] | null }).exam_categories as { name: string } | null)?.name ?? '—',
         attemptsUsed: stats.attemptNumbers.size,
         bestAccuracy: stats.bestAccuracy,
         lastAttempted: stats.lastAttempted,
       })
     } else {
-      notStarted.push({ assessmentId: a.id, title: a.title, category: a.exam_type ?? '—' })
+      notStarted.push({ assessmentId: a.id, title: a.title, category: ((a as { exam_categories?: { name: string } | { name: string }[] | null }).exam_categories as { name: string } | null)?.name ?? '—' })
     }
   }
 
@@ -490,7 +490,7 @@ export async function fetchFreeAccessAttempts(
 ): Promise<PlanAssessmentRow[]> {
   const { data, error } = await supabase
     .from('attempts')
-    .select('assessment_id, accuracy_percent, completed_at, assessments(title, exam_type)')
+    .select('assessment_id, accuracy_percent, completed_at, assessments(title, exam_categories(name))')
     .eq('user_id', userId)
     .eq('is_free_attempt', true)
     .ilike('status', 'completed')
@@ -502,8 +502,9 @@ export async function fetchFreeAccessAttempts(
 
   return uncovered.map((a) => {
     const assessment = Array.isArray(a.assessments) ? a.assessments[0] : a.assessments
-    const title = (assessment as { title: string; exam_type: string } | null)?.title ?? 'Unknown Assessment'
-    const category = (assessment as { title: string; exam_type: string } | null)?.exam_type ?? '—'
+    const title = (assessment as { title: string } | null)?.title ?? 'Unknown Assessment'
+    const cats = (assessment as { exam_categories?: { name: string } | { name: string }[] | null } | null)?.exam_categories
+    const category = (Array.isArray(cats) ? cats[0]?.name : (cats as { name: string } | null)?.name) ?? '—'
     return {
       assessmentId: a.assessment_id,
       title,

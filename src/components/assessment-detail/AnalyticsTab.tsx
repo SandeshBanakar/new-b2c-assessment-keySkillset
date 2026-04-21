@@ -19,6 +19,10 @@ import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
 import { tiptapToPlainText } from '@/utils/tiptapUtils';
 import AttemptPillFilter from '@/components/ui/AttemptPillFilter';
+import ScoreTrajectoryChart from '@/components/assessment-detail/ScoreTrajectoryChart';
+import RankPredictionCard, { type RankLookupRow } from '@/components/assessment-detail/RankPredictionCard';
+import MistakeIntelligence, { type MIAttemptAnswer } from '@/components/assessment-detail/MistakeIntelligence';
+import LeverageActions from '@/components/assessment-detail/LeverageActions';
 import type { Assessment } from '@/types';
 
 // ── Negative marks per exam ───────────────────────────────────────────────────
@@ -28,6 +32,16 @@ const NEG_MARKS: Record<string, number> = {
   CLAT: 0.25,
   SAT: 0,
   PMP: 0,
+};
+
+const SCORE_MAX: Record<string, number> = { NEET: 720, JEE: 300, CLAT: 120, SAT: 1600 };
+
+const RANK_PREDICTION_EXAMS = new Set(['NEET', 'JEE', 'CLAT']);
+
+const EXAM_CATEGORY_ID: Record<string, string> = {
+  NEET: '23d482e7-81c3-4a10-bd60-52fd458595d6',
+  JEE:  '93319838-3e05-4472-9dd0-decd6f731f7b',
+  CLAT: 'ad260442-74de-4e7c-993c-f006c4a29045',
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -239,7 +253,7 @@ export default function AnalyticsTab({
   initialAttemptId,
   userTier,
 }: AnalyticsTabProps) {
-  const { user } = useAppContext();
+  const { user, updateTargetScore } = useAppContext();
 
   // AI Insights: Pro and Premium only — completely hidden for Free/Basic
   const isAiEligible = userTier === 'professional' || userTier === 'premium';
@@ -258,6 +272,13 @@ export default function AnalyticsTab({
 
   // ── Concept mastery — all attempts, loaded once ────────────────────────────
   const [conceptMastery, setConceptMastery] = useState<ConceptMastery[]>([]);
+
+  // ── Rank prediction lookup (once on mount) ────────────────────────────────
+  const [rankLookup, setRankLookup] = useState<RankLookupRow[]>([]);
+  const [rankDataYear, setRankDataYear] = useState<number>(2025);
+
+  // ── Attempt answers — shared by MistakeIntelligence + LeverageActions ─────
+  const [attemptAnswers, setAttemptAnswers] = useState<MIAttemptAnswer[] | null>(null);
 
   // ── Solutions panel ────────────────────────────────────────────────────────
   const [sectionTabs, setSectionTabs] = useState<SectionTab[]>([]);
@@ -314,6 +335,21 @@ export default function AnalyticsTab({
         .order('concept_tag');
       setConceptMastery(masteryData ?? []);
 
+      // Rank prediction — NEET/JEE/CLAT only, fetched once on mount
+      const examCatId = EXAM_CATEGORY_ID[assessment.exam];
+      if (examCatId) {
+        const { data: rankData } = await supabase
+          .from('rank_prediction_tables')
+          .select('data, year')
+          .eq('exam_category_id', examCatId)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (rankData) {
+          setRankLookup(rankData.data as RankLookupRow[]);
+          setRankDataYear(rankData.year as number);
+        }
+      }
+
       // Section tabs — derived from question map
       const { data: tabData } = await supabase
         .from('assessment_question_map')
@@ -355,8 +391,9 @@ export default function AnalyticsTab({
 
     async function loadAttemptData() {
       setAnalyticsLoading(true);
+      setAttemptAnswers(null); // reset to loading state
 
-      const [sectionsRes, insightRes] = await Promise.all([
+      const [sectionsRes, insightRes, answersRes] = await Promise.all([
         supabase
           .from('attempt_section_results')
           .select(
@@ -369,10 +406,15 @@ export default function AnalyticsTab({
           .select('what_went_well, next_steps, model_used')
           .eq('attempt_id', selectedAttemptId!)
           .maybeSingle(),
+        supabase
+          .from('attempt_answers')
+          .select('question_id, is_correct, is_skipped, time_spent_seconds, marks_awarded, concept_tag')
+          .eq('attempt_id', selectedAttemptId!),
       ]);
 
       setSectionResults(sectionsRes.data ?? []);
       setAiInsight(insightRes.data ?? null);
+      setAttemptAnswers(answersRes.data ?? []);
       setAnalyticsLoading(false);
     }
 
@@ -493,6 +535,14 @@ export default function AnalyticsTab({
 
   // ── Derived values ────────────────────────────────────────────────────────
   const selectedAttempt = attempts.find((a) => a.id === selectedAttemptId) ?? attempts[attempts.length - 1];
+
+  const targetScore =
+    assessment.exam === 'NEET' ? (user?.targetNeetScore ?? null) :
+    assessment.exam === 'JEE'  ? (user?.targetJeeScore ?? null) :
+    assessment.exam === 'CLAT' ? (user?.targetClatScore ?? null) :
+    null;
+
+  const scoreMax = SCORE_MAX[assessment.exam] ?? assessment.questionCount ?? 100;
   const isLatest = selectedAttempt.id === attempts[attempts.length - 1].id;
 
   const negMark = NEG_MARKS[assessment.exam] ?? 0;
@@ -525,16 +575,6 @@ export default function AnalyticsTab({
       )?.mastery_percent ?? null
     );
   }
-
-  // Strengths and weak spots for selected attempt
-  const strengths = selAttemptMastery
-    .filter((m) => (m.mastery_percent ?? 0) >= 80)
-    .sort((a, b) => (b.mastery_percent ?? 0) - (a.mastery_percent ?? 0))
-    .slice(0, 3);
-  const weakSpots = selAttemptMastery
-    .filter((m) => (m.mastery_percent ?? 0) < 60)
-    .sort((a, b) => (a.mastery_percent ?? 0) - (b.mastery_percent ?? 0))
-    .slice(0, 3);
 
   // Solutions panel helpers
   const currentSection = selectedSection
@@ -747,6 +787,33 @@ export default function AnalyticsTab({
             </div>
           </div>
 
+          {/* ── Block 3: Score Trajectory ─────────────────────────────────────── */}
+          <ScoreTrajectoryChart
+            attempts={attempts.map((a) => ({
+              id: a.id,
+              attempt_number: a.attempt_number,
+              score: a.score,
+              accuracy_percent: a.accuracy_percent,
+              completed_at: a.completed_at,
+              is_free_attempt: a.attempt_number === 1,
+            }))}
+            exam={assessment.exam}
+            targetScore={targetScore}
+            onSetTarget={(score) => updateTargetScore(assessment.exam as 'NEET' | 'JEE' | 'CLAT', score)}
+            scoreMax={scoreMax}
+          />
+
+          {/* ── Block 4: Rank Prediction — NEET/JEE/CLAT only ────────────────── */}
+          {RANK_PREDICTION_EXAMS.has(assessment.exam) && (
+            <RankPredictionCard
+              exam={assessment.exam as 'NEET' | 'JEE' | 'CLAT'}
+              currentScore={selectedAttempt.score}
+              targetScore={targetScore}
+              lookupData={rankLookup}
+              dataYear={rankDataYear}
+            />
+          )}
+
           {/* ── Block 2: Marks Lost — hero, negative-marking exams only ──────── */}
           {negMark > 0 && marksLost > 0 && (
             <div className="bg-rose-50 border border-rose-200 rounded-md p-5">
@@ -766,60 +833,7 @@ export default function AnalyticsTab({
             </div>
           )}
 
-          {/* ── Block 3: Strengths + Weak Spots ──────────────────────────────── */}
-          {(strengths.length > 0 || weakSpots.length > 0) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Strengths */}
-              <div className="bg-white shadow-sm rounded-md p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  <h3 className="text-sm font-medium text-zinc-900">Strengths</h3>
-                </div>
-                {strengths.length === 0 ? (
-                  <p className="text-xs text-zinc-400">
-                    Score above 80% on any concept to see strengths.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {strengths.map((m) => (
-                      <div key={m.concept_tag} className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-700">{m.concept_tag}</span>
-                        <span className="text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">
-                          {Math.round(m.mastery_percent ?? 0)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Weak Spots */}
-              <div className="bg-white shadow-sm rounded-md p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <Target className="w-4 h-4 text-rose-600" />
-                  <h3 className="text-sm font-medium text-zinc-900">Needs Work</h3>
-                </div>
-                {weakSpots.length === 0 ? (
-                  <p className="text-xs text-zinc-400">
-                    No concepts below 60% — well done.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {weakSpots.map((m) => (
-                      <div key={m.concept_tag} className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-700">{m.concept_tag}</span>
-                        <span className="text-xs font-medium bg-rose-100 text-rose-700 rounded-full px-2 py-0.5">
-                          {Math.round(m.mastery_percent ?? 0)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── Block 4: Section Breakdown ────────────────────────────────────── */}
+          {/* ── Block 5: Section Breakdown ────────────────────────────────────── */}
           {sectionResults.length > 0 && (
             <div className="bg-white shadow-sm rounded-md p-6">
               <h3 className="text-base font-medium text-zinc-900 mb-4">
@@ -871,7 +885,14 @@ export default function AnalyticsTab({
             </div>
           )}
 
-          {/* ── Block 5: Concept Mastery ──────────────────────────────────────── */}
+          {/* ── Block 7: Mistake Intelligence ────────────────────────────────── */}
+          <MistakeIntelligence
+            attemptAnswers={attemptAnswers}
+            exam={assessment.exam}
+            negMark={negMark}
+          />
+
+          {/* ── Block 8: Concept Mastery ──────────────────────────────────────── */}
           {allConceptTags.length > 0 && (
             <div className="bg-white shadow-sm rounded-md p-6">
               <div className="mb-4">
@@ -1000,7 +1021,16 @@ export default function AnalyticsTab({
             </div>
           )}
 
-          {/* ── Block 6: AI Insight — Pro/Premium only ────────────────────────── */}
+          {/* ── Block 9: Leverage Actions ─────────────────────────────────────── */}
+          <LeverageActions
+            conceptMastery={conceptMastery}
+            selectedAttemptNum={selAttemptNum}
+            attemptAnswers={attemptAnswers}
+            exam={assessment.exam}
+            negMark={negMark}
+          />
+
+          {/* ── Block 10: AI Insight — Pro/Premium only ───────────────────────── */}
           {isAiEligible ? (
             <div className="bg-white shadow-sm rounded-md p-6">
               <div className="flex items-center gap-2 mb-5">

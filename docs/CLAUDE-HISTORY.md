@@ -6,6 +6,49 @@
 
 ## COMPLETED WORK LOG
 
+### April 21, 2026 — KSS-SA-CA-001 DB Migrations: KSS-DB-050 + KSS-DB-051
+
+**Ticket:** KSS-SA-CA-001 | **SQL:** `docs/requirements/SQL-CA-MIGRATIONS.txt`
+
+**DB migrations confirmed in Supabase:**
+- **KSS-DB-050**: `ALTER TABLE exam_categories ADD COLUMN score_min INT NULL, score_max INT NULL` — SAT seeded 200/800, all others NULL. Verified via SELECT.
+- **KSS-DB-051**: `CREATE TABLE assessment_scale_scores (...)` — table exists, index created. Verified via information_schema check.
+
+Scale Score tab in Adaptive Create/Edit form is now fully functional end-to-end.
+
+---
+
+### April 21, 2026 — KSS-ANA-001 Phase 2: NEET/JEE/CLAT Analytics Data Seeding + KSS-DB-052
+
+**Ticket:** KSS-ANA-001 | **PRD:** `prds/analytics/PRD-LINEAR-ANALYTICS-V2.md`
+
+**Scope:** Seeded full-test attempt_answers, attempt_section_results, user_concept_mastery, and attempt_ai_insights for premium user `191c894d-b532-4fa8-b1fe-746e5cdcdcc8` across NEET FT1, JEE FT1, CLAT FT1 (2 attempts each).
+
+**DB migration applied:**
+- **KSS-DB-052**: `ALTER TABLE attempt_answers DROP CONSTRAINT attempt_answers_question_id_fkey` — undocumented FK that blocked seeding with placeholder question_ids. `question_id` column remains as uuid (no FK). KSS-DB-050/051 are reserved for KSS-SA-CA-001 (exam_categories score range + assessment_scale_scores).
+
+**Critical discovery — assessment ID routing:**
+- `getAssessmentBySlug()` (`src/utils/assessmentUtils.ts:106`) filters `assessment_items` with `.eq('status', 'INACTIVE')` — this filter never matches LIVE or DRAFT assessments, so the function always falls through to the `assessments` (legacy engine) table lookup by slug.
+- Consequence: `assessment.id` returned to `AnalyticsTab` = `assessments.id`, not `assessment_items.id`.
+- All seeded data uses `assessments.id` values: NEET `693a891b-a1d9-4c44-89a6-703ad034c13c`, JEE `183eac3e-473b-4dfd-a13c-5ee84ff42e44`, CLAT `b123f49f-a7a2-4114-82da-b3579fe3dc68`.
+- Bug filed as backlog: `.eq('status','INACTIVE')` should be `.eq('status','LIVE')` for SA-created assessments to route through `assessment_items.id`.
+
+**Seeding completed (all 10 steps):**
+- STEP 0: Cleanup — deleted ~116 wrongly-seeded mastery rows with `assessment_items.id` values
+- STEP 1: 6 attempt rows for NEET A1/A2, JEE A1/A2, CLAT A1/A2 (using `assessments.id`)
+- STEP 2: 22 `attempt_section_results` rows (sections per exam × 2 attempts)
+- STEP 3: 6 `attempt_ai_insights` rows (model_used='static_demo')
+- STEP 4: NEET A1 — 180 `attempt_answers` (Physics/Chemistry/Biology split, time + outcome distribution)
+- STEP 5: NEET A2 — 180 `attempt_answers`
+- STEP 6: JEE A1+A2 — 180 `attempt_answers` (Physics/Chemistry/Maths)
+- STEP 7: CLAT A1+A2 — 240 `attempt_answers` (English/Legal/Logical/GK/Quant)
+- STEP 8: ~116 `user_concept_mastery` rows for all 6 full-test attempts
+- STEP 9+10: Chapter test answer UPDATEs + mastery INSERTs (pre-completed earlier session)
+
+**Build:** Post-seeding docs only — no code changes this session. `npm run build` pending.
+
+---
+
 ### April 20, 2026 — KSS-B2C-001: End User Persona + Assessment Access Fixes
 
 **Ticket:** KSS-B2C-001 | **PRD:** `prds/end-user/PRD-B2C-END-USER-ASSESS-PLANS.md`

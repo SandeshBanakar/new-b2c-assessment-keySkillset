@@ -210,12 +210,16 @@ export async function fetchLiveAssessments(): Promise<
 > {
   const { data, error } = await supabase
     .from('assessments')
-    .select('id, title, exam_type, assessment_type')
+    .select('id, title, exam_categories!exam_category_id(name), assessment_type')
     .eq('is_active', true)
     .order('title', { ascending: true })
 
   if (error) throw new Error(error.message)
-  return data as { id: string; title: string; exam_type: string; assessment_type: string }[]
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const cats = row.exam_categories as { name: string } | { name: string }[] | null
+    const examName = Array.isArray(cats) ? (cats[0]?.name ?? '') : (cats?.name ?? '')
+    return { id: row.id as string, title: row.title as string, exam_type: examName, assessment_type: row.assessment_type as string }
+  })
 }
 
 // ─── Detail page types + helpers (KSS-SA-004-C) ──────────────────────────────
@@ -310,11 +314,15 @@ export async function fetchAllAssessmentsForPlan(): Promise<
 > {
   const { data, error } = await supabase
     .from('assessments')
-    .select('id, title, exam_type, assessment_type, is_active')
+    .select('id, title, exam_categories!exam_category_id(name), assessment_type, is_active')
     .order('title', { ascending: true })
 
   if (error) throw new Error(error.message)
-  return data as Omit<PlanContentItem, 'include_mode' | 'excluded'>[]
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const cats = row.exam_categories as { name: string } | { name: string }[] | null
+    const examName = Array.isArray(cats) ? (cats[0]?.name ?? '') : (cats?.name ?? '')
+    return { id: row.id as string, title: row.title as string, exam_type: examName, assessment_type: row.assessment_type as string, is_active: row.is_active as boolean }
+  })
 }
 
 export async function updatePlan(

@@ -1,27 +1,60 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { useRouter, useParams } from 'next/navigation'
+import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import type { TopicEntry, DisplayConfig, AssessmentConfig } from '@/types'
 import {
   LANGUAGES, TEST_TYPE_OPTIONS,
-  Toggle, ToggleRow, Label, FieldError, FieldHint, inputCls, SelectField,
+  ToggleRow, Label, FieldError, FieldHint, inputCls, SelectField,
   SectionCard, SortableBulletList,
   SectionEntry, SectionsBuilder,
   TopicsCoveredBuilder,
   AssessmentPreviewPanel, TestTypeChangeModal,
-} from './_components'
+} from '../_components'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ExamCategory { id: string; name: string }
 
+interface DBAssessment {
+  id: string
+  title: string
+  exam_category_id: string
+  test_type: string
+  status: string
+  description: string | null
+  assessment_config: AssessmentConfig | null
+  display_config: {
+    language?: string
+    what_youll_get?: string[]
+    topics_covered?: TopicEntry[]
+  } | null
+}
+
+// ─── Hydrate section entries from DB config ───────────────────────────────────
+
+function hydrateSection(
+  s: { id?: string; name?: string; questions_per_attempt?: number; duration_minutes?: number }
+): SectionEntry {
+  return {
+    id: s.id ?? crypto.randomUUID(),
+    name: s.name ?? '',
+    questionCount: String(s.questions_per_attempt ?? ''),
+    durationMinutes: String(s.duration_minutes ?? ''),
+  }
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function CreateLinearAssessmentPage() {
+export default function EditLinearAssessmentPage() {
   const router = useRouter()
+  const { id } = useParams<{ id: string }>()
+
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const [assessmentStatus, setAssessmentStatus] = useState('')
   const [categories, setCategories] = useState<ExamCategory[]>([])
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -45,12 +78,11 @@ export default function CreateLinearAssessmentPage() {
 
   // Timings
   const [duration, setDuration] = useState('')
-  // allowSectionalNavigation=true → FREE nav, FULL timer | false → SECTION_LOCKED nav, SECTIONAL timer
   const [allowSectionalNavigation, setAllowSectionalNavigation] = useState(false)
   const [allowBackNavigation, setAllowBackNavigation] = useState(true)
   const [allowCalculator, setAllowCalculator] = useState(false)
 
-  // Derived from allowSectionalNavigation (locked decision — toggle drives both fields)
+  // Derived
   const navigationPolicy = allowSectionalNavigation ? 'FREE' : 'SECTION_LOCKED'
   const timerMode: 'FULL' | 'SECTIONAL' = allowSectionalNavigation ? 'FULL' : 'SECTIONAL'
 
@@ -62,7 +94,7 @@ export default function CreateLinearAssessmentPage() {
   // Test type change modal
   const [pendingTestType, setPendingTestType] = useState<string | null>(null)
 
-  // Derived — computed totals when sections are defined
+  // Derived — computed totals
   const isFullTest = testType === 'FULL_TEST'
   const hasSections = isFullTest && sections.some(s => s.name.trim())
   const computedTotalQ = hasSections
@@ -72,20 +104,52 @@ export default function CreateLinearAssessmentPage() {
     ? (computedTotalQ ?? 0) * Number(marksPerQuestion)
     : null
 
+  const isReadOnly = assessmentStatus === 'MAINTENANCE'
+
   useEffect(() => {
-    supabase.from('exam_categories').select('id, name').eq('is_active', true).order('display_order').then(({ data }) => {
-      if (data) setCategories(data as ExamCategory[])
-    })
-  }, [])
+    async function load() {
+      const [{ data: catData }, { data: row, error }] = await Promise.all([
+        supabase.from('exam_categories').select('id, name').eq('is_active', true).order('display_order'),
+        supabase.from('assessment_items').select('*').eq('id', id).single(),
+      ])
+      if (catData) setCategories(catData as ExamCategory[])
+      if (error || !row) { setNotFound(true); setLoading(false); return }
+
+      const a = row as DBAssessment
+      const cfg = a.assessment_config ?? {}
+      const disp = a.display_config ?? {}
+
+      setAssessmentStatus(a.status)
+      setTitle(a.title)
+      setTestType(a.test_type ?? '')
+      setExamCategoryId(a.exam_category_id ?? '')
+      setDescription(a.description ?? '')
+      setLanguage(disp.language ?? 'English')
+      setWhatYoullGet(disp.what_youll_get?.length ? disp.what_youll_get : [''])
+      setTopicsCovered(disp.topics_covered ?? [])
+      setDuration(cfg.duration_minutes != null ? String(cfg.duration_minutes) : '')
+      setAllowSectionalNavigation(cfg.navigation_policy === 'FREE')
+      setAllowBackNavigation(cfg.allow_back_navigation !== false)
+      setAllowCalculator(cfg.allow_calculator === true)
+      setOverrideMarks(cfg.override_marks === true)
+      setMarksPerQuestion(cfg.marks_per_question != null ? String(cfg.marks_per_question) : '')
+      setNegativeMarks(cfg.negative_marks != null ? String(cfg.negative_marks) : '')
+      setTotalQuestions(cfg.total_questions != null ? String(cfg.total_questions) : '')
+      setTotalMarks(cfg.total_marks != null ? String(cfg.total_marks) : '')
+      if (a.test_type === 'FULL_TEST' && Array.isArray(cfg.sections)) {
+        setSections((cfg.sections as Parameters<typeof hydrateSection>[0][]).map(hydrateSection))
+      }
+      setLoading(false)
+    }
+    load()
+  }, [id])
 
   const examCategoryName = categories.find(c => c.id === examCategoryId)?.name ?? ''
 
   function handleTestTypeChange(val: string) {
     if (val === testType) return
     const willClear = topicsCovered.length > 0 || (testType === 'FULL_TEST' && sections.length > 0)
-    if (willClear) {
-      setPendingTestType(val)
-    } else {
+    if (willClear) { setPendingTestType(val) } else {
       setTestType(val)
       if (val !== 'FULL_TEST') setSections([])
     }
@@ -116,7 +180,7 @@ export default function CreateLinearAssessmentPage() {
   }
 
   async function handleSave() {
-    if (!validate()) return
+    if (isReadOnly || !validate()) return
     setSaving(true)
 
     const displayConfig: DisplayConfig = {
@@ -153,28 +217,49 @@ export default function CreateLinearAssessmentPage() {
     }
 
     try {
-      const { error } = await supabase.from('assessment_items').insert({
+      const { error } = await supabase.from('assessment_items').update({
         title: title.trim(),
         exam_category_id: examCategoryId,
         test_type: testType,
-        status: 'INACTIVE',
-        assessment_type: 'LINEAR',
-        source: 'PLATFORM',
         description: description.trim() || null,
         display_config: displayConfig,
         assessment_config: assessmentConfig,
-        audience_type: 'B2C_ONLY',
-        visibility_scope: 'GLOBAL',
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
+      }).eq('id', id)
       if (error) throw error
       router.push('/super-admin/create-assessments')
     } catch (err) {
-      console.error('Failed to create assessment:', err)
+      console.error('Failed to update assessment:', err)
     } finally {
       setSaving(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="px-8 py-8 max-w-4xl">
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-zinc-100 rounded w-48" />
+          <div className="h-8 bg-zinc-100 rounded w-72" />
+          <div className="h-48 bg-zinc-100 rounded" />
+        </div>
+      </div>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <div className="px-8 py-8 max-w-4xl">
+        <button
+          onClick={() => router.push('/super-admin/create-assessments')}
+          className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700 transition-colors mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Create Assessments
+        </button>
+        <p className="text-sm text-zinc-500">Assessment not found.</p>
+      </div>
+    )
   }
 
   return (
@@ -196,11 +281,21 @@ export default function CreateLinearAssessmentPage() {
       </button>
 
       <div className="mb-5">
-        <h1 className="text-lg font-semibold text-zinc-900">New Linear Assessment</h1>
-        <p className="text-sm text-zinc-500 mt-0.5">
-          Create assessments with fixed sections and also configure what gets displayed to end user in the Overview tab
-        </p>
+        <h1 className="text-lg font-semibold text-zinc-900">Edit Linear Assessment</h1>
+        <p className="text-sm text-zinc-500 mt-0.5">{title}</p>
       </div>
+
+      {isReadOnly && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6">
+          <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-amber-800">Assessment is under maintenance</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              This assessment is currently offline for maintenance. Changes are locked until the maintenance window ends. Use "End Maintenance" from the assessments list to unlock editing.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Edit / Preview segmented control */}
       <div className="inline-flex items-center bg-zinc-100 border border-zinc-200 rounded-md p-0.5 mb-6">
@@ -236,7 +331,7 @@ export default function CreateLinearAssessmentPage() {
           sections={sections}
         />
       ) : (
-        <div className="space-y-6">
+        <fieldset disabled={isReadOnly} className="space-y-6 disabled:opacity-60">
           {/* Basic Info */}
           <SectionCard
             title="Basic Info"
@@ -494,13 +589,13 @@ export default function CreateLinearAssessmentPage() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || isReadOnly}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {saving ? 'Saving…' : 'Save as Draft'}
+              {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
-        </div>
+        </fieldset>
       )}
     </div>
   )

@@ -1,7 +1,7 @@
 # CLAUDE.md — Mission Control
 # AMBIGUITY PROTOCOL: STOP/STATE/LIST OPTIONS if schema or locked behaviors are unclear.
 
-## CONTEXT ROUTING (Read ONLY when relevant)
+## CONTEXT ROUTING (Read always before proceeding with clarification questions)
 - **Database/SQL:** Read `@docs/CLAUDE-DB.md`
 - **UI/Design/Platform:** Read `@docs/CLAUDE-PLATFORM.md`
 - **Git/Workflow/Config:** Read `@docs/CLAUDE-RULES.md`
@@ -10,31 +10,29 @@
 
 ---
 
+## CRITICAL GUARDRAILS (Never Violate)
+- **DB:** RLS OFF ALWAYS. Use `execute_sql` only.
+- **UI:** Tailwind tokens only.
+- **GIT:** `npm run build` must pass. You can commit to main.
+- DO NOT ask too many questions - always self critique and analyse with your recommendations, and then present the questions if it needs genuine clarifications. 
+
+---
+
 ## PRIMARY DIRECTIVES
-- **PRD Standards:** All new features must have a PRD in `/prds/` following the `@docs/PRD-TEMPLATE.md` structure.
-- **UI Focus:** MOBILE-FIRST RESPONSIVENESS. [cite_start]Every mockup description and component must prioritize mobile layouts before scaling to desktop[cite: 1, 4].
-- **Reuse First:** Always check the `Impacted Existing Components` section in the PRD to avoid duplicate UI work.
+- **UI Focus:** MOBILE-FIRST RESPONSIVENESS. Every mockup description and component must prioritize mobile layouts before scaling to desktop.
+- Always try to reuse components, or create a shared component for better workflow and consistency
 - Always update TODO-BACKLOG.md file with currect tasks to be completed before the start of every session. And update the status of those tasks after session.
 - Always self-critique your answers, decisions, and code.
 - Ask clarification questions before commiting or concluding anything.
 
 ## DOCUMENT AND LISTS
-- **TODO LISTS**: Always maintain a todo list in every chat and ticket. Update current TODO list to `@docs/TODO-BACKLOG.md` file. Post completion, mark the tasks as completed and move the completed tasks to `@docs/CLAUDE-HISTORY.md` file.
+- **TODO LISTS**: Always maintain a todo list in every chat and ticket. 
+- Update current TODO list to `@docs/TODO-BACKLOG.md` file. Post completion, mark the tasks as completed and move the completed tasks to `@docs/CLAUDE-HISTORY.md` file.
+- **PRD Standards:** All new features must have a PRD in `/prds/` following the `@docs/PRD-TEMPLATE.md` structure.
 - **PRD UPDATES**: Ask before writing PRD as some build are bug fixes, and may or may not require a PRD to be written.
 
 ## ACTIVE ROLES (apply simultaneously on every task)
 - **Software Architect:** Always analyse system design, component boundaries, reusability, and coupling before writing code. Critique your own architecture decisions.
 - **Backend Developer:** Always critique the full stack — DB schema, query efficiency, data contracts, and API surface — even when the task appears UI-only.
-- **UX Researcher:** Always flag usability concerns, mobile responsiveness gaps, and accessibility issues before and during implementation.
+- **UX Researcher:** Always flag usability concerns, mobile responsiveness gaps, and accessibility issues before and during implementation. Conduct UX research with web search agent against our app and suggest better UI elements usage.
 - **Self Critique:** Always self-critique your answers and reason within yourself against the current codebase before laying our clarification questions or solutions in the relevant chat
-
----
-
-## CRITICAL GUARDRAILS (Never Violate)
-- **DB:** RLS OFF ALWAYS. Use `execute_sql` only. `tenant_scope_id` != `tenant_id`.
-- **UI:** Tailwind tokens only. NO `font-bold` (use medium/semibold).
-- **GIT:** No main commits. `npm run build` must pass.
-- **MCP:** Batch SQL commands. Never run one-by-one.
-
-Do NOT read CLAUDE-DB.md unless the current task involves execute_sql or schema discussion.
----

@@ -1,5 +1,238 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 20 2026 — KSS-B2C-001 complete. Active tasks only. Completed work → CLAUDE-HISTORY.md.
+# Last updated: Apr 21 2026 — KSS-ANA-001 Phase 2 seeding COMPLETE. KSS-DB-052 added. KSS-SA-CA-001 Create Assessment Feature Set added. Active tasks only. Completed work → CLAUDE-HISTORY.md.
+
+---
+
+## [DONE] KSS-SA-CA-001 — Create Assessment Feature Set
+
+**PRD:** `prds/super-admin/PRD-SA-CREATE-ASSESSMENTS.md`  
+**SQL:** `docs/requirements/SQL-CA-MIGRATIONS.txt` — KSS-DB-050 + KSS-DB-051 (SA must run in Supabase)  
+**Scope:** Main page state machine · Linear form refactor · Linear edit flow · Adaptive create + edit forms · Scale Score tab  
+**Completed:** Apr 21 2026
+
+### Phase 0 — PRD + SQL + Planning
+| # | Task | Status |
+|---|------|--------|
+| CA-0a | Write PRD → `prds/super-admin/PRD-SA-CREATE-ASSESSMENTS.md` | [x] DONE |
+| CA-0b | Write SQL → `docs/requirements/SQL-CA-MIGRATIONS.txt` (KSS-DB-050 + KSS-DB-051) | [x] DONE |
+| CA-0c | Update TODO-BACKLOG.md | [x] DONE |
+| CA-0d | Add nav policy lock note to `prds/analytics/PRD-LINEAR-ANALYTICS-V2.md` | [x] DONE |
+
+### Phase 1 — Main Page Rewrite
+| # | Task | Status |
+|---|------|--------|
+| CA-1a | `statusActions()` helper — returns allowed actions per status | [x] DONE |
+| CA-1b | Search bar (title-only, client-side) | [x] DONE |
+| CA-1c | Full action menus by status (DRAFT/INACTIVE/LIVE/MAINTENANCE/ARCHIVED) | [x] DONE |
+| CA-1d | Modals: Publish, Ready to Publish, Archive, Duplicate | [x] DONE |
+| CA-1e | Take Offline modal (start/end date-time → stores to assessment_config JSONB, status → MAINTENANCE) | [x] DONE |
+| CA-1f | End Maintenance modal (MAINTENANCE → INACTIVE) | [x] DONE |
+| CA-1g | Make Live modal (ARCHIVED → LIVE) | [x] DONE |
+| CA-1h | Delete modal (query plan_content_map, list plans, block if LIVE/MAINTENANCE) | [x] DONE |
+| CA-1i | Auto-revert check on page load (MAINTENANCE + end_time < now → INACTIVE + banner) | [x] DONE |
+| CA-1j | Enable "Create Adaptive" button | [x] DONE |
+
+### Phase 2 — Linear Form Refactor
+| # | Task | Status |
+|---|------|--------|
+| CA-2a | Move Duration to new "Timings" section card | [x] DONE |
+| CA-2b | Allow Sectional Navigation toggle (drives timer_mode + navigation_policy; removes dropdown) | [x] DONE |
+| CA-2c | Cap sections at 10 (disable button at cap, tooltip) | [x] DONE |
+| CA-2d | Cap duration at 500 min (max=500 on input) | [x] DONE |
+| CA-2e | Allow Back Navigation + Allow Calculator toggles in Timings section | [x] DONE |
+| CA-2f | Shared components extracted to `linear/_components.tsx` | [x] DONE |
+
+### Phase 3 — Linear Edit Form
+| # | Task | Status |
+|---|------|--------|
+| CA-3a | `/linear/[id]/page.tsx` — load by ID, pre-populate all fields | [x] DONE |
+| CA-3b | "Save Changes" button, UPDATE instead of INSERT | [x] DONE |
+| CA-3c | MAINTENANCE read-only warning banner + fieldset disabled | [x] DONE |
+
+### Phase 4 — Adaptive Create Form
+| # | Task | Status |
+|---|------|--------|
+| CA-4a | Basic Info section (Full Test / Subject Test, Category, Allow Calculator) | [x] DONE |
+| CA-4b | Foundation Module builder (1–5 FM for Full Test, exactly 1 for Subject Test) | [x] DONE |
+| CA-4c | Per-FM branching config (High/Low % + auto medium range + reset) | [x] DONE |
+| CA-4d | Variant Module cards (3 per FM: EASY/MEDIUM/HARD) | [x] DONE |
+| CA-4e | Break screen builder (between FM and VMs only) | [x] DONE |
+| CA-4f | Display Config section | [x] DONE |
+| CA-4g | Preview tab (module flow diagram) | [x] DONE |
+| CA-4h | Scale Score tab (disabled until save; shows "Save first" message) | [x] DONE |
+| CA-4i | Sources + Chapters multi-select picker per module | [x] DONE |
+| CA-4j | Question Type Distribution editor per module | [x] DONE |
+| CA-4k | Save as Draft (INSERT to assessment_items) | [x] DONE |
+
+### Phase 5 — Adaptive Edit Form
+| # | Task | Status |
+|---|------|--------|
+| CA-5a | `/adaptive/[id]/page.tsx` — hydrate from DB, pre-populate all FM/VM fields | [x] DONE |
+| CA-5b | "Save Changes" button, UPDATE + Scale Score UPSERT (per-module delete+insert) | [x] DONE |
+| CA-5c | Scale Score tab fully active (assessment_id available) | [x] DONE |
+| CA-5d | MAINTENANCE read-only banner + fieldset disabled | [x] DONE |
+
+### Phase 6 — Post-Build
+| # | Task | Status |
+|---|------|--------|
+| CA-6a | Update `docs/CLAUDE-DB.md` — KSS-DB-050 + KSS-DB-051 schemas | [x] DONE |
+| CA-6b | `npm run build` passes clean (6 new routes) | [x] DONE |
+| CA-6c | KSS-DB-050 + KSS-DB-051 run in Supabase — verified Apr 21 2026 | [x] DONE |
+
+---
+
+## [IN-PROGRESS] KSS-ANA-001 — Linear Analytics V2 (NEET / JEE / CLAT)
+
+**PRD:** `prds/analytics/PRD-LINEAR-ANALYTICS-V2.md`  
+**Scope:** ScoreTrajectoryChart · MistakeIntelligence · LeverageActions · RankPredictionCard  
+**Retains:** All 7 existing AnalyticsTab blocks unchanged. Strengths/WeakSpots → replaced by LeverageActions.  
+**Out of scope (locked):** Exam-specific insights, peer percentile, exam countdown, recovery journey, SAT analytics.
+
+### Phase 0 — PRD & Planning
+| # | Task | Status |
+|---|------|--------|
+| LA-0a | Write PRD → `prds/analytics/PRD-LINEAR-ANALYTICS-V2.md` | [x] DONE — Apr 20 2026 |
+| LA-0b | Update TODO-BACKLOG.md | [x] DONE — Apr 20 2026 |
+
+### Phase 1 — DB Migrations
+| # | Migration | Status |
+|---|---|---|
+| KSS-DB-048 | `users`: ADD `target_neet_score INT NULL`, `target_jee_score INT NULL`, `target_clat_score INT NULL` | [ ] PENDING |
+| KSS-DB-049 | CREATE `rank_prediction_tables` + seed NEET/JEE/CLAT 2025 data (`is_active=true`) | [ ] PENDING |
+| KSS-DB-052 | DROP `attempt_answers_question_id_fkey` — undocumented FK blocking analytics seeding with placeholder question_ids | [x] DONE — Apr 21 2026 |
+
+### Phase 2 — Data Seeding (attempt_answers for NEET / JEE / CLAT)
+| # | Task | Status |
+|---|---|---|
+| SEED-LA-001 | NEET FT1 Attempt 1 (free) — 180 attempt_answers with time + distribution | [x] DONE — Apr 21 2026 |
+| SEED-LA-002 | NEET FT1 Attempt 2 (paid) — 180 attempt_answers | [x] DONE — Apr 21 2026 |
+| SEED-LA-003 | JEE FT1 Attempt 1+2 — 180 attempt_answers combined | [x] DONE — Apr 21 2026 |
+| SEED-LA-004 | JEE FT1 Attempt 2 (paid) — 90 attempt_answers | [x] DONE — Apr 21 2026 (combined with SEED-LA-003) |
+| SEED-LA-005 | CLAT FT1 Attempt 1+2 — 240 attempt_answers combined | [x] DONE — Apr 21 2026 |
+| SEED-LA-006 | CLAT FT1 Attempt 2 (paid) — 150 attempt_answers | [x] DONE — Apr 21 2026 (combined with SEED-LA-005) |
+| SEED-LA-007 | Verify `attempt_section_results.time_spent_seconds` populated for all 6 attempts | [x] DONE — Apr 21 2026 (seeded in STEP 2) |
+| SEED-LA-008 | Chapter test answer UPDATEs + mastery INSERTs for chapter tests | [x] DONE — Apr 21 2026 (STEP 9+10, pre-completed) |
+
+### Phase 3 — New Standalone Components
+| # | File | Status |
+|---|---|---|
+| LA-C001 | `src/components/assessment-detail/ScoreTrajectoryChart.tsx` — 6-slot, target line, inline prompt | [ ] PENDING |
+| LA-C002 | `src/components/assessment-detail/RankPredictionCard.tsx` — NEET/CLAT AIR + JEE band, interpolation | [ ] PENDING |
+| LA-C003 | `src/components/assessment-detail/MistakeIntelligence.tsx` — 6 categories, empty state, INFERENCE-ENGINE rules | [ ] PENDING |
+| LA-C004 | `src/components/assessment-detail/LeverageActions.tsx` — top 3 by marks lost, mastery fallback, time insight | [ ] PENDING |
+
+### Phase 4 — AnalyticsTab.tsx Integration
+| # | Task | Status |
+|---|---|---|
+| LA-I001 | Add rank_prediction_tables fetch (once on mount, by exam_category_id) | [ ] PENDING |
+| LA-I002 | Add attempt_answers fetch per selected attempt (shared by MistakeIntelligence + LeverageActions) | [ ] PENDING |
+| LA-I003 | Insert ScoreTrajectoryChart at Block 3 | [ ] PENDING |
+| LA-I004 | Insert RankPredictionCard at Block 4 (NEET/JEE/CLAT guard) | [ ] PENDING |
+| LA-I005 | Insert MistakeIntelligence after Section Breakdown | [ ] PENDING |
+| LA-I006 | Replace Strengths/WeakSpots with LeverageActions | [ ] PENDING |
+| LA-I007 | Wire target score read/write via AppContext | [ ] PENDING |
+
+### Phase 5 — AppContext
+| # | Task | Status |
+|---|---|---|
+| LA-AC001 | Add `target_neet_score`, `target_jee_score`, `target_clat_score` to user shape | [ ] PENDING |
+| LA-AC002 | Add `updateTargetScore(exam, score)` method — writes Supabase + updates context | [ ] PENDING |
+
+### Phase 6 — Platform Config Rank Prediction Sub-tab
+| # | Task | Status |
+|---|---|---|
+| LA-PC001 | Add "Rank Prediction" sub-tab to NEET/JEE/CLAT categories in Platform Config drill-down | [ ] PENDING |
+| LA-PC002 | List years + is_active toggle + "Add Year" slide-over (year + JSON paste) | [ ] PENDING |
+
+### Phase 7 — Post-Build (Phase 2 seeding docs)
+| # | Task | Status |
+|---|---|---|
+| LA-POST001 | Update `CLAUDE-DB.md` — KSS-DB-052 + Phase 2 seeding notes + routing bug note | [x] DONE — Apr 21 2026 |
+| LA-POST002 | Update `CLAUDE-HISTORY.md` — log KSS-ANA-001 Phase 2 seeding + KSS-DB-052 | [x] DONE — Apr 21 2026 |
+| LA-POST003 | Update memory files — project_kss_ana_001.md | [x] DONE — Apr 21 2026 |
+| LA-POST004 | `npm run build` must pass clean | [ ] PENDING |
+| LA-POST005 | Update `CLAUDE-DB.md` — KSS-DB-048 + KSS-DB-049 schemas (after Phase 1 DB migrations run) | [ ] PENDING |
+
+---
+
+## [COMPLETE — BUILD PASSING] KSS-SA-PC-001 — Platform Config Exam Category CRUD
+
+**PRD:** `prds/super-admin/PRD-SA-PLATFORM-CONFIG.md`
+**Decision:** Option B — `display_name` column added; `name` = immutable short code
+
+### Phase 0 — Pre-Implementation
+| # | Task | Status |
+|---|------|--------|
+| PC-0a | DB diagnostic run — DIAG-1 through DIAG-6 pasted in SQL-RESPONSE-3.txt | [x] DONE — Apr 20 2026 |
+| PC-0b | CQ-6a/b/c resolved — JEE-only, Thermodynamics=Physics, CLAT Quantitative | [x] DONE |
+| PC-0c | CLAUDE-DB.md updated — confirmed IDs, schema gaps, backfill mapping | [x] DONE |
+| PC-0d | PRD written — `prds/super-admin/PRD-SA-PLATFORM-CONFIG.md` | [x] DONE |
+| PC-0e | Option B chosen — `display_name` column added (`name` = immutable code) | [x] DONE — Apr 20 2026 |
+
+### Phase 1 — DB Migrations
+| # | Migration | Status |
+|---|---|---|
+| KSS-DB-045 | `exam_categories`: ADD `description`, `display_order`, `display_name`. Seeded. | [x] DONE — Apr 20 2026 |
+| KSS-DB-046a | `assessments` + `assessment_items`: ADD `exam_category_id UUID FK`. Backfilled. | [x] DONE — Apr 20 2026 |
+| KSS-DB-046b | `assessments`: DROP `exam_type`. | [x] DONE — Apr 20 2026 |
+| KSS-DB-047 | Insert missing concept tags (Thermodynamics/JEE, Arithmetic+Ratio/CLAT). Verify pending. | [x] DONE — Apr 20 2026 |
+
+### Phase 2 — Shared Hook
+| # | Task | Status |
+|---|---|---|
+| PC-2a | Create `src/hooks/useExamCategories.ts` — `activeOnly` flag, ordered by `display_order` | [x] DONE — Apr 20 2026 |
+| PC-2b | `useAssessments.ts`, `assessmentUtils.ts`, `plans.ts`, `b2c-users.ts` — JOIN `exam_categories!exam_category_id` | [x] DONE — Apr 20 2026 |
+
+### Phase 3 — EXAM_SORT_ORDER Replacement
+| # | Task | Status |
+|---|---|---|
+| PC-3a | Remove hardcoded `EXAM_SORT_ORDER` from `AssessmentLibrarySection.tsx` | [x] DONE — Apr 20 2026 |
+| PC-3b | `buildExamGroups()` sorts by `display_order`; filters `is_active = false` | [x] DONE — Apr 20 2026 |
+| PC-3c | `YourAssessmentsSection` — dynamic exam filter options from active assessments | [x] DONE — Apr 20 2026 |
+
+### Phase 4 — Platform Config Page Refactor
+| # | Task | Status |
+|---|---|---|
+| PC-4a | Replace tab nav → 3-col card grid (mobile 1-col, tablet 2-col, desktop 3-col) | [x] DONE — Apr 20 2026 |
+| PC-4b | SortableExamCard: display_name, badge, tag count, Edit button, drag handle | [x] DONE — Apr 20 2026 |
+| PC-4c | dnd-kit drag-to-reorder → batch UPDATE `display_order` on drop | [x] DONE — Apr 20 2026 |
+| PC-4d | URL param `?cat=[categoryId]` — drill-down with breadcrumb (Suspense wrapper) | [x] DONE — Apr 20 2026 |
+| PC-4e | Sub-tabs (Concept Tags + Analytics Display) preserved inside drill-down | [x] DONE — Apr 20 2026 |
+
+### Phase 5 — Exam Category CRUD
+| # | Task | Status |
+|---|---|---|
+| PC-5a | "Create Exam Category" slide-over (all fields, slug auto-gen) | [x] DONE — Apr 20 2026 |
+| PC-5b | Edit slide-over — name/slug READ-ONLY; delete button at bottom | [x] DONE — Apr 20 2026 |
+| PC-5c | Delete guard — count concept_tags + assessment_items; block if > 0 | [x] DONE — Apr 20 2026 |
+| PC-5d | Cancel button bug fixed — `onCancelDelete` prop resets confirming state | [x] DONE — Apr 20 2026 |
+
+### Phase 6 — is_active Consumer Wiring
+| # | Task | Status |
+|---|---|---|
+| PC-6a | SA `create-assessments/page.tsx` + `linear/page.tsx` — `.eq('is_active', true).order('display_order')` | [x] DONE — Apr 20 2026 |
+| PC-6b | `AssessmentCard`, `ContinueLearningWidget` — use `exam_categories.name/display_name` | [x] DONE — Apr 20 2026 |
+| PC-6c | `AssessmentLibrarySection`, `YourAssessmentsSection` — filter inactive categories | [x] DONE — Apr 20 2026 |
+
+### Phase 7 — makeLive Sync
+| # | Task | Status |
+|---|---|---|
+| PC-7a | `makeLive()` in `content-bank.ts` — INSERT into `assessments`, set `assessment_items.assessments_id` | [x] DONE — Apr 20 2026 |
+| PC-7b | Idempotent guard — if `assessments_id` set, UPDATE existing row | [x] DONE — Apr 20 2026 |
+
+### Phase 8 — Concept Tag Count Fix (post QB-DB-021 Step B)
+| # | Task | Status |
+|---|---|---|
+| PC-8a | Count query already correct — uses `questions WHERE concept_tag_id = x` (verified) | [x] DONE — Apr 20 2026 |
+
+### Post-Implementation
+| # | Task | Status |
+|---|---|---|
+| POST-1 | Update PRD status → LOCKED | [ ] PENDING |
+| POST-2 | Update `CLAUDE-DB.md` — final exam_categories schema | [ ] PENDING |
+| POST-3 | Update `CLAUDE-HISTORY.md` — log KSS-SA-PC-001 completion | [ ] PENDING |
+| POST-4 | Update memory `project_kss_sa_pc_001.md` | [ ] PENDING |
+| POST-5 | `npm run build` — must pass clean | [x] DONE — Apr 20 2026 |
 
 ---
 
@@ -8,9 +241,9 @@
 | # | Task | Status |
 |---|------|--------|
 | QB-DB-001 | KSS-DB-020 migration — numeric_answer_type/min/max on questions, marks/negative_marks on passage_sub_questions | [x] DONE — confirmed Apr 20 2026 |
-| QB-DB-002 | KSS-DB-021 — Add `concept_tag_id UUID REFERENCES concept_tags(id) ON DELETE RESTRICT` (nullable) to `questions`. Backfill by name-match (`concept_tag` text → `concept_tags.concept_name`). Drop legacy `concept_tag` text column. Replace `question_concept_mappings` count query in platform-config with `COUNT(*) FROM questions WHERE concept_tag_id=x`. Retire `question_concept_mappings` table. SQL → SQL-RESPONSE-2.txt | [ ] PENDING — all decisions locked, ready to build |
-| QB-001 | Write `prds/content_creation/PRD-SA-QUESTIONS.md` — after all QB decisions finalised | [ ] PENDING — all decisions locked, ready to write |
-| QB-002 | Update CLAUDE-DB.md to reflect KSS-DB-020 + KSS-DB-021 new columns | [ ] PENDING — after both migrations confirmed |
+| QB-DB-002 | KSS-DB-021 — Add `concept_tag_id UUID REFERENCES concept_tags(id) ON DELETE RESTRICT` (nullable) to `questions`. Backfill by name-match (`concept_tag` text → `concept_tags.concept_name`). Drop legacy `concept_tag` text column. Replace `question_concept_mappings` count query in platform-config with `COUNT(*) FROM questions WHERE concept_tag_id=x`. Retire `question_concept_mappings` table. SQL → SQL-RESPONSE-2.txt | [x] DONE — Apr 20 2026 |
+| QB-001 | Write `prds/super-admin/PRD-SA-QUESTIONS.md` — after all QB decisions finalised | [x] DONE — Apr 20 2026 |
+| QB-002 | Update CLAUDE-DB.md to reflect KSS-DB-033 + KSS-DB-034 new columns | [x] DONE — Apr 20 2026 |
 | QB-003 | Create Assessment question-picker UI — SA picks sources/chapters, system randomly assigns questions at runtime | [ ] PENDING — separate ticket |
 | QB-004 | `categories` column on `questions` table — legacy/redundant. Leave as DEFAULT '[]', never write to it. Drop in future cleanup | [ ] DEFERRED |
 | QB-005 | TIPTAP-001/002 — Exam player rendering of Tiptap JSONB question_text and options[].text | [ ] PENDING — pre-existing ticket |

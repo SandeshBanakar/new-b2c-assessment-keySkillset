@@ -12,7 +12,7 @@ export function useAssessments() {
     supabase
       .from('assessments')
       .select(
-        'id, title, description, exam_type, assessment_type, subject, difficulty, duration_minutes, total_questions, min_tier, is_active, thumbnail_url, created_at, slug',
+        'id, title, description, exam_category_id, exam_categories!exam_category_id(name, display_name, display_order, is_active), assessment_type, subject, difficulty, duration_minutes, total_questions, min_tier, is_active, thumbnail_url, created_at, slug',
       )
       .eq('is_active', true)
       .order('created_at', { ascending: true })

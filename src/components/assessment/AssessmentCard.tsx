@@ -22,11 +22,13 @@ import { supabase } from '@/lib/supabase/client';
 // -------------------------------------------------------
 
 const EXAM_BADGE: Record<string, string> = {
-  SAT:      'bg-blue-50 text-blue-700 border border-blue-200',
-  'IIT-JEE':'bg-orange-50 text-orange-700 border border-orange-200',
-  NEET:     'bg-green-50 text-green-700 border border-green-200',
-  PMP:      'bg-purple-50 text-purple-700 border border-purple-200',
-  CLAT:     'bg-rose-50 text-rose-700 border border-rose-200',
+  SAT:  'bg-blue-50 text-blue-700 border border-blue-200',
+  JEE:  'bg-orange-50 text-orange-700 border border-orange-200',
+  NEET: 'bg-green-50 text-green-700 border border-green-200',
+  PMP:  'bg-purple-50 text-purple-700 border border-purple-200',
+  CLAT: 'bg-rose-50 text-rose-700 border border-rose-200',
+  BANK: 'bg-teal-50 text-teal-700 border border-teal-200',
+  SSC:  'bg-amber-50 text-amber-700 border border-amber-200',
 };
 
 const DIFF_BADGE: Record<string, string> = {
@@ -40,11 +42,13 @@ const DIFF_BADGE: Record<string, string> = {
 // -------------------------------------------------------
 
 const EXAM_GRADIENT: Record<string, string> = {
-  SAT:      'from-blue-100 to-blue-200',
-  'IIT-JEE':'from-orange-100 to-orange-200',
-  NEET:     'from-green-100 to-green-200',
-  PMP:      'from-purple-100 to-purple-200',
-  CLAT:     'from-rose-100 to-rose-200',
+  SAT:  'from-blue-100 to-blue-200',
+  JEE:  'from-orange-100 to-orange-200',
+  NEET: 'from-green-100 to-green-200',
+  PMP:  'from-purple-100 to-purple-200',
+  CLAT: 'from-rose-100 to-rose-200',
+  BANK: 'from-teal-100 to-teal-200',
+  SSC:  'from-amber-100 to-amber-200',
 };
 
 // -------------------------------------------------------
@@ -53,10 +57,6 @@ const EXAM_GRADIENT: Record<string, string> = {
 
 export type CardState = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-// exam_type in the DB may be 'IIT-JEE' while plan category is 'JEE'
-function normalizeExam(examType: string): string {
-  return examType === 'IIT-JEE' ? 'JEE' : examType
-}
 
 export function deriveCardState({
   userTier,
@@ -79,7 +79,7 @@ export function deriveCardState({
   // State 3: category plan but this assessment is outside the plan's exam category
   if (
     activePlanInfo?.scope === 'CATEGORY_BUNDLE' &&
-    normalizeExam(assessment.exam_type) !== activePlanInfo.category
+    (assessment.exam_categories?.name ?? '') !== activePlanInfo.category
   ) {
     return 3;
   }
@@ -132,7 +132,7 @@ export default function AssessmentCard({
   const [targetPick, setTargetPick]   = useState(1500);
   const [savingTarget, setSavingTarget] = useState(false);
 
-  const isSatFullTest = assessment.exam_type === 'SAT' && assessment.assessment_type === 'full-test';
+  const isSatFullTest = assessment.exam_categories?.name === 'SAT' && assessment.assessment_type === 'full-test';
   const showTargetTouch1 = isSatFullTest && (user?.targetSatScore ?? null) === null;
 
   async function handleSaveTouch1(e: React.MouseEvent) {
@@ -152,8 +152,10 @@ export default function AssessmentCard({
   const showProgressBar     = cardState === 5 || cardState === 6 || cardState === 7;
   const fillPct = Math.min((attemptData.attemptsUsed / 6) * 100, 100);
 
-  const gradientClass = EXAM_GRADIENT[assessment.exam_type] ?? 'from-zinc-100 to-zinc-200';
-  const examBadgeClass = EXAM_BADGE[assessment.exam_type] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200';
+  const examName = assessment.exam_categories?.name ?? '';
+  const examDisplayName = assessment.exam_categories?.display_name ?? examName;
+  const gradientClass = EXAM_GRADIENT[examName] ?? 'from-zinc-100 to-zinc-200';
+  const examBadgeClass = EXAM_BADGE[examName] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200';
   const diffBadgeClass = DIFF_BADGE[assessment.difficulty] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200';
 
   const showPlaceholder = !assessment.thumbnail_url || imgError;
@@ -169,7 +171,7 @@ export default function AssessmentCard({
           className={`w-full h-40 bg-linear-to-br ${gradientClass} flex items-center justify-center`}
         >
           <span className="text-2xl font-bold text-white opacity-40">
-            {assessment.exam_type}
+            {examDisplayName}
           </span>
         </div>
       ) : (
@@ -188,7 +190,7 @@ export default function AssessmentCard({
         {/* Row 1 — Chips */}
         <div className="flex flex-wrap gap-2">
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${examBadgeClass}`}>
-            {assessment.exam_type}
+            {examDisplayName}
           </span>
           {showFreeAttemptChip && (
             <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700">
@@ -294,7 +296,7 @@ export default function AssessmentCard({
               </button>
             )}
             <button
-              onClick={(e) => { e.stopPropagation(); router.push(`/plans?highlight=${assessment.exam_type}`); }}
+              onClick={(e) => { e.stopPropagation(); router.push(`/plans?highlight=${examName}`); }}
               className="border border-zinc-300 text-zinc-600 bg-white hover:bg-zinc-50 w-full rounded-lg py-2.5 text-sm font-medium transition-colors"
             >
               Switch Plan

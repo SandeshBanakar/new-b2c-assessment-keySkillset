@@ -1,10 +1,18 @@
 import type { Tier } from '@/types';
 
+export interface ExamCategoryRef {
+  name: string;
+  display_name: string;
+  display_order: number;
+  is_active: boolean;
+}
+
 export interface SupabaseAssessment {
   id: string;
   title: string;
   description: string;
-  exam_type: string;
+  exam_category_id: string | null;
+  exam_categories: ExamCategoryRef | null;
   assessment_type: string;
   subject: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
@@ -20,7 +28,7 @@ export interface SupabaseAssessment {
   slug?: string;
 }
 
-export type ExamType = 'SAT' | 'IIT-JEE' | 'NEET' | 'CLAT' | 'PMP';
+export type ExamType = 'SAT' | 'JEE' | 'NEET' | 'CLAT' | 'PMP' | 'BANK' | 'SSC';
 export type SupabaseAssessmentType = 'full-test' | 'subject-test' | 'chapter-test';
 export type SupabaseDifficulty = 'Easy' | 'Medium' | 'Hard';
 

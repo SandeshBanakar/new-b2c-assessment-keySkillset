@@ -1,9 +1,9 @@
 CARELESS MISTAKE
-→ Wrong answer + time < 40% of section average per question
+→ Wrong answer + time < 40% of section average time per question
 → Interpretation: Rushed, didn't read carefully
 
 CONCEPT GAP
-→ Wrong answer + time > 120% of section average per question
+→ Wrong answer + time > 120% of section average time per question
 → Interpretation: Spent time, still got it wrong — genuine gap
 
 PANIC SKIP
@@ -15,9 +15,9 @@ KNOWLEDGE SKIP
 → Interpretation: Tried, gave up — partial knowledge
 
 FRAGILE CORRECT
-→ Correct answer + time > 180% of section average
+→ Correct answer + time > 180% of section average time
 → Interpretation: Right but slow — will break under real exam pressure
 
 CONFIDENT CORRECT
-→ Correct answer + time < 60% of section average
+→ Correct answer + time < 60% of section average time
 → Interpretation: Genuinely mastered

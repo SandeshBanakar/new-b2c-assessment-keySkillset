@@ -1,18 +1,44 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import {
-  Plus, Pencil, Trash2, Search, Tag, X,
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, rectSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import {
+  Plus, Pencil, Trash2, Search, Tag, X, GripVertical, ChevronLeft,
   TriangleAlert as AlertTriangle, Settings2, GraduationCap,
-  ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Save, Clock,
+  ToggleLeft, ToggleRight, Save, Clock, TrendingUp,
 } from 'lucide-react'
 
 const DEMO_SA_ID = '3bd6101b-1fb9-4c96-a9a5-c958a3deb54a'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ExamCategory { id: string; name: string }
+interface ExamCategory {
+  id: string
+  name: string
+  display_name: string
+  slug: string
+  description: string | null
+  display_order: number
+  is_active: boolean
+}
+
+interface ExamCategoryForm {
+  display_name: string
+  name: string
+  slug: string
+  description: string
+  display_order: string
+  is_active: boolean
+}
 
 interface ConceptTag {
   id: string; exam_category: string; subject: string
@@ -45,6 +71,22 @@ interface AnalyticsConfig {
   show_mistake_taxonomy_preview: boolean
 }
 
+interface RankPredictionRow {
+  id: string
+  year: number
+  is_active: boolean
+  updated_at: string | null
+}
+
+interface AddYearForm {
+  year: string
+  json: string
+}
+
+type SubTab = 'concept-tags' | 'analytics-display' | 'rank-prediction'
+
+const RANK_PREDICTION_CATS = new Set(['NEET', 'JEE', 'CLAT'])
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function slugify(text: string) {
@@ -57,6 +99,10 @@ function emptyTagForm(): ConceptTagForm {
 
 function emptyCollegeForm(): CollegeForm {
   return { name: '', country: 'US', cutoff_score: '', aid_pct: '0', logo_initials: '' }
+}
+
+function emptyCategoryForm(nextOrder = 1): ExamCategoryForm {
+  return { display_name: '', name: '', slug: '', description: '', display_order: String(nextOrder), is_active: true }
 }
 
 const TIER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -72,6 +118,8 @@ const EXAM_BADGE: Record<string, string> = {
   NEET: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   JEE:  'bg-amber-50 text-amber-700 border border-amber-200',
   CLAT: 'bg-rose-50 text-rose-700 border border-rose-200',
+  BANK: 'bg-teal-50 text-teal-700 border border-teal-200',
+  SSC:  'bg-orange-50 text-orange-700 border border-orange-200',
 }
 
 function computeTierForScore(cutoff: number, bands: TierBand[]): TierBand | null {
@@ -80,24 +128,456 @@ function computeTierForScore(cutoff: number, bands: TierBand[]): TierBand | null
 
 const inputCls = 'block w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500'
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Sortable Exam Card ────────────────────────────────────────────────────────
 
-export default function PlatformConfigPage() {
-  const [examCategories, setExamCategories] = useState<ExamCategory[]>([])
-  const [selectedCatId, setSelectedCatId] = useState<string>('')
-  const [activeSubTab, setActiveSubTab] = useState<'concept-tags' | 'analytics-display'>('concept-tags')
+function SortableExamCard({
+  category,
+  onEdit,
+  onDrillDown,
+  tagCount,
+}: {
+  category: ExamCategory
+  onEdit: (cat: ExamCategory) => void
+  onDrillDown: (cat: ExamCategory) => void
+  tagCount: number
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: category.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const badgeClass = EXAM_BADGE[category.name] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200'
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="bg-white border border-zinc-200 rounded-md p-5 hover:border-zinc-300 hover:shadow-sm transition-all"
+    >
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {/* Drag handle */}
+          <button
+            {...attributes}
+            {...listeners}
+            className="p-1 text-zinc-300 hover:text-zinc-500 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeClass}`}>
+            {category.name}
+          </span>
+        </div>
+        {!category.is_active && (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 shrink-0">
+            Inactive
+          </span>
+        )}
+      </div>
+
+      <h3
+        className="text-base font-medium text-zinc-900 mb-1 cursor-pointer hover:text-blue-700 transition-colors"
+        onClick={() => onDrillDown(category)}
+      >
+        {category.display_name}
+      </h3>
+
+      {category.description && (
+        <p className="text-xs text-zinc-500 mb-3 line-clamp-2">{category.description}</p>
+      )}
+
+      <div className="flex items-center gap-2 mt-3">
+        <span className="text-xs text-zinc-400 flex items-center gap-1">
+          <Tag className="w-3 h-3" />
+          {tagCount} concept {tagCount === 1 ? 'tag' : 'tags'}
+        </span>
+        <span className="ml-auto flex items-center gap-1">
+          <button
+            onClick={() => onEdit(category)}
+            className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-md transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => onDrillDown(category)}
+            className="px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+          >
+            Manage →
+          </button>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Category Slide-Over ──────────────────────────────────────────────────────
+
+function CategorySlideOver({
+  mode,
+  form,
+  setForm,
+  error,
+  saving,
+  deleteState,
+  onSave,
+  onDelete,
+  onCancelDelete,
+  onClose,
+}: {
+  mode: 'create' | 'edit'
+  form: ExamCategoryForm
+  setForm: React.Dispatch<React.SetStateAction<ExamCategoryForm>>
+  error: string
+  saving: boolean
+  deleteState: { checking: boolean; tagCount: number; assessmentCount: number; confirming: boolean; deleting: boolean } | null
+  onSave: () => void
+  onDelete: () => void
+  onCancelDelete: () => void
+  onClose: () => void
+}) {
+  function handleDisplayNameChange(v: string) {
+    setForm(f => ({
+      ...f,
+      display_name: v,
+      slug: mode === 'create' ? slugify(v) : f.slug,
+    }))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white w-full max-w-md h-full shadow-2xl flex flex-col overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
+          <h2 className="text-base font-semibold text-zinc-900">
+            {mode === 'create' ? 'Create Exam Category' : 'Edit Exam Category'}
+          </h2>
+          <button onClick={onClose} className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-md">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 px-6 py-5 space-y-4">
+          {error && (
+            <div className="px-3 py-2 bg-rose-50 border border-rose-200 rounded-md text-sm text-rose-700">{error}</div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">
+              Display Name <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. JEE Mains"
+              value={form.display_name}
+              onChange={e => handleDisplayNameChange(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">
+              Code / Name <span className="text-rose-500">*</span>
+              {mode === 'edit' && <span className="ml-1 text-zinc-400 font-normal">(read-only)</span>}
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. JEE"
+              value={form.name}
+              readOnly={mode === 'edit'}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value.toUpperCase() }))}
+              className={`${inputCls} ${mode === 'edit' ? 'bg-zinc-50 text-zinc-500 cursor-not-allowed' : ''}`}
+            />
+            <p className="text-[10px] text-zinc-400 mt-0.5">Immutable after creation. Used as internal identifier.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">Slug</label>
+            <input
+              type="text"
+              value={form.slug}
+              onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
+              className={`${inputCls} font-mono text-xs`}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">Description</label>
+            <textarea
+              rows={2}
+              placeholder="Optional"
+              value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">Display Order</label>
+            <input
+              type="number"
+              min={1}
+              value={form.display_order}
+              onChange={e => setForm(f => ({ ...f, display_order: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <p className="text-sm font-medium text-zinc-900">Active</p>
+              <p className="text-xs text-zinc-500">Inactive categories are hidden from end-user pages and SA dropdowns.</p>
+            </div>
+            <button onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}>
+              {form.is_active
+                ? <ToggleRight className="w-8 h-8 text-blue-700" />
+                : <ToggleLeft className="w-8 h-8 text-zinc-300" />}
+            </button>
+          </div>
+
+          {/* Delete guard (edit mode only) */}
+          {mode === 'edit' && deleteState && (
+            <div className="pt-4 border-t border-zinc-100">
+              {!deleteState.confirming ? (
+                <button
+                  onClick={onDelete}
+                  disabled={deleteState.checking}
+                  className="w-full py-2.5 text-sm font-medium text-rose-600 border border-rose-200 rounded-md hover:bg-rose-50 transition-colors disabled:opacity-40"
+                >
+                  {deleteState.checking ? 'Checking…' : 'Delete Category'}
+                </button>
+              ) : (deleteState.tagCount > 0 || deleteState.assessmentCount > 0) ? (
+                <div className="px-3 py-2.5 bg-rose-50 border border-rose-200 rounded-md text-sm text-rose-700">
+                  Cannot delete — {deleteState.tagCount} concept {deleteState.tagCount === 1 ? 'tag' : 'tags'} and {deleteState.assessmentCount} {deleteState.assessmentCount === 1 ? 'assessment' : 'assessments'} are linked to this category.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-zinc-700">Confirm deletion? This cannot be undone.</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={onDelete}
+                      disabled={deleteState.deleting}
+                      className="flex-1 py-2 text-sm font-medium bg-rose-600 text-white rounded-md hover:bg-rose-700 disabled:opacity-50"
+                    >
+                      {deleteState.deleting ? 'Deleting…' : 'Delete'}
+                    </button>
+                    <button
+                      onClick={onCancelDelete}
+                      className="px-4 py-2 text-sm border border-zinc-200 rounded-md hover:bg-zinc-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-200 shrink-0 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50">
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-md hover:bg-blue-800 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Page (inner — needs Suspense for useSearchParams) ───────────────────
+
+function PlatformConfigInner() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const catIdParam = searchParams.get('cat')
+
+  const [categories, setCategories] = useState<ExamCategory[]>([])
+  const [tagCounts, setTagCounts] = useState<Record<string, number>>({})
   const [loadingCats, setLoadingCats] = useState(true)
 
-  useEffect(() => {
-    supabase.from('exam_categories').select('id, name').order('name').then(({ data }) => {
-      const cats = data ?? []
-      setExamCategories(cats)
-      if (cats.length > 0) setSelectedCatId(cats[0].id)
-      setLoadingCats(false)
-    })
+  // Create/Edit slide-over state
+  const [showCreate, setShowCreate] = useState(false)
+  const [editCat, setEditCat] = useState<ExamCategory | null>(null)
+  const [catForm, setCatForm] = useState<ExamCategoryForm>(emptyCategoryForm())
+  const [catFormError, setCatFormError] = useState('')
+  const [catSaving, setCatSaving] = useState(false)
+  const [deleteState, setDeleteState] = useState<{
+    checking: boolean; tagCount: number; assessmentCount: number; confirming: boolean; deleting: boolean
+  } | null>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  const loadCategories = useCallback(async () => {
+    setLoadingCats(true)
+    const { data } = await supabase
+      .from('exam_categories')
+      .select('id, name, display_name, slug, description, display_order, is_active')
+      .order('display_order', { ascending: true })
+
+    const cats = (data ?? []) as ExamCategory[]
+    setCategories(cats)
+
+    // Fetch concept tag counts per category (by name)
+    if (cats.length > 0) {
+      const names = cats.map(c => c.name)
+      const { data: tagRows } = await supabase
+        .from('concept_tags')
+        .select('exam_category')
+        .in('exam_category', names)
+      const counts: Record<string, number> = {}
+      for (const row of tagRows ?? []) {
+        counts[row.exam_category] = (counts[row.exam_category] ?? 0) + 1
+      }
+      setTagCounts(counts)
+    }
+
+    setLoadingCats(false)
   }, [])
 
-  const selectedCat = examCategories.find(c => c.id === selectedCatId)
+  useEffect(() => { loadCategories() }, [loadCategories])
+
+  // ── Drill-down state ─────────────────────────────────────────────────────────
+
+  const selectedCat = catIdParam ? categories.find(c => c.id === catIdParam) ?? null : null
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>('concept-tags')
+
+  function drillDown(cat: ExamCategory) {
+    router.push(`/super-admin/platform-config?cat=${cat.id}`)
+    setActiveSubTab('concept-tags')
+  }
+
+  function goBack() {
+    router.push('/super-admin/platform-config')
+  }
+
+  // ── Drag-to-reorder ──────────────────────────────────────────────────────────
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = categories.findIndex(c => c.id === active.id)
+    const newIndex = categories.findIndex(c => c.id === over.id)
+    const reordered = arrayMove(categories, oldIndex, newIndex)
+
+    // Optimistic update
+    setCategories(reordered)
+
+    // Batch upsert display_order
+    const updates = reordered.map((c, i) => ({
+      id: c.id,
+      display_order: i + 1,
+    }))
+
+    for (const { id, display_order } of updates) {
+      await supabase.from('exam_categories').update({ display_order }).eq('id', id)
+    }
+
+    setCategories(reordered.map((c, i) => ({ ...c, display_order: i + 1 })))
+  }
+
+  // ── Create Category ──────────────────────────────────────────────────────────
+
+  function openCreate() {
+    const nextOrder = categories.length > 0
+      ? Math.max(...categories.map(c => c.display_order)) + 1
+      : 1
+    setCatForm(emptyCategoryForm(nextOrder))
+    setCatFormError('')
+    setShowCreate(true)
+  }
+
+  async function handleCreateSave() {
+    if (!catForm.display_name.trim()) { setCatFormError('Display name is required'); return }
+    if (!catForm.name.trim()) { setCatFormError('Code/Name is required'); return }
+    if (!catForm.slug.trim()) { setCatFormError('Slug is required'); return }
+
+    setCatSaving(true)
+    const { error } = await supabase.from('exam_categories').insert({
+      name: catForm.name.trim(),
+      display_name: catForm.display_name.trim(),
+      slug: catForm.slug.trim(),
+      description: catForm.description.trim() || null,
+      display_order: parseInt(catForm.display_order) || 1,
+      is_active: catForm.is_active,
+    })
+    setCatSaving(false)
+
+    if (error) { setCatFormError(error.message); return }
+    setShowCreate(false)
+    loadCategories()
+  }
+
+  // ── Edit Category ────────────────────────────────────────────────────────────
+
+  function openEdit(cat: ExamCategory) {
+    setCatForm({
+      display_name: cat.display_name,
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description ?? '',
+      display_order: String(cat.display_order),
+      is_active: cat.is_active,
+    })
+    setCatFormError('')
+    setDeleteState({ checking: false, tagCount: 0, assessmentCount: 0, confirming: false, deleting: false })
+    setEditCat(cat)
+  }
+
+  async function handleEditSave() {
+    if (!editCat) return
+    if (!catForm.display_name.trim()) { setCatFormError('Display name is required'); return }
+
+    setCatSaving(true)
+    const { error } = await supabase.from('exam_categories').update({
+      display_name: catForm.display_name.trim(),
+      slug: catForm.slug.trim(),
+      description: catForm.description.trim() || null,
+      display_order: parseInt(catForm.display_order) || editCat.display_order,
+      is_active: catForm.is_active,
+    }).eq('id', editCat.id)
+    setCatSaving(false)
+
+    if (error) { setCatFormError(error.message); return }
+    setEditCat(null)
+    loadCategories()
+  }
+
+  // ── Delete Category ──────────────────────────────────────────────────────────
+
+  async function handleDeleteAction() {
+    if (!editCat || !deleteState) return
+
+    if (!deleteState.confirming) {
+      // Check counts first
+      setDeleteState(s => s ? { ...s, checking: true } : s)
+      const [{ count: tagCount }, { count: assessmentCount }] = await Promise.all([
+        supabase.from('concept_tags').select('*', { count: 'exact', head: true }).eq('exam_category', editCat.name),
+        supabase.from('assessment_items').select('*', { count: 'exact', head: true }).eq('exam_category_id', editCat.id),
+      ])
+      setDeleteState({ checking: false, tagCount: tagCount ?? 0, assessmentCount: assessmentCount ?? 0, confirming: true, deleting: false })
+      return
+    }
+
+    if (deleteState.tagCount > 0 || deleteState.assessmentCount > 0) return
+
+    // Confirmed + no linked content → hard delete
+    setDeleteState(s => s ? { ...s, deleting: true } : s)
+    await supabase.from('exam_categories').delete().eq('id', editCat.id)
+    setEditCat(null)
+    setDeleteState(null)
+    loadCategories()
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loadingCats) {
     return (
@@ -107,58 +587,158 @@ export default function PlatformConfigPage() {
     )
   }
 
+  // Drill-down view
+  if (selectedCat) {
+    return (
+      <div className="px-4 sm:px-6 py-8 max-w-7xl mx-auto">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 mb-6">
+          <button
+            onClick={goBack}
+            className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Platform Config
+          </button>
+          <span className="text-zinc-300">/</span>
+          <span className="text-sm font-medium text-zinc-900">{selectedCat.display_name}</span>
+        </div>
+
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-semibold text-zinc-900">{selectedCat.display_name}</h1>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${EXAM_BADGE[selectedCat.name] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200'}`}>
+              {selectedCat.name}
+            </span>
+            {!selectedCat.is_active && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500">Inactive</span>
+            )}
+          </div>
+          <button
+            onClick={() => openEdit(selectedCat)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" /> Edit
+          </button>
+        </div>
+
+        {/* Sub-tabs */}
+        <div className="flex items-center gap-1 mb-5 flex-wrap">
+          {([
+            'concept-tags',
+            'analytics-display',
+            ...(RANK_PREDICTION_CATS.has(selectedCat.name) ? ['rank-prediction'] : []),
+          ] as SubTab[]).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveSubTab(tab)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeSubTab === tab
+                  ? 'bg-zinc-900 text-white'
+                  : 'text-zinc-600 hover:bg-zinc-100'
+              }`}
+            >
+              {tab === 'concept-tags'
+                ? <><Tag className="w-3.5 h-3.5" /> Concept Tags</>
+                : tab === 'analytics-display'
+                ? <><Settings2 className="w-3.5 h-3.5" /> Analytics Display</>
+                : <><TrendingUp className="w-3.5 h-3.5" /> Rank Prediction</>}
+            </button>
+          ))}
+        </div>
+
+        {activeSubTab === 'concept-tags' && <ConceptTagsPanel categoryName={selectedCat.name} />}
+        {activeSubTab === 'analytics-display' && <AnalyticsDisplayPanel category={selectedCat} />}
+        {activeSubTab === 'rank-prediction' && <RankPredictionPanel category={selectedCat} />}
+      </div>
+    )
+  }
+
+  // Card grid view
   return (
     <div className="px-4 sm:px-6 py-8 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-zinc-900">Platform Config</h1>
-        <p className="text-sm text-zinc-500 mt-1">Manage concept tags, analytics display, and exam-specific settings.</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-zinc-900">Platform Config</h1>
+          <p className="text-sm text-zinc-500 mt-1">Manage exam categories, concept tags, and analytics display.</p>
+        </div>
+        <button
+          onClick={openCreate}
+          className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Create Exam Category
+        </button>
       </div>
 
-      {/* Exam Category Tabs */}
-      <div className="flex items-center gap-1 mb-0 overflow-x-auto pb-0 border-b border-zinc-200">
-        {examCategories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => { setSelectedCatId(cat.id); setActiveSubTab('concept-tags') }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              selectedCatId === cat.id
-                ? 'border-blue-700 text-blue-700'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
-            }`}
-          >
-            {cat.name}
-          </button>
-        ))}
-      </div>
+      {categories.length === 0 ? (
+        <div className="border border-dashed border-zinc-200 rounded-md py-16 text-center">
+          <Settings2 className="w-8 h-8 text-zinc-300 mx-auto mb-3" />
+          <p className="text-sm text-zinc-500">No exam categories yet.</p>
+        </div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {categories.map(cat => (
+                <SortableExamCard
+                  key={cat.id}
+                  category={cat}
+                  tagCount={tagCounts[cat.name] ?? 0}
+                  onEdit={openEdit}
+                  onDrillDown={drillDown}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
 
-      {selectedCat && (
-        <>
-          {/* Sub-tabs */}
-          <div className="flex items-center gap-1 mt-4 mb-5">
-            {(['concept-tags', 'analytics-display'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveSubTab(tab)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  activeSubTab === tab
-                    ? 'bg-zinc-900 text-white'
-                    : 'text-zinc-600 hover:bg-zinc-100'
-                }`}
-              >
-                {tab === 'concept-tags' ? <><Tag className="w-3.5 h-3.5" /> Concept Tags</> : <><Settings2 className="w-3.5 h-3.5" /> Analytics Display</>}
-              </button>
-            ))}
-          </div>
+      {/* Create slide-over */}
+      {showCreate && (
+        <CategorySlideOver
+          mode="create"
+          form={catForm}
+          setForm={setCatForm}
+          error={catFormError}
+          saving={catSaving}
+          deleteState={null}
+          onSave={handleCreateSave}
+          onDelete={() => {}}
+          onCancelDelete={() => {}}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
 
-          {activeSubTab === 'concept-tags' && (
-            <ConceptTagsPanel categoryName={selectedCat.name} />
-          )}
-          {activeSubTab === 'analytics-display' && (
-            <AnalyticsDisplayPanel category={selectedCat} />
-          )}
-        </>
+      {/* Edit slide-over */}
+      {editCat && (
+        <CategorySlideOver
+          mode="edit"
+          form={catForm}
+          setForm={setCatForm}
+          error={catFormError}
+          saving={catSaving}
+          deleteState={deleteState}
+          onSave={handleEditSave}
+          onDelete={handleDeleteAction}
+          onCancelDelete={() => setDeleteState(null)}
+          onClose={() => { setEditCat(null); setDeleteState(null) }}
+        />
       )}
     </div>
+  )
+}
+
+// ─── Page export (wraps inner in Suspense for useSearchParams) ─────────────────
+
+export default function PlatformConfigPage() {
+  return (
+    <Suspense fallback={
+      <div className="px-6 py-8 max-w-7xl mx-auto flex items-center justify-center py-20">
+        <div className="w-5 h-5 border-2 border-blue-700 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <PlatformConfigInner />
+    </Suspense>
   )
 }
 
@@ -199,10 +779,10 @@ function ConceptTagsPanel({ categoryName }: { categoryName: string }) {
     const tagIds = data.map(t => t.id)
     let qcounts: Record<string, number> = {}
     if (tagIds.length > 0) {
-      const { data: mappings } = await supabase
-        .from('question_concept_mappings').select('concept_tag_id').in('concept_tag_id', tagIds)
-      if (mappings) {
-        for (const m of mappings) qcounts[m.concept_tag_id] = (qcounts[m.concept_tag_id] ?? 0) + 1
+      const { data: qrows } = await supabase
+        .from('questions').select('concept_tag_id').in('concept_tag_id', tagIds)
+      if (qrows) {
+        for (const r of qrows) if (r.concept_tag_id) qcounts[r.concept_tag_id] = (qcounts[r.concept_tag_id] ?? 0) + 1
       }
     }
 
@@ -256,8 +836,10 @@ function ConceptTagsPanel({ categoryName }: { categoryName: string }) {
   async function handleDelete() {
     if (!deleteTag) return
     setDeleting(true)
-    await supabase.from('concept_tags').delete().eq('id', deleteTag.id)
-    setDeleting(false); setDeleteTag(null); loadTags()
+    const { error: dbErr } = await supabase.from('concept_tags').delete().eq('id', deleteTag.id)
+    setDeleting(false)
+    if (dbErr) { setError(dbErr.message); return }
+    setDeleteTag(null); loadTags()
   }
 
   const start = page * PAGE_SIZE + 1
@@ -371,7 +953,7 @@ function AnalyticsDisplayPanel({ category }: { category: ExamCategory }) {
     return (
       <div className="rounded-md border border-zinc-200 bg-zinc-50 p-10 text-center">
         <Settings2 className="w-8 h-8 text-zinc-300 mx-auto mb-3" />
-        <p className="text-sm font-medium text-zinc-700">Analytics Display configuration for {category.name}</p>
+        <p className="text-sm font-medium text-zinc-700">Analytics Display configuration for {category.display_name}</p>
         <p className="text-xs text-zinc-400 mt-1">Coming soon.</p>
       </div>
     )
@@ -425,8 +1007,6 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
     load()
   }, [categoryId])
 
-  // ── Section Visibility ──────────────────────────────────────────────────────
-
   async function saveConfig() {
     setConfigSaving(true)
     const upserts = (Object.entries(analyticsConfig) as [string, boolean][]).map(([key, val]) => ({
@@ -437,8 +1017,6 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
     setConfigSaving(false); setConfigSaved(true)
     setTimeout(() => setConfigSaved(false), 2000)
   }
-
-  // ── Tier Bands Edit ─────────────────────────────────────────────────────────
 
   function startBandEdit(band: TierBand) {
     setEditingBand(band.id)
@@ -454,8 +1032,6 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
     setTierBands(bs => bs.map(b => b.id === band.id ? { ...b, min_score: min, max_score: max } : b))
     setEditingBand(null)
   }
-
-  // ── College CRUD ────────────────────────────────────────────────────────────
 
   function openCreateCollege() {
     setCollegeForm(emptyCollegeForm()); setCollegeError(''); setShowCollegeForm(true)
@@ -506,7 +1082,6 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
 
   return (
     <div className="space-y-6">
-
       {/* Section Visibility */}
       <div className="bg-white border border-zinc-200 rounded-md">
         <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between gap-3">
@@ -545,7 +1120,7 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
       <div className="bg-white border border-zinc-200 rounded-md">
         <div className="px-5 py-4 border-b border-zinc-100">
           <h2 className="text-sm font-semibold text-zinc-900">Tier Bands</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">Score ranges used to group colleges on the ladder. Editing a band re-buckets all colleges automatically.</p>
+          <p className="text-xs text-zinc-500 mt-0.5">Score ranges used to group colleges on the ladder.</p>
         </div>
         {tierBands.length === 0 ? (
           <div className="px-5 py-8 text-center text-sm text-zinc-400">No tier bands found. Run KSS-DB-041 migration first.</div>
@@ -608,7 +1183,7 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
         <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-sm font-semibold text-zinc-900">College Targets</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Colleges shown on the student analytics ladder. Sorted by cutoff score (highest first).</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Colleges shown on the student analytics ladder. Sorted by cutoff score.</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-md border border-zinc-200 bg-white overflow-hidden text-xs">
@@ -628,7 +1203,7 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
         {colleges.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <GraduationCap className="w-8 h-8 text-zinc-300 mx-auto mb-3" />
-            <p className="text-sm text-zinc-500">No colleges yet. Run KSS-DB-042 migration or add one above.</p>
+            <p className="text-sm text-zinc-500">No colleges yet.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -658,9 +1233,7 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
                           <span className="font-medium text-zinc-900">{college.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center text-sm">
-                        {college.country === 'US' ? '🇺🇸' : '🇮🇳'}
-                      </td>
+                      <td className="px-4 py-3 text-center text-sm">{college.country === 'US' ? '🇺🇸' : '🇮🇳'}</td>
                       <td className="px-4 py-3 text-center tabular-nums text-zinc-700 font-medium">{college.cutoff_score}</td>
                       <td className="px-4 py-3 text-center text-zinc-500">{college.aid_pct}%</td>
                       <td className="px-4 py-3">
@@ -749,7 +1322,7 @@ function CollegeFormModal({ title, form, setForm, error, saving, onSave, onClose
           <div>
             <label className="block text-xs font-medium text-zinc-700 mb-1">Logo Initials</label>
             <input type="text" placeholder="MIT" maxLength={4} value={form.logo_initials} onChange={e => setForm(f => ({ ...f, logo_initials: e.target.value.toUpperCase() }))} className={inputCls} />
-            <p className="text-[10px] text-zinc-400 mt-0.5">2–4 characters shown in the badge. Auto-derived from name if empty.</p>
+            <p className="text-[10px] text-zinc-400 mt-0.5">2–4 characters. Auto-derived from name if empty.</p>
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 mt-6">
@@ -837,6 +1410,238 @@ function DeleteTagModal({ tag, deleting, onDelete, onClose }: {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Rank Prediction Panel ─────────────────────────────────────────────────────
+
+function RankPredictionPanel({ category }: { category: ExamCategory }) {
+  const [rows, setRows] = useState<RankPredictionRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [toggling, setToggling] = useState<string | null>(null)
+  const [showAddYear, setShowAddYear] = useState(false)
+  const [addForm, setAddForm] = useState<AddYearForm>({ year: '', json: '' })
+  const [addError, setAddError] = useState('')
+  const [addSaving, setAddSaving] = useState(false)
+
+  const isJee = category.name === 'JEE'
+  const jsonHint = isJee
+    ? `[{"marks": 300, "percentile_low": 99.9, "percentile_high": 100}, ...]`
+    : `[{"marks": 720, "rank": 1}, {"marks": 640, "rank": 2000}, ...]`
+
+  useEffect(() => { loadRows() }, [category.id])
+
+  async function loadRows() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('rank_prediction_tables')
+      .select('id, year, is_active, updated_at')
+      .eq('exam_category_id', category.id)
+      .order('year', { ascending: false })
+    setRows(data ?? [])
+    setLoading(false)
+  }
+
+  async function toggleActive(row: RankPredictionRow) {
+    if (toggling) return
+    setToggling(row.id)
+    const now = new Date().toISOString()
+
+    if (!row.is_active) {
+      // Deactivate all others, activate this one
+      await supabase
+        .from('rank_prediction_tables')
+        .update({ is_active: false, updated_at: now })
+        .eq('exam_category_id', category.id)
+        .neq('id', row.id)
+      await supabase
+        .from('rank_prediction_tables')
+        .update({ is_active: true, updated_at: now })
+        .eq('id', row.id)
+      setRows(rs => rs.map(r => ({ ...r, is_active: r.id === row.id, updated_at: r.id === row.id ? now : r.updated_at })))
+    } else {
+      await supabase
+        .from('rank_prediction_tables')
+        .update({ is_active: false, updated_at: now })
+        .eq('id', row.id)
+      setRows(rs => rs.map(r => r.id === row.id ? { ...r, is_active: false, updated_at: now } : r))
+    }
+    setToggling(null)
+  }
+
+  async function handleAddYear() {
+    const yearNum = parseInt(addForm.year)
+    if (isNaN(yearNum) || yearNum < 2020 || yearNum > 2035) {
+      setAddError('Enter a valid year (2020–2035)')
+      return
+    }
+    let parsed: unknown
+    try { parsed = JSON.parse(addForm.json) } catch {
+      setAddError('Invalid JSON — check your format and try again')
+      return
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      setAddError('JSON must be a non-empty array')
+      return
+    }
+    setAddSaving(true)
+    const { error } = await supabase.from('rank_prediction_tables').insert({
+      exam_category_id: category.id,
+      year: yearNum,
+      is_active: false,
+      data: parsed,
+      updated_by: DEMO_SA_ID,
+      updated_at: new Date().toISOString(),
+    })
+    setAddSaving(false)
+    if (error) {
+      setAddError(error.message.includes('unique') ? `Data for ${yearNum} already exists` : error.message)
+      return
+    }
+    setShowAddYear(false)
+    setAddForm({ year: '', json: '' })
+    setAddError('')
+    loadRows()
+  }
+
+  if (loading) {
+    return (
+      <div className="py-16 text-center">
+        <div className="w-5 h-5 border-2 border-blue-700 border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Year list */}
+      <div className="bg-white border border-zinc-200 rounded-md">
+        <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">Rank Prediction Data</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              {isJee
+                ? 'NTA-normalised percentile bands per marks. One year active at a time.'
+                : `Marks → AIR lookup for ${category.display_name}. One year active at a time.`}
+            </p>
+          </div>
+          <button
+            onClick={() => { setAddForm({ year: '', json: '' }); setAddError(''); setShowAddYear(true) }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-700 text-white rounded-md hover:bg-blue-800 transition-colors shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Year
+          </button>
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <TrendingUp className="w-7 h-7 text-zinc-300 mx-auto mb-2" />
+            <p className="text-sm text-zinc-500">No rank prediction data configured yet.</p>
+            <p className="text-xs text-zinc-400 mt-1">Click "Add Year" to add the first lookup table.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-zinc-100">
+            {rows.map(row => (
+              <div key={row.id} className="px-5 py-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-zinc-900">{row.year}</p>
+                  {row.updated_at && (
+                    <p className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Updated {new Date(row.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {row.is_active && (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Active</span>
+                  )}
+                  <button
+                    onClick={() => toggleActive(row)}
+                    disabled={toggling === row.id}
+                    title={row.is_active ? 'Deactivate' : 'Set as active'}
+                    className="shrink-0 disabled:opacity-50"
+                  >
+                    {row.is_active
+                      ? <ToggleRight className="w-8 h-8 text-emerald-600" />
+                      : <ToggleLeft className="w-8 h-8 text-zinc-300 hover:text-zinc-500" />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* JSON format reference */}
+      <div className="bg-zinc-50 border border-zinc-200 rounded-md px-5 py-4">
+        <p className="text-xs font-medium text-zinc-600 mb-1.5">Expected JSON format for {category.name}</p>
+        <code className="text-xs text-zinc-500 font-mono break-all">{jsonHint}</code>
+        {isJee && (
+          <p className="text-xs text-zinc-400 mt-2">
+            Values are shift-normalised — use a band (percentile_low + percentile_high) per marks entry. Sort marks descending.
+          </p>
+        )}
+      </div>
+
+      {/* Add Year slide-over */}
+      {showAddYear && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowAddYear(false)} />
+          <div className="relative bg-white w-full max-w-md h-full shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
+              <h2 className="text-base font-semibold text-zinc-900">Add Rank Data — {category.display_name}</h2>
+              <button onClick={() => setShowAddYear(false)} className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-md">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 px-6 py-5 space-y-4 overflow-y-auto">
+              {addError && (
+                <div className="px-3 py-2 bg-rose-50 border border-rose-200 rounded-md text-sm text-rose-700">{addError}</div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Year</label>
+                <input
+                  type="number"
+                  min={2020}
+                  max={2035}
+                  value={addForm.year}
+                  onChange={e => setAddForm(f => ({ ...f, year: e.target.value }))}
+                  placeholder="e.g. 2026"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Lookup Data (JSON array)</label>
+                <p className="text-xs text-zinc-400 mb-1.5 font-mono break-all">{jsonHint}</p>
+                <textarea
+                  rows={14}
+                  value={addForm.json}
+                  onChange={e => { setAddForm(f => ({ ...f, json: e.target.value })); setAddError('') }}
+                  placeholder={`Paste JSON array here…`}
+                  className={`${inputCls} font-mono text-xs resize-none`}
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-zinc-200 flex items-center justify-end gap-2 shrink-0">
+              <button onClick={() => setShowAddYear(false)} className="px-4 py-2 text-sm text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50">
+                Cancel
+              </button>
+              <button
+                onClick={handleAddYear}
+                disabled={addSaving}
+                className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-md hover:bg-blue-800 disabled:opacity-50"
+              >
+                {addSaving ? 'Saving…' : 'Add Year'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -58,7 +58,7 @@ interface FormState {
   numeric_min: string
   numeric_max: string
   explanation: JSONContent
-  concept_tag: string
+  concept_tag_id: string
   marks: string
   negative_marks: string
   video_url: string
@@ -113,7 +113,7 @@ function defaultForm(): FormState {
     numeric_min: '',
     numeric_max: '',
     explanation: emptyDoc(),
-    concept_tag: '',
+    concept_tag_id: '',
     marks: '4',
     negative_marks: '1',
     video_url: '',
@@ -642,7 +642,7 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
       .select(`
         id, chapter_id, source_id, question_type, difficulty,
         question_text, passage_text, options, correct_answer,
-        acceptable_answers, explanation, concept_tag, marks, negative_marks,
+        acceptable_answers, explanation, concept_tag_id, marks, negative_marks,
         video_url, numeric_answer_type, numeric_min, numeric_max,
         passage_sub_questions(id, question_text, options, correct_answer, explanation, marks, negative_marks, order_index)
       `)
@@ -695,7 +695,7 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
       numeric_min: numType === 'RANGE' ? String(d.numeric_min ?? '') : '',
       numeric_max: numType === 'RANGE' ? String(d.numeric_max ?? '') : '',
       explanation: ensureDoc(d.explanation),
-      concept_tag: (d.concept_tag as string | null) ?? '',
+      concept_tag_id: (d.concept_tag_id as string | null) ?? '',
       marks: String(d.marks ?? 4),
       negative_marks: String(d.negative_marks ?? 1),
       video_url: (d.video_url as string | null) ?? '',
@@ -889,7 +889,7 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
       numeric_min: isNumeric && form.numeric_answer_type === 'RANGE' ? parseFloat(form.numeric_min) : null,
       numeric_max: isNumeric && form.numeric_answer_type === 'RANGE' ? parseFloat(form.numeric_max) : null,
       explanation: (!isPassage && !isDocEmpty(form.explanation)) ? form.explanation : null,
-      concept_tag: form.concept_tag.trim() || null,
+      concept_tag_id: form.concept_tag_id || null,
       marks: finalMarks,
       negative_marks: finalNegMarks,
       video_url: form.video_url.trim() || null,
@@ -1121,8 +1121,8 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
                     Manage tags <ExternalLink className="w-3 h-3" />
                   </a>
                 </FieldLabel>
-                <select className={inputCls} value={form.concept_tag}
-                  onChange={(e) => setField('concept_tag', e.target.value)}>
+                <select className={inputCls} value={form.concept_tag_id}
+                  onChange={(e) => setField('concept_tag_id', e.target.value)}>
                   <option value="">— None —</option>
                   {Array.from(new Set(conceptTags.map((t) => `${t.exam_category}|||${t.subject}`))).map((key) => {
                     const [exam, subject] = key.split('|||')
@@ -1130,7 +1130,7 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
                     return (
                       <optgroup key={key} label={`${exam} — ${subject}`}>
                         {group.map((t) => (
-                          <option key={t.id} value={t.concept_name}>{t.concept_name}</option>
+                          <option key={t.id} value={t.id}>{t.concept_name}</option>
                         ))}
                       </optgroup>
                     )

@@ -14,11 +14,13 @@ import { EmptyStateAction } from '@/components/shared/EmptyStateAction';
 // -------------------------------------------------------
 
 const EXAM_BADGE: Record<string, string> = {
-  SAT:      'bg-blue-50 text-blue-700',
-  'IIT-JEE':'bg-orange-50 text-orange-700',
-  NEET:     'bg-green-50 text-green-700',
-  PMP:      'bg-purple-50 text-purple-700',
-  CLAT:     'bg-rose-50 text-rose-700',
+  SAT:  'bg-blue-50 text-blue-700',
+  JEE:  'bg-orange-50 text-orange-700',
+  NEET: 'bg-green-50 text-green-700',
+  PMP:  'bg-purple-50 text-purple-700',
+  CLAT: 'bg-rose-50 text-rose-700',
+  BANK: 'bg-teal-50 text-teal-700',
+  SSC:  'bg-amber-50 text-amber-700',
 };
 
 function relativeTime(ts: number): string {
@@ -131,7 +133,9 @@ export default function ContinueLearningWidget() {
           >
             {inProgress.map(({ assessment, attempt, lastAccessedAt }) => {
               const fillPct = Math.min((attempt.attemptsUsed / 6) * 100, 100);
-              const badgeClass = EXAM_BADGE[assessment.exam_type] ?? 'bg-zinc-50 text-zinc-700';
+              const examName = assessment.exam_categories?.name ?? '';
+              const examDisplay = assessment.exam_categories?.display_name ?? examName;
+              const badgeClass = EXAM_BADGE[examName] ?? 'bg-zinc-50 text-zinc-700';
               return (
                 <div
                   key={assessment.id}
@@ -139,7 +143,7 @@ export default function ContinueLearningWidget() {
                   style={{ minWidth: 260, maxWidth: 260, scrollSnapAlign: 'start' }}
                 >
                   <span className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${badgeClass}`}>
-                    {assessment.exam_type}
+                    {examDisplay}
                   </span>
                   <p className="text-sm font-medium text-zinc-900 leading-snug">
                     {assessment.title}
@@ -187,7 +191,9 @@ export default function ContinueLearningWidget() {
             style={{ scrollSnapType: 'x mandatory' }}
           >
             {recentlyCompleted.map(({ assessment, lastAccessedAt }) => {
-              const badgeClass = EXAM_BADGE[assessment.exam_type] ?? 'bg-zinc-50 text-zinc-700';
+              const examName = assessment.exam_categories?.name ?? '';
+              const examDisplay = assessment.exam_categories?.display_name ?? examName;
+              const badgeClass = EXAM_BADGE[examName] ?? 'bg-zinc-50 text-zinc-700';
               return (
                 <div
                   key={assessment.id}
@@ -195,7 +201,7 @@ export default function ContinueLearningWidget() {
                   style={{ minWidth: 260, maxWidth: 260, scrollSnapAlign: 'start' }}
                 >
                   <span className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${badgeClass}`}>
-                    {assessment.exam_type}
+                    {examDisplay}
                   </span>
                   <p className="text-sm font-medium text-zinc-900 leading-snug">
                     {assessment.title}

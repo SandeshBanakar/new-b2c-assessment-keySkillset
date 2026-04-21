@@ -22,22 +22,19 @@ const TYPE_LABELS: Record<ActiveType, string> = {
   'chapter-test': 'Chapter Tests',
 };
 
-// Sort order for exam sections (alphabetical by display name)
-const EXAM_SORT_ORDER = ['CLAT', 'IIT-JEE', 'NEET', 'PMP', 'SAT'];
-
 // -------------------------------------------------------
 // Per-exam category section
 // -------------------------------------------------------
 
 function ExamCategorySection({
-  examType,
+  examDisplayName,
   items,
   attemptsMap,
   userTier,
   typeLabel,
   activePlanInfo,
 }: {
-  examType: string;
+  examDisplayName: string;
   items: SupabaseAssessment[];
   attemptsMap: Map<string, MockAttemptData>;
   userTier: Tier;
@@ -54,7 +51,7 @@ function ExamCategorySection({
     <div className="mt-10">
       {/* Section header */}
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-xl font-semibold text-zinc-900">{examType}</h2>
+        <h2 className="text-xl font-semibold text-zinc-900">{examDisplayName}</h2>
         <span className="bg-zinc-100 text-zinc-500 text-xs px-2.5 py-1 rounded-full">
           {count} {count === 1 ? 'assessment' : 'assessments'}
         </span>
@@ -64,7 +61,7 @@ function ExamCategorySection({
       {count === 0 && (
         <div className="border border-dashed border-zinc-200 rounded-md py-8 text-center">
           <p className="text-sm text-zinc-500">
-            No {examType} {typeLabel.toLowerCase()} match your current filters.
+            No {examDisplayName} {typeLabel.toLowerCase()} match your current filters.
           </p>
         </div>
       )}
@@ -102,6 +99,23 @@ function ExamCategorySection({
 // Main section
 // -------------------------------------------------------
 
+type ExamGroup = { name: string; displayName: string; displayOrder: number }
+
+function buildExamGroups(assessments: SupabaseAssessment[]): ExamGroup[] {
+  const map = new Map<string, ExamGroup>()
+  for (const a of assessments) {
+    const key = a.exam_categories?.name ?? 'Other'
+    if (!map.has(key)) {
+      map.set(key, {
+        name: key,
+        displayName: a.exam_categories?.display_name ?? key,
+        displayOrder: a.exam_categories?.display_order ?? 999,
+      })
+    }
+  }
+  return [...map.values()].sort((a, b) => a.displayOrder - b.displayOrder)
+}
+
 export default function AssessmentLibrarySection() {
   const { user } = useAppContext();
   const { assessments, loading, error } = useAssessments();
@@ -114,7 +128,6 @@ export default function AssessmentLibrarySection() {
   if (!user) return null;
 
   const tier           = user.subscriptionTier;
-  const userId         = user.id;
   const isPremium      = tier === 'premium';
   const activePlanInfo = user.activePlanInfo ?? null;
 
@@ -131,29 +144,21 @@ export default function AssessmentLibrarySection() {
     </div>
   );
 
-  // ── Filter by active type ─────────────────────────────────────────────────
-  const filteredByType = assessments.filter(
-    (a) => a.assessment_type === activeType,
-  );
+  // Filter out inactive exam categories, then filter by assessment type
+  const activeAssessments = assessments.filter(a => a.exam_categories?.is_active !== false);
+  const filteredByType    = activeAssessments.filter(a => a.assessment_type === activeType);
 
-  // ── Derive unique exam groups, sorted ────────────────────────────────────
-  const examsWithType = [
-    ...new Set(filteredByType.map((a) => a.exam_type)),
-  ].sort((a, b) => {
-    const ai = EXAM_SORT_ORDER.indexOf(a);
-    const bi = EXAM_SORT_ORDER.indexOf(b);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
+  // Derive sorted exam groups from filtered list
+  const examGroups = buildExamGroups(filteredByType);
 
-  // Apply exam dropdown filter
-  const visibleExams =
-    selectedExam !== 'all'
-      ? examsWithType.filter((e) => e === selectedExam)
-      : examsWithType;
+  // Apply exam dropdown filter (by name/code)
+  const visibleGroups = selectedExam !== 'all'
+    ? examGroups.filter(g => g.name === selectedExam)
+    : examGroups;
 
-  // ── Apply progress filter per exam section ────────────────────────────────
-  const examSections = visibleExams.map((examType) => {
-    let items = filteredByType.filter((a) => a.exam_type === examType);
+  // Apply progress filter per exam section
+  const examSections = visibleGroups.map(({ name, displayName }) => {
+    let items = filteredByType.filter(a => (a.exam_categories?.name ?? 'Other') === name);
 
     if (selectedProgress !== 'all') {
       items = items.filter((a) => {
@@ -166,19 +171,13 @@ export default function AssessmentLibrarySection() {
       });
     }
 
-    return { examType, items };
+    return { examDisplayName: displayName, items };
   });
 
   const typeLabel = TYPE_LABELS[activeType];
 
-  // ── All unique exam options for the dropdown ─────────────────────────────
-  const allExamOptions = [
-    ...new Set(assessments.map((a) => a.exam_type)),
-  ].sort((a, b) => {
-    const ai = EXAM_SORT_ORDER.indexOf(a);
-    const bi = EXAM_SORT_ORDER.indexOf(b);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
+  // All unique exam options for dropdown (from all assessments, sorted by display_order)
+  const allExamOptions = buildExamGroups(activeAssessments);
 
   // -------------------------------------------------------
   return (
@@ -230,8 +229,8 @@ export default function AssessmentLibrarySection() {
           className="bg-white border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-700 min-w-35 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-700"
         >
           <option value="all">All Exams</option>
-          {allExamOptions.map((exam) => (
-            <option key={exam} value={exam}>{exam}</option>
+          {allExamOptions.map((g) => (
+            <option key={g.name} value={g.name}>{g.displayName}</option>
           ))}
         </select>
 
@@ -256,10 +255,10 @@ export default function AssessmentLibrarySection() {
           </p>
         </div>
       ) : (
-        examSections.map(({ examType, items }) => (
+        examSections.map(({ examDisplayName, items }) => (
           <ExamCategorySection
-            key={examType}
-            examType={examType}
+            key={examDisplayName}
+            examDisplayName={examDisplayName}
             items={items}
             attemptsMap={attemptsMap}
             userTier={tier}

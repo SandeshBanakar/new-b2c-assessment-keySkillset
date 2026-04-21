@@ -17,6 +17,11 @@ export type ContentBankItem = {
 export type ExamCategory = {
   id: string
   name: string
+  display_name: string
+  slug: string
+  description: string | null
+  display_order: number
+  is_active: boolean
 }
 
 export async function fetchContentBank(): Promise<ContentBankItem[]> {
@@ -92,11 +97,11 @@ export async function fetchContentBank(): Promise<ContentBankItem[]> {
 export async function fetchExamCategories(): Promise<ExamCategory[]> {
   const { data, error } = await supabase
     .from('exam_categories')
-    .select('id, name')
-    .order('name')
+    .select('id, name, display_name, slug, description, display_order, is_active')
+    .order('display_order', { ascending: true })
 
   if (error) throw new Error(error.message)
-  return data ?? []
+  return (data ?? []) as ExamCategory[]
 }
 
 export async function fetchEligiblePlans(
@@ -149,12 +154,81 @@ export async function fetchContentPlanMembership(
   })
 }
 
+function mapTestTypeToAssessmentType(testType: string): string {
+  switch (testType?.toUpperCase()) {
+    case 'FULL_TEST':    return 'full-test'
+    case 'SUBJECT_TEST': return 'subject-test'
+    case 'CHAPTER_TEST': return 'chapter-test'
+    default:             return 'full-test'
+  }
+}
+
 export async function makeLive(
   id: string,
   contentType: 'ASSESSMENT' | 'COURSE',
   audienceType: string,
 ): Promise<void> {
   const table = contentType === 'ASSESSMENT' ? 'assessment_items' : 'courses'
+
+  if (contentType === 'ASSESSMENT') {
+    // Fetch assessment_item to sync to assessments table
+    const { data: item, error: fetchErr } = await supabase
+      .from('assessment_items')
+      .select('id, title, test_type, exam_category_id, assessments_id, assessment_config, display_config')
+      .eq('id', id)
+      .single()
+
+    if (fetchErr) throw new Error(fetchErr.message)
+    if (!item) throw new Error('Assessment item not found')
+
+    const ac = (item.assessment_config as Record<string, unknown> | null) ?? {}
+    const totalQuestions = (ac.total_questions as number | null) ?? null
+    const durationMinutes = (ac.duration_minutes as number | null) ?? null
+    const assessmentType = mapTestTypeToAssessmentType(item.test_type as string)
+
+    let assessmentsRowId: string | null = item.assessments_id as string | null
+
+    if (assessmentsRowId) {
+      // Idempotent: update existing assessments row
+      const { error: updateErr } = await supabase
+        .from('assessments')
+        .update({
+          title: item.title,
+          exam_category_id: item.exam_category_id,
+          assessment_type: assessmentType,
+          is_active: true,
+        })
+        .eq('id', assessmentsRowId)
+      if (updateErr) throw new Error(updateErr.message)
+    } else {
+      // Insert new assessments row
+      const { data: inserted, error: insertErr } = await supabase
+        .from('assessments')
+        .insert({
+          title: item.title,
+          exam_category_id: item.exam_category_id,
+          assessment_type: assessmentType,
+          total_questions: totalQuestions,
+          duration_minutes: durationMinutes,
+          min_tier: 'basic',
+          is_active: true,
+        })
+        .select('id')
+        .single()
+
+      if (insertErr) throw new Error(insertErr.message)
+      assessmentsRowId = (inserted as { id: string }).id
+
+      // Link back to assessment_items
+      const { error: linkErr } = await supabase
+        .from('assessment_items')
+        .update({ assessments_id: assessmentsRowId })
+        .eq('id', id)
+      if (linkErr) throw new Error(linkErr.message)
+    }
+  }
+
+  // Flip status → LIVE on the source table
   const { error } = await supabase
     .from(table)
     .update({ status: 'LIVE', audience_type: audienceType })

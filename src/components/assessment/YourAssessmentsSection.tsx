@@ -23,9 +23,19 @@ export default function YourAssessmentsSection() {
     return attempt.attemptsUsed > 0 || attempt.status !== 'not_started';
   });
 
+  // Derive unique exam options from active assessments
+  const examOptions = [...new Map(
+    active
+      .filter(a => a.exam_categories?.is_active !== false)
+      .map(a => [
+        a.exam_categories?.name ?? 'Other',
+        { name: a.exam_categories?.name ?? 'Other', displayName: a.exam_categories?.display_name ?? a.exam_categories?.name ?? 'Other', displayOrder: a.exam_categories?.display_order ?? 999 },
+      ])
+  ).values()].sort((a, b) => a.displayOrder - b.displayOrder);
+
   // Apply filters
   const filtered = active.filter((a) => {
-    if (examFilter !== 'all' && a.exam_type !== examFilter) return false;
+    if (examFilter !== 'all' && (a.exam_categories?.name ?? '') !== examFilter) return false;
     if (typeFilter !== 'all' && a.assessment_type !== typeFilter) return false;
     if (statusFilter !== 'all') {
       const s = getAttemptData(user.id, a.title).status;
@@ -57,11 +67,9 @@ export default function YourAssessmentsSection() {
             className="bg-white border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-700 min-w-35 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-700"
           >
             <option value="all">All Exams</option>
-            <option value="SAT">SAT</option>
-            <option value="IIT-JEE">IIT-JEE</option>
-            <option value="NEET">NEET</option>
-            <option value="PMP">PMP</option>
-            <option value="CLAT">CLAT</option>
+            {examOptions.map(o => (
+              <option key={o.name} value={o.name}>{o.displayName}</option>
+            ))}
           </select>
 
           <select

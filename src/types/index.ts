@@ -179,6 +179,9 @@ export interface User {
   activePlanInfo?: ActivePlanInfo | null; // null = no active assessment plan
   targetSatScore?: number | null;         // target_sat_score (full test)
   targetSatSubjectScore?: number | null;  // target_sat_subject_score (subject test)
+  targetNeetScore?: number | null;        // target_neet_score (KSS-DB-048)
+  targetJeeScore?: number | null;         // target_jee_score (KSS-DB-048)
+  targetClatScore?: number | null;        // target_clat_score (KSS-DB-048)
 }
 
 // ─── Assessment Creation (SA) ─────────────────────────────────────────────────

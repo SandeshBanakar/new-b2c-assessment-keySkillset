@@ -35,6 +35,38 @@ There is no foreign key. Always filter by `content_type` first:
 - `assessments` = exam engine operational table (slug, duration, questions count, sections — what the engine reads)
 - They are linked via `assessment_items.assessments_id FK→assessments.id` (set at "Make Live" step)
 - `questions` links to `assessments.id` — never to `assessment_items.id`
+- **WARNING (Apr 20 2026):** `makeLive()` in content-bank.ts currently only flips `status='LIVE'` on `assessment_items`. It does NOT yet create a row in `assessments` or set `assessments_id`. The feed is PLANNED, not implemented. `assessments` table = legacy/demo data only until sync is built (KSS-SA-PC-001).
+
+**`exam_categories` — confirmed schema (DIAG-1, Apr 20 2026)**
+Current columns: `id` (uuid PK), `name` (text NOT NULL), `slug` (text NOT NULL), `is_active` (boolean DEFAULT true)
+MISSING — need migration: `description` (text nullable), `display_order` (integer)
+Pending decision: rename `name` vs add `display_name` column (see KSS-SA-PC-001 clarification)
+
+**KSS-DB-050 (Apr 21 2026 — KSS-SA-CA-001) — DONE:**
+Added `score_min INT NULL` + `score_max INT NULL` to `exam_categories`.
+SAT seeded: score_min=200, score_max=800. NEET/JEE/CLAT/BANK/SSC remain NULL.
+
+Confirmed IDs (DIAG-2):
+- BANK: `608a115b-194a-44b9-8511-030fcf1c15ef`
+- CLAT: `ad260442-74de-4e7c-993c-f006c4a29045`
+- JEE: `93319838-3e05-4472-9dd0-decd6f731f7b`
+- NEET: `23d482e7-81c3-4a10-bd60-52fd458595d6`
+- SAT: `f16d8e32-77d1-4705-ac75-be7009c85636`
+- SSC: `0193eb75-2342-4c98-9781-27d3997a536b`
+
+Desired display names (KSS-SA-PC-001): JEE Mains, CLAT UG, NEET UG, SSC CGL, BANK, SAT
+Concept tag cascade scope (DIAG-5): CLAT=45, JEE=47, NEET=48, SAT=45 tags. BANK+SSC=0.
+
+**`assessments.exam_type` — migration (KSS-SA-PC-001)**
+Current distinct values (DIAG-3): CLAT(5), JEE(3), NEET(8), SAT(6). No IIT-JEE rows.
+Backfill mapping (exam_type → exam_categories.id):
+- 'JEE' → `93319838-3e05-4472-9dd0-decd6f731f7b`
+- 'CLAT' → `ad260442-74de-4e7c-993c-f006c4a29045`
+- 'NEET' → `23d482e7-81c3-4a10-bd60-52fd458595d6`
+- 'SAT' → `f16d8e32-77d1-4705-ac75-be7009c85636`
+Migration: ADD `exam_category_id UUID FK→exam_categories` + backfill + DROP `exam_type`
+After drop: `useAssessments` JOIN `exam_categories` for name + display_order + is_active
+`EXAM_SORT_ORDER` hardcoded array (AssessmentLibrarySection.tsx:26) → replaced by display_order from DB
 
 **`price_usd` is always actual dollars (e.g. 29.99)**
 Never cents. Never rename to `price_usd_cents`. Applies to all tables.
@@ -215,19 +247,24 @@ created_at, updated_at
 - Soft delete: set `deleted_at = NOW()`. ALL queries must filter `deleted_at IS NULL`.
 - When a source is soft-deleted, all child chapters are soft-deleted in the same operation.
 
-### questions (Assessment Creation — KSS-DB-009 extended Apr 11 2026; KSS-DB-018 Apr 12 2026)
+### questions (KSS-DB-009 extended Apr 11 2026; KSS-DB-018 Apr 12 2026; KSS-DB-033/034 Apr 20 2026)
 ```
 id, assessment_id (uuid nullable FK→assessments — legacy direct link),
 source_id (uuid nullable FK→sources), chapter_id (uuid nullable FK→chapters),
-question_type (text NOT NULL), question_text (JSONB NOT NULL — KSS-DB-018, Tiptap doc),
-passage_text (JSONB nullable — KSS-DB-018, Tiptap doc, for PASSAGE_SINGLE inline),
-options (jsonb — array of {key: string, text: TiptapDoc} objects — KSS-DB-018),
-correct_answer (jsonb nullable — array e.g. ["A"] or ["A","C"]),
-acceptable_answers (jsonb nullable — for NUMERIC type, array of strings),
+question_type (text NOT NULL — MCQ_SINGLE|MCQ_MULTI|PASSAGE_SINGLE|PASSAGE_MULTI|NUMERIC),
+question_text (JSONB NOT NULL — KSS-DB-018, Tiptap doc; for PASSAGE types stores optional stem),
+passage_text (JSONB nullable — KSS-DB-018, Tiptap doc, passage body),
+options (jsonb — array of {key: string, text: TiptapDoc} — 4–6 items A–F for MCQ — KSS-DB-018),
+correct_answer (jsonb nullable — array e.g. ["A"] or ["A","C"]; null for NUMERIC/PASSAGE parent),
+acceptable_answers (jsonb nullable — NUMERIC EXACT only, array of strings),
+numeric_answer_type (text CHECK ('EXACT','RANGE') nullable — KSS-DB-033, Apr 20 2026),
+numeric_min (numeric nullable — KSS-DB-033, RANGE only),
+numeric_max (numeric nullable — KSS-DB-033, RANGE only),
 explanation (JSONB nullable — KSS-DB-018, Tiptap doc), explanation_steps (jsonb), video_url (text),
-marks (numeric DEFAULT 1), negative_marks (numeric DEFAULT 0),
-categories (jsonb DEFAULT '[]' — array of exam category names),
-concept_tag (text nullable — KSS-DB-016, single skill/concept label e.g. "sp3 Hybridization"),
+marks (numeric DEFAULT 1 — validated: 0 < marks ≤ 10; PASSAGE_MULTI = auto-sum of sub-question marks),
+negative_marks (numeric DEFAULT 0 — validated: 0 ≤ neg_marks ≤ marks),
+categories (jsonb DEFAULT '[]' — legacy, never written to; drop in future cleanup),
+concept_tag_id (uuid nullable FK→concept_tags ON DELETE RESTRICT — KSS-DB-034, Apr 20 2026),
 status ('DRAFT'|'ACTIVE'|'FLAGGED' DEFAULT 'ACTIVE'),
 difficulty ('easy'|'medium'|'hard'|'mixed' DEFAULT 'medium'),
 section_name (text — CLAT section mapping),
@@ -237,9 +274,12 @@ question_order (int DEFAULT 0 nullable),
 created_by (FK→admin_users), last_modified_by (FK→admin_users),
 created_at, updated_at
 ```
-- Rich text: question_text, explanation, passage_text, options[].text are all Tiptap JSONB (KSS-DB-018, Apr 12 2026)
+- Rich text: question_text, explanation, passage_text, options[].text are all Tiptap JSONB (KSS-DB-018)
 - Tiptap doc shape: `{ type: 'doc', content: [...] }` — use ensureDoc() when reading legacy rows
-- `correct_answer` is JSONB array: `["A"]` single, `["A","C"]` multi, null for NUMERIC
+- `correct_answer` is JSONB array: `["A"]` single, `["A","C"]` multi, null for NUMERIC/PASSAGE parent
+- MCQ options: min 4, max 6 (keys A–F). Keys reflowed alphabetically after drag-reorder or remove.
+- `concept_tag` text column DROPPED (KSS-DB-034) — use `concept_tag_id` UUID FK only
+- `concept_tag_id` ON DELETE RESTRICT — deleting a concept_tag with referenced questions will error (QB-010)
 - Bank model: questions are source/chapter-owned, pulled into assessments via assessment_question_map
 - Status on create: always ACTIVE (no draft cycle on create)
 
@@ -252,17 +292,21 @@ created_at
 UNIQUE(assessment_id, question_id)
 ```
 
-### passage_sub_questions (KSS-DB-014, Apr 11 2026; KSS-DB-019 Apr 12 2026)
+### passage_sub_questions (KSS-DB-014 Apr 11 2026; KSS-DB-019 Apr 12 2026; KSS-DB-033 Apr 20 2026)
 ```
 id, parent_question_id (FK→questions ON DELETE CASCADE),
 question_text (JSONB NOT NULL — KSS-DB-019, Tiptap doc),
-options (jsonb DEFAULT '[]' — array of {key: string, text: TiptapDoc}),
+options (jsonb DEFAULT '[]' — array of {key: string, text: TiptapDoc} — 4–6 items A–F),
 correct_answer (jsonb nullable), explanation (JSONB nullable — KSS-DB-019, Tiptap doc),
+marks (numeric — KSS-DB-033, validated: 0 < marks ≤ 10),
+negative_marks (numeric — KSS-DB-033, validated: 0 ≤ neg_marks ≤ marks),
 video_url (text), order_index (int NOT NULL DEFAULT 0),
 created_at, updated_at
 ```
 - Used for PASSAGE_SINGLE (1 row) and PASSAGE_MULTI (N rows) under one parent question
-- question_text and explanation are Tiptap JSONB (KSS-DB-019, Apr 12 2026) — use ensureDoc() on read
+- question_text and explanation are Tiptap JSONB (KSS-DB-019) — use ensureDoc() on read
+- PASSAGE_MULTI: parent `questions.marks` = auto-sum of all sub-question marks (not user-enterable)
+- PASSAGE_SINGLE: sub-question inherits parent marks (single sub-question, no separate field displayed)
 
 ### courses
 ```
@@ -468,7 +512,7 @@ client_audit_log — tenant_id, actor_id, actor_name,
   entity_id, before_state (jsonb), after_state (jsonb), ip_address, created_at
 ```
 
-### concept_tags (KSS-DB-030, Apr 17 2026 — replaces KSS-DB-026 display-only version)
+### concept_tags (KSS-DB-030 Apr 17 2026; KSS-DB-034 Apr 20 2026 — 41 new tags inserted)
 ```
 id (uuid PK), exam_category (text NOT NULL), subject (text NOT NULL),
 concept_name (text NOT NULL), slug (text NOT NULL),
@@ -478,21 +522,15 @@ created_at (timestamptz DEFAULT now())
 UNIQUE (exam_category, subject, concept_name)
 ```
 - Indexes: exam_category, (exam_category, subject), slug
-- Seeded with 144 tags: SAT=45, NEET=43, JEE=33, CLAT=23
-- IMMUTABLE seed data — concept tags are registry only; SA may add via Platform Config page
-- `questions.concept_tag` (free text) is the operational field; `concept_tags` is the registry
-- Hard delete allowed (with warning if question_count > 0 linked via question_concept_mappings)
+- Seeded total 185 tags (Apr 20 2026): SAT=45, NEET=48, JEE=51, CLAT=41
+- SA may add tags via Platform Config page
+- `questions.concept_tag_id` UUID FK is the canonical link (KSS-DB-034) — `concept_tag` text column DROPPED
+- Hard delete: ON DELETE RESTRICT on `questions.concept_tag_id` — cannot delete a tag while questions reference it. Platform Config delete handler must catch FK error (QB-010, pending).
+- Platform Config question_count: `SELECT COUNT(*) FROM questions WHERE concept_tag_id = $1`
 
-### question_concept_mappings (KSS-DB-031, Apr 17 2026)
-```
-id (uuid PK), question_id (uuid NOT NULL FK→questions ON DELETE CASCADE),
-concept_tag_id (uuid NOT NULL FK→concept_tags ON DELETE CASCADE),
-created_at (timestamptz DEFAULT now())
-UNIQUE (question_id, concept_tag_id)
-```
-- Indexes: question_id, concept_tag_id
-- One question → one concept (enforced at UI level in QuestionForm)
-- One concept → many questions (shown in Platform Config list view)
+### ~~question_concept_mappings~~ (RETIRED — KSS-DB-034, Apr 20 2026)
+Table dropped. Was only used for concept tag question counts in Platform Config.
+Replaced by: `SELECT COUNT(*) FROM questions WHERE concept_tag_id = $tag_id`
 
 ### user_concept_mastery ENHANCED (KSS-DB-032, Apr 17 2026)
 Additional columns added to existing table:
@@ -629,8 +667,27 @@ Math Module 2 (27Q): B,B,C,A,A,15/-5,50,B,D,A,A,B,.3,2,A,C,B,D,A,15/17,51,A,C,C,
 - **KSS-DB-029 (Apr 16 2026)**: Dropped `status` column from `chapters` table
 - **KSS-DB-030 (Apr 17 2026)**: Recreated `concept_tags` table (full hierarchy). Replaced KSS-DB-026 display-only version. New columns: `exam_category`, `subject`, `concept_name`, `slug`, `description`. UNIQUE on `(exam_category, subject, concept_name)`. Seeded 144 tags: SAT=45, NEET=43, JEE=33, CLAT=23.
 - **KSS-DB-031 (Apr 17 2026)**: Created `question_concept_mappings` table. Links `questions.id → concept_tags.id`. UNIQUE `(question_id, concept_tag_id)`. Soft link — no cascade changes to `questions.concept_tag` text field.
+- **KSS-DB-033 (Apr 20 2026, sprint label KSS-DB-020)**: Added `numeric_answer_type (TEXT CHECK 'EXACT'|'RANGE')`, `numeric_min (NUMERIC NULL)`, `numeric_max (NUMERIC NULL)` to `questions`. Added `marks (NUMERIC)` and `negative_marks (NUMERIC)` to `passage_sub_questions`. Validation rules: 0 < marks ≤ 10; 0 ≤ negative_marks ≤ marks.
+- **KSS-DB-034 (Apr 20 2026, sprint label KSS-DB-021)**: Added `concept_tag_id UUID FK→concept_tags ON DELETE RESTRICT` (nullable) to `questions`. Inserted 41 missing concept_tags (JEE Physics/Chemistry/Math, NEET Biology, CLAT Legal/Logical/English/GK). Backfilled all 233 questions (source-aware join through chapters→sources→exam_categories for ambiguous tags). Dropped `concept_tag` text column. Dropped `question_concept_mappings` table. Platform Config count query updated to `COUNT(*) FROM questions WHERE concept_tag_id = x`.
 - **KSS-DB-032 (Apr 17 2026)**: Enhanced `user_concept_mastery` with 5 new columns: `module_id (text)`, `stage (text GENERATED STORED)`, `attempt_count (int DEFAULT 1)`, `last_attempt_date (timestamptz)`, `trend (text CHECK IN ('improving','declining','stable'))`. Stage computed from mastery_percent: ≥80=strength, ≥60=developing, ≥40=needs_practice, <40=weak. (`ALTER TABLE chapters DROP COLUMN IF EXISTS status;`). Chapters have no draft/archive concept — they are always live from creation. UI and all queries updated to remove any reference to chapter status.
+- **KSS-DB-050 (Apr 21 2026 — KSS-SA-CA-001)**: Added `score_min INT NULL` + `score_max INT NULL` to `exam_categories`. Seeded SAT: score_min=200, score_max=800. All other categories NULL. Used by Scale Score tab in Adaptive Create/Edit form to bound raw→scaled score mapping.
+- **KSS-DB-051 (Apr 21 2026 — KSS-SA-CA-001)**: Created `assessment_scale_scores` table. Stores raw→scaled score mapping per module per assessment for Adaptive assessments. Index `idx_scale_scores_assessment_id` on `assessment_id`.
+- **KSS-DB-052 (Apr 21 2026)**: Dropped undocumented FK constraint `attempt_answers_question_id_fkey` (`attempt_answers.question_id → questions(id)`). This FK was never documented and blocked analytics seeding where `question_id` values are `gen_random_uuid()` placeholders (no real question rows needed for analytics). Migration: `ALTER TABLE attempt_answers DROP CONSTRAINT attempt_answers_question_id_fkey;`. `question_id` column remains (uuid type, no FK) — stores question ID reference for display purposes only. Authorized Apr 21 2026 during KSS-ANA-001 Phase 2 seeding.
 - **KSS-DB-026 (Apr 14 2026)**: Created `concept_tags` table. SA-controlled concept tag registry for analytics. Columns: `id (uuid PK)`, `name (text NOT NULL)`, `exam_category (text NOT NULL)`, `subject (text nullable)`, `created_by (uuid FK→admin_users nullable)`, `created_at (timestamptz)`. UNIQUE index on `(name, exam_category, COALESCE(subject,''))`. RLS OFF. Soft link to `questions.concept_tag` (no FK constraint — `questions.concept_tag` stays free-text; registry is display-only for SA Marketing Config view).
+
+### assessment_scale_scores (KSS-DB-051, Apr 21 2026 — KSS-SA-CA-001)
+```
+id (uuid PK), assessment_id (uuid NOT NULL FK→assessment_items ON DELETE CASCADE),
+module_id (text NOT NULL), module_type (text NOT NULL CHECK IN ('FOUNDATION','VARIANT_EASY','VARIANT_MEDIUM','VARIANT_HARD')),
+foundation_module_order (int NOT NULL DEFAULT 1),
+raw_score (int NOT NULL), scaled_score (int NULL),
+created_at (timestamptz), updated_at (timestamptz)
+UNIQUE (assessment_id, module_id, module_type, raw_score)
+```
+- Index: `idx_scale_scores_assessment_id` on `assessment_id`
+- One row per raw score value per module. SA enters scaled scores via Scale Score tab in Adaptive Create/Edit form.
+- `score_min`/`score_max` bounds come from `exam_categories.score_min/max` (KSS-DB-050)
+- UPSERT pattern: delete existing rows for `(assessment_id, module_id, module_type)` then re-insert on save
 
 ### attempt_answers (KSS-DB-022, Apr 13 2026)
 ```
@@ -678,11 +735,18 @@ model_used (text DEFAULT 'static_demo'), generated_at (timestamptz)
 
 All seeding is data-only. No schema changes.
 
-### NEET/JEE/CLAT Analytics (seeded KSS-SA-031)
-- `attempts`: 5 demo attempts for premium user `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
-- `attempt_section_results`: section rows for those 5 attempts
-- `user_concept_mastery`: concept tag mastery rows for those 5 attempts
-- `attempt_ai_insights`: 5 static AI insight rows (model_used='static_demo')
+### NEET/JEE/CLAT Analytics (seeded KSS-SA-031; extended KSS-ANA-001 Phase 2, Apr 21 2026)
+- `attempts`: 5 demo attempts for premium user `191c894d-b532-4fa8-b1fe-746e5cdcdcc8` (original) + 6 new full-test attempts (2 per exam — NEET FT1, JEE FT1, CLAT FT1)
+- `attempt_section_results`: section rows for all attempts
+- `user_concept_mastery`: concept tag mastery rows for all attempts
+- `attempt_ai_insights`: static AI insight rows (model_used='static_demo')
+
+**KSS-ANA-001 Phase 2 seeding (Apr 21 2026) — premium user `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`:**
+- Assessment IDs used (from `assessments` table — NOT `assessment_items`): NEET FT1 `693a891b-a1d9-4c44-89a6-703ad034c13c`, JEE FT1 `183eac3e-473b-4dfd-a13c-5ee84ff42e44`, CLAT FT1 `b123f49f-a7a2-4114-82da-b3579fe3dc68`
+- `attempt_answers`: 180 rows × NEET A1, 180 rows × NEET A2, 180 rows × JEE A1+A2, 240 rows × CLAT A1+A2 — with concept_tag, time_spent_seconds, is_correct/is_skipped distributions matching INFERENCE-ENGINE.txt rules
+- `user_concept_mastery`: ~116 rows for the 6 full-test attempts
+- FK note: `attempt_answers_question_id_fkey` was dropped (KSS-DB-052) to allow placeholder `question_id` UUIDs in seeded analytics rows
+- Assessment ID routing: `getAssessmentBySlug()` in `assessmentUtils.ts` has `.eq('status','INACTIVE')` filter which never matches LIVE/DRAFT assessments → falls through to `assessments` table lookup → `assessment.id = assessments.id`. All analytics queries in `AnalyticsTab.tsx` use this ID.
 
 ### SAT Analytics (seeded KSS-SA-031 extension, Apr 13 2026; updated KSS-SAT-A02, Apr 20 2026)
 Premium user: `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
@@ -726,6 +790,35 @@ Premium user: `191c894d-b532-4fa8-b1fe-746e5cdcdcc8`
 - Blocks: Score Progression (static), Section Breakdown (filtered), Concept Mastery heatmap (all attempts), Where You Lost Points (mastery < 60%, filtered), AI Insight (filtered)
 - Full test: dual heatmap panels (R&W + Math side by side)
 - Wired into `/assessments/[id]/page.tsx` — used when `assessment.exam === 'SAT'` and `type === 'full-test' || 'subject-test'`
+
+---
+
+## KSS-DB-051 — assessment_scale_scores (Apr 21 2026 — KSS-SA-CA-001) — PENDING SA RUN
+
+**Purpose:** Stores per-module raw→scaled score lookup tables for Adaptive assessments (e.g. SAT 0–27 raw → 200–800 scaled).
+
+```
+assessment_scale_scores (
+  id                      UUID PK DEFAULT gen_random_uuid()
+  assessment_id           UUID NOT NULL → assessment_items(id) ON DELETE CASCADE
+  module_id               TEXT NOT NULL   (FM or VM UUID from assessment_config JSONB)
+  module_type             TEXT NOT NULL   CHECK ('FOUNDATION' | 'VARIANT_EASY' | 'VARIANT_MEDIUM' | 'VARIANT_HARD')
+  foundation_module_order INT NOT NULL DEFAULT 1
+  raw_score               INT NOT NULL
+  scaled_score            INT NULL
+  created_at              TIMESTAMPTZ DEFAULT now()
+  updated_at              TIMESTAMPTZ DEFAULT now()
+  UNIQUE (assessment_id, module_id, module_type, raw_score)
+)
+INDEX: idx_scale_scores_assessment_id ON assessment_id
+```
+
+Key rules:
+- `module_id` references the `id` stored in `assessment_config.foundation_modules[].id` or `.variant_modules[].id` — NOT a FK
+- One row per (assessment_id, module_id, raw_score) — safe to upsert via DELETE+INSERT per module
+- SA fills scaled_score manually via Scale Score tab in Adaptive Edit form
+- Scale Score tab sources score_min/max from `exam_categories.score_min/max` (KSS-DB-050)
+- SQL: `docs/requirements/SQL-CA-MIGRATIONS.txt` STEP 2
 
 ---
 

@@ -15,6 +15,9 @@ export type DemoUser = {
   active_plan_info?: ActivePlanInfo | null
   target_sat_score?: number | null
   target_sat_subject_score?: number | null
+  target_neet_score?: number | null
+  target_jee_score?: number | null
+  target_clat_score?: number | null
 }
 
 export const DEMO_USERS: DemoUser[] = [
@@ -73,6 +76,9 @@ export const DEMO_USERS: DemoUser[] = [
     streak: 21,
     role: 'student',
     active_plan_info: { scope: 'PLATFORM_WIDE', tier: 'PREMIUM', category: null },
+    target_neet_score: 650,
+    target_jee_score: 220,
+    target_clat_score: 95,
   },
   // ── Category Plan Demo Users ──────────────────────────────────────────────
   {

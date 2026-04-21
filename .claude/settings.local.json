@@ -118,7 +118,8 @@
       "Bash(npm --version)",
       "WebFetch(domain:api.anthropic.com)",
       "Bash(npx kill-port *)",
-      "Bash(rm -f .next/lock)"
+      "Bash(rm -f .next/lock)",
+      "Bash(taskkill /f /im node.exe)"
     ]
   },
   "enabledMcpjsonServers": [

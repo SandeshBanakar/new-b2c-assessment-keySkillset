@@ -60,7 +60,7 @@ export async function getAssessments(): Promise<Assessment[]> {
   const { data, error } = await supabase
     .from('assessments')
     .select(
-      'id, title, description, duration_minutes, total_questions, exam_type, assessment_type, subject, difficulty, min_tier, is_puzzle_mode, rating, total_users, slug',
+      'id, title, description, duration_minutes, total_questions, exam_categories!exam_category_id(name), assessment_type, subject, difficulty, min_tier, is_puzzle_mode, rating, total_users, slug',
     )
     .order('created_at', { ascending: true });
 
@@ -72,7 +72,7 @@ export async function getAssessments(): Promise<Assessment[]> {
   return (data ?? []).map((row) => ({
     id: row.id as string,
     title: row.title as string,
-    exam: row.exam_type as Exam,
+    exam: ((row.exam_categories as unknown as { name: string } | null)?.name ?? '') as Exam,
     type: row.assessment_type as AssessmentType,
     subject: (row.subject as string | null) ?? null,
     difficulty: row.difficulty as Difficulty,
@@ -145,7 +145,7 @@ export async function getAssessmentBySlug(slug: string): Promise<Assessment | nu
   const { data, error } = await supabase
     .from('assessments')
     .select(
-      'id, title, description, duration_minutes, total_questions, exam_type, assessment_type, subject, difficulty, min_tier, is_puzzle_mode, rating, total_users, slug',
+      'id, title, description, duration_minutes, total_questions, exam_categories!exam_category_id(name), assessment_type, subject, difficulty, min_tier, is_puzzle_mode, rating, total_users, slug',
     )
     .eq('slug', slug)
     .single();
@@ -159,7 +159,7 @@ export async function getAssessmentBySlug(slug: string): Promise<Assessment | nu
     id:           data.id as string,
     title:        data.title as string,
     slug:         (data.slug as string | undefined) ?? undefined,
-    exam:         data.exam_type as Exam,
+    exam:         ((data.exam_categories as unknown as { name: string } | null)?.name ?? '') as Exam,
     type:         data.assessment_type as AssessmentType,
     subject:      (data.subject as string | null) ?? null,
     difficulty:   data.difficulty as Difficulty,

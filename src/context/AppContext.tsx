@@ -10,6 +10,7 @@ interface AppContextValue {
   switchPersona: (userId: string) => void;
   simulateTierChange: (newTier: string) => void;
   updateUser: (fields: Partial<User>) => void;
+  updateTargetScore: (exam: 'NEET' | 'JEE' | 'CLAT', score: number) => void;
   logout: () => void;
   isSubscribed: (assessmentId: string) => boolean;
   subscribeToAssessment: (assessmentId: string) => void;
@@ -40,6 +41,9 @@ function demoUserToUser(demo: (typeof DEMO_USERS)[number]): User {
     activePlanInfo: (demo.active_plan_info ?? null) as ActivePlanInfo | null,
     targetSatScore: demo.target_sat_score ?? null,
     targetSatSubjectScore: demo.target_sat_subject_score ?? null,
+    targetNeetScore: demo.target_neet_score ?? null,
+    targetJeeScore: demo.target_jee_score ?? null,
+    targetClatScore: demo.target_clat_score ?? null,
   };
 }
 
@@ -80,6 +84,15 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, ...fields } : prev));
   };
 
+  const updateTargetScore = (exam: 'NEET' | 'JEE' | 'CLAT', score: number) => {
+    const fieldMap = {
+      NEET: 'targetNeetScore',
+      JEE: 'targetJeeScore',
+      CLAT: 'targetClatScore',
+    } as const;
+    setUser((prev) => (prev ? { ...prev, [fieldMap[exam]]: score } : prev));
+  };
+
   const logout = () => {
     localStorage.removeItem(STORAGE_KEY);
     setUser(null);
@@ -106,6 +119,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         switchPersona,
         simulateTierChange,
         updateUser,
+        updateTargetScore,
         logout,
         isSubscribed,
         subscribeToAssessment,
