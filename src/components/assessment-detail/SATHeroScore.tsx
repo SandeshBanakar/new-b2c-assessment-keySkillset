@@ -49,13 +49,6 @@ function DeltaBadge({ delta }: { delta: number | null }) {
   );
 }
 
-function targetOptions(scoreMax: number): number[] {
-  const min = scoreMax === 1600 ? 1000 : 500;
-  const opts: number[] = [];
-  for (let s = min; s <= scoreMax; s += 50) opts.push(s);
-  return opts;
-}
-
 export default function SATHeroScore({
   attempts,
   selectedAttempt,
@@ -68,6 +61,11 @@ export default function SATHeroScore({
   const [editingTarget, setEditingTarget] = useState(false);
   const [pickedTarget, setPickedTarget]   = useState<number>(targetScore ?? scoreMax);
   const [saving, setSaving]               = useState(false);
+
+  function handleNumericInput(val: string) {
+    const n = parseInt(val, 10);
+    if (!isNaN(n)) setPickedTarget(n);
+  }
 
   const firstAttempt = attempts[0];
   const lastAttempt  = attempts[attempts.length - 1];
@@ -85,8 +83,6 @@ export default function SATHeroScore({
       ? Math.min(100, Math.round((latestScore / targetScore) * 100))
       : null;
 
-  const opts = targetOptions(scoreMax);
-
   return (
     <div className="bg-white shadow-sm rounded-md p-6">
       {/* Header */}
@@ -101,7 +97,7 @@ export default function SATHeroScore({
       </div>
 
       {/* Hero score */}
-      <div className="flex items-start gap-6 mb-5">
+      <div className="flex flex-col sm:flex-row items-start gap-6 mb-5">
         <div>
           <div className="flex items-baseline gap-1">
             <span className="text-5xl font-semibold text-zinc-900 tracking-tight">
@@ -109,12 +105,12 @@ export default function SATHeroScore({
             </span>
             <span className="text-lg text-zinc-400">/{scoreMax}</span>
           </div>
-          {isFullTest && (lastAttempt.score_rw !== null || lastAttempt.score_math !== null) && (
+          {isFullTest && (selectedAttempt.score_rw !== null || selectedAttempt.score_math !== null) && (
             <div className="flex gap-4 mt-2">
               <div>
                 <p className="text-xs text-zinc-400">R&amp;W</p>
                 <p className="text-sm font-medium text-zinc-700">
-                  {lastAttempt.score_rw ?? '—'}
+                  {selectedAttempt.score_rw ?? '—'}
                   <span className="text-xs font-normal text-zinc-400">/800</span>
                 </p>
               </div>
@@ -122,7 +118,7 @@ export default function SATHeroScore({
               <div>
                 <p className="text-xs text-zinc-400">Math</p>
                 <p className="text-sm font-medium text-zinc-700">
-                  {lastAttempt.score_math ?? '—'}
+                  {selectedAttempt.score_math ?? '—'}
                   <span className="text-xs font-normal text-zinc-400">/800</span>
                 </p>
               </div>
@@ -161,15 +157,14 @@ export default function SATHeroScore({
         <div className="border border-dashed border-zinc-200 rounded-md px-4 py-3 bg-zinc-50">
           <p className="text-xs text-zinc-500 mb-2 font-medium">Set a target score</p>
           <div className="flex items-center gap-2">
-            <select
-              className="text-sm border border-zinc-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
-              value={pickedTarget}
-              onChange={(e) => setPickedTarget(Number(e.target.value))}
-            >
-              {opts.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              className="w-24 text-sm border border-zinc-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+              value={pickedTarget || ''}
+              onChange={(e) => handleNumericInput(e.target.value)}
+            />
             <button
               disabled={saving}
               onClick={() => handleSave(pickedTarget)}
@@ -185,15 +180,14 @@ export default function SATHeroScore({
         <div className="border border-dashed border-violet-200 rounded-md px-4 py-3 bg-violet-50">
           <p className="text-xs text-violet-700 mb-2 font-medium">Edit target score</p>
           <div className="flex items-center gap-2 flex-wrap">
-            <select
-              className="text-sm border border-violet-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-              value={pickedTarget}
-              onChange={(e) => setPickedTarget(Number(e.target.value))}
-            >
-              {opts.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              className="w-24 text-sm border border-violet-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+              value={pickedTarget || ''}
+              onChange={(e) => handleNumericInput(e.target.value)}
+            />
             <button
               disabled={saving}
               onClick={() => handleSave(pickedTarget)}

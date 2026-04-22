@@ -12,7 +12,6 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
-  Trophy,
   XCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
@@ -22,7 +21,6 @@ import AttemptPillFilter from '@/components/ui/AttemptPillFilter';
 import ScoreTrajectoryChart from '@/components/assessment-detail/ScoreTrajectoryChart';
 import RankPredictionCard, { type RankLookupRow } from '@/components/assessment-detail/RankPredictionCard';
 import MistakeIntelligence, { type MIAttemptAnswer } from '@/components/assessment-detail/MistakeIntelligence';
-import LeverageActions from '@/components/assessment-detail/LeverageActions';
 import type { Assessment } from '@/types';
 
 // ── Negative marks per exam ───────────────────────────────────────────────────
@@ -743,50 +741,6 @@ export default function AnalyticsTab({
 
       {!analyticsLoading && (
         <>
-          {/* ── Block 1: Score Summary ────────────────────────────────────────── */}
-          <div className="bg-white shadow-sm rounded-md p-6">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <Trophy className="w-4 h-4 text-amber-500" />
-                  <span className="text-2xl font-semibold text-zinc-900">
-                    {selectedAttempt.score ?? selectedAttempt.correct_count ?? 0}
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400">
-                  {selectedAttempt.score !== null ? 'Score' : 'Correct'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xl font-semibold text-zinc-900 mb-1">
-                  {selectedAttempt.accuracy_percent !== null
-                    ? `${Math.round(selectedAttempt.accuracy_percent)}%`
-                    : selectedAttempt.correct_count !== null &&
-                      selectedAttempt.incorrect_count !== null
-                    ? `${Math.round(
-                        (selectedAttempt.correct_count /
-                          Math.max(
-                            1,
-                            selectedAttempt.correct_count +
-                              selectedAttempt.incorrect_count,
-                          )) *
-                          100,
-                      )}%`
-                    : '—'}
-                </p>
-                <p className="text-xs text-zinc-400">Accuracy</p>
-              </div>
-              <div>
-                <p className="text-xl font-semibold text-zinc-900 mb-1">
-                  {attempts.length}
-                </p>
-                <p className="text-xs text-zinc-400">
-                  {attempts.length === 1 ? 'Attempt' : 'Total Attempts'}
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* ── Block 3: Score Trajectory ─────────────────────────────────────── */}
           <ScoreTrajectoryChart
             attempts={attempts.map((a) => ({
@@ -1020,15 +974,6 @@ export default function AnalyticsTab({
               </div>
             </div>
           )}
-
-          {/* ── Block 9: Leverage Actions ─────────────────────────────────────── */}
-          <LeverageActions
-            conceptMastery={conceptMastery}
-            selectedAttemptNum={selAttemptNum}
-            attemptAnswers={attemptAnswers}
-            exam={assessment.exam}
-            negMark={negMark}
-          />
 
           {/* ── Block 10: AI Insight — Pro/Premium only ───────────────────────── */}
           {isAiEligible ? (

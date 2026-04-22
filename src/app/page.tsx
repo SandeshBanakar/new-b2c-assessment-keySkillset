@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool, FlaskConical, Atom, Scale } from 'lucide-react';
+import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool, FlaskConical, Atom, Scale, Mail } from 'lucide-react';
 import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
 import type { DemoUser } from '@/data/demoUsers';
@@ -103,6 +103,21 @@ function PersonaSelector() {
           </span>
           <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-teal-900 text-teal-300">
             CLIENT_ADMIN
+          </span>
+        </div>
+
+        <div
+          onClick={() => handleAdminSelect('/email-templates')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-rose-700">
+            <Mail className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">
+            Email Templates
+          </span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-rose-900 text-rose-300">
+            QA PERSONA
           </span>
         </div>
       </div>

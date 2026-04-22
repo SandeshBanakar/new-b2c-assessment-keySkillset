@@ -232,6 +232,9 @@ export default function SolutionsPanel({
   isFullTest?: boolean;
 }) {
   const [expandedQs, setExpandedQs] = useState<Set<string>>(new Set());
+  const [selectedModule, setSelectedModule] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+
   const answerMap = Object.fromEntries(userAnswers.map((a) => [a.question_id, a]));
 
   const moduleOrder = isFullTest
@@ -244,13 +247,24 @@ export default function SolutionsPanel({
     return acc;
   }, {});
 
-  const availableModules = moduleOrder.filter(
-    (m) => groupedByModule[m ?? '__none__']?.length,
-  );
+  // Also bucket any questions whose module_name doesn't match MODULE_ORDER (e.g. non-SAT)
+  const allModuleKeys = Array.from(new Set(questions.map((q) => q.module_name ?? '__none__')));
+  for (const key of allModuleKeys) {
+    if (!groupedByModule[key]) {
+      groupedByModule[key] = questions.filter((q) => (q.module_name ?? '__none__') === key);
+    }
+  }
 
-  const fallbackModule = availableModules[0] ?? null;
-  const [activeModule, setActiveModule] = useState<string | null>(fallbackModule);
-  const [page, setPage] = useState(0);
+  const availableModules = [
+    ...moduleOrder.filter((m) => groupedByModule[m ?? '__none__']?.length),
+    ...allModuleKeys.filter((k) => !moduleOrder.includes(k === '__none__' ? null as unknown as string : k) && groupedByModule[k]?.length),
+  ];
+
+  // Derive active module: use selectedModule if valid, else first available
+  const activeModule =
+    selectedModule && groupedByModule[selectedModule]?.length
+      ? selectedModule
+      : (availableModules[0] ?? null);
 
   function toggleExpanded(qId: string) {
     setExpandedQs((prev) => {
@@ -262,7 +276,7 @@ export default function SolutionsPanel({
   }
 
   function handleModuleChange(mod: string) {
-    setActiveModule(mod);
+    setSelectedModule(mod);
     setPage(0);
     setExpandedQs(new Set());
   }
@@ -299,7 +313,7 @@ export default function SolutionsPanel({
         <div className="flex flex-wrap gap-2 mb-5 pb-4 border-b border-zinc-100">
           {availableModules.map((mod) => {
             const key      = mod ?? '__none__';
-            const label    = MODULE_LABELS[mod] ?? 'Questions';
+            const label    = MODULE_LABELS[mod] ?? (mod === '__none__' ? 'Questions' : mod);
             const count    = groupedByModule[key]?.length ?? 0;
             const isActive = activeModule === mod;
             return (

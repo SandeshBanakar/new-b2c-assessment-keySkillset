@@ -165,6 +165,7 @@ export default function ClientAdminLayout({
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">
             Insights
           </p>
+          {/* Reports merged into Dashboard - kept for backward compatibility */}
           <NavItem href={`${base}/reports`} icon={BarChart2} label="Reports" />
 
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-2 pt-5 pb-1 select-none">

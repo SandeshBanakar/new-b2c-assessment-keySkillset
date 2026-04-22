@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { DEMO_USERS, STORAGE_KEY } from '@/data/demoUsers';
 import { SUBSCRIBED_ASSESSMENTS } from '@/data/assessments';
+import { supabase } from '@/lib/supabase/client';
 import type { User, Exam, Tier, ActivePlanInfo } from '@/types';
 
 interface AppContextValue {
@@ -90,7 +91,15 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
       JEE: 'targetJeeScore',
       CLAT: 'targetClatScore',
     } as const;
+    const dbColMap = {
+      NEET: 'target_neet_score',
+      JEE: 'target_jee_score',
+      CLAT: 'target_clat_score',
+    } as const;
     setUser((prev) => (prev ? { ...prev, [fieldMap[exam]]: score } : prev));
+    if (user?.id) {
+      supabase.from('users').update({ [dbColMap[exam]]: score }).eq('id', user.id);
+    }
   };
 
   const logout = () => {

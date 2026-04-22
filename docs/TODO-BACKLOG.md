@@ -1,5 +1,61 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 21 2026 — KSS-ANA-002 added (Analytics Shared Components + SAT + Linear Fixes). Active tasks only. Completed work → CLAUDE-HISTORY.md.
+# Last updated: Apr 22 2026 — KSS-CA-OVERHAUL-001 completed (Client Admin Dashboard + Profile Overhaul). Active tasks only. Completed work → CLAUDE-HISTORY.md.
+
+---
+
+## [COMPLETE] KSS-CA-OVERHAUL-001 — Client Admin Dashboard & Profile Overhaul
+
+**PRD:** `prds/client_admin/PRD-CA-DASHBOARD.md`
+**SQL:** `docs/requirements/SQL-CA-MIGRATIONS.txt` — KSS-DB-052 (pending run in Supabase)
+
+### Summary
+- Unified Dashboard with role-based tabs:
+  - **FULL_CREATOR:** Content (courses, assessments, questions) + Analytics tabs
+  - **RUN_ONLY:** Overview (learner metrics) + Performance tabs
+- Name field split in Users & Roles:
+  - CA Profile: First Name + Last Name with inline edit
+  - Content Creator: Add/Edit/View slide-overs use split name fields
+  - Avatar initials use first_name + last_name
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `docs/requirements/SQL-CA-MIGRATIONS.txt` | Added KSS-DB-052 migration |
+| `src/app/client-admin/[tenant]/users-roles/page.tsx` | Split name fields |
+| `src/app/client-admin/[tenant]/dashboard/page.tsx` | Unified dashboard |
+| `src/app/client-admin/[tenant]/layout.tsx` | Nav note |
+| `prds/client_admin/PRD-CA-DASHBOARD.md` | New PRD |
+
+### Build: ✅ PASSED
+
+---
+
+## [IN-PROGRESS] KSS-CA-EMAIL-001 - Client Admin White-Label Email Template Center
+
+**PRD:** Not requested for this session
+**Scope:** Shared Email Templates persona -> tenant chooser -> client-admin email index -> template detail with iframe preview -> raw white-label HTML templates + SES-safe token rendering
+
+### Phase 1 - Raw Template System
+| # | Task | Status |
+|---|------|--------|
+| CAE-1a | Create dedicated raw HTML email template folder with 6 white-label templates | [ ] IN PROGRESS |
+| CAE-1b | Add shared token renderer + preview payload contract | [ ] PENDING |
+| CAE-1c | Add sample tenant/template data with tenant-first branding fallback | [ ] PENDING |
+
+### Phase 2 - Persona Flow
+| # | Task | Status |
+|---|------|--------|
+| CAE-2a | Add shared Email Templates persona tile on root selector | [ ] PENDING |
+| CAE-2b | Build tenant chooser page using existing tenant slug mapping | [ ] PENDING |
+| CAE-2c | Build client-admin email template index page | [ ] PENDING |
+| CAE-2d | Build template detail page with trigger context, variables, payload, and iframe preview | [ ] PENDING |
+
+### Phase 3 - Verification + Documentation
+| # | Task | Status |
+|---|------|--------|
+| CAE-3a | Verify no Sandesh Banakar references or hardcoded old-brand support contact remain in new templates | [ ] PENDING |
+| CAE-3b | Run `npm run build` | [ ] PENDING |
+| CAE-3c | Move completed work to `CLAUDE-HISTORY.md` and mark backlog done | [ ] PENDING |
 
 ---
 

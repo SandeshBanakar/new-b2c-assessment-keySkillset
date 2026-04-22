@@ -99,12 +99,13 @@ city, state, country, zip_code, logo_url (text nullable)
 
 ### admin_users
 ```
-id (uuid), email (UNIQUE), name, role, tenant_id (uuid), is_active (boolean),
-created_at, password_hash (text nullable — demo only)
+id (uuid), email (UNIQUE), name, first_name, last_name, role, tenant_id (uuid),
+is_active (boolean), created_at, password_hash (text nullable — demo only)
 ```
 - Valid V1 roles: `SUPER_ADMIN` | `CLIENT_ADMIN` | `CONTENT_CREATOR`
 - `TEAM_MANAGER` deferred to V2 — never add to V1
 - Master Org CCs: `tenant_id IS NULL`. B2B CCs: `tenant_id = B2B tenant UUID`
+- **KSS-DB-052 (Apr 22 2026):** Added `first_name` and `last_name` columns. Migration splits existing `name` into two fields.
 
 ### users (B2C)
 ```

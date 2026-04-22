@@ -19,11 +19,7 @@ import ConceptMasteryPanel from '@/components/assessment-detail/ConceptMasteryPa
 import AttemptPillFilter from '@/components/ui/AttemptPillFilter';
 import SATHeroScore from '@/components/assessment-detail/SATHeroScore';
 import SATCollegeLadder, { type TierBand, type College } from '@/components/assessment-detail/SATCollegeLadder';
-import SATLeveragePanel from '@/components/assessment-detail/SATLeveragePanel';
-import SATPacingChart from '@/components/assessment-detail/SATPacingChart';
-import SATMistakeTaxonomy from '@/components/assessment-detail/SATMistakeTaxonomy';
 import DifficultyBreakdownCard, { type DiffMap } from '@/components/ui/DifficultyBreakdownCard';
-import PreviewSectionWrapper from '@/components/ui/PreviewSectionWrapper';
 import type { Assessment } from '@/types';
 
 // ─── SAT domain taxonomy ───────────────────────────────────────────────────────
@@ -207,7 +203,6 @@ export default function SATAnalyticsTab({
   const [allUserAnswers, setAllUserAnswers]            = useState<Record<string, UserAnswer[]>>({});
   const [tierBands, setTierBands]                     = useState<TierBand[]>([]);
   const [colleges, setColleges]                       = useState<College[]>([]);
-  const [analyticsConfig, setAnalyticsConfig]         = useState<Record<string, boolean>>({});
 
   const isAiEligible =
     user?.subscriptionTier === 'professional' ||
@@ -224,9 +219,6 @@ export default function SATAnalyticsTab({
   const targetScore = isFullTest
     ? (user?.targetSatScore ?? null)
     : (user?.targetSatSubjectScore ?? null);
-
-  const showPacing       = analyticsConfig['show_pacing_preview'] !== false;
-  const showMistakeTax   = analyticsConfig['show_mistake_taxonomy_preview'] !== false;
 
   useEffect(() => {
     if (!user?.id) return;
@@ -356,32 +348,14 @@ export default function SATAnalyticsTab({
       }
       setAllUserAnswers(answersMap);
 
-      // 7. Tier bands + colleges (Full Test only) + platform config in parallel
-      const extraLoads = await Promise.all([
-        isFullTest
-          ? supabase.from('sat_tier_bands').select('*').order('display_order')
-          : Promise.resolve({ data: [] }),
-        isFullTest
-          ? supabase.from('sat_colleges').select('*').eq('is_active', true).order('cutoff_score', { ascending: false })
-          : Promise.resolve({ data: [] }),
-        supabase.from('exam_categories').select('id').eq('name', 'SAT').maybeSingle(),
-      ]);
-
-      setTierBands((extraLoads[0].data as TierBand[] | null) ?? []);
-      setColleges((extraLoads[1].data as College[] | null) ?? []);
-
-      const catRow = extraLoads[2].data as { id: string } | null;
-      if (catRow) {
-        const { data: configRows } = await supabase
-          .from('platform_analytics_config')
-          .select('config_key, config_value')
-          .eq('exam_category_id', catRow.id);
-
-        const configMap: Record<string, boolean> = {};
-        for (const row of configRows ?? []) {
-          configMap[row.config_key as string] = row.config_value as boolean;
-        }
-        setAnalyticsConfig(configMap);
+      // 7. Tier bands + colleges (Full Test only)
+      if (isFullTest) {
+        const [bandsResult, collegesResult] = await Promise.all([
+          supabase.from('sat_tier_bands').select('*').order('display_order'),
+          supabase.from('sat_colleges').select('*').eq('is_active', true).order('cutoff_score', { ascending: false }),
+        ]);
+        setTierBands((bandsResult.data as TierBand[] | null) ?? []);
+        setColleges((collegesResult.data as College[] | null) ?? []);
       }
 
       setLoading(false);
@@ -545,38 +519,7 @@ export default function SATAnalyticsTab({
           <p className="text-sm text-zinc-400">No section data for this attempt.</p>
         ) : (
           <div className="space-y-5">
-            {isFullTest ? (
-              <>
-                {derivedSectionResults.filter((s) => s.section_id.startsWith('rw')).length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-                      Reading &amp; Writing
-                    </p>
-                    <div className="space-y-4 pl-0.5">
-                      {derivedSectionResults
-                        .filter((s) => s.section_id.startsWith('rw'))
-                        .map((sec) => <SectionRow key={sec.section_id} sec={sec} />)}
-                    </div>
-                  </div>
-                )}
-                {derivedSectionResults.filter((s) => s.section_id.startsWith('math')).length > 0 && (
-                  <div className="pt-2 border-t border-zinc-100">
-                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-                      Math
-                    </p>
-                    <div className="space-y-4 pl-0.5">
-                      {derivedSectionResults
-                        .filter((s) => s.section_id.startsWith('math'))
-                        .map((sec) => <SectionRow key={sec.section_id} sec={sec} />)}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="space-y-5">
-                {derivedSectionResults.map((sec) => <SectionRow key={sec.section_id} sec={sec} />)}
-              </div>
-            )}
+            {derivedSectionResults.map((sec) => <SectionRow key={sec.section_id} sec={sec} />)}
           </div>
         )}
       </div>
@@ -585,16 +528,6 @@ export default function SATAnalyticsTab({
       {hasDiffData && (
         <DifficultyBreakdownCard
           diffMap={difficultyMap}
-          attemptNumber={selectedAttempt.attempt_number}
-        />
-      )}
-
-      {/* ── Block 6: Leverage Panel (replaces "Where You Lost Points") ────────── */}
-      {selectedConceptMastery.length > 0 && (
-        <SATLeveragePanel
-          conceptMastery={selectedConceptMastery}
-          totalQuestions={selectedAttempt.total_questions}
-          isFullTest={isFullTest}
           attemptNumber={selectedAttempt.attempt_number}
         />
       )}
@@ -610,20 +543,6 @@ export default function SATAnalyticsTab({
             completed_at: a.completed_at,
           }))}
         />
-      )}
-
-      {/* ── Block 8: Pacing Analysis (Preview, gated by platform config) ─────── */}
-      {showPacing && (
-        <PreviewSectionWrapper>
-          <SATPacingChart />
-        </PreviewSectionWrapper>
-      )}
-
-      {/* ── Block 9: Mistake Taxonomy (Preview, gated by platform config) ────── */}
-      {showMistakeTax && (
-        <PreviewSectionWrapper>
-          <SATMistakeTaxonomy />
-        </PreviewSectionWrapper>
       )}
 
       {/* ── Block 10: SAT Scoring Reference (Full Test only) ─────────────────── */}
