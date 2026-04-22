@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, X, ChevronDown, ChevronRight, RotateCcw, AlertCircle } from 'lucide-react'
+import { Plus, X, ChevronRight, RotateCcw, AlertCircle } from 'lucide-react'
+import { SourceChapterPicker, Source, Chapter } from '../linear/_components'
+export type { Source, Chapter }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,7 +20,6 @@ export interface VariantModule {
   difficulty: 'EASY' | 'MEDIUM' | 'HARD'
   name: string
   time_minutes: string
-  question_type: string
   source_ids: string[]
   chapter_ids: string[]
   questions_per_attempt: string
@@ -36,27 +37,17 @@ export interface FoundationModule {
   order: number
   name: string
   time_minutes: string
-  question_type: string
   source_ids: string[]
   chapter_ids: string[]
   questions_per_attempt: string
   question_type_distribution: QTDist
   branching: { high_threshold: number; low_threshold: number }
   break_screen: BreakScreen | null
+  allow_calculator: boolean
   variant_modules: VariantModule[]
 }
 
-export interface Source { id: string; name: string; exam_category_id: string | null }
-export interface Chapter { id: string; source_id: string; name: string; order_index: number }
-
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-export const QUESTION_TYPE_OPTIONS = [
-  { value: 'MCQ',         label: 'MCQ' },
-  { value: 'SAQ',         label: 'SAQ' },
-  { value: 'PASSAGE',     label: 'Passage' },
-  { value: 'MIXED',       label: 'Mixed' },
-]
 
 export const DIFFICULTY_LABELS: Record<string, { label: string; color: string }> = {
   EASY:   { label: 'Easy',   color: 'bg-emerald-100 text-emerald-700' },
@@ -72,7 +63,6 @@ export function newVariantModule(difficulty: 'EASY' | 'MEDIUM' | 'HARD'): Varian
     difficulty,
     name: '',
     time_minutes: '',
-    question_type: '',
     source_ids: [],
     chapter_ids: [],
     questions_per_attempt: '',
@@ -86,13 +76,13 @@ export function newFoundationModule(order: number): FoundationModule {
     order,
     name: '',
     time_minutes: '',
-    question_type: '',
     source_ids: [],
     chapter_ids: [],
     questions_per_attempt: '',
     question_type_distribution: { ...DEFAULT_QTD },
     branching: { high_threshold: 70, low_threshold: 40 },
     break_screen: null,
+    allow_calculator: false,
     variant_modules: [
       newVariantModule('EASY'),
       newVariantModule('MEDIUM'),
@@ -118,28 +108,6 @@ export function Label({ children, required }: { children: React.ReactNode; requi
 
 export function FieldHint({ children }: { children: React.ReactNode }) {
   return <p className="mt-1 text-xs text-zinc-400">{children}</p>
-}
-
-function SelectField({
-  value, onChange, options, placeholder, disabled,
-}: {
-  value: string; onChange: (v: string) => void
-  options: { value: string; label: string }[]; placeholder: string; disabled?: boolean
-}) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        disabled={disabled}
-        className={`${inputCls()} appearance-none pr-8 bg-white ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        <option value="">{placeholder}</option>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
-    </div>
-  )
 }
 
 // ─── Question Type Distribution ───────────────────────────────────────────────
@@ -189,103 +157,6 @@ export function QTDistEditor({
           </>
         )}
       </div>
-    </div>
-  )
-}
-
-// ─── Source + Chapter multi-select ───────────────────────────────────────────
-
-export function SourceChapterPicker({
-  sources, chaptersMap,
-  selectedSourceIds, selectedChapterIds,
-  onSourcesChange, onChaptersChange,
-}: {
-  sources: Source[]
-  chaptersMap: Record<string, Chapter[]>
-  selectedSourceIds: string[]
-  selectedChapterIds: string[]
-  onSourcesChange: (ids: string[]) => void
-  onChaptersChange: (ids: string[]) => void
-}) {
-  const [openSources, setOpenSources] = useState<Set<string>>(new Set())
-
-  function toggleSource(id: string) {
-    const next = selectedSourceIds.includes(id)
-      ? selectedSourceIds.filter(s => s !== id)
-      : [...selectedSourceIds, id]
-    onSourcesChange(next)
-    // deselect chapters that belong to deselected source
-    if (selectedSourceIds.includes(id)) {
-      const chapIds = (chaptersMap[id] ?? []).map(c => c.id)
-      onChaptersChange(selectedChapterIds.filter(c => !chapIds.includes(c)))
-    }
-  }
-
-  function toggleChapter(chapterId: string) {
-    onChaptersChange(
-      selectedChapterIds.includes(chapterId)
-        ? selectedChapterIds.filter(c => c !== chapterId)
-        : [...selectedChapterIds, chapterId]
-    )
-  }
-
-  function toggleOpen(id: string) {
-    setOpenSources(prev => {
-      const s = new Set(prev)
-      s.has(id) ? s.delete(id) : s.add(id)
-      return s
-    })
-  }
-
-  if (sources.length === 0) {
-    return <p className="text-xs text-zinc-400">No sources available for this category.</p>
-  }
-
-  return (
-    <div className="space-y-1">
-      {sources.map(src => {
-        const chapters = chaptersMap[src.id] ?? []
-        const isChecked = selectedSourceIds.includes(src.id)
-        const isOpen = openSources.has(src.id)
-        return (
-          <div key={src.id} className="border border-zinc-100 rounded-md overflow-hidden">
-            <div className="flex items-center gap-2 px-2.5 py-2 bg-zinc-50">
-              <input
-                type="checkbox"
-                checked={isChecked}
-                onChange={() => toggleSource(src.id)}
-                className="accent-blue-700 shrink-0"
-              />
-              <span className="flex-1 text-sm text-zinc-800">{src.name}</span>
-              {chapters.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => toggleOpen(src.id)}
-                  className="p-0.5 text-zinc-400 hover:text-zinc-600 transition-colors"
-                >
-                  <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-                </button>
-              )}
-            </div>
-            {isOpen && chapters.length > 0 && (
-              <div className="px-3 py-2 space-y-1.5 border-t border-zinc-100">
-                {chapters.map(ch => (
-                  <label key={ch.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedChapterIds.includes(ch.id)}
-                      onChange={() => toggleChapter(ch.id)}
-                      disabled={!isChecked}
-                      className="accent-blue-700"
-                    />
-                    <span className="text-xs text-zinc-700">{ch.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -410,26 +281,15 @@ export function VariantModuleCard({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <Label>Question Type</Label>
-              <SelectField
-                value={vm.question_type}
-                onChange={v => onChange({ ...vm, question_type: v })}
-                options={QUESTION_TYPE_OPTIONS}
-                placeholder="Select type"
-              />
-            </div>
-            <div>
-              <Label required>Questions Per Attempt</Label>
-              <input
-                type="number" min={1}
-                value={vm.questions_per_attempt}
-                onChange={e => onChange({ ...vm, questions_per_attempt: e.target.value })}
-                placeholder="e.g. 27"
-                className={inputCls()}
-              />
-            </div>
+          <div>
+            <Label required>Questions Per Attempt</Label>
+            <input
+              type="number" min={1}
+              value={vm.questions_per_attempt}
+              onChange={e => onChange({ ...vm, questions_per_attempt: e.target.value })}
+              placeholder="e.g. 27"
+              className={inputCls()}
+            />
           </div>
 
           <div>
@@ -575,26 +435,29 @@ export function FoundationModuleCard({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label required>Questions Per Attempt</Label>
+              <input
+                type="number" min={1}
+                value={fm.questions_per_attempt}
+                onChange={e => onUpdate({ ...fm, questions_per_attempt: e.target.value })}
+                placeholder="e.g. 27"
+                className={inputCls()}
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
               <div>
-                <Label>Question Type</Label>
-                <SelectField
-                  value={fm.question_type}
-                  onChange={v => onUpdate({ ...fm, question_type: v })}
-                  options={QUESTION_TYPE_OPTIONS}
-                  placeholder="Select type"
-                />
+                <p className="text-sm font-medium text-zinc-700">Allow Calculator</p>
+                <p className="text-xs text-zinc-400 mt-0.5">Variant Modules inherit this setting.</p>
               </div>
-              <div>
-                <Label required>Questions Per Attempt</Label>
-                <input
-                  type="number" min={1}
-                  value={fm.questions_per_attempt}
-                  onChange={e => onUpdate({ ...fm, questions_per_attempt: e.target.value })}
-                  placeholder="e.g. 27"
-                  className={inputCls()}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => onUpdate({ ...fm, allow_calculator: !fm.allow_calculator })}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${fm.allow_calculator ? 'bg-blue-600' : 'bg-zinc-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${fm.allow_calculator ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
             </div>
 
             <div>

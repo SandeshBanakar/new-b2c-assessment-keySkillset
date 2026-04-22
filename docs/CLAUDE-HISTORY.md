@@ -6,6 +6,26 @@
 
 ## COMPLETED WORK LOG
 
+### April 22, 2026 — KSS-SA-CA-001 Phase 7: Sources & Chapters + Engine Assessment Seeding
+
+**Ticket:** KSS-SA-CA-001 | **SQL:** `docs/requirements/SQL-CA-MIGRATIONS-2.txt`
+
+**Code changes:**
+- **Fixed 400 on Create Assessments page:** PostgREST join without FK constraint returns 400; removed `admin_users!created_by` join temporarily, then restored after KSS-DB-054b.
+- **`SourceChapterPicker` moved to `linear/_components.tsx`** (was in `adaptive/_components.tsx`); adaptive re-exports `Source`, `Chapter` types — no breaking change.
+- **`SortableSectionRow` → expandable card:** drag handle on header, chevron toggle, Sources & Chapters picker in collapsible body. DnD preserved.
+- **Linear create + edit forms:** Sources & Chapters wired — per-section `source_ids`/`chapter_ids` for `FULL_TEST`, single top-level pool for `SUBJECT_TEST`/`CHAPTER_TEST`.
+- **`admin_users` join re-wired:** PostgREST named alias syntax `created_by_user:admin_users!fk_assessment_items_created_by(name)`. `admin_users.name` is the column (not `full_name`).
+
+**DB migrations confirmed:**
+- **KSS-DB-054a:** `assessment_items` ADD `assessments_id UUID REFERENCES assessments(id) ON DELETE SET NULL` + index. Verified.
+- **KSS-DB-054b:** FK constraints `fk_assessment_items_created_by` + `fk_assessment_items_last_modified_by` → `admin_users(id) ON DELETE SET NULL`. Safety check showed 0 orphans — applied clean.
+- **KSS-DB-055:** Seeded 22 linear engine assessments (`assessments` table, `architecture='linear'`) into `assessment_items` as `INACTIVE`/`LINEAR`. Type mapping: `full-test`→`FULL_TEST`, `subject-test`→`SUBJECT_TEST`, `chapter-test`→`CHAPTER_TEST`. `assessment_config` contains `duration_minutes` + `total_questions` only.
+
+**Post-seed state:** `assessment_items` has 44 rows — 18 SA-created (18 with `created_by` set) + 22 seeded (no `created_by`, no `display_config`).
+
+---
+
 ### April 21, 2026 — KSS-SA-CA-001 DB Migrations: KSS-DB-050 + KSS-DB-051
 
 **Ticket:** KSS-SA-CA-001 | **SQL:** `docs/requirements/SQL-CA-MIGRATIONS.txt`

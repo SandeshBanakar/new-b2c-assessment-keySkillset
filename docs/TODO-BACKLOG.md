@@ -1,14 +1,29 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 21 2026 — KSS-ANA-001 Phase 2 seeding COMPLETE. KSS-DB-052 added. KSS-SA-CA-001 Create Assessment Feature Set added. Active tasks only. Completed work → CLAUDE-HISTORY.md.
+# Last updated: Apr 21 2026 — KSS-ANA-002 added (Analytics Shared Components + SAT + Linear Fixes). Active tasks only. Completed work → CLAUDE-HISTORY.md.
 
 ---
 
-## [DONE] KSS-SA-CA-001 — Create Assessment Feature Set
+## [DONE] KSS-SA-CA-001 — Create Assessment Feature Set (Part 2)
 
 **PRD:** `prds/super-admin/PRD-SA-CREATE-ASSESSMENTS.md`  
-**SQL:** `docs/requirements/SQL-CA-MIGRATIONS.txt` — KSS-DB-050 + KSS-DB-051 (SA must run in Supabase)  
+**SQL:** `docs/requirements/SQL-CA-MIGRATIONS.txt` (KSS-DB-050 + KSS-DB-051 ✓) · `docs/requirements/SQL-CA-MIGRATIONS-2.txt` (KSS-DB-054 + KSS-DB-055 pending SA run)  
 **Scope:** Main page state machine · Linear form refactor · Linear edit flow · Adaptive create + edit forms · Scale Score tab  
-**Completed:** Apr 21 2026
+**Phase 1–7 Completed:** Apr 21 2026
+
+### Phase 7 — Fixes + Engine Assessment Seeding (Apr 21 2026 session)
+| # | Task | Status |
+|---|------|--------|
+| CA-7a | Fix 400 error on Create Assessments page (remove broken admin_users!created_by PostgREST join) | [x] DONE |
+| CA-7b | Add Sources & Chapters picker to linear create form — FULL_TEST (per section) + SUBJECT/CHAPTER test (single pool) | [x] DONE |
+| CA-7c | Add Sources & Chapters picker to linear edit form (`linear/[id]/page.tsx`) — same pattern as create | [x] DONE |
+| CA-7d | Move `SourceChapterPicker`, `Source`, `Chapter` to `linear/_components.tsx`; adaptive re-exports them | [x] DONE |
+| CA-7e | `SortableSectionRow` → expandable card with collapsible Sources & Chapters panel | [x] DONE |
+| CA-7f | Write SQL — KSS-DB-054 (`assessments_id` col + admin_users FK constraints) | [x] DONE — SQL-CA-MIGRATIONS-2.txt |
+| CA-7g | Write SQL — KSS-DB-055 (seed 22 engine assessments into assessment_items) | [x] DONE — SQL-CA-MIGRATIONS-2.txt |
+| CA-7h | Run KSS-DB-054 (STEP 1 + STEP 3 + STEP 4) in Supabase | [x] DONE — Apr 22 2026 |
+| CA-7i | Run KSS-DB-055 (STEP 2) in Supabase | [x] DONE — Apr 22 2026 |
+| CA-7j | After KSS-DB-054 complete: re-add admin_users join in `page.tsx` to populate "Created by" column | [x] DONE — Apr 22 2026 |
+| CA-7k | `npm run build` passes clean | [x] DONE — verified Apr 22 2026 |
 
 ### Phase 0 — PRD + SQL + Planning
 | # | Task | Status |
@@ -78,6 +93,130 @@
 | CA-6a | Update `docs/CLAUDE-DB.md` — KSS-DB-050 + KSS-DB-051 schemas | [x] DONE |
 | CA-6b | `npm run build` passes clean (6 new routes) | [x] DONE |
 | CA-6c | KSS-DB-050 + KSS-DB-051 run in Supabase — verified Apr 21 2026 | [x] DONE |
+
+---
+
+## [NEW] KSS-ANA-002 — Analytics V2: Shared Components + SAT + Linear Fixes
+
+**PRD:** `prds/analytics/PRD-ANA-002.md` (to be written)
+**Scope:** Shared SectionBreakdown · Unified ConceptMastery (per section/attempt, dynamic pills) · MistakeTaxonomy (live 6-cat) · Live PacingAnalysis · Solutions Panel fixes · SAT HeroScore bugs · Linear stats card removal · Attempt naming
+**DB Required:** KSS-DB-048 (users target score columns) — for Linear target-set UI only
+**Solutions Panel:** UI-match approach (both implementations kept, matched visually — no merge)
+
+---
+
+**LOCKED DECISIONS:**
+- Attempt naming: attempt_number=1 → "Free Attempt", others → "Attempt {N}" — no DB change
+- Leverage Panels: remove from both SAT and Linear entirely
+- Stats card (Score/Accuracy/Attempts): remove from Linear AnalyticsTab
+- Target score input: `<input type="number" min=1 max=10000>` (replaces dropdown) — SAT and Linear
+- SATHeroScore layout: keep single card, fix responsive (flex-col → sm:flex-row), fix selectedAttempt sub-scores
+- PreviewSectionWrapper: remove from Pacing + MistakeTaxonomy entirely
+- Pacing data: live from `attempt_answers.time_spent_seconds` — no more demo data
+- Pacing formula: `(assessment.duration × 60) / assessment.questionCount` s/q — displayed visibly in UI
+- Pacing in Linear: YES add it (target = total_duration_seconds ÷ total_questions)
+- MistakeTaxonomy: 6-category classification (same as `MistakeIntelligence`) — wire to SAT, replaces `SATMistakeTaxonomy`
+- Concept Mastery: per section, per attempt. Pills = dynamic from `attempt_section_results.section_label`. Data derived from `attempt_answers` (concept_tag + section_id). New shared component replaces both `ConceptMasteryPanel` (SAT) and inline heatmap (Linear)
+- Section Breakdown: shared component, flat list (no R&W/Math headings), used by both
+- Solutions Panel: keep separate implementations (SAT: SolutionsPanel.tsx, Linear: inline) — match UI only
+- Platform Config Analytics Config: DEFERRED to Create Adaptive Assessment form
+- SAT Scoring Reference table: remains static for now
+
+---
+
+---
+
+**FINAL LOCKED DECISIONS (Apr 21 2026):**
+- Pacing in Linear: group by subject section (Physics/Chemistry/Biology for NEET etc.) — same grouping as Section Breakdown
+- Pacing formula: algebraic only (`Target = Total duration (min) × 60 ÷ Total questions`) shown in "View Formula" info popover — not student-facing inline
+- ConceptMasterySection: derives from `attempt_answers.concept_tag + section_id` (not `user_concept_mastery`)
+- `attempt_answers.section_id` backfill: SQL UPDATE via `concept_tag = concept_tags.concept_name` join → derive subject → map to section_id
+
+---
+
+### Phase 0 — PRD + Diagnostics (run before building)
+| # | Task | Status |
+|---|------|--------|
+| A2-PRD | Write `prds/analytics/PRD-ANA-002.md` | [x] DONE — Apr 21 2026 |
+| A2-D1 | DIAG-1/1b: SAT FT questions found (98 rows, module_name matches MODULE_ORDER). Code bug confirmed. | [x] DONE |
+| A2-D2 | DIAG-2: Linear questions found per section (5/5 each). Questions are placeholder IDs not in `questions` table — code bug in loadSection() JOIN. | [x] DONE |
+| A2-D3 | DIAG-3: Duplicate attempts confirmed — attempt_number 1 AND 2 each have 2 rows (placeholder + real seed). Delete placeholders in STEP 9b/9c. | [x] DONE |
+| A2-D4 | DIAG-4: section_id already 100% populated for NEET/JEE/CLAT (null_section_id=0). KSS-DB-053 backfill CANCELLED. | [x] DONE |
+| A2-D5 | DIAG-5: concept_tag → concept_name 100% match. All tags resolve. | [x] DONE |
+| A2-DB048 | KSS-DB-048: target_neet/jee/clat_score columns added and verified. | [x] DONE |
+| A2-DB053 | KSS-DB-053: CANCELLED — section_id already populated. | [x] N/A |
+| A2-DATA001 | KSS-DATA-001: Delete placeholder attempt rows (11111111-*, 22222222-*, 33333333-*) — SQL-ANA-002.txt STEP 9b/9c. Run STEP 10/11 after. | [ ] SA RUNS |
+
+### Phase 1 — Quick Removals (no new components, fast wins)
+| # | Task | Status |
+|---|------|--------|
+| A2-0a | Remove `SATLeveragePanel` block from `SATAnalyticsTab.tsx` Block 6 | [ ] PENDING |
+| A2-0b | Remove `LeverageActions` block from `AnalyticsTab.tsx` | [ ] PENDING |
+| A2-0c | Remove "Reading & Writing" + "Math" group headings from SAT Section Breakdown in `SATAnalyticsTab.tsx` | [ ] PENDING |
+| A2-0d | Remove `PreviewSectionWrapper` wrapping from Pacing + MistakeTaxonomy in `SATAnalyticsTab.tsx` | [ ] PENDING |
+| A2-0e | Remove Block 1 Score Summary card (Score / Accuracy / Total Attempts grid) from `AnalyticsTab.tsx` | [ ] PENDING |
+
+### Phase 2 — Bug Fixes
+| # | Task | Status |
+|---|------|--------|
+| A2-1a | `SATHeroScore.tsx`: fix mobile layout — `flex items-start gap-6` → `flex flex-col sm:flex-row sm:items-start sm:gap-6` | [ ] PENDING |
+| A2-1b | `SATHeroScore.tsx`: R&W/Math sub-scores hardcoded to `lastAttempt` — fix to `selectedAttempt` | [ ] PENDING |
+| A2-1c | `SATHeroScore.tsx`: convert target `<select>` dropdown → `<input type="number" min={1} max={10000}>` | [ ] PENDING |
+| A2-1d | `AttemptPillFilter.tsx`: accept optional `attemptName?: string` per entry; attempt_number=1 → "Free Attempt" | [ ] PENDING |
+| A2-1e | `AttemptPillFilter.tsx`: deduplicate attempts array by `id` defensively | [ ] PENDING |
+| A2-1f | `SolutionsPanel.tsx` (SAT): add `module_name` fallback grouping (render all questions when no module match) + proper empty state | [ ] PENDING |
+| A2-1g | `AnalyticsTab.tsx` solutions section (Linear): add empty state when section loads but questions array is empty | [ ] PENDING |
+
+### Phase 3 — Shared: SectionBreakdown
+| # | Task | Status |
+|---|------|--------|
+| A2-2a | Create `src/components/assessment-detail/SectionBreakdown.tsx` — props: `sections: SectionResult[]`; flat list (no group headings); marks bar + correct/wrong/skipped/time/accuracy | [ ] PENDING |
+| A2-2b | Replace SAT inline section breakdown in `SATAnalyticsTab.tsx` with `<SectionBreakdown>` | [ ] PENDING |
+| A2-2c | Replace Linear inline section breakdown (Block 5) in `AnalyticsTab.tsx` with `<SectionBreakdown>` | [ ] PENDING |
+
+### Phase 4 — Shared: MistakeTaxonomy (unify)
+| # | Task | Status |
+|---|------|--------|
+| A2-3a | Add `concept_tag` + `section_id` to SAT `attempt_answers` query in `SATAnalyticsTab.tsx` | [ ] PENDING |
+| A2-3b | Wire `MistakeIntelligence` into `SATAnalyticsTab.tsx` — replaces `SATMistakeTaxonomy` block | [ ] PENDING |
+| A2-3c | Delete `SATMistakeTaxonomy.tsx` | [ ] PENDING |
+
+### Phase 5 — Shared: Live PacingAnalysis
+| # | Task | Status |
+|---|------|--------|
+| A2-4a | Build `src/components/assessment-detail/PacingAnalysis.tsx` — live `attempt_answers.time_spent_seconds`; target time from assessment config (time_minutes ÷ questions_per_attempt per module for SAT / duration × 60 ÷ questionCount for Linear); chip layout showing "Q{N} · {t}s" on each dot; visible formula line in section header | [ ] PENDING |
+| A2-4b | Wire `PacingAnalysis` into `SATAnalyticsTab.tsx` — replace `SATPacingChart` | [ ] PENDING |
+| A2-4c | Wire `PacingAnalysis` into `AnalyticsTab.tsx` (Linear) — target = `assessment.duration × 60 ÷ assessment.questionCount` | [ ] PENDING |
+| A2-4d | Delete `SATPacingChart.tsx` | [ ] PENDING |
+
+### Phase 6 — Shared: ConceptMastery (per section, per attempt)
+| # | Task | Status |
+|---|------|--------|
+| A2-5a | Build `src/components/assessment-detail/ConceptMasterySection.tsx` — props: `answers: {section_id, concept_tag, is_correct, is_skipped}[]`, `sectionLabels: Record<string, string>`, `selectedAttemptNumber: number`; pill tabs from `sectionLabels` keys (dynamic DB values); concept mastery bars per selected section | [ ] PENDING |
+| A2-5b | Add `section_id` to Linear `attempt_answers` query in `AnalyticsTab.tsx` | [ ] PENDING |
+| A2-5c | Replace `ConceptMasteryPanel` usage in `SATAnalyticsTab.tsx` with `<ConceptMasterySection>` | [ ] PENDING |
+| A2-5d | Replace inline concept mastery heatmap in `AnalyticsTab.tsx` with `<ConceptMasterySection>` | [ ] PENDING |
+| A2-5e | Retire `ConceptMasteryPanel.tsx` (replaced) | [ ] PENDING |
+
+### Phase 7 — Solutions Panel: UI-match (Linear inline = SAT accordion style)
+| # | Task | Status |
+|---|------|--------|
+| A2-6a | Audit visual diff between SAT `SolutionsPanel.tsx` and Linear inline solutions in `AnalyticsTab.tsx` | [ ] PENDING |
+| A2-6b | Update Linear inline solutions to match SAT accordion style (collapsed row = Q# / status badge / time / answer; expanded = full question + marks earned/lost + explanation) | [ ] PENDING |
+
+### Phase 8 — Linear Score Trajectory Target Input
+| # | Task | Status |
+|---|------|--------|
+| A2-7a | KSS-DB-048 SQL: `users` ADD `target_neet_score`, `target_jee_score`, `target_clat_score` INT NULL — write to `docs/requirements/SQL-ANA-002.txt`, SA runs in Supabase | [ ] PENDING |
+| A2-7b | Add inline `<input type="number">` to `ScoreTrajectoryChart.tsx` when target is null (shows "Set a target →" prompt) | [ ] PENDING |
+| A2-7c | Verify `AppContext.updateTargetScore()` writes to KSS-DB-048 columns (referenced in AnalyticsTab but columns may not exist yet) | [ ] PENDING |
+
+### Phase 9 — Post-Build
+| # | Task | Status |
+|---|------|--------|
+| A2-8a | `npm run build` passes clean | [ ] PENDING |
+| A2-8b | Move completed tasks to `CLAUDE-HISTORY.md`, update `TODO-BACKLOG.md` | [ ] PENDING |
+| A2-8c | Update memory file `project_kss_ana_002.md` | [ ] PENDING |
 
 ---
 

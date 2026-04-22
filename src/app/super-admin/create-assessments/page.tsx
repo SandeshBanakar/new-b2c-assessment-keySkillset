@@ -463,19 +463,21 @@ export default function CreateAssessmentsPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [{ data: assessments }, { data: cats }] = await Promise.all([
+    const [{ data: assessments, error: assessErr }, { data: cats }] = await Promise.all([
       supabase
         .from('assessment_items')
         .select(`
           id, title, description, test_type, status, assessment_type, assessment_config,
-          created_at, updated_at,
+          created_at, updated_at, assessments_id,
           exam_categories!exam_category_id ( name ),
-          created_by_user:admin_users!created_by ( name ),
-          last_modified_user:admin_users!last_modified_by ( name )
+          created_by_user:admin_users!fk_assessment_items_created_by ( name ),
+          last_modified_by_user:admin_users!fk_assessment_items_last_modified_by ( name )
         `)
         .order('created_at', { ascending: false }),
       supabase.from('exam_categories').select('id, name').eq('is_active', true).order('display_order'),
     ])
+
+    if (assessErr) console.error('Failed to load assessments:', assessErr)
 
     if (assessments) {
       const mapped: Assessment[] = assessments.map((a: Record<string, unknown>) => ({
@@ -489,7 +491,7 @@ export default function CreateAssessmentsPage() {
         updated_at: a.updated_at as string,
         category_name: (a.exam_categories as { name: string } | null)?.name ?? null,
         created_by_name: (a.created_by_user as { name: string } | null)?.name ?? null,
-        last_modified_by_name: (a.last_modified_user as { name: string } | null)?.name ?? null,
+        last_modified_by_name: (a.last_modified_by_user as { name: string } | null)?.name ?? null,
         assessment_config: (a.assessment_config as AssessmentConfig | null) ?? null,
       }))
 

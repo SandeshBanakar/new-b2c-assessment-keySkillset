@@ -40,7 +40,6 @@ export default function CreateAdaptiveAssessmentPage() {
   const [title, setTitle] = useState('')
   const [testType, setTestType] = useState('')
   const [examCategoryId, setExamCategoryId] = useState('')
-  const [allowCalculator, setAllowCalculator] = useState(false)
 
   // Modules
   const [foundationModules, setFoundationModules] = useState<FoundationModule[]>([newFoundationModule(1)])
@@ -61,7 +60,10 @@ export default function CreateAdaptiveAssessmentPage() {
       .select('id, name, score_min, score_max')
       .eq('is_active', true)
       .order('display_order')
-      .then(({ data }) => { if (data) setCategories(data as ExamCategory[]) })
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load categories:', error)
+        if (data) setCategories(data as ExamCategory[])
+      })
   }, [])
 
   // Load sources when category changes
@@ -130,13 +132,12 @@ export default function CreateAdaptiveAssessmentPage() {
 
     const assessmentConfig = {
       assessment_type: 'ADAPTIVE',
-      allow_calculator: allowCalculator,
       foundation_modules: foundationModules.map(fm => ({
         id: fm.id,
         order: fm.order,
         name: fm.name.trim(),
         time_minutes: fm.time_minutes ? Number(fm.time_minutes) : null,
-        question_type: fm.question_type || null,
+        allow_calculator: fm.allow_calculator,
         source_ids: fm.source_ids,
         chapter_ids: fm.chapter_ids,
         questions_per_attempt: fm.questions_per_attempt ? Number(fm.questions_per_attempt) : null,
@@ -148,7 +149,6 @@ export default function CreateAdaptiveAssessmentPage() {
           difficulty: vm.difficulty,
           name: vm.name.trim(),
           time_minutes: vm.time_minutes ? Number(vm.time_minutes) : null,
-          question_type: vm.question_type || null,
           source_ids: vm.source_ids,
           chapter_ids: vm.chapter_ids,
           questions_per_attempt: vm.questions_per_attempt ? Number(vm.questions_per_attempt) : null,
@@ -299,19 +299,6 @@ export default function CreateAdaptiveAssessmentPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                <p className="text-sm font-medium text-zinc-700">Allow Calculator</p>
-                <p className="text-xs text-zinc-400 mt-0.5">When off, calculator is hidden for all learners.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAllowCalculator(v => !v)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${allowCalculator ? 'bg-blue-600' : 'bg-zinc-300'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${allowCalculator ? 'translate-x-4' : 'translate-x-0'}`} />
-              </button>
-            </div>
           </SectionCard>
 
           {/* Foundation Modules */}

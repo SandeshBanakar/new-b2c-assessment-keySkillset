@@ -22,6 +22,11 @@ import { CSS } from '@dnd-kit/utilities'
 import type { TopicEntry } from '@/types'
 import { DisplayConfigPreview } from '@/components/assessment-detail/DisplayConfigPreview'
 
+// ─── Shared types ─────────────────────────────────────────────────────────────
+
+export interface Source { id: string; name: string; exam_category_id: string | null }
+export interface Chapter { id: string; source_id: string; name: string; order_index: number }
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const LANGUAGES = [
@@ -174,6 +179,102 @@ export function SelectField({
   )
 }
 
+// ─── Source + Chapter multi-select ───────────────────────────────────────────
+
+export function SourceChapterPicker({
+  sources, chaptersMap,
+  selectedSourceIds, selectedChapterIds,
+  onSourcesChange, onChaptersChange,
+}: {
+  sources: Source[]
+  chaptersMap: Record<string, Chapter[]>
+  selectedSourceIds: string[]
+  selectedChapterIds: string[]
+  onSourcesChange: (ids: string[]) => void
+  onChaptersChange: (ids: string[]) => void
+}) {
+  const [openSources, setOpenSources] = useState<Set<string>>(new Set())
+
+  function toggleSource(id: string) {
+    const next = selectedSourceIds.includes(id)
+      ? selectedSourceIds.filter(s => s !== id)
+      : [...selectedSourceIds, id]
+    onSourcesChange(next)
+    if (selectedSourceIds.includes(id)) {
+      const chapIds = (chaptersMap[id] ?? []).map(c => c.id)
+      onChaptersChange(selectedChapterIds.filter(c => !chapIds.includes(c)))
+    }
+  }
+
+  function toggleChapter(chapterId: string) {
+    onChaptersChange(
+      selectedChapterIds.includes(chapterId)
+        ? selectedChapterIds.filter(c => c !== chapterId)
+        : [...selectedChapterIds, chapterId]
+    )
+  }
+
+  function toggleOpen(id: string) {
+    setOpenSources(prev => {
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
+  }
+
+  if (sources.length === 0) {
+    return <p className="text-xs text-zinc-400">No sources available for this category.</p>
+  }
+
+  return (
+    <div className="space-y-1">
+      {sources.map(src => {
+        const chapters = chaptersMap[src.id] ?? []
+        const isChecked = selectedSourceIds.includes(src.id)
+        const isOpen = openSources.has(src.id)
+        return (
+          <div key={src.id} className="border border-zinc-100 rounded-md overflow-hidden">
+            <div className="flex items-center gap-2 px-2.5 py-2 bg-zinc-50">
+              <input
+                type="checkbox"
+                checked={isChecked}
+                onChange={() => toggleSource(src.id)}
+                className="accent-blue-700 shrink-0"
+              />
+              <span className="flex-1 text-sm text-zinc-800">{src.name}</span>
+              {chapters.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => toggleOpen(src.id)}
+                  className="p-0.5 text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                </button>
+              )}
+            </div>
+            {isOpen && chapters.length > 0 && (
+              <div className="px-3 py-2 space-y-1.5 border-t border-zinc-100">
+                {chapters.map(ch => (
+                  <label key={ch.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedChapterIds.includes(ch.id)}
+                      onChange={() => toggleChapter(ch.id)}
+                      disabled={!isChecked}
+                      className="accent-blue-700"
+                    />
+                    <span className="text-xs text-zinc-700">{ch.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function SectionCard({ title, description, children }: {
   title: string; description?: string; children: React.ReactNode
 }) {
@@ -298,57 +399,95 @@ export interface SectionEntry {
   name: string
   questionCount: string
   durationMinutes: string
+  source_ids: string[]
+  chapter_ids: string[]
 }
 
-// ─── Sortable section row ─────────────────────────────────────────────────────
+// ─── Sortable section card ────────────────────────────────────────────────────
 
 function SortableSectionRow({
-  entry, showDuration, onChange, onRemove,
+  entry, showDuration, sources, chaptersMap, onChange, onRemove,
 }: {
   entry: SectionEntry
   showDuration: boolean
-  onChange: (id: string, field: keyof SectionEntry, value: string) => void
+  sources: Source[]
+  chaptersMap: Record<string, Chapter[]>
+  onChange: (id: string, updates: Partial<SectionEntry>) => void
   onRemove: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: entry.id })
+  const [open, setOpen] = useState(false)
+
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
-      className="flex items-center gap-2"
+      className="border border-zinc-200 rounded-lg overflow-hidden"
     >
-      <button type="button" className="cursor-grab text-zinc-300 hover:text-zinc-400 shrink-0 touch-none" {...attributes} {...listeners}>
-        <GripVertical className="w-4 h-4" />
-      </button>
-      <input
-        type="text"
-        value={entry.name}
-        onChange={e => onChange(entry.id, 'name', e.target.value)}
-        placeholder="Section name, e.g. Biology"
-        className="flex-1 border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-blue-700 focus:border-transparent outline-none"
-      />
-      <input
-        type="number" min={1}
-        value={entry.questionCount}
-        onChange={e => onChange(entry.id, 'questionCount', e.target.value)}
-        placeholder="Qs"
-        title="Question count"
-        className="w-20 border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-blue-700 focus:border-transparent outline-none"
-      />
-      {showDuration && (
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-zinc-50">
+        <button
+          type="button"
+          className="cursor-grab text-zinc-300 hover:text-zinc-400 shrink-0 touch-none"
+          {...attributes} {...listeners}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <input
+          type="text"
+          value={entry.name}
+          onChange={e => onChange(entry.id, { name: e.target.value })}
+          placeholder="Section name, e.g. Biology"
+          className="flex-1 bg-transparent border-none text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none min-w-0"
+        />
         <input
           type="number" min={1}
-          value={entry.durationMinutes}
-          onChange={e => onChange(entry.id, 'durationMinutes', e.target.value)}
-          placeholder="Min"
-          title="Duration in minutes"
-          className="w-16 border border-zinc-200 rounded-md px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-blue-700 focus:border-transparent outline-none"
+          value={entry.questionCount}
+          onChange={e => onChange(entry.id, { questionCount: e.target.value })}
+          placeholder="Qs"
+          title="Question count"
+          className="w-16 border border-zinc-200 rounded-md px-2 py-1 text-sm text-zinc-900 placeholder-zinc-400 focus:ring-1 focus:ring-blue-700 focus:border-transparent outline-none bg-white"
         />
+        {showDuration && (
+          <input
+            type="number" min={1}
+            value={entry.durationMinutes}
+            onChange={e => onChange(entry.id, { durationMinutes: e.target.value })}
+            placeholder="Min"
+            title="Duration in minutes"
+            className="w-14 border border-zinc-200 rounded-md px-2 py-1 text-sm text-zinc-900 placeholder-zinc-400 focus:ring-1 focus:ring-blue-700 focus:border-transparent outline-none bg-white"
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          title="Sources & Chapters"
+          className="p-1 text-zinc-400 hover:text-zinc-600 transition-colors shrink-0"
+        >
+          <ChevronRight className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(entry.id)}
+          className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-md transition-colors shrink-0"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="px-4 py-3 border-t border-zinc-100 space-y-2">
+          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Sources & Chapters</p>
+          <SourceChapterPicker
+            sources={sources}
+            chaptersMap={chaptersMap}
+            selectedSourceIds={entry.source_ids}
+            selectedChapterIds={entry.chapter_ids}
+            onSourcesChange={ids => onChange(entry.id, { source_ids: ids })}
+            onChaptersChange={ids => onChange(entry.id, { chapter_ids: ids })}
+          />
+        </div>
       )}
-      <button type="button" onClick={() => onRemove(entry.id)} className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-md transition-colors shrink-0">
-        <X className="w-3.5 h-3.5" />
-      </button>
     </div>
   )
 }
@@ -359,6 +498,7 @@ export function SectionsBuilder({
   sections, onChange,
   timerMode, navigationPolicy,
   overrideMarks, marksPerQuestion,
+  sources, chaptersMap,
   error,
 }: {
   sections: SectionEntry[]
@@ -367,6 +507,8 @@ export function SectionsBuilder({
   navigationPolicy: string
   overrideMarks: boolean
   marksPerQuestion: string
+  sources: Source[]
+  chaptersMap: Record<string, Chapter[]>
   error?: string
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -380,26 +522,20 @@ export function SectionsBuilder({
     onChange(arrayMove(sections, oi, ni))
   }
 
-  function handleChange(id: string, field: keyof SectionEntry, value: string) {
-    onChange(sections.map(s => s.id === id ? { ...s, [field]: value } : s))
+  function handleChange(id: string, updates: Partial<SectionEntry>) {
+    onChange(sections.map(s => s.id === id ? { ...s, ...updates } : s))
   }
 
   const computedQ = sections.reduce((sum, s) => sum + (Number(s.questionCount) || 0), 0)
   const marksNum = Number(marksPerQuestion)
   const computedM = overrideMarks && computedQ > 0 && marksNum > 0 ? computedQ * marksNum : null
 
+  function newSection(): SectionEntry {
+    return { id: crypto.randomUUID(), name: '', questionCount: '', durationMinutes: '', source_ids: [], chapter_ids: [] }
+  }
+
   return (
     <div className="space-y-5">
-      {sections.length > 0 && (
-        <div className="flex items-center gap-2 px-0">
-          <div className="w-5 shrink-0" />
-          <p className="flex-1 text-xs font-medium text-zinc-400 uppercase tracking-wide">Section Name</p>
-          <p className="w-20 text-xs font-medium text-zinc-400 uppercase tracking-wide">Questions</p>
-          {showDuration && <p className="w-16 text-xs font-medium text-zinc-400 uppercase tracking-wide">Duration</p>}
-          <div className="w-8 shrink-0" />
-        </div>
-      )}
-
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
@@ -407,6 +543,8 @@ export function SectionsBuilder({
               <SortableSectionRow
                 key={s.id} entry={s}
                 showDuration={showDuration}
+                sources={sources}
+                chaptersMap={chaptersMap}
                 onChange={handleChange}
                 onRemove={id => onChange(sections.filter(x => x.id !== id))}
               />
@@ -425,7 +563,7 @@ export function SectionsBuilder({
         <button
           type="button"
           disabled={sections.length >= 10}
-          onClick={() => sections.length < 10 && onChange([...sections, { id: crypto.randomUUID(), name: '', questionCount: '', durationMinutes: '' }])}
+          onClick={() => sections.length < 10 && onChange([...sections, newSection()])}
           className={`flex items-center gap-1.5 text-sm transition-colors ${sections.length >= 10 ? 'text-zinc-300 cursor-not-allowed' : 'text-blue-700 hover:text-blue-800'}`}
         >
           <Plus className="w-3.5 h-3.5" />

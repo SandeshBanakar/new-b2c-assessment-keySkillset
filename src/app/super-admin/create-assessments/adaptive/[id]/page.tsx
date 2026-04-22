@@ -42,7 +42,6 @@ function hydrateVM(raw: Record<string, unknown>, difficulty: 'EASY' | 'MEDIUM' |
     difficulty,
     name: (raw.name as string) ?? '',
     time_minutes: raw.time_minutes != null ? String(raw.time_minutes) : '',
-    question_type: (raw.question_type as string) ?? '',
     source_ids: (raw.source_ids as string[]) ?? [],
     chapter_ids: (raw.chapter_ids as string[]) ?? [],
     questions_per_attempt: raw.questions_per_attempt != null ? String(raw.questions_per_attempt) : '',
@@ -54,7 +53,7 @@ function hydrateFM(raw: Record<string, unknown>, order: number): FoundationModul
   const rawVMs = (raw.variant_modules as Record<string, unknown>[]) ?? []
   const vms: VariantModule[] = (['EASY', 'MEDIUM', 'HARD'] as const).map(diff => {
     const found = rawVMs.find(v => (v.difficulty as string) === diff)
-    return found ? hydrateVM(found, diff) : { id: crypto.randomUUID(), difficulty: diff, name: '', time_minutes: '', question_type: '', source_ids: [], chapter_ids: [], questions_per_attempt: '', question_type_distribution: { mcq_single: 0, mcq_multi: 0, passage_single: 0, passage_multi: 0, numeric: 0 } }
+    return found ? hydrateVM(found, diff) : { id: crypto.randomUUID(), difficulty: diff, name: '', time_minutes: '', source_ids: [], chapter_ids: [], questions_per_attempt: '', question_type_distribution: { mcq_single: 0, mcq_multi: 0, passage_single: 0, passage_multi: 0, numeric: 0 } }
   })
 
   const bs = raw.break_screen as { id?: string; title?: string; message?: string } | null | undefined
@@ -63,7 +62,6 @@ function hydrateFM(raw: Record<string, unknown>, order: number): FoundationModul
     order: (raw.order as number) ?? order,
     name: (raw.name as string) ?? '',
     time_minutes: raw.time_minutes != null ? String(raw.time_minutes) : '',
-    question_type: (raw.question_type as string) ?? '',
     source_ids: (raw.source_ids as string[]) ?? [],
     chapter_ids: (raw.chapter_ids as string[]) ?? [],
     questions_per_attempt: raw.questions_per_attempt != null ? String(raw.questions_per_attempt) : '',
@@ -73,6 +71,7 @@ function hydrateFM(raw: Record<string, unknown>, order: number): FoundationModul
       low_threshold: (raw.branching as { low_threshold?: number })?.low_threshold ?? 40,
     },
     break_screen: bs ? { id: bs.id ?? crypto.randomUUID(), title: bs.title ?? '', message: bs.message ?? '' } : null,
+    allow_calculator: (raw.allow_calculator as boolean) ?? false,
     variant_modules: vms,
   }
 }
@@ -99,7 +98,6 @@ export default function EditAdaptiveAssessmentPage() {
   const [title, setTitle] = useState('')
   const [testType, setTestType] = useState('')
   const [examCategoryId, setExamCategoryId] = useState('')
-  const [allowCalculator, setAllowCalculator] = useState(false)
 
   // Modules
   const [foundationModules, setFoundationModules] = useState<FoundationModule[]>([])
@@ -121,7 +119,10 @@ export default function EditAdaptiveAssessmentPage() {
       .select('id, name, score_min, score_max')
       .eq('is_active', true)
       .order('display_order')
-      .then(({ data }) => { if (data) setCategories(data as ExamCategory[]) })
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load categories:', error)
+        if (data) setCategories(data as ExamCategory[])
+      })
   }, [])
 
   // Load assessment
@@ -146,8 +147,6 @@ export default function EditAdaptiveAssessmentPage() {
       setLanguage((disp.language as string) ?? 'English')
       setWhatYoullGet((disp.what_youll_get as string[])?.length ? disp.what_youll_get as string[] : [''])
       setTopicsCovered((disp.topics_covered as TopicEntry[]) ?? [])
-      setAllowCalculator(cfg.allow_calculator === true)
-
       const rawFMs = (cfg.foundation_modules as Record<string, unknown>[]) ?? []
       if (rawFMs.length > 0) {
         setFoundationModules(rawFMs.map((fm, i) => hydrateFM(fm, i + 1)))
@@ -224,13 +223,12 @@ export default function EditAdaptiveAssessmentPage() {
 
     const assessmentConfig = {
       assessment_type: 'ADAPTIVE',
-      allow_calculator: allowCalculator,
       foundation_modules: foundationModules.map(fm => ({
         id: fm.id,
         order: fm.order,
         name: fm.name.trim(),
         time_minutes: fm.time_minutes ? Number(fm.time_minutes) : null,
-        question_type: fm.question_type || null,
+        allow_calculator: fm.allow_calculator,
         source_ids: fm.source_ids,
         chapter_ids: fm.chapter_ids,
         questions_per_attempt: fm.questions_per_attempt ? Number(fm.questions_per_attempt) : null,
@@ -242,7 +240,6 @@ export default function EditAdaptiveAssessmentPage() {
           difficulty: vm.difficulty,
           name: vm.name.trim(),
           time_minutes: vm.time_minutes ? Number(vm.time_minutes) : null,
-          question_type: vm.question_type || null,
           source_ids: vm.source_ids,
           chapter_ids: vm.chapter_ids,
           questions_per_attempt: vm.questions_per_attempt ? Number(vm.questions_per_attempt) : null,
@@ -424,19 +421,6 @@ export default function EditAdaptiveAssessmentPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                <p className="text-sm font-medium text-zinc-700">Allow Calculator</p>
-                <p className="text-xs text-zinc-400 mt-0.5">When off, calculator is hidden for all learners.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAllowCalculator(v => !v)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${allowCalculator ? 'bg-blue-600' : 'bg-zinc-300'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${allowCalculator ? 'translate-x-4' : 'translate-x-0'}`} />
-              </button>
-            </div>
           </SectionCard>
 
           {/* Foundation Modules */}

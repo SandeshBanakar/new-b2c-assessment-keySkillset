@@ -12,6 +12,7 @@ import {
   SectionEntry, SectionsBuilder,
   TopicsCoveredBuilder,
   AssessmentPreviewPanel, TestTypeChangeModal,
+  SourceChapterPicker, Source, Chapter,
 } from './_components'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,6 +44,14 @@ export default function CreateLinearAssessmentPage() {
   // Sections (FULL_TEST only)
   const [sections, setSections] = useState<SectionEntry[]>([])
 
+  // Sources catalog
+  const [sources, setSources] = useState<Source[]>([])
+  const [chaptersMap, setChaptersMap] = useState<Record<string, Chapter[]>>({})
+
+  // Single question pool for SUBJECT_TEST / CHAPTER_TEST
+  const [singleSourceIds, setSingleSourceIds] = useState<string[]>([])
+  const [singleChapterIds, setSingleChapterIds] = useState<string[]>([])
+
   // Timings
   const [duration, setDuration] = useState('')
   // allowSectionalNavigation=true → FREE nav, FULL timer | false → SECTION_LOCKED nav, SECTIONAL timer
@@ -73,10 +82,39 @@ export default function CreateLinearAssessmentPage() {
     : null
 
   useEffect(() => {
-    supabase.from('exam_categories').select('id, name').eq('is_active', true).order('display_order').then(({ data }) => {
+    supabase.from('exam_categories').select('id, name').eq('is_active', true).order('display_order').then(({ data, error }) => {
+      if (error) console.error('Failed to load categories:', error)
       if (data) setCategories(data as ExamCategory[])
     })
   }, [])
+
+  // Load sources when category changes
+  useEffect(() => {
+    if (!examCategoryId) { setSources([]); setChaptersMap({}); return }
+    supabase.from('sources')
+      .select('id, name, exam_category_id')
+      .eq('exam_category_id', examCategoryId)
+      .is('deleted_at', null)
+      .order('name')
+      .then(({ data }) => {
+        const srcs = (data ?? []) as Source[]
+        setSources(srcs)
+        if (srcs.length === 0) { setChaptersMap({}); return }
+        supabase.from('chapters')
+          .select('id, source_id, name, order_index')
+          .in('source_id', srcs.map(s => s.id))
+          .is('deleted_at', null)
+          .order('order_index')
+          .then(({ data: cData }) => {
+            const map: Record<string, Chapter[]> = {}
+            for (const ch of (cData ?? []) as Chapter[]) {
+              if (!map[ch.source_id]) map[ch.source_id] = []
+              map[ch.source_id].push(ch)
+            }
+            setChaptersMap(map)
+          })
+      })
+  }, [examCategoryId])
 
   const examCategoryName = categories.find(c => c.id === examCategoryId)?.name ?? ''
 
@@ -142,14 +180,15 @@ export default function CreateLinearAssessmentPage() {
         ? namedSections.map(s => ({
             id: s.id,
             name: s.name.trim(),
-            source_ids: [],
-            chapter_ids: [],
+            source_ids: s.source_ids,
+            chapter_ids: s.chapter_ids,
             questions_per_attempt: Number(s.questionCount) || 0,
             ...(showSectionDuration && s.durationMinutes
               ? { duration_minutes: Number(s.durationMinutes) }
               : {}),
           }))
         : undefined,
+      ...(!isFullTest ? { source_ids: singleSourceIds, chapter_ids: singleChapterIds } : {}),
     }
 
     try {
@@ -464,22 +503,29 @@ export default function CreateLinearAssessmentPage() {
                 navigationPolicy={navigationPolicy}
                 overrideMarks={overrideMarks}
                 marksPerQuestion={marksPerQuestion}
+                sources={sources}
+                chaptersMap={chaptersMap}
                 error={errors.sections}
               />
             </SectionCard>
           ) : testType ? (
-            <div className="bg-white border border-zinc-200 rounded-lg">
-              <div className="px-6 py-4 border-b border-zinc-100">
-                <p className="text-sm font-semibold text-zinc-900">Sections & Question Pools</p>
-              </div>
-              <div className="px-6 py-5">
-                <p className="text-sm text-zinc-500">
-                  {testType === 'SUBJECT_TEST'
-                    ? 'Subject tests have a single section. Configure question pools after saving this assessment.'
-                    : 'Chapter tests have a single section. Configure question pools after saving this assessment.'}
-                </p>
-              </div>
-            </div>
+            <SectionCard
+              title="Question Pool"
+              description="Select the sources and chapters this assessment draws questions from."
+            >
+              {examCategoryId ? (
+                <SourceChapterPicker
+                  sources={sources}
+                  chaptersMap={chaptersMap}
+                  selectedSourceIds={singleSourceIds}
+                  selectedChapterIds={singleChapterIds}
+                  onSourcesChange={setSingleSourceIds}
+                  onChaptersChange={setSingleChapterIds}
+                />
+              ) : (
+                <p className="text-sm text-zinc-400">Select a category above to load sources.</p>
+              )}
+            </SectionCard>
           ) : null}
 
           {/* Action bar */}

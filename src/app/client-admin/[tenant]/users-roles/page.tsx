@@ -23,6 +23,8 @@ import { getTenantId } from '@/lib/client-admin/tenants'
 interface AdminUser {
   id: string
   name: string
+  first_name: string | null
+  last_name: string | null
   email: string
   role: string
   is_active: boolean
@@ -39,8 +41,17 @@ function formatDate(iso: string) {
   })
 }
 
-function getInitials(name: string) {
-  return name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+function getInitials(firstName: string | null, lastName: string | null) {
+  const first = firstName?.charAt(0) ?? ''
+  const last = lastName?.charAt(0) ?? ''
+  return (first + last).toUpperCase() || '?'
+}
+
+function getFullName(firstName: string | null, lastName: string | null): string {
+  if (firstName && lastName) return `${firstName} ${lastName}`
+  if (firstName) return firstName
+  if (lastName) return lastName
+  return ''
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -84,10 +95,10 @@ function ViewCCSlideOver({
           {/* Avatar block */}
           <div className="flex items-center gap-4 mb-6">
             <div className="w-12 h-12 rounded-md bg-amber-100 flex items-center justify-center text-lg font-semibold text-amber-700 shrink-0">
-              {getInitials(cc.name)}
+              {getInitials(cc.first_name, cc.last_name)}
             </div>
             <div>
-              <p className="text-base font-semibold text-zinc-900">{cc.name}</p>
+              <p className="text-base font-semibold text-zinc-900">{getFullName(cc.first_name, cc.last_name)}</p>
               <div className="flex items-center gap-2 mt-1">
                 <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
                   <Shield className="w-3 h-3" />
@@ -146,7 +157,8 @@ function EditCCSlideOver({
   onClose: () => void
   onSaved: () => void
 }) {
-  const [name, setName] = useState(cc.name)
+  const [firstName, setFirstName] = useState(cc.first_name ?? '')
+  const [lastName, setLastName] = useState(cc.last_name ?? '')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -158,7 +170,7 @@ function EditCCSlideOver({
   const passwordFilled = newPassword.length > 0 || confirmPassword.length > 0
 
   function validate(): string | null {
-    if (!name.trim()) return 'Name is required.'
+    if (!firstName.trim()) return 'First name is required.'
     if (passwordFilled) {
       if (newPassword.length < 8) return 'Password must be at least 8 characters.'
       if (newPassword !== confirmPassword) return 'Passwords do not match.'
@@ -182,10 +194,14 @@ function EditCCSlideOver({
   async function doSave() {
     setSaving(true)
     setShowPasswordWarning(false)
-    // Update name only (password is UI-only in V1 — no password column on admin_users)
+    const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ')
     const { error: updateErr } = await supabase
       .from('admin_users')
-      .update({ name: name.trim() })
+      .update({ 
+        name: fullName,
+        first_name: firstName.trim(),
+        last_name: lastName.trim() || null
+      })
       .eq('id', cc.id)
     if (updateErr) { setError(updateErr.message); setSaving(false); return }
     setSaving(false)
@@ -214,15 +230,30 @@ function EditCCSlideOver({
             <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">
               Profile
             </p>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Full Name <span className="text-rose-600">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  First Name <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Reset password */}
@@ -352,7 +383,8 @@ function AddCCSlideOver({
   onClose: () => void
   onAdded: () => void
 }) {
-  const [name, setName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -361,7 +393,7 @@ function AddCCSlideOver({
 
   async function handleSave() {
     setError(null)
-    if (!name.trim()) { setError('Name is required.'); return }
+    if (!firstName.trim()) { setError('First name is required.'); return }
     if (!email.trim()) { setError('Email is required.'); return }
     if (!password) { setError('Password is required.'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
@@ -382,11 +414,14 @@ function AddCCSlideOver({
       return
     }
 
+    const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ')
     const { error: insertErr } = await supabase
       .from('admin_users')
       .insert({
         tenant_id: tenantId,
-        name: name.trim(),
+        name: fullName,
+        first_name: firstName.trim(),
+        last_name: lastName.trim() || null,
         email: email.trim().toLowerCase(),
         role: 'CONTENT_CREATOR',
         is_active: true,
@@ -414,17 +449,31 @@ function AddCCSlideOver({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Full Name <span className="text-rose-600">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Priya Mehta"
-              className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1">
+                First Name <span className="text-rose-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="e.g. Priya"
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1">
+                Last Name
+              </label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="e.g. Mehta"
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              />
+            </div>
           </div>
 
           <div>
@@ -509,7 +558,8 @@ export default function UsersRolesPage() {
 
   // CA profile edit state
   const [editingName, setEditingName] = useState(false)
-  const [nameValue, setNameValue] = useState('')
+  const [firstNameValue, setFirstNameValue] = useState('')
+  const [lastNameValue, setLastNameValue] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
 
@@ -535,14 +585,14 @@ export default function UsersRolesPage() {
       supabase.from('tenants').select('feature_toggle_mode').eq('id', tenantId).single(),
       supabase
         .from('admin_users')
-        .select('id, name, email, role, is_active, created_at')
+        .select('id, name, first_name, last_name, email, role, is_active, created_at')
         .eq('tenant_id', tenantId)
         .eq('role', 'CLIENT_ADMIN')
         .limit(1)
         .single(),
       supabase
         .from('admin_users')
-        .select('id, name, email, role, is_active, created_at')
+        .select('id, name, first_name, last_name, email, role, is_active, created_at')
         .eq('tenant_id', tenantId)
         .eq('role', 'CONTENT_CREATOR')
         .order('created_at', { ascending: true }),
@@ -551,7 +601,8 @@ export default function UsersRolesPage() {
     if (tenantRes.data) setTenantMode(tenantRes.data.feature_toggle_mode)
     if (caRes.data) {
       setCaUser(caRes.data as AdminUser)
-      setNameValue(caRes.data.name)
+      setFirstNameValue(caRes.data.first_name ?? '')
+      setLastNameValue(caRes.data.last_name ?? '')
     }
     setContentCreators((ccRes.data ?? []) as AdminUser[])
     setLoading(false)
@@ -562,21 +613,32 @@ export default function UsersRolesPage() {
   // ── CA profile name edit ───────────────────────────────────────────────────
 
   async function handleSaveName() {
-    if (!caUser || !nameValue.trim()) { setNameError('Name is required.'); return }
+    if (!caUser || !firstNameValue.trim()) { setNameError('First name is required.'); return }
     setSavingName(true)
     setNameError(null)
+    const fullName = [firstNameValue.trim(), lastNameValue.trim()].filter(Boolean).join(' ')
     const { error } = await supabase
       .from('admin_users')
-      .update({ name: nameValue.trim() })
+      .update({ 
+        name: fullName,
+        first_name: firstNameValue.trim(),
+        last_name: lastNameValue.trim() || null
+      })
       .eq('id', caUser.id)
     if (error) { setNameError(error.message); setSavingName(false); return }
-    setCaUser((prev) => prev ? { ...prev, name: nameValue.trim() } : prev)
+    setCaUser((prev) => prev ? { 
+      ...prev, 
+      name: fullName,
+      first_name: firstNameValue.trim(),
+      last_name: lastNameValue.trim() || null
+    } : prev)
     setSavingName(false)
     setEditingName(false)
   }
 
   function handleCancelEdit() {
-    setNameValue(caUser?.name ?? '')
+    setFirstNameValue(caUser?.first_name ?? '')
+    setLastNameValue(caUser?.last_name ?? '')
     setNameError(null)
     setEditingName(false)
   }
@@ -640,10 +702,10 @@ export default function UsersRolesPage() {
           <div className="px-6 py-5">
             <div className="flex items-center gap-4 mb-6">
               <div className="w-12 h-12 rounded-md bg-violet-100 flex items-center justify-center text-lg font-semibold text-violet-700 shrink-0">
-                {getInitials(caUser.name)}
+                {getInitials(caUser.first_name, caUser.last_name)}
               </div>
               <div>
-                <p className="text-base font-semibold text-zinc-900">{caUser.name}</p>
+                <p className="text-base font-semibold text-zinc-900">{getFullName(caUser.first_name, caUser.last_name)}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                     <Shield className="w-3 h-3" />
@@ -657,33 +719,49 @@ export default function UsersRolesPage() {
             <div className="space-y-5 max-w-md">
               {/* Name (editable) */}
               <div>
-                <label className="block text-xs font-medium text-zinc-500 mb-1.5">Full Name</label>
+                <label className="block text-xs font-medium text-zinc-500 mb-1.5">Name</label>
                 {editingName ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={nameValue}
-                      onChange={(e) => setNameValue(e.target.value)}
-                      className="flex-1 border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleSaveName}
-                      disabled={savingName}
-                      className="p-2 rounded-md text-violet-700 border border-violet-200 hover:bg-violet-50 transition-colors disabled:opacity-50"
-                    >
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="p-2 rounded-md text-zinc-400 border border-zinc-200 hover:bg-zinc-50 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={firstNameValue}
+                          onChange={(e) => setFirstNameValue(e.target.value)}
+                          placeholder="First Name"
+                          className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={lastNameValue}
+                          onChange={(e) => setLastNameValue(e.target.value)}
+                          placeholder="Last Name"
+                          className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveName}
+                        disabled={savingName}
+                        className="px-3 py-1.5 text-sm font-medium text-white bg-violet-700 rounded-md hover:bg-violet-800 transition-colors disabled:opacity-50"
+                      >
+                        {savingName ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-3 py-1.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-zinc-900 font-medium">{caUser.name}</p>
+                    <p className="text-sm text-zinc-900 font-medium">{getFullName(caUser.first_name, caUser.last_name)}</p>
                     <button
                       onClick={() => setEditingName(true)}
                       className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-zinc-500 border border-zinc-200 rounded hover:bg-zinc-50 transition-colors"
@@ -771,9 +849,9 @@ export default function UsersRolesPage() {
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center text-xs font-semibold text-amber-700 shrink-0">
-                          {getInitials(cc.name)}
+                          {getInitials(cc.first_name, cc.last_name)}
                         </div>
-                        <p className="font-medium text-zinc-900">{cc.name}</p>
+                        <p className="font-medium text-zinc-900">{getFullName(cc.first_name, cc.last_name)}</p>
                       </div>
                     </td>
                     <td className="px-6 py-3 text-zinc-500">{cc.email}</td>
