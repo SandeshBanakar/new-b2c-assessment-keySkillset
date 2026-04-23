@@ -5,8 +5,10 @@ export type EmailTemplateId =
   | 'learner-onboarding-invite'
   | 'course-completion'
   | 'certificate-of-completion'
+  | 'b2c-user-suspended'
+  | 'b2c-access-restored'
 
-export type TenantEmailSlug = 'akash' | 'techcorp'
+export type TenantEmailSlug = 'akash' | 'techcorp' | 'keyskillset'
 
 export interface EmailBranding {
   companyName: string
@@ -45,10 +47,24 @@ export interface EmailTemplateContext {
   unsubscribeUrl: string
 }
 
+export interface B2CUserActionContext {
+  action: 'suspend' | 'revoke'
+  email: string
+  firstName: string
+  lastName: string
+  reason: string
+}
+
 export interface EmailTemplatePayload {
   branding: EmailBranding
   recipient: EmailRecipient
   context: EmailTemplateContext
+}
+
+export interface B2CUserActionPayload {
+  branding: EmailBranding
+  recipient: EmailRecipient
+  actionContext: B2CUserActionContext
 }
 
 export interface TenantEmailPreviewProfile {
@@ -56,7 +72,7 @@ export interface TenantEmailPreviewProfile {
   tenantId: string
   displayName: string
   companyName: string
-  featureMode: 'FULL_CREATOR' | 'RUN_ONLY'
+  featureMode: 'FULL_CREATOR' | 'RUN_ONLY' | 'B2C_END_USER'
   companyLogoUrl: string | null
   supportEmail: string
   accentClass: string
@@ -70,7 +86,7 @@ export interface EmailTemplateDefinition {
   filename: string
   recipient: string
   triggerEvent: string
-  featureApplicability: 'ALL' | 'FULL_CREATOR' | 'RUN_ONLY'
+  featureApplicability: 'ALL' | 'FULL_CREATOR' | 'RUN_ONLY' | 'B2C_END_USER'
   primaryCtaStyle: string
   subject: string
   summary: string

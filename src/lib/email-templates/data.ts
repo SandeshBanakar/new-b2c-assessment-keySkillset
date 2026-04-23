@@ -35,6 +35,18 @@ export const TENANT_EMAIL_PREVIEW_PROFILES: Record<TenantEmailSlug, TenantEmailP
     badgeClass: 'bg-teal-50 text-teal-700 border border-teal-200',
     description: 'Run-Only tenant that intentionally falls back to keySkillset branding when logo assets are missing.',
   },
+  keyskillset: {
+    slug: 'keyskillset',
+    tenantId: 'b2c-end-user',
+    displayName: 'keySkillset',
+    companyName: 'keySkillset',
+    featureMode: 'B2C_END_USER',
+    companyLogoUrl: KEYSKILLSET_LOGO_URL,
+    supportEmail: 'support@keyskillset.com',
+    accentClass: 'bg-blue-700',
+    badgeClass: 'bg-blue-50 text-blue-700 border border-blue-200',
+    description: 'B2C End User Emails - keySkillset branded emails for B2C user account actions.',
+  },
 }
 
 export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
@@ -172,6 +184,46 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     ],
     previewHeight: 1160,
   },
+  {
+    id: 'b2c-user-suspended',
+    name: 'Account Suspended',
+    filename: 'b2c-user-suspended.html',
+    recipient: 'B2C End User',
+    triggerEvent: 'Sent when a Super Admin suspends a B2C user account.',
+    featureApplicability: 'B2C_END_USER',
+    primaryCtaStyle: 'Informational - no CTA',
+    subject: 'Your keySkillset account has been suspended',
+    summary: 'Notifies the user that their account has been suspended by a Super Admin.',
+    whenTriggered: 'Trigger when Super Admin clicks Suspend User on a B2C user profile.',
+    variables: [
+      '{{first_name}}',
+      '{{last_name}}',
+      '{{email}}',
+      '{{reason}}',
+      '{{action}}',
+    ],
+    previewHeight: 800,
+  },
+  {
+    id: 'b2c-access-restored',
+    name: 'Access Restored',
+    filename: 'b2c-access-restored.html',
+    recipient: 'B2C End User',
+    triggerEvent: 'Sent when a Super Admin removes suspension (revokes) from a B2C user account.',
+    featureApplicability: 'B2C_END_USER',
+    primaryCtaStyle: 'Tour-first CTA with login support',
+    subject: 'Your keySkillset access has been restored',
+    summary: 'Notifies the user that their account access has been restored.',
+    whenTriggered: 'Trigger when Super Admin clicks Remove Suspension on a suspended B2C user profile.',
+    variables: [
+      '{{first_name}}',
+      '{{last_name}}',
+      '{{email}}',
+      '{{reason}}',
+      '{{action}}',
+    ],
+    previewHeight: 800,
+  },
 ]
 
 export function getEmailTemplateDefinition(templateId: EmailTemplateId): EmailTemplateDefinition | null {
@@ -181,6 +233,9 @@ export function getEmailTemplateDefinition(templateId: EmailTemplateId): EmailTe
 export function getTemplatesForTenant(tenantSlug: TenantEmailSlug): EmailTemplateDefinition[] {
   const tenant = TENANT_EMAIL_PREVIEW_PROFILES[tenantSlug]
   return EMAIL_TEMPLATE_DEFINITIONS.filter((template) => {
+    if (tenant.featureMode === 'B2C_END_USER') {
+      return template.featureApplicability === 'B2C_END_USER'
+    }
     if (template.featureApplicability === 'ALL') return true
     return template.featureApplicability === tenant.featureMode
   })

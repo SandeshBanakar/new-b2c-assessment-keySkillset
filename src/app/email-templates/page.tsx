@@ -5,7 +5,7 @@ import TenantChooserCard from '@/components/email-templates/TenantChooserCard'
 import { TENANT_EMAIL_PREVIEW_PROFILES } from '@/lib/email-templates/data'
 
 export default function EmailTemplatesTenantChooserPage() {
-  const tenants = Object.values(TENANT_EMAIL_PREVIEW_PROFILES)
+  const tenants = Object.values(TENANT_EMAIL_PREVIEW_PROFILES).filter((t) => t.featureMode !== 'B2C_END_USER')
 
   return (
     <main className="min-h-screen bg-zinc-50">
@@ -46,7 +46,7 @@ export default function EmailTemplatesTenantChooserPage() {
             <h2 className="text-sm font-semibold">SES-safe preview rules baked into this center</h2>
           </div>
           <div className="mt-4 grid gap-3 text-sm leading-6 text-zinc-600 sm:grid-cols-2">
-            <p>Templates use separate raw HTML files with stable `{{token}}` placeholders so preview output and send output stay aligned.</p>
+            <p>Templates use separate raw HTML files with stable <code>{`{{token}}`}</code> placeholders so preview output and send output stay aligned.</p>
             <p>Branding resolves tenant-first with keySkillset fallback for missing logo assets, which is visible in the tenant previews.</p>
             <p>Layouts stay table-based and lightweight for direct email sending through AWS SES v2.</p>
             <p>Each detail page includes the trigger event, payload contract, rendered HTML preview, and text fallback reference.</p>

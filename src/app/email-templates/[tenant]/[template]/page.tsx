@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, FileCode2, MailCheck, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, FileCode2, MailCheck, ShieldCheck } from 'lucide-react'
 import { notFound } from 'next/navigation'
 
 import {
@@ -40,10 +40,10 @@ export default async function EmailTemplateDetailPage({
     <main className="min-h-screen bg-zinc-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Link href={`/email-templates/${tenantSlug}`} className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Client Admin Emails
-          </Link>
+<Link href={`/email-templates/${tenantSlug}`} className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900">
+          <ChevronLeft className="w-4 h-4" />
+          {tenantSlug === 'keyskillset' ? 'Back to B2C End User Emails' : 'Back to Client Admin Emails'}
+        </Link>
           <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${tenantProfile.badgeClass}`}>
             {tenantProfile.displayName}
           </span>
@@ -57,13 +57,13 @@ export default async function EmailTemplateDetailPage({
               <p className="mt-3 text-sm leading-6 text-zinc-600">{templateDefinition.summary}</p>
             </div>
             <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-              <p><span className="font-medium text-zinc-900">Raw file:</span> `src/email-templates/html/{templateDefinition.filename}`</p>
+              <p><span className="font-medium text-zinc-900">Raw file:</span> {templateDefinition.filename}</p>
               <p className="mt-1"><span className="font-medium text-zinc-900">Subject:</span> {templateDefinition.subject}</p>
             </div>
           </div>
         </div>
 
-        <section className="mt-8 grid gap-6 xl:grid-cols-[1.05fr_1.35fr]">
+        <section className="mt-8 grid gap-6">
           <div className="space-y-6">
             <div className="rounded-md border border-zinc-200 bg-white p-6">
               <div className="flex items-center gap-2">
@@ -84,7 +84,9 @@ export default async function EmailTemplateDetailPage({
                 <h2 className="text-sm font-semibold text-zinc-900">Dynamic variables</h2>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                {templateDefinition.variables.map((variable) => (
+                {templateDefinition.variables.filter(v => 
+                  ['{{cta_url}}', '{{course_title}}', '{{full_name}}', '{{company_name}}', '{{company_logo_url}}'].includes(v)
+                ).map((variable) => (
                   <span key={variable} className="rounded-md border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-700">
                     {variable}
                   </span>
@@ -111,7 +113,7 @@ export default async function EmailTemplateDetailPage({
                 <p>Direct-send template stays table-based and avoids JavaScript or local assets inside the HTML itself.</p>
                 <p>Preview uses the same token replacement flow as the send path, which keeps iframe output and future SES rendering aligned.</p>
                 <p>Branding is tenant-first, with fallback to keySkillset branding when logo data is unavailable.</p>
-                <p>Template tokens remain stable and SES-friendly using `{{token}}` syntax.</p>
+                <p>Template tokens remain stable and SES-friendly using <code>{`{{token}}`}</code> syntax.</p>
               </div>
             </div>
           </div>

@@ -6,6 +6,51 @@
 
 ## COMPLETED WORK LOG
 
+### April 23, 2026 — B2C End User Suspend/Revoke Email Templates
+
+**Ticket:** B2C-EML-001 | **PRD:** `prds/end-user/PRD-B2C-EML-001-SUSPEND-REVOKE-EMAILS.md`
+
+**Code changes:**
+- **Types updated** (`src/lib/email-templates/types.ts`): Added new template IDs `b2c-user-suspended`, `b2c-access-restored` + new slug `keyskillset` + new `featureMode: 'B2C_END_USER'` + new interfaces `B2CUserActionContext`, `B2CUserActionPayload`
+- **Preview profile added** (`src/lib/email-templates/data.ts`): Added `keyskillset` profile with `featureMode: 'B2C_END_USER'` for B2C End User Emails
+- **Template definitions added** (`src/lib/email-templates/data.ts`): Added definitions for both B2C email templates with 5 variables: `{{first_name}}`, `{{last_name}}`, `{{email}}`, `{{reason}}`, `{{action}}`
+
+**Email templates created:**
+- `src/email-templates/html/b2c-user-suspended.html` — Account Suspended email (rose/red theme)
+- `src/email-templates/html/b2c-access-restored.html` — Access Restored email (blue/navy theme)
+
+**Navigation restructure:**
+- **Persona Selector** now has TWO entries under "Email Templates" group:
+  - **Client Admin Emails** (rose bg) → `/email-templates` → shows Akash + TechCorp tenants
+  - **B2C End User Emails** (blue bg) → `/email-templates/keyskillset` → shows 2 template cards (Account Suspended, Access Restored)
+- Updated tenant chooser page to filter out B2C End User profile
+- Updated detail page back link text based on tenant slug
+
+**PRD created:**
+- `prds/end-user/PRD-B2C-EML-001-SUSPEND-REVOKE-EMAILS.md` — Full specification for B2C end user email templates
+
+**Build:** `npm run build` ✅
+
+---
+
+### April 23, 2026 — Email Templates Persona Fixes + PRD
+
+**Ticket:** Email Templates QA persona | **PRD:** `prds/PRD-CA-EMAIL-TEMPLATES.md`
+
+**Code changes:**
+- **iframe width fix** (`src/app/email-templates/[tenant]/[template]/page.tsx`): Changed from 2-column layout `xl:grid-cols-[1.05fr_1.35fr]` to single column full-width layout to prevent email preview being squeezed
+- **Raw file display**: Changed from `src/email-templates/html/{filename}` to just `{filename}` (e.g., `certificate-of-completion.html`)
+- **Dynamic variables filter**: Filtered to only show 5 core tokens: `{{cta_url}}`, `{{course_title}}`, `{{full_name}}`, `{{company_name}}`, `{{company_logo_url}}`
+- **Persona selector restructure** (`src/app/page.tsx`): Created new "Email Templates" group below "Admin Access" with single entry "Client Admin Emails" → routes to `/email-templates` (tenant chooser)
+- **Certificate background** (`src/email-templates/html/certificate-of-completion.html`): Added full background image from Supabase banner-images bucket (`https://uqweguyeaqkbxgtpkhez.supabase.co/storage/v1/object/public/banner-images/Page%202.png`)
+
+**PRD created:**
+- `prds/PRD-CA-EMAIL-TEMPLATES.md` — Full specification for email templates persona including user flows, technical specs, and scope boundaries
+
+**Build:** `npm run build` ✅
+
+---
+
 ### April 22, 2026 — KSS-SA-CA-001 Phase 7: Sources & Chapters + Engine Assessment Seeding
 
 **Ticket:** KSS-SA-CA-001 | **SQL:** `docs/requirements/SQL-CA-MIGRATIONS-2.txt`

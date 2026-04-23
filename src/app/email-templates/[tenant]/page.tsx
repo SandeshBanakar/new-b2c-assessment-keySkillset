@@ -32,9 +32,11 @@ export default async function TenantEmailTemplatesPage({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${tenantProfile.badgeClass}`}>
-                {tenantProfile.featureMode === 'FULL_CREATOR' ? 'Full Creator tenant' : 'Run Only tenant'}
+                {tenantProfile.featureMode === 'FULL_CREATOR' ? 'Full Creator tenant' : tenantProfile.featureMode === 'RUN_ONLY' ? 'Run Only tenant' : 'B2C End User Emails'}
               </span>
-              <h1 className="mt-4 text-2xl font-semibold text-zinc-900">{tenantProfile.displayName} - Client Admin Emails</h1>
+              <h1 className="mt-4 text-2xl font-semibold text-zinc-900">
+                {tenantProfile.featureMode === 'B2C_END_USER' ? `${tenantProfile.displayName} - B2C End User Emails` : `${tenantProfile.displayName} - Client Admin Emails`}
+              </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600">
                 Review each trigger, inspect the token contract, and open the template detail page to preview the raw HTML in an iframe.
               </p>
@@ -80,7 +82,9 @@ export default async function TenantEmailTemplatesPage({
                         ? 'All tenants'
                         : template.featureApplicability === 'FULL_CREATOR'
                           ? 'Full Creator only'
-                          : 'Run Only only'}
+                          : template.featureApplicability === 'RUN_ONLY'
+                            ? 'Run Only only'
+                            : 'B2C End Users'}
                     </td>
                     <td className="px-3 py-3 text-zinc-600">{template.primaryCtaStyle}</td>
                   </tr>
