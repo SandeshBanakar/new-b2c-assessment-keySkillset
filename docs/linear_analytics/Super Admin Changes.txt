@@ -12,3 +12,9 @@ In the Super Admin > Platform Config > Exam Categories > SAT > Analytics Config 
 Ask me clarification questions, analyse as per your role in [CLAUDE.md](CLAUDE.md) and proceed.
 
 
+---
+B2B Course learning + Certificate
+
+(1) b2b assessment dashboard enhancement based on the plans, 
+(2) certificate generation logic for assessment completion, 
+(3) b2b users course completion certificate and assessment completion certificate logic

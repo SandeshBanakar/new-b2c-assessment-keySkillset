@@ -10,7 +10,6 @@ import {
   X,
   AlertTriangle,
   Pencil,
-  Check,
   Calendar,
   KeyRound,
   Eye,
@@ -266,7 +265,7 @@ function EditCCSlideOver({
             </div>
             <p className="text-xs text-zinc-400 mb-3">
               Leave blank to keep the current password. Filling these fields will reset the
-              Content Creator's password on save.
+              Content Creator&#39;s password on save.
             </p>
             <div className="space-y-3">
               <div>
@@ -300,7 +299,7 @@ function EditCCSlideOver({
               <div className="flex items-start gap-2 mt-3 p-3 rounded-md bg-amber-50 border border-amber-200">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-800">
-                  Saving will reset this Content Creator's password. You will need to share
+                  Saving will reset this Content Creator&#39;s password. You will need to share
                   the new password with them directly.
                 </p>
               </div>
@@ -341,7 +340,7 @@ function EditCCSlideOver({
                   <p className="text-sm font-semibold text-zinc-900">Reset password?</p>
                   <p className="text-sm text-zinc-500 mt-1">
                     You are about to reset{' '}
-                    <span className="font-medium text-zinc-700">{cc.name}</span>'s password.
+                    <span className="font-medium text-zinc-700">{cc.name}</span>&#39;s password.
                     They will need to log in with the new password immediately.
                   </p>
                   <p className="text-sm text-zinc-500 mt-2">
@@ -440,7 +439,7 @@ function AddCCSlideOver({
           <div>
             <h2 className="text-sm font-semibold text-zinc-900">Add Content Creator</h2>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Content Creators can manage your organisation's content bank.
+              Content Creators can manage your organisation&#39;s content bank.
             </p>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 mt-0.5">
@@ -608,7 +607,12 @@ export default function UsersRolesPage() {
     setLoading(false)
   }, [tenantId])
 
-  useEffect(() => { void fetchData() }, [fetchData])
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchData()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchData])
 
   // ── CA profile name edit ───────────────────────────────────────────────────
 
@@ -813,7 +817,7 @@ export default function UsersRolesPage() {
             <div>
               <p className="text-sm font-semibold text-zinc-700">Content Creators</p>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Content Creators manage your organisation's private content bank.
+                Content Creators manage your organisation&#39;s private content bank.
               </p>
             </div>
             <button
