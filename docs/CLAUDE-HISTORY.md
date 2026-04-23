@@ -29,6 +29,9 @@
 **PRD created:**
 - `prds/end-user/PRD-B2C-EML-001-SUSPEND-REVOKE-EMAILS.md` — Full specification for B2C end user email templates
 
+**Support email updated:**
+- Changed `support@keyskillset.com` → `contact@keyskillset.com` everywhere in codebase
+
 **Build:** `npm run build` ✅
 
 ---
