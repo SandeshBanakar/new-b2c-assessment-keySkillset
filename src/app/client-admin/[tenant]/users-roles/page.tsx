@@ -80,7 +80,7 @@ function ViewCCSlideOver({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[480px] z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-120 z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
         <div className="flex items-start justify-between px-6 py-4 border-b border-zinc-200">
           <div>
             <h2 className="text-sm font-semibold text-zinc-900">Content Creator Profile</h2>
@@ -211,7 +211,7 @@ function EditCCSlideOver({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[480px] z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-120 z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-zinc-200">
           <div>
@@ -435,7 +435,7 @@ function AddCCSlideOver({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[480px] z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-120 z-50 bg-white shadow-xl border-l border-zinc-200 flex flex-col">
         <div className="flex items-start justify-between px-6 py-4 border-b border-zinc-200">
           <div>
             <h2 className="text-sm font-semibold text-zinc-900">Add Content Creator</h2>
