@@ -10,9 +10,6 @@ import {
   Lightbulb,
   Lock,
   Target,
-  TrendingDown,
-  TrendingUp,
-  XCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useAppContext } from '@/context/AppContext';
@@ -21,6 +18,7 @@ import AttemptPillFilter from '@/components/ui/AttemptPillFilter';
 import ScoreTrajectoryChart from '@/components/assessment-detail/ScoreTrajectoryChart';
 import RankPredictionCard, { type RankLookupRow } from '@/components/assessment-detail/RankPredictionCard';
 import MistakeIntelligence, { type MIAttemptAnswer } from '@/components/assessment-detail/MistakeIntelligence';
+import ConceptMasteryPanel from '@/components/assessment-detail/ConceptMasteryPanel';
 import type { Assessment } from '@/types';
 
 // ── Negative marks per exam ───────────────────────────────────────────────────
@@ -40,6 +38,37 @@ const EXAM_CATEGORY_ID: Record<string, string> = {
   NEET: '23d482e7-81c3-4a10-bd60-52fd458595d6',
   JEE:  '93319838-3e05-4472-9dd0-decd6f731f7b',
   CLAT: 'ad260442-74de-4e7c-993c-f006c4a29045',
+};
+
+// ── Concept mastery section mapping — fallback for demo/seeded data ───────────
+// Used when attempt_answers.section_id is NULL (synthetic seeded rows).
+// Real exam-engine answers always carry section_id → dynamic path takes over.
+const DEMO_TAG_SECTION: Record<string, Record<string, string>> = {
+  NEET: {
+    Mechanics: 'Physics', Thermodynamics: 'Physics', Optics: 'Physics', 'Waves & Sound': 'Physics',
+    Electrochemistry: 'Chemistry', 'Organic Chemistry': 'Chemistry',
+    Genetics: 'Biology', 'Human Physiology': 'Biology', 'Cell Biology': 'Biology', 'Plant Biology': 'Biology',
+  },
+  JEE: {
+    Calculus: 'Mathematics', 'Coordinate Geometry': 'Mathematics', Vectors: 'Mathematics',
+    Mechanics: 'Physics', Electrostatics: 'Physics', Thermodynamics: 'Physics',
+    Waves: 'Physics', 'Modern Physics': 'Physics',
+    'Organic Chemistry': 'Chemistry', 'Inorganic Chemistry': 'Chemistry',
+  },
+  CLAT: {
+    'Legal Reasoning': 'Legal Reasoning', 'Constitutional Law': 'Legal Reasoning',
+    'Contract Law': 'Legal Reasoning', 'Criminal Law': 'Legal Reasoning',
+    'Logical Reasoning': 'Logical Reasoning',
+    'English Comprehension': 'English Language',
+    'General Knowledge': 'Current Affairs & GK',
+    'Quantitative Techniques': 'Quantitative Techniques',
+  },
+};
+
+const DEMO_SECTION_ORDER: Record<string, string[]> = {
+  NEET:  ['Physics', 'Chemistry', 'Biology'],
+  JEE:   ['Physics', 'Chemistry', 'Mathematics'],
+  CLAT:  ['Legal Reasoning', 'Logical Reasoning', 'English Language', 'Current Affairs & GK', 'Quantitative Techniques'],
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -138,20 +167,6 @@ interface AnalyticsTabProps {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function masteryBadgeClass(pct: number | null): string {
-  if (pct === null) return 'bg-zinc-100 text-zinc-400';
-  if (pct >= 80) return 'bg-emerald-100 text-emerald-700';
-  if (pct >= 60) return 'bg-amber-100 text-amber-700';
-  return 'bg-rose-100 text-rose-700';
-}
-
-function masteryBarClass(pct: number | null): string {
-  if (pct === null) return 'bg-zinc-200';
-  if (pct >= 80) return 'bg-emerald-500';
-  if (pct >= 60) return 'bg-amber-500';
-  return 'bg-rose-500';
-}
 
 function sectionBarClass(pct: number): string {
   if (pct >= 70) return 'bg-emerald-500';
@@ -275,7 +290,7 @@ export default function AnalyticsTab({
   const [rankLookup, setRankLookup] = useState<RankLookupRow[]>([]);
   const [rankDataYear, setRankDataYear] = useState<number>(2025);
 
-  // ── Attempt answers — shared by MistakeIntelligence + LeverageActions ─────
+  // ── Attempt answers — used by MistakeIntelligence ────────────────────────
   const [attemptAnswers, setAttemptAnswers] = useState<MIAttemptAnswer[] | null>(null);
 
   // ── Solutions panel ────────────────────────────────────────────────────────
@@ -406,13 +421,23 @@ export default function AnalyticsTab({
           .maybeSingle(),
         supabase
           .from('attempt_answers')
-          .select('question_id, is_correct, is_skipped, time_spent_seconds, marks_awarded, concept_tag')
+          .select('question_id, is_correct, is_skipped, time_spent_seconds, marks_awarded, concept_tag, section_id')
           .eq('attempt_id', selectedAttemptId!),
       ]);
 
       setSectionResults(sectionsRes.data ?? []);
       setAiInsight(insightRes.data ?? null);
-      setAttemptAnswers(answersRes.data ?? []);
+      setAttemptAnswers(
+        (answersRes.data ?? []).map((r) => ({
+          question_id:        r.question_id as string,
+          is_correct:         r.is_correct as boolean,
+          is_skipped:         r.is_skipped as boolean,
+          time_spent_seconds: r.time_spent_seconds as number,
+          marks_awarded:      r.marks_awarded as number,
+          concept_tag:        r.concept_tag as string | null,
+          section_id:         r.section_id as string | null,
+        })),
+      );
       setAnalyticsLoading(false);
     }
 
@@ -544,35 +569,31 @@ export default function AnalyticsTab({
   const isLatest = selectedAttempt.id === attempts[attempts.length - 1].id;
 
   const negMark = NEG_MARKS[assessment.exam] ?? 0;
-  const latestIncorrect = sectionResults.reduce(
-    (s, r) => s + r.incorrect_count,
-    0,
-  );
-  const marksLost = Math.round(latestIncorrect * negMark * 100) / 100;
-
-  // Concept mastery for selected attempt
   const selAttemptNum = selectedAttempt.attempt_number;
-  const selAttemptMastery = conceptMastery.filter(
-    (m) => m.attempt_number === selAttemptNum,
-  );
 
-  // Attempt 1 baseline for delta
-  const attempt1Mastery = conceptMastery.filter((m) => m.attempt_number === 1);
-  const mastery1Map = new Map(attempt1Mastery.map((m) => [m.concept_tag, m.mastery_percent]));
-
-  // Heatmap: all unique attempt numbers across all mastery rows
-  const allAttemptNums = [
-    ...new Set(conceptMastery.map((m) => m.attempt_number)),
-  ].sort((a, b) => a - b);
-  const allConceptTags = [...new Set(conceptMastery.map((m) => m.concept_tag))];
-
-  function getMastery(tag: string, attemptNum: number): number | null {
-    return (
-      conceptMastery.find(
-        (m) => m.concept_tag === tag && m.attempt_number === attemptNum,
-      )?.mastery_percent ?? null
-    );
+  // ── Concept mastery section mapping ───────────────────────────────────────
+  // Primary: concept_tag → section_label derived from attempt_answers.section_id
+  // Fallback: demo/seeded data where section_id is NULL
+  const dynamicTagSectionMap: Record<string, string> = {};
+  for (const ans of attemptAnswers ?? []) {
+    if (ans.concept_tag && ans.section_id) {
+      const label = sectionResults.find((s) => s.section_id === ans.section_id)?.section_label ?? ans.section_id;
+      dynamicTagSectionMap[ans.concept_tag] = label;
+    }
   }
+  const tagSectionMap = Object.keys(dynamicTagSectionMap).length > 0
+    ? dynamicTagSectionMap
+    : (DEMO_TAG_SECTION[assessment.exam] ?? {});
+
+  const hasSections = Object.keys(tagSectionMap).length > 0;
+  const masteryTagSectionMap = hasSections
+    ? tagSectionMap
+    : Object.fromEntries(conceptMastery.map((m) => [m.concept_tag, 'All Topics']));
+  const masterySections = hasSections
+    ? (sectionResults.length > 0
+        ? [...new Set(sectionResults.map((s) => s.section_label))]
+        : (DEMO_SECTION_ORDER[assessment.exam] ?? ['All Topics']))
+    : ['All Topics'];
 
   // Solutions panel helpers
   const currentSection = selectedSection
@@ -768,25 +789,6 @@ export default function AnalyticsTab({
             />
           )}
 
-          {/* ── Block 2: Marks Lost — hero, negative-marking exams only ──────── */}
-          {negMark > 0 && marksLost > 0 && (
-            <div className="bg-rose-50 border border-rose-200 rounded-md p-5">
-              <div className="flex items-start gap-3">
-                <XCircle className="w-5 h-5 text-rose-600 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-base font-semibold text-rose-700">
-                    You left {marksLost} marks on the table
-                  </p>
-                  <p className="text-sm text-rose-600 mt-0.5 leading-relaxed">
-                    {latestIncorrect} incorrect answers &times; {negMark} negative mark.
-                    Cutting wrong answers by half recovers{' '}
-                    {Math.round(marksLost / 2)} marks immediately.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* ── Block 5: Section Breakdown ────────────────────────────────────── */}
           {sectionResults.length > 0 && (
             <div className="bg-white shadow-sm rounded-md p-6">
@@ -847,133 +849,15 @@ export default function AnalyticsTab({
           />
 
           {/* ── Block 8: Concept Mastery ──────────────────────────────────────── */}
-          {allConceptTags.length > 0 && (
-            <div className="bg-white shadow-sm rounded-md p-6">
-              <div className="mb-4">
-                <h3 className="text-base font-medium text-zinc-900">
-                  Concept Mastery
-                </h3>
-                <p className="text-xs text-zinc-500 mt-1">
-                  All concepts across attempts. Arrows show change since Attempt 1.
-                </p>
-              </div>
-
-              {allAttemptNums.length >= 2 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr>
-                        <th className="text-left text-xs font-medium text-zinc-400 pb-2 pr-6">
-                          Concept
-                        </th>
-                        {allAttemptNums.map((n) => (
-                          <th
-                            key={n}
-                            className="text-center text-xs font-medium text-zinc-400 pb-2 px-3"
-                          >
-                            Attempt {n}
-                          </th>
-                        ))}
-                        {selAttemptNum > 1 && (
-                          <th className="text-center text-xs font-medium text-zinc-400 pb-2 px-3">
-                            Trend
-                          </th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-50">
-                      {allConceptTags.map((tag) => {
-                        const base = mastery1Map.get(tag) ?? null;
-                        const current = getMastery(tag, selAttemptNum);
-                        const delta =
-                          selAttemptNum > 1 && base !== null && current !== null
-                            ? Math.round(current - base)
-                            : null;
-
-                        return (
-                          <tr key={tag}>
-                            <td className="text-xs font-medium text-zinc-700 py-2 pr-6">
-                              {tag}
-                            </td>
-                            {allAttemptNums.map((n) => {
-                              const pct = getMastery(tag, n);
-                              return (
-                                <td key={n} className="text-center py-2 px-3">
-                                  <span
-                                    className={`inline-block text-xs font-medium rounded px-2 py-0.5 ${masteryBadgeClass(pct)}`}
-                                  >
-                                    {pct !== null ? `${Math.round(pct)}%` : '—'}
-                                  </span>
-                                </td>
-                              );
-                            })}
-                            {selAttemptNum > 1 && (
-                              <td className="text-center py-2 px-3">
-                                {delta === null ? (
-                                  <span className="text-xs text-zinc-400">—</span>
-                                ) : delta > 0 ? (
-                                  <span className="inline-flex items-center gap-0.5 text-xs text-emerald-600">
-                                    <TrendingUp className="w-3 h-3" />
-                                    +{delta}%
-                                  </span>
-                                ) : delta < 0 ? (
-                                  <span className="inline-flex items-center gap-0.5 text-xs text-rose-600">
-                                    <TrendingDown className="w-3 h-3" />
-                                    {delta}%
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-zinc-400">→</span>
-                                )}
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {allConceptTags.map((tag) => {
-                    const pct = getMastery(tag, allAttemptNums[0] ?? 1);
-                    return (
-                      <div key={tag}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-zinc-700">
-                            {tag}
-                          </span>
-                          <span className="text-xs text-zinc-500">
-                            {pct !== null ? `${Math.round(pct)}%` : '—'}
-                          </span>
-                        </div>
-                        <div className="w-full bg-zinc-100 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${masteryBarClass(pct)}`}
-                            style={{ width: `${pct ?? 0}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-zinc-100">
-                <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  &ge;80% — strong
-                </span>
-                <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                  60–79% — developing
-                </span>
-                <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                  &lt;60% — needs work
-                </span>
-              </div>
-            </div>
-          )}
+          <ConceptMasteryPanel
+            conceptMastery={conceptMastery}
+            tagSectionMap={masteryTagSectionMap}
+            sections={masterySections}
+            attempts={attempts.map((a) => ({
+              attempt_number: a.attempt_number,
+              completed_at: a.completed_at,
+            }))}
+          />
 
           {/* ── Block 10: AI Insight — Pro/Premium only ───────────────────────── */}
           {isAiEligible ? (

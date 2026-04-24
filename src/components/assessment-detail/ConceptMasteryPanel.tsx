@@ -70,7 +70,7 @@ export default function ConceptMasteryPanel({
         <p className="text-xs text-zinc-500 mt-1">Progress across all attempts</p>
       </div>
 
-      {sections.length > 0 && (
+      {sections.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {sections.map((section) => {
             const isActive = section === activeSection;

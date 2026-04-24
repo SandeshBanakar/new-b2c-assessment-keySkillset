@@ -1,5 +1,30 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 22 2026 — KSS-CA-OVERHAUL-001 completed (Client Admin Dashboard + Profile Overhaul). Active tasks only. Completed work → CLAUDE-HISTORY.md.
+# Last updated: Apr 24 2026 — KSS-B2B-LEARNER-001 completed (B2B Learner Portal: login, navbar, courses, bug fixes). Active tasks only. Completed work → CLAUDE-HISTORY.md.
+
+---
+
+## [COMPLETE] KSS-B2B-LEARNER-001 — B2B Learner Portal Fix + Login + Navigation
+
+**SQL:** KSS-DB-053 — Add `category` column to `courses` + seed values (migration SQL provided in session Apr 24 2026 — run in Supabase)
+
+### Summary
+- Email-only demo login (learner picker card grid per tenant)
+- `B2BLearnerContext` + `useB2BLearner()` hook (localStorage keyed by tenant slug)
+- `B2BAuthGuard` (replaces no-op `AuthGuard` on all B2B pages)
+- `B2BNavbar` (sticky, tenant-branded, tab links with active state)
+- `layout.tsx` at `[tenant]` level — provides context to all B2B pages
+- Standalone `/b2b-learner/[tenant]/courses` page
+- Fixed course query: `(tenant_id IS NULL OR tenant_id = currentTenantId) AND status = LIVE`
+- Fixed all progress/attempt queries: added `learner_id` filter
+- Fixed assessments column names: `exam_category_id` → joined `exam_categories(name)`
+- Removed non-existent `assigned_at` reference — `started_at IS NULL` as "New" badge proxy
+- Removed non-existent `thumbnail_url` — colored placeholders by `course_type`
+- WelcomeHeader moved below navbar (layout fix)
+
+### Backlog item (deferred)
+- **`learner_course_progress.assigned_at`**: Column does not exist. Currently using `started_at IS NULL` as "New" proxy. PRD and DB migration needed when we want proper assignment-date tracking. Add to next B2B PRD.
+
+### Build: ✅ PASSED
 
 ---
 

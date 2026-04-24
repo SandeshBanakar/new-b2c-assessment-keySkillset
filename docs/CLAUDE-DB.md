@@ -316,16 +316,19 @@ source, tenant_id, created_by, created_at, updated_at,
 audience_type (B2C_ONLY/B2B_ONLY/BOTH nullable), price (INR nullable),
 price_usd (numeric nullable), currency (DEFAULT 'INR'),
 is_individually_purchasable (boolean DEFAULT false), stripe_price_id,
-last_modified_by (uuid nullable)
+last_modified_by (uuid nullable),
+category (TEXT nullable — KSS-DB-053, Apr 24 2026)
 ```
-- 15 courses total: 1 B2C ARCHIVED (HIPAA — `425b71f4`, purchasable, $12.99), 7 B2B LIVE (platform-wide), 1 INACTIVE (CLAT), 6 B2B INACTIVE (Akash private — Apr 16 2026)
-- Akash-private courses (`tenant_id = ec1bc005-e76d-4208-ab0f-abe0d316e260`, `status = INACTIVE`, `audience_type = B2B_ONLY`, `price = 0`):
-  - NEET Preparation Course (`96a8eebd`) — COMBINATION
-  - JEE Preparation Course (`4487343a`) — COMBINATION
-  - Cognitive Skills Course (`7b57da77`) — CLICK_BASED
-  - SAT Preparation Course (`e96e99dd`) — COMBINATION
-  - Typing Course (`ee93d801`) — KEYBOARD_TRAINER
-  - English Language Course (`dd4923ab`) — VIDEO
+- **KSS-DB-053 (Apr 24 2026):** Added `category TEXT NULL` column. Seeded values: 'Exam Prep', 'Technology', 'HR & Compliance', 'Professional Skills', 'Language & Communication'
+- B2B learner query scope: `status='LIVE' AND (tenant_id IS NULL OR tenant_id = currentTenantId)` — always apply both filters
+- 11 B2B LIVE courses (Apr 24 2026, per SQL audit): 10 global (tenant_id IS NULL) + 1 Akash-private LIVE (NEET Preparation Course — `96a8eebd`)
+- Akash-private courses (`tenant_id = ec1bc005-e76d-4208-ab0f-abe0d316e260`):
+  - NEET Preparation Course (`96a8eebd`) — COMBINATION, **LIVE**
+  - JEE Preparation Course (`4487343a`) — COMBINATION, INACTIVE
+  - Cognitive Skills Course (`7b57da77`) — CLICK_BASED, INACTIVE
+  - SAT Preparation Course (`e96e99dd`) — COMBINATION, INACTIVE
+  - Typing Course (`ee93d801`) — KEYBOARD_TRAINER, INACTIVE
+  - English Language Course (`dd4923ab`) — VIDEO, INACTIVE
 - Tenant-private courses are scoped by `tenant_id` on `courses` (NOT `tenant_scope_id` — that column is on `assessment_items` only)
 - `is_individually_purchasable` managed ONLY via SINGLE_COURSE_PLAN plan lifecycle — no manual toggle
 - On SINGLE_COURSE_PLAN PUBLISHED: sync `price + price_usd + stripe_price_id` to course + set `purchasable=true`

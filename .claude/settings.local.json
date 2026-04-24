@@ -119,7 +119,8 @@
       "WebFetch(domain:api.anthropic.com)",
       "Bash(npx kill-port *)",
       "Bash(rm -f .next/lock)",
-      "Bash(taskkill /f /im node.exe)"
+      "Bash(taskkill /f /im node.exe)",
+      "Bash(findstr /C:\"error\" /C:\"Error\" /C:\"Compiled\" /C:\"Failed\")"
     ]
   },
   "enabledMcpjsonServers": [

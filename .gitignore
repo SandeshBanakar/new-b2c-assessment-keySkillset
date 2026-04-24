@@ -47,3 +47,12 @@ next-env.d.ts
 
 # local doc reference
 /docs/requirements/
+
+# email rules references folder
+/docs/email_rules/
+
+# linear analytics references folder
+/docs/linear_analytics/
+
+# sat analytics references folder
+/docs/sat_platform/

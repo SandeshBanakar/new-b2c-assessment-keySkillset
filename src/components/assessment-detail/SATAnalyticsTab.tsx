@@ -20,64 +20,20 @@ import AttemptPillFilter from '@/components/ui/AttemptPillFilter';
 import SATHeroScore from '@/components/assessment-detail/SATHeroScore';
 import SATCollegeLadder, { type TierBand, type College } from '@/components/assessment-detail/SATCollegeLadder';
 import DifficultyBreakdownCard, { type DiffMap } from '@/components/ui/DifficultyBreakdownCard';
+import MistakeIntelligence, { type MIAttemptAnswer } from '@/components/assessment-detail/MistakeIntelligence';
 import type { Assessment } from '@/types';
-
-// ─── SAT domain taxonomy ───────────────────────────────────────────────────────
-
-const SAT_MATH_DOMAIN_MAP: Record<string, string> = {
-  'Linear equations and inequalities':                    'Algebra',
-  'Systems of linear equations':                         'Algebra',
-  'Linear functions':                                    'Algebra',
-  'Word problems involving linear relationships':         'Algebra',
-  'Quadratic equations':                                 'Advanced Math',
-  'Polynomial expressions and functions':                'Advanced Math',
-  'Exponential functions and equations':                 'Advanced Math',
-  'Rational expressions':                                'Advanced Math',
-  'Radical expressions':                                 'Advanced Math',
-  'Function notation and transformations':               'Advanced Math',
-  'Solving equations involving absolute value or higher powers': 'Advanced Math',
-  'Ratios, rates, and proportions':                      'Problem Solving & Data Analysis',
-  'Percentages':                                         'Problem Solving & Data Analysis',
-  'Units and unit conversions':                          'Problem Solving & Data Analysis',
-  'Tables, graphs, and data interpretation':             'Problem Solving & Data Analysis',
-  'Mean, median, mode, and range':                       'Problem Solving & Data Analysis',
-  'Probability':                                         'Problem Solving & Data Analysis',
-  'Scatterplots and trend lines':                        'Problem Solving & Data Analysis',
-  'Statistical concepts':                                'Problem Solving & Data Analysis',
-  'Properties of lines, angles, triangles, and circles': 'Geometry & Trigonometry',
-  'Area, perimeter, and volume formulas':                'Geometry & Trigonometry',
-  'The Pythagorean theorem':                             'Geometry & Trigonometry',
-  'Similarity and congruence':                           'Geometry & Trigonometry',
-  'Basic trigonometry':                                  'Geometry & Trigonometry',
-  'Coordinate geometry':                                 'Geometry & Trigonometry',
-};
-
-const SAT_RW_DOMAIN_MAP: Record<string, string> = {
-  'Central ideas and themes':                            'Craft & Structure',
-  'Text structure and organization':                     'Craft & Structure',
-  'Word choice in context':                              'Craft & Structure',
-  'Point of view and purpose':                          'Craft & Structure',
-  'Textual relationships':                               'Craft & Structure',
-  'Reading comprehension':                               'Information & Ideas',
-  'Evidence-based questions':                            'Information & Ideas',
-  'Data interpretation in context':                      'Information & Ideas',
-  'Logical connections between ideas':                   'Information & Ideas',
-  'Sentence structure':                                  'Standard English Conventions',
-  'Punctuation':                                         'Standard English Conventions',
-  'Verb tense and agreement':                            'Standard English Conventions',
-  'Pronoun usage and agreement':                         'Standard English Conventions',
-  'Modifier placement':                                  'Standard English Conventions',
-  'Parallel structure':                                  'Standard English Conventions',
-  'Transition words and logical flow':                   'Expression of Ideas',
-  'Concision':                                           'Expression of Ideas',
-  'Style and tone appropriateness':                      'Expression of Ideas',
-  'Sentence and paragraph organization':                 'Expression of Ideas',
-  'Effective introduction and conclusion sentences':      'Expression of Ideas',
-};
 
 const FULL_TEST_SECTION_ORDER = ['rw_module_1', 'rw_module_2', 'math_module_1', 'math_module_2'];
 const MATH_SECTION_ORDER      = ['algebra', 'advanced_math', 'psda', 'geometry_trig'];
 const RW_SECTION_ORDER        = ['craft_structure', 'info_ideas', 'sec', 'expression_ideas'];
+
+// Maps SAT module section_ids to display-level subject labels
+function satSectionLabel(sectionId: string): string {
+  const id = sectionId.toLowerCase();
+  if (id.startsWith('rw') || id.startsWith('reading')) return 'Reading & Writing';
+  if (id.startsWith('math')) return 'Math';
+  return 'Other';
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -288,7 +244,7 @@ export default function SATAnalyticsTab({
         // 6. User answers
         supabase
           .from('attempt_answers')
-          .select('attempt_id, question_id, section_id, user_answer, is_correct, is_skipped, time_spent_seconds, marks_awarded')
+          .select('attempt_id, question_id, section_id, user_answer, is_correct, is_skipped, time_spent_seconds, marks_awarded, concept_tag')
           .in('attempt_id', attemptIds),
       ]);
 
@@ -344,7 +300,8 @@ export default function SATAnalyticsTab({
           is_skipped: row.is_skipped as boolean | null,
           time_spent_seconds: row.time_spent_seconds as number | null,
           marks_awarded: row.marks_awarded as number | null,
-        });
+          concept_tag: row.concept_tag as string | null,
+        } as unknown as UserAnswer);
       }
       setAllUserAnswers(answersMap);
 
@@ -464,16 +421,40 @@ export default function SATAnalyticsTab({
     (m) => m.attempt_number === selectedAttempt?.attempt_number,
   );
 
-  // Build tagSectionMap and sections for ConceptMasteryPanel
-  const tagSectionMap: Record<string, string> = {};
-  for (const tag of Object.keys(SAT_MATH_DOMAIN_MAP)) tagSectionMap[tag] = 'Math';
-  for (const tag of Object.keys(SAT_RW_DOMAIN_MAP))   tagSectionMap[tag] = 'Reading & Writing';
+  // MistakeIntelligence answers — convert selectedAnswers to MIAttemptAnswer shape
+  type RawAnswer = { question_id: string; is_correct: boolean | null; is_skipped: boolean | null; time_spent_seconds: number | null; marks_awarded: number | null; concept_tag: string | null; section_id: string | null };
+  const miAnswers: MIAttemptAnswer[] | null = loading
+    ? null
+    : selectedAnswers.map((a) => {
+        const r = a as unknown as RawAnswer;
+        return {
+          question_id:        r.question_id ?? '',
+          is_correct:         r.is_correct  ?? false,
+          is_skipped:         r.is_skipped  ?? false,
+          time_spent_seconds: r.time_spent_seconds ?? 0,
+          marks_awarded:      r.marks_awarded ?? 0,
+          concept_tag:        r.concept_tag ?? null,
+          section_id:         r.section_id  ?? null,
+        };
+      });
 
-  const sections = isFullTest
-    ? ['Reading & Writing', 'Math']
-    : assessment.subject === 'Math'
-      ? ['Math']
-      : ['Reading & Writing'];
+  // Build concept-tag → subject-level section map from all loaded answers
+  const satTagSectionMap: Record<string, string> = {};
+  for (const answers of Object.values(allUserAnswers)) {
+    for (const a of answers) {
+      const r = a as unknown as RawAnswer;
+      if (r.concept_tag && r.section_id) {
+        satTagSectionMap[r.concept_tag] = satSectionLabel(r.section_id);
+      }
+    }
+  }
+  const hasSatSections = Object.keys(satTagSectionMap).length > 0;
+  const satMasteryTagMap = hasSatSections
+    ? satTagSectionMap
+    : Object.fromEntries(conceptMastery.map((m) => [m.concept_tag, 'All Topics']));
+  const satMasterySections = hasSatSections
+    ? (isFullTest ? ['Reading & Writing', 'Math'] : assessment.subject === 'Math' ? ['Math'] : ['Reading & Writing'])
+    : ['All Topics'];
 
   return (
     <div className="space-y-4">
@@ -532,18 +513,23 @@ export default function SATAnalyticsTab({
         />
       )}
 
+      {/* ── Block 6: Mistake Intelligence ─────────────────────────────────────── */}
+      <MistakeIntelligence
+        attemptAnswers={miAnswers}
+        exam={assessment.exam}
+        negMark={0}
+      />
+
       {/* ── Block 7: Concept Mastery ──────────────────────────────────────────── */}
-      {conceptMastery.length > 0 && (
-        <ConceptMasteryPanel
-          conceptMastery={conceptMastery}
-          tagSectionMap={tagSectionMap}
-          sections={sections}
-          attempts={attempts.map((a) => ({
-            attempt_number: a.attempt_number,
-            completed_at: a.completed_at,
-          }))}
-        />
-      )}
+      <ConceptMasteryPanel
+        conceptMastery={conceptMastery}
+        tagSectionMap={satMasteryTagMap}
+        sections={satMasterySections}
+        attempts={attempts.map((a) => ({
+          attempt_number: a.attempt_number,
+          completed_at: a.completed_at,
+        }))}
+      />
 
       {/* ── Block 10: SAT Scoring Reference (Full Test only) ─────────────────── */}
       {isFullTest && <SATScoringTable />}

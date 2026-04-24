@@ -5,16 +5,7 @@ Fix 2: In Super Admin -> B2C Users -> there is a table with 'Plan' column. Curre
 
 Fix 3: In the super admin -> Question bank page -> I don't see any questions that are in the db. Check and fix. Ask me clarification questions by analysing as per your role in CLAUDE.md file.
 
-After that, refine Super Admn > Platform Config page. Here I need to have 'Exam Categories' card with simple information on it saying what is inside and what is the purpose of this card. Inside this card lies a table of EXAM CATEGORIES with CRUD and pages within them as is.
 
-In the Super Admin > Platform Config > Exam Categories > SAT > Analytics Config > Remove this section and associated dependencies: "C:\Projects\new-b2c-assessment-keySkillset\reference_images\super_admin_prod\platform_config_ec_sat_sections.png"
 
 Ask me clarification questions, analyse as per your role in [CLAUDE.md](CLAUDE.md) and proceed.
 
-
----
-B2B Course learning + Certificate
-
-(1) b2b assessment dashboard enhancement based on the plans, 
-(2) certificate generation logic for assessment completion, 
-(3) b2b users course completion certificate and assessment completion certificate logic

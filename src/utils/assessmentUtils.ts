@@ -114,7 +114,7 @@ export async function getAssessmentBySlug(slug: string): Promise<Assessment | nu
       exam_categories ( name )
     `)
     .eq('id', slug)
-    .eq('status', 'INACTIVE')
+    .in('status', ['LIVE', 'INACTIVE'])
     .maybeSingle();
 
   if (ciData) {

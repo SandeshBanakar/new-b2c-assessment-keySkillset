@@ -7,6 +7,7 @@ export interface MIAttemptAnswer {
   time_spent_seconds: number;
   marks_awarded: number;
   concept_tag: string | null;
+  section_id?: string | null;
 }
 
 type CategoryKey =
