@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Building2, AlertTriangle, User } from 'lucide-react';
+import { Building2, AlertTriangle, User, CheckCircle2, BookOpen, FileQuestion, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { getTenantId } from '@/lib/client-admin/tenants';
 import { useB2BLearner, type B2BLearner } from '@/context/B2BLearnerContext';
@@ -29,6 +29,105 @@ function avatarColor(index: number) {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 }
 
+// ── Persona guide data ──
+type PersonaState = 'completed' | 'in_progress' | 'empty';
+
+interface PersonaGuideRow {
+  name: string;
+  state: PersonaState;
+  courseLabel: string;
+  assessmentLabel: string;
+}
+
+const PERSONA_GUIDE: Record<string, PersonaGuideRow[]> = {
+  akash: [
+    {
+      name: 'Aditya Shah',
+      state: 'completed',
+      courseLabel: 'NEET Prep (100% + cert)',
+      assessmentLabel: '82% — Passed',
+    },
+    {
+      name: 'Divya Nair',
+      state: 'in_progress',
+      courseLabel: 'NEET Prep (45%)',
+      assessmentLabel: 'No attempts',
+    },
+    {
+      name: 'Arjun Gupta',
+      state: 'empty',
+      courseLabel: 'No progress',
+      assessmentLabel: 'No attempts',
+    },
+  ],
+  techcorp: [
+    {
+      name: 'Nisha Kapoor',
+      state: 'completed',
+      courseLabel: 'PF Basics (100% + cert)',
+      assessmentLabel: '76% — Passed',
+    },
+    {
+      name: 'Rahul Bose',
+      state: 'in_progress',
+      courseLabel: 'PF Basics (30%)',
+      assessmentLabel: 'No attempts',
+    },
+  ],
+};
+
+const STATE_BADGE: Record<PersonaState, { label: string; cls: string }> = {
+  completed:   { label: 'Completed',   cls: 'bg-emerald-100 text-emerald-700' },
+  in_progress: { label: 'In Progress', cls: 'bg-amber-100 text-amber-700' },
+  empty:       { label: 'Empty State', cls: 'bg-zinc-100 text-zinc-500' },
+};
+
+function PersonaGuide({ tenantSlug }: { tenantSlug: string }) {
+  const rows = PERSONA_GUIDE[tenantSlug];
+  if (!rows) return null;
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center gap-2">
+        <span className="text-xs font-semibold text-zinc-600 uppercase tracking-wide">Demo Persona Guide</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-100">
+              <th className="text-left px-4 py-2.5 font-medium text-zinc-500">Learner</th>
+              <th className="text-left px-4 py-2.5 font-medium text-zinc-500">State</th>
+              <th className="text-left px-4 py-2.5 font-medium text-zinc-500">
+                <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> Course</span>
+              </th>
+              <th className="text-left px-4 py-2.5 font-medium text-zinc-500">
+                <span className="flex items-center gap-1"><FileQuestion className="w-3 h-3" /> Assessment</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-50">
+            {rows.map((row) => {
+              const badge = STATE_BADGE[row.state];
+              return (
+                <tr key={row.name} className="hover:bg-zinc-50 transition-colors">
+                  <td className="px-4 py-2.5 font-medium text-zinc-800">{row.name}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.cls}`}>
+                      {badge.label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-zinc-600">{row.courseLabel}</td>
+                  <td className="px-4 py-2.5 text-zinc-600">{row.assessmentLabel}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function B2BLoginPage() {
   const params = useParams<{ tenant: string }>();
   const tenantSlug = params.tenant;
@@ -39,7 +138,6 @@ export default function B2BLoginPage() {
   const [learners, setLearners] = useState<B2BLearner[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Already logged in — go to dashboard
   useEffect(() => {
     if (learner) {
       router.replace(`/b2b-learner/${tenantSlug}`);
@@ -103,6 +201,9 @@ export default function B2BLoginPage() {
           </p>
         </div>
 
+        {/* Persona guide */}
+        <PersonaGuide tenantSlug={tenantSlug} />
+
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">Select your profile</h1>
           <p className="text-sm text-zinc-500 mt-1">Who are you learning as today?</p>
@@ -119,23 +220,33 @@ export default function B2BLoginPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {learners.map((l, i) => (
-              <button
-                key={l.id}
-                onClick={() => handleSelect(l)}
-                className="flex items-center gap-4 bg-white border border-zinc-200 rounded-lg p-4 text-left hover:border-teal-300 hover:shadow-sm transition-all group"
-              >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${avatarColor(i)}`}>
-                  {getInitials(l.full_name)}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-zinc-900 truncate group-hover:text-teal-700 transition-colors">
-                    {l.full_name}
-                  </p>
-                  <p className="text-xs text-zinc-400 truncate">{l.email}</p>
-                </div>
-              </button>
-            ))}
+            {learners.map((l, i) => {
+              const guideRow = PERSONA_GUIDE[tenantSlug]?.find(
+                (r) => r.name.toLowerCase() === l.full_name.toLowerCase()
+              );
+              return (
+                <button
+                  key={l.id}
+                  onClick={() => handleSelect(l)}
+                  className="flex items-center gap-4 bg-white border border-zinc-200 rounded-lg p-4 text-left hover:border-teal-300 hover:shadow-sm transition-all group"
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${avatarColor(i)}`}>
+                    {getInitials(l.full_name)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-zinc-900 truncate group-hover:text-teal-700 transition-colors">
+                      {l.full_name}
+                    </p>
+                    <p className="text-xs text-zinc-400 truncate">{l.email}</p>
+                  </div>
+                  {guideRow && (
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0 ${STATE_BADGE[guideRow.state].cls}`}>
+                      {STATE_BADGE[guideRow.state].label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

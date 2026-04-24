@@ -3,11 +3,11 @@
 
 ---
 
-## [COMPLETE] KSS-B2B-LEARNER-001 — B2B Learner Portal Fix + Login + Navigation
+## [COMPLETE] KSS-B2B-LEARNER-001 — B2B Learner Portal Fix + Login + Navigation + Demo Data
 
-**SQL:** KSS-DB-053 — Add `category` column to `courses` + seed values (migration SQL provided in session Apr 24 2026 — run in Supabase)
+**SQL:** KSS-DB-053 ✓ · SEED-B2B-MODULES.sql ✓ · SEED-B2B-PROGRESS.sql ✓
 
-### Summary
+### Summary (Phase 1 — Apr 24 2026)
 - Email-only demo login (learner picker card grid per tenant)
 - `B2BLearnerContext` + `useB2BLearner()` hook (localStorage keyed by tenant slug)
 - `B2BAuthGuard` (replaces no-op `AuthGuard` on all B2B pages)
@@ -21,8 +21,18 @@
 - Removed non-existent `thumbnail_url` — colored placeholders by `course_type`
 - WelcomeHeader moved below navbar (layout fix)
 
+### Summary (Phase 2 — Apr 24 2026)
+- Fixed `getAssessmentBySlug`: `.eq('status','INACTIVE')` → `.in('status',['LIVE','INACTIVE'])`
+- Course detail: 2-column layout (left: hero + curriculum accordion, right: sticky action panel with SVG progress ring + CTA)
+- Assessment list: B2C-style cards (gradient strip, exam badge, attempt chip) + `AttemptsSummaryPanel`
+- Login page: `PersonaGuide` table + state badge inline on each learner card
+- DB seed: 4 modules + 16 topics (NEET Prep) · 4 modules + 11 topics (PF Basics)
+- DB seed: progress — Aditya Shah 100%, Divya Nair 45%, Nisha Kapoor 100%, Rahul Bose 30%
+- DB seed: certificates for Aditya Shah (KSS-AKASH-2026-0001) + Nisha Kapoor (KSS-TCORP-2026-0001)
+- DB seed: learner_attempts — Aditya Shah 82% passed · Nisha Kapoor 76% passed
+
 ### Backlog item (deferred)
-- **`learner_course_progress.assigned_at`**: Column does not exist. Currently using `started_at IS NULL` as "New" proxy. PRD and DB migration needed when we want proper assignment-date tracking. Add to next B2B PRD.
+- **`learner_course_progress.assigned_at`**: Column does not exist. Using `started_at IS NULL` as "New" proxy. PRD + DB migration needed for proper assignment-date tracking.
 
 ### Build: ✅ PASSED
 
