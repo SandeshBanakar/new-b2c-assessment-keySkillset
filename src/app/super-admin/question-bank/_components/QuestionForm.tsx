@@ -367,7 +367,6 @@ function FormPreview({ form }: { form: FormState }) {
   const isMultiPassage = form.question_type === 'PASSAGE_MULTI'
   const isNumeric = form.question_type === 'NUMERIC'
 
-  useEffect(() => { setSubIdx(0) }, [form.question_type])
 
   const diffCls: Record<Difficulty, string> = {
     easy: 'bg-green-50 text-green-700', medium: 'bg-amber-50 text-amber-700',
@@ -626,7 +625,7 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
 
   // Load chapters when source changes
   useEffect(() => {
-    if (!form.source_id) { setChapters([]); return }
+    if (!form.source_id) return
     supabase.from('chapters').select('id, source_id, name, order_index')
       .eq('source_id', form.source_id).order('order_index')
       .then(({ data }) => { if (data) setChapters(data as Chapter[]) })
@@ -635,7 +634,6 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
   // Load question for edit mode
   const loadQuestion = useCallback(async () => {
     if (mode !== 'edit' || !questionId) return
-    setLoadingEdit(true)
 
     const { data, error: err } = await supabase
       .from('questions')
@@ -1001,7 +999,7 @@ export default function QuestionForm({ mode, questionId, defaultChapterId, defau
         {/* ── Preview Mode ── */}
         {activeTab === 'preview' ? (
           <div className="bg-white rounded-xl border border-zinc-200 p-5">
-            <FormPreview form={form} />
+            <FormPreview key={form.question_type} form={form} />
           </div>
         ) : (
           /* ── Edit Mode ── */

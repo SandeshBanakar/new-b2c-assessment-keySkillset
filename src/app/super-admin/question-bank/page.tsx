@@ -118,18 +118,18 @@ export default function QuestionBankPage() {
       .then(({ data }) => { if (data) setCreators(data as Creator[]) })
   }, [])
 
-  const fetchQuestions = useCallback(async () => {
-    setLoading(true)
-
+  const fetchQuestions = useCallback(() => {
     let query = supabase
       .from('questions')
       .select(`
         id, question_type, difficulty,
         question_text, passage_text,
-        concept_tag, created_at, updated_at,
+        concept_tag_id,
+        concept_tags!concept_tag_id(concept_name),
+        created_at, updated_at,
         chapters(name, sources(name)),
-        creator:admin_users!questions_created_by_fkey(name),
-        editor:admin_users!questions_last_modified_by_fkey(name)
+        creator:admin_users!created_by(name),
+        editor:admin_users!last_modified_by(name)
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
@@ -150,42 +150,42 @@ export default function QuestionBankPage() {
       query = query.gte('updated_at', day.toISOString()).lt('updated_at', next.toISOString())
     }
 
-    const { data, count, error } = await query
+    query.then(({ data, count, error }) => {
+      if (!error && data) {
+        const mapped: Question[] = data.map((row: Record<string, unknown>) => {
+          const ch = row.chapters as Record<string, unknown> | null
+          const src = ch?.sources as Record<string, unknown> | null
+          const creator = row.creator as { name?: string } | null
+          const editor = row.editor as { name?: string } | null
+          const conceptTag = row.concept_tags as { concept_name?: string } | null
 
-    if (!error && data) {
-      const mapped: Question[] = data.map((row: Record<string, unknown>, idx: number) => {
-        const ch = row.chapters as Record<string, unknown> | null
-        const src = ch?.sources as Record<string, unknown> | null
-        const creator = row.creator as { name?: string } | null
-        const editor = row.editor as { name?: string } | null
+          const qType = row.question_type as QuestionType
+          const isPassage = qType === 'PASSAGE_SINGLE' || qType === 'PASSAGE_MULTI'
+          const display_text = isPassage
+            ? extractPlainText(row.passage_text)
+            : extractPlainText(row.question_text)
 
-        const qType = row.question_type as QuestionType
-        const isPassage = qType === 'PASSAGE_SINGLE' || qType === 'PASSAGE_MULTI'
-        const display_text = isPassage
-          ? extractPlainText(row.passage_text)
-          : extractPlainText(row.question_text)
-
-        return {
-          id: row.id as string,
-          question_type: qType,
-          difficulty: row.difficulty as Difficulty,
-          display_text,
-          concept_tag: (row.concept_tag as string | null) ?? null,
-          created_at: row.created_at as string,
-          updated_at: row.updated_at as string,
-          creator_name: creator?.name ?? null,
-          editor_name: editor?.name ?? null,
-          source_name: (src?.name as string | null) ?? null,
-          chapter_name: (ch?.name as string | null) ?? null,
-        }
-      })
-      setQuestions(mapped)
-      setTotal(count ?? 0)
-    }
-    setLoading(false)
+          return {
+            id: row.id as string,
+            question_type: qType,
+            difficulty: row.difficulty as Difficulty,
+            display_text,
+            concept_tag: conceptTag?.concept_name ?? null,
+            created_at: row.created_at as string,
+            updated_at: row.updated_at as string,
+            creator_name: creator?.name ?? null,
+            editor_name: editor?.name ?? null,
+            source_name: (src?.name as string | null) ?? null,
+            chapter_name: (ch?.name as string | null) ?? null,
+          }
+        })
+        setQuestions(mapped)
+        setTotal(count ?? 0)
+      }
+      setLoading(false)
+    })
   }, [page, typeFilter, diffFilter, sourceFilter, creatorFilter, search, createdOn, lastEdited])
 
-  useEffect(() => { setPage(0) }, [typeFilter, diffFilter, sourceFilter, creatorFilter, search, createdOn, lastEdited])
   useEffect(() => { fetchQuestions() }, [fetchQuestions])
 
   const hasActiveFilters = typeFilter !== 'ALL' || diffFilter !== 'ALL'
@@ -226,11 +226,11 @@ export default function QuestionBankPage() {
               className="w-full pl-8 pr-3 py-1.5 text-sm border border-zinc-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Search questions…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(0) }}
             />
           </div>
           <select className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 shrink-0"
-            value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as QuestionType | 'ALL')}>
+            value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value as QuestionType | 'ALL'); setPage(0) }}>
             <option value="ALL">All Types</option>
             <option value="MCQ_SINGLE">MCQ Single</option>
             <option value="MCQ_MULTI">MCQ Multiple</option>
@@ -239,7 +239,7 @@ export default function QuestionBankPage() {
             <option value="NUMERIC">Numeric</option>
           </select>
           <select className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 shrink-0"
-            value={diffFilter} onChange={(e) => setDiffFilter(e.target.value as Difficulty | 'ALL')}>
+            value={diffFilter} onChange={(e) => { setDiffFilter(e.target.value as Difficulty | 'ALL'); setPage(0) }}>
             <option value="ALL">All Difficulty</option>
             <option value="easy">Easy</option>
             <option value="medium">Medium</option>
@@ -251,12 +251,12 @@ export default function QuestionBankPage() {
         {/* Row 2 */}
         <div className="flex items-center gap-2 flex-wrap">
           <select className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
-            value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+            value={sourceFilter} onChange={(e) => { setSourceFilter(e.target.value); setPage(0) }}>
             <option value="ALL">All Sources</option>
             {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <select className="text-sm border border-zinc-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700"
-            value={creatorFilter} onChange={(e) => setCreatorFilter(e.target.value)}>
+            value={creatorFilter} onChange={(e) => { setCreatorFilter(e.target.value); setPage(0) }}>
             <option value="ALL">All Creators</option>
             {creators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -265,14 +265,14 @@ export default function QuestionBankPage() {
             <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span className="text-xs text-zinc-500 shrink-0">Created on</span>
             <input type="date" className="text-sm text-zinc-700 focus:outline-none bg-transparent"
-              value={createdOn} onChange={(e) => setCreatedOn(e.target.value)} />
+              value={createdOn} onChange={(e) => { setCreatedOn(e.target.value); setPage(0) }} />
           </div>
 
           <div className="flex items-center gap-1.5 border border-zinc-200 rounded-md px-2.5 py-1.5">
             <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span className="text-xs text-zinc-500 shrink-0">Last edited</span>
             <input type="date" className="text-sm text-zinc-700 focus:outline-none bg-transparent"
-              value={lastEdited} onChange={(e) => setLastEdited(e.target.value)} />
+              value={lastEdited} onChange={(e) => { setLastEdited(e.target.value); setPage(0) }} />
           </div>
 
           {hasActiveFilters && (
@@ -384,6 +384,7 @@ export default function QuestionBankPage() {
       </div>
 
       <QuestionPreviewModal
+        key={previewId ?? 'closed'}
         open={!!previewId}
         questionId={previewId}
         onClose={() => setPreviewId(null)}

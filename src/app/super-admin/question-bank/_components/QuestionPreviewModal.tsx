@@ -371,16 +371,13 @@ export default function QuestionPreviewModal({
 }: QuestionPreviewModalProps) {
   const router = useRouter()
   const [question, setQuestion] = useState<FullQuestion | null>(null)
-  const [loading, setLoading] = useState(false)
   const [subIndex, setSubIndex] = useState(0)
   const [showDelete, setShowDelete] = useState(false)
 
-  const fetchQuestion = useCallback(async () => {
+  const fetchQuestion = useCallback(() => {
     if (!questionId) return
-    setLoading(true)
-    setSubIndex(0)
 
-    const { data, error } = await supabase
+    supabase
       .from('questions')
       .select(`
         id, question_type, difficulty,
@@ -399,7 +396,7 @@ export default function QuestionPreviewModal({
       `)
       .eq('id', questionId)
       .single()
-
+      .then(({ data, error }) => {
     if (!error && data) {
       const d = data as Record<string, unknown>
       const ch = d.chapters as Record<string, unknown> | null
@@ -454,17 +451,18 @@ export default function QuestionPreviewModal({
         updated_at: d.updated_at as string,
         sub_questions,
       })
+      setSubIndex(0)
     }
-    setLoading(false)
+  })
   }, [questionId])
 
   useEffect(() => {
     if (open && questionId) fetchQuestion()
-    if (!open) { setQuestion(null); setShowDelete(false) }
   }, [open, questionId, fetchQuestion])
 
   if (!open) return null
 
+  const loading = !question
   const isPassage = question?.question_type === 'PASSAGE_SINGLE' || question?.question_type === 'PASSAGE_MULTI'
   const isMulti = question?.question_type === 'MCQ_MULTI' || question?.question_type === 'PASSAGE_MULTI'
   const showSubNav = question?.question_type === 'PASSAGE_MULTI'

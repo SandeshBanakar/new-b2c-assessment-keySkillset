@@ -165,7 +165,6 @@ export default function ContentCreatorsPage() {
   const [showCreate, setShowCreate] = useState(false)
 
   function load() {
-    setLoading(true)
     fetchContentCreators()
       .then(setCreators)
       .catch((e: Error) => setError(e.message))

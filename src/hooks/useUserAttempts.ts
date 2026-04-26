@@ -28,13 +28,10 @@ function toStatus(dbStatus: string): MockAttemptData['status'] {
 
 export function useUserAttempts(userId: string | undefined) {
   const [attemptsMap, setAttemptsMap] = useState<Map<string, MockAttemptData>>(new Map())
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!!userId)
 
   useEffect(() => {
-    if (!userId) {
-      setLoading(false)
-      return
-    }
+    if (!userId) return
 
     supabase
       .from('attempts')

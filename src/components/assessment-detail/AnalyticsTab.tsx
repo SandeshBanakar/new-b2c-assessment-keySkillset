@@ -21,55 +21,12 @@ import MistakeIntelligence, { type MIAttemptAnswer } from '@/components/assessme
 import ConceptMasteryPanel from '@/components/assessment-detail/ConceptMasteryPanel';
 import type { Assessment } from '@/types';
 
-// ── Negative marks per exam ───────────────────────────────────────────────────
-const NEG_MARKS: Record<string, number> = {
-  NEET: 1,
-  JEE: 1,
-  CLAT: 0.25,
-  SAT: 0,
-  PMP: 0,
-};
-
-const SCORE_MAX: Record<string, number> = { NEET: 720, JEE: 300, CLAT: 120, SAT: 1600 };
-
-const RANK_PREDICTION_EXAMS = new Set(['NEET', 'JEE', 'CLAT']);
-
-const EXAM_CATEGORY_ID: Record<string, string> = {
-  NEET: '23d482e7-81c3-4a10-bd60-52fd458595d6',
-  JEE:  '93319838-3e05-4472-9dd0-decd6f731f7b',
-  CLAT: 'ad260442-74de-4e7c-993c-f006c4a29045',
-};
-
-// ── Concept mastery section mapping — fallback for demo/seeded data ───────────
-// Used when attempt_answers.section_id is NULL (synthetic seeded rows).
-// Real exam-engine answers always carry section_id → dynamic path takes over.
-const DEMO_TAG_SECTION: Record<string, Record<string, string>> = {
-  NEET: {
-    Mechanics: 'Physics', Thermodynamics: 'Physics', Optics: 'Physics', 'Waves & Sound': 'Physics',
-    Electrochemistry: 'Chemistry', 'Organic Chemistry': 'Chemistry',
-    Genetics: 'Biology', 'Human Physiology': 'Biology', 'Cell Biology': 'Biology', 'Plant Biology': 'Biology',
-  },
-  JEE: {
-    Calculus: 'Mathematics', 'Coordinate Geometry': 'Mathematics', Vectors: 'Mathematics',
-    Mechanics: 'Physics', Electrostatics: 'Physics', Thermodynamics: 'Physics',
-    Waves: 'Physics', 'Modern Physics': 'Physics',
-    'Organic Chemistry': 'Chemistry', 'Inorganic Chemistry': 'Chemistry',
-  },
-  CLAT: {
-    'Legal Reasoning': 'Legal Reasoning', 'Constitutional Law': 'Legal Reasoning',
-    'Contract Law': 'Legal Reasoning', 'Criminal Law': 'Legal Reasoning',
-    'Logical Reasoning': 'Logical Reasoning',
-    'English Comprehension': 'English Language',
-    'General Knowledge': 'Current Affairs & GK',
-    'Quantitative Techniques': 'Quantitative Techniques',
-  },
-};
-
-const DEMO_SECTION_ORDER: Record<string, string[]> = {
-  NEET:  ['Physics', 'Chemistry', 'Biology'],
-  JEE:   ['Physics', 'Chemistry', 'Mathematics'],
-  CLAT:  ['Legal Reasoning', 'Logical Reasoning', 'English Language', 'Current Affairs & GK', 'Quantitative Techniques'],
-};
+// ── Local types for DB-sourced exam config ────────────────────────────────────
+interface ExamCatConfig {
+  id: string;
+  score_max: number | null;
+  neg_mark: number | null;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -293,6 +250,12 @@ export default function AnalyticsTab({
   // ── Attempt answers — used by MistakeIntelligence ────────────────────────
   const [attemptAnswers, setAttemptAnswers] = useState<MIAttemptAnswer[] | null>(null);
 
+  // ── Exam config from DB — replaces hardcoded NEG_MARKS / SCORE_MAX ────────
+  const [scoreMax, setScoreMax] = useState<number>(100);
+  const [negMark, setNegMark] = useState<number>(0);
+  const [dbTagSectionMap, setDbTagSectionMap] = useState<Record<string, string>>({});
+  const [dbSectionOrder, setDbSectionOrder] = useState<string[]>([]);
+
   // ── Solutions panel ────────────────────────────────────────────────────────
   const [sectionTabs, setSectionTabs] = useState<SectionTab[]>([]);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
@@ -335,31 +298,62 @@ export default function AnalyticsTab({
           : completed[completed.length - 1].id;
       setSelectedAttemptId(initId);
 
-      // Concept mastery — all attempts (for heatmap + delta)
+      // Concept mastery + exam category config — fetched in parallel
       const attemptNums = completed.map((a) => a.attempt_number);
-      const { data: masteryData } = await supabase
-        .from('user_concept_mastery')
-        .select(
-          'concept_tag, attempt_number, correct_count, total_count, mastery_percent',
-        )
-        .eq('user_id', user!.id)
-        .eq('assessment_id', assessmentId)
-        .in('attempt_number', attemptNums)
-        .order('concept_tag');
-      setConceptMastery(masteryData ?? []);
+      const [masteryRes, examCatRes] = await Promise.all([
+        supabase
+          .from('user_concept_mastery')
+          .select('concept_tag, attempt_number, correct_count, total_count, mastery_percent')
+          .eq('user_id', user!.id)
+          .eq('assessment_id', assessmentId)
+          .in('attempt_number', attemptNums)
+          .order('concept_tag'),
+        supabase
+          .from('exam_categories')
+          .select('id, score_max, neg_mark')
+          .eq('slug', assessment.exam.toLowerCase())
+          .maybeSingle(),
+      ]);
+      setConceptMastery(masteryRes.data ?? []);
 
-      // Rank prediction — NEET/JEE/CLAT only, fetched once on mount
-      const examCatId = EXAM_CATEGORY_ID[assessment.exam];
-      if (examCatId) {
-        const { data: rankData } = await supabase
-          .from('rank_prediction_tables')
-          .select('data, year')
-          .eq('exam_category_id', examCatId)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (rankData) {
-          setRankLookup(rankData.data as RankLookupRow[]);
-          setRankDataYear(rankData.year as number);
+      // Exam config: score_max, neg_mark, tag→section map, rank prediction
+      const examCat = examCatRes.data as ExamCatConfig | null;
+      if (examCat) {
+        setScoreMax(examCat.score_max ?? assessment.questionCount ?? 100);
+        setNegMark(examCat.neg_mark ?? 0);
+
+        const [tagMapRes, rankRes] = await Promise.all([
+          supabase
+            .from('concept_tag_section_map')
+            .select('concept_tag, section_name, section_display_order')
+            .eq('exam_category_id', examCat.id)
+            .order('section_display_order'),
+          supabase
+            .from('rank_prediction_tables')
+            .select('data, year')
+            .eq('exam_category_id', examCat.id)
+            .eq('is_active', true)
+            .maybeSingle(),
+        ]);
+
+        if (tagMapRes.data && tagMapRes.data.length > 0) {
+          const tagMap: Record<string, string> = {};
+          const seenSections = new Map<string, number>();
+          for (const row of tagMapRes.data) {
+            tagMap[row.concept_tag] = row.section_name;
+            if (!seenSections.has(row.section_name)) {
+              seenSections.set(row.section_name, row.section_display_order ?? 0);
+            }
+          }
+          setDbTagSectionMap(tagMap);
+          setDbSectionOrder(
+            [...seenSections.entries()].sort((a, b) => a[1] - b[1]).map(([name]) => name),
+          );
+        }
+
+        if (rankRes.data) {
+          setRankLookup(rankRes.data.data as RankLookupRow[]);
+          setRankDataYear(rankRes.data.year as number);
         }
       }
 
@@ -565,15 +559,12 @@ export default function AnalyticsTab({
     assessment.exam === 'CLAT' ? (user?.targetClatScore ?? null) :
     null;
 
-  const scoreMax = SCORE_MAX[assessment.exam] ?? assessment.questionCount ?? 100;
   const isLatest = selectedAttempt.id === attempts[attempts.length - 1].id;
-
-  const negMark = NEG_MARKS[assessment.exam] ?? 0;
   const selAttemptNum = selectedAttempt.attempt_number;
 
   // ── Concept mastery section mapping ───────────────────────────────────────
-  // Primary: concept_tag → section_label derived from attempt_answers.section_id
-  // Fallback: demo/seeded data where section_id is NULL
+  // Primary: section_id from attempt_answers → section_label (real exam-engine data)
+  // Secondary: concept_tag_section_map from DB (loaded in loadAttempts)
   const dynamicTagSectionMap: Record<string, string> = {};
   for (const ans of attemptAnswers ?? []) {
     if (ans.concept_tag && ans.section_id) {
@@ -581,18 +572,18 @@ export default function AnalyticsTab({
       dynamicTagSectionMap[ans.concept_tag] = label;
     }
   }
-  const tagSectionMap = Object.keys(dynamicTagSectionMap).length > 0
+  const resolvedTagSectionMap = Object.keys(dynamicTagSectionMap).length > 0
     ? dynamicTagSectionMap
-    : (DEMO_TAG_SECTION[assessment.exam] ?? {});
+    : dbTagSectionMap;
 
-  const hasSections = Object.keys(tagSectionMap).length > 0;
+  const hasSections = Object.keys(resolvedTagSectionMap).length > 0;
   const masteryTagSectionMap = hasSections
-    ? tagSectionMap
+    ? resolvedTagSectionMap
     : Object.fromEntries(conceptMastery.map((m) => [m.concept_tag, 'All Topics']));
   const masterySections = hasSections
     ? (sectionResults.length > 0
         ? [...new Set(sectionResults.map((s) => s.section_label))]
-        : (DEMO_SECTION_ORDER[assessment.exam] ?? ['All Topics']))
+        : (dbSectionOrder.length > 0 ? dbSectionOrder : ['All Topics']))
     : ['All Topics'];
 
   // Solutions panel helpers
@@ -778,8 +769,8 @@ export default function AnalyticsTab({
             scoreMax={scoreMax}
           />
 
-          {/* ── Block 4: Rank Prediction — NEET/JEE/CLAT only ────────────────── */}
-          {RANK_PREDICTION_EXAMS.has(assessment.exam) && (
+          {/* ── Block 4: Rank Prediction — shown when DB has rank data for this exam ── */}
+          {rankLookup.length > 0 && (
             <RankPredictionCard
               exam={assessment.exam as 'NEET' | 'JEE' | 'CLAT'}
               currentScore={selectedAttempt.score}

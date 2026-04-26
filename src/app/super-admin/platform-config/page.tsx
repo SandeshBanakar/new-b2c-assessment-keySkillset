@@ -83,7 +83,7 @@ interface AddYearForm {
   json: string
 }
 
-type SubTab = 'concept-tags' | 'analytics-display' | 'rank-prediction'
+type SubTab = 'concept-tags' | 'rank-prediction'
 
 const RANK_PREDICTION_CATS = new Set(['NEET', 'JEE', 'CLAT'])
 
@@ -415,31 +415,34 @@ function PlatformConfigInner() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  const loadCategories = useCallback(async () => {
-    setLoadingCats(true)
-    const { data } = await supabase
+  const loadCategories = useCallback(() => {
+    supabase
       .from('exam_categories')
       .select('id, name, display_name, slug, description, display_order, is_active')
       .order('display_order', { ascending: true })
+      .then(({ data }) => {
+        const cats = (data ?? []) as ExamCategory[]
+        setCategories(cats)
 
-    const cats = (data ?? []) as ExamCategory[]
-    setCategories(cats)
+        if (cats.length === 0) {
+          setLoadingCats(false)
+          return
+        }
 
-    // Fetch concept tag counts per category (by name)
-    if (cats.length > 0) {
-      const names = cats.map(c => c.name)
-      const { data: tagRows } = await supabase
-        .from('concept_tags')
-        .select('exam_category')
-        .in('exam_category', names)
-      const counts: Record<string, number> = {}
-      for (const row of tagRows ?? []) {
-        counts[row.exam_category] = (counts[row.exam_category] ?? 0) + 1
-      }
-      setTagCounts(counts)
-    }
-
-    setLoadingCats(false)
+        const names = cats.map(c => c.name)
+        supabase
+          .from('concept_tags')
+          .select('exam_category')
+          .in('exam_category', names)
+          .then(({ data: tagRows }) => {
+            const counts: Record<string, number> = {}
+            for (const row of tagRows ?? []) {
+              counts[row.exam_category] = (counts[row.exam_category] ?? 0) + 1
+            }
+            setTagCounts(counts)
+            setLoadingCats(false)
+          })
+      })
   }, [])
 
   useEffect(() => { loadCategories() }, [loadCategories])
@@ -626,7 +629,6 @@ function PlatformConfigInner() {
         <div className="flex items-center gap-1 mb-5 flex-wrap">
           {([
             'concept-tags',
-            'analytics-display',
             ...(RANK_PREDICTION_CATS.has(selectedCat.name) ? ['rank-prediction'] : []),
           ] as SubTab[]).map(tab => (
             <button
@@ -640,15 +642,12 @@ function PlatformConfigInner() {
             >
               {tab === 'concept-tags'
                 ? <><Tag className="w-3.5 h-3.5" /> Concept Tags</>
-                : tab === 'analytics-display'
-                ? <><Settings2 className="w-3.5 h-3.5" /> Analytics Display</>
                 : <><TrendingUp className="w-3.5 h-3.5" /> Rank Prediction</>}
             </button>
           ))}
         </div>
 
-        {activeSubTab === 'concept-tags' && <ConceptTagsPanel categoryName={selectedCat.name} />}
-        {activeSubTab === 'analytics-display' && <AnalyticsDisplayPanel category={selectedCat} />}
+        {activeSubTab === 'concept-tags' && <ConceptTagsPanel key={selectedCat.name} categoryName={selectedCat.name} />}
         {activeSubTab === 'rank-prediction' && <RankPredictionPanel category={selectedCat} />}
       </div>
     )
@@ -761,8 +760,7 @@ function ConceptTagsPanel({ categoryName }: { categoryName: string }) {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
 
-  const loadTags = useCallback(async () => {
-    setLoading(true)
+  const loadTags = useCallback(() => {
     let query = supabase
       .from('concept_tags')
       .select('*', { count: 'exact' })
@@ -773,25 +771,31 @@ function ConceptTagsPanel({ categoryName }: { categoryName: string }) {
     if (subjectFilter) query = query.ilike('subject', `%${subjectFilter}%`)
     if (search) query = query.ilike('concept_name', `%${search}%`)
 
-    const { data, count } = await query
-    if (!data) { setLoading(false); return }
+    query.then(({ data, count }) => {
+      if (!data) { setLoading(false); return }
 
-    const tagIds = data.map(t => t.id)
-    let qcounts: Record<string, number> = {}
-    if (tagIds.length > 0) {
-      const { data: qrows } = await supabase
-        .from('questions').select('concept_tag_id').in('concept_tag_id', tagIds)
-      if (qrows) {
-        for (const r of qrows) if (r.concept_tag_id) qcounts[r.concept_tag_id] = (qcounts[r.concept_tag_id] ?? 0) + 1
+      const tagIds = data.map(t => t.id)
+      if (tagIds.length === 0) {
+        setTags(data.map(t => ({ ...t, question_count: 0 })))
+        setTotal(count ?? 0)
+        setLoading(false)
+        return
       }
-    }
 
-    setTags(data.map(t => ({ ...t, question_count: qcounts[t.id] ?? 0 })))
-    setTotal(count ?? 0)
-    setLoading(false)
+      supabase
+        .from('questions').select('concept_tag_id').in('concept_tag_id', tagIds)
+        .then(({ data: qrows }) => {
+          const qcounts: Record<string, number> = {}
+          if (qrows) {
+            for (const r of qrows) if (r.concept_tag_id) qcounts[r.concept_tag_id] = (qcounts[r.concept_tag_id] ?? 0) + 1
+          }
+          setTags(data.map(t => ({ ...t, question_count: qcounts[t.id] ?? 0 })))
+          setTotal(count ?? 0)
+          setLoading(false)
+        })
+    })
   }, [categoryName, page, subjectFilter, search])
 
-  useEffect(() => { setPage(0); setSearch(''); setSubjectFilter('') }, [categoryName])
   useEffect(() => { loadTags() }, [loadTags])
 
   const allSubjects = Array.from(new Set(tags.map(t => t.subject))).sort()
@@ -987,7 +991,6 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
 
   useEffect(() => {
     async function load() {
-      setLoading(true)
       const [bandsRes, collegesRes, configRes] = await Promise.all([
         supabase.from('sat_tier_bands').select('*').order('display_order'),
         supabase.from('sat_colleges').select('*').order('cutoff_score', { ascending: false }),
@@ -1430,18 +1433,19 @@ function RankPredictionPanel({ category }: { category: ExamCategory }) {
     ? `[{"marks": 300, "percentile_low": 99.9, "percentile_high": 100}, ...]`
     : `[{"marks": 720, "rank": 1}, {"marks": 640, "rank": 2000}, ...]`
 
-  useEffect(() => { loadRows() }, [category.id])
-
-  async function loadRows() {
-    setLoading(true)
-    const { data } = await supabase
+  const loadRows = useCallback(() => {
+    supabase
       .from('rank_prediction_tables')
       .select('id, year, is_active, updated_at')
       .eq('exam_category_id', category.id)
       .order('year', { ascending: false })
-    setRows(data ?? [])
-    setLoading(false)
-  }
+      .then(({ data }) => {
+        setRows(data ?? [])
+        setLoading(false)
+      })
+  }, [category.id])
+
+  useEffect(() => { loadRows() }, [loadRows])
 
   async function toggleActive(row: RankPredictionRow) {
     if (toggling) return

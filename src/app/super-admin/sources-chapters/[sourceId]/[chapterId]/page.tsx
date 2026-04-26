@@ -240,9 +240,8 @@ export default function ChapterQuestionsPage() {
 
   const [viewQuestion, setViewQuestion] = useState<Question | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    const [sourceRes, chapterRes, questionsRes] = await Promise.all([
+  const fetchData = useCallback(() => {
+    Promise.all([
       supabase.from('sources').select('id, name').eq('id', sourceId).single(),
       supabase
         .from('chapters')
@@ -256,21 +255,17 @@ export default function ChapterQuestionsPage() {
         )
         .eq('chapter_id', chapterId)
         .order('created_at', { ascending: false }),
-    ])
-
-    if (sourceRes.data) setSource(sourceRes.data as Source)
-    if (chapterRes.data) setChapter(chapterRes.data as Chapter)
-    if (questionsRes.data) setQuestions(questionsRes.data as Question[])
-    setLoading(false)
+    ]).then(([sourceRes, chapterRes, questionsRes]) => {
+      if (sourceRes.data) setSource(sourceRes.data as Source)
+      if (chapterRes.data) setChapter(chapterRes.data as Chapter)
+      if (questionsRes.data) setQuestions(questionsRes.data as Question[])
+      setLoading(false)
+    })
   }, [sourceId, chapterId])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
-
-  useEffect(() => {
-    setPage(1)
-  }, [search, typeFilter, diffFilter, statusFilter])
 
   const conceptOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -293,9 +288,10 @@ export default function ChapterQuestionsPage() {
   })
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
-  const showingFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1
-  const showingTo = Math.min(page * pageSize, filtered.length)
+  const effectivePage = Math.min(page, totalPages)
+  const paginated = filtered.slice((effectivePage - 1) * pageSize, effectivePage * pageSize)
+  const showingFrom = filtered.length === 0 ? 0 : (effectivePage - 1) * pageSize + 1
+  const showingTo = Math.min(effectivePage * pageSize, filtered.length)
 
   const createUrl = `/super-admin/question-bank/new?chapterId=${chapterId}&sourceId=${sourceId}`
 
@@ -543,7 +539,7 @@ export default function ChapterQuestionsPage() {
         </div>
       )}
       <PaginationBar
-        page={page}
+        page={effectivePage}
         totalPages={totalPages}
         onPageChange={setPage}
         pageSize={pageSize}

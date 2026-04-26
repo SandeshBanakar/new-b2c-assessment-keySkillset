@@ -287,7 +287,6 @@ function AssessmentPlanSection({
   const totalPages = Math.max(1, Math.ceil(total / CARD_PAGE_SIZE))
 
   const load = useCallback(() => {
-    setLoading(true)
     fetchFn(page, CARD_PAGE_SIZE)
       .then(async ({ data, count }) => {
         setPlans(data)
@@ -434,7 +433,6 @@ function SingleCoursePlanTab({
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   useEffect(() => {
-    setLoading(true)
     fetchSingleCoursePlansPaginated(page, pageSize, showDeleted)
       .then(({ data, count }) => { setPlans(data); setTotal(count) })
       .catch((e: Error) => setError(e.message))
@@ -573,7 +571,6 @@ function CourseBundlePlansTab({
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   useEffect(() => {
-    setLoading(true)
     fetchCourseBundlePlansPaginated(page, pageSize, showDeleted)
       .then(({ data, count }) => { setBundles(data); setTotal(count) })
       .catch((e: Error) => setError(e.message))
@@ -689,7 +686,6 @@ function B2BPlansTab({
   const totalPages = Math.max(1, Math.ceil(total / CARD_PAGE_SIZE))
 
   useEffect(() => {
-    setLoading(true)
     fetchB2BPlansForGridPaginated(page, CARD_PAGE_SIZE, showDeleted)
       .then(({ data, count }) => { setCards(data); setTotal(count) })
       .catch((e: Error) => setError(e.message))

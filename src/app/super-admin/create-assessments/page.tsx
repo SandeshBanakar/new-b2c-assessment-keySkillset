@@ -461,64 +461,70 @@ export default function CreateAssessmentsPage() {
   // Maintenance auto-revert banner
   const [revertedCount, setRevertedCount] = useState(0)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    const [{ data: assessments, error: assessErr }, { data: cats }] = await Promise.all([
-      supabase
-        .from('assessment_items')
-        .select(`
-          id, title, description, test_type, status, assessment_type, assessment_config,
-          created_at, updated_at, assessments_id,
-          exam_categories!exam_category_id ( name ),
-          created_by_user:admin_users!fk_assessment_items_created_by ( name ),
-          last_modified_by_user:admin_users!fk_assessment_items_last_modified_by ( name )
-        `)
-        .order('created_at', { ascending: false }),
-      supabase.from('exam_categories').select('id, name').eq('is_active', true).order('display_order'),
-    ])
+  const fetchData = useCallback(() => {
+    async function doFetch() {
+      const [{ data: assessments, error: assessErr }, { data: cats }] = await Promise.all([
+        supabase
+          .from('assessment_items')
+          .select(`
+            id, title, description, test_type, status, assessment_type, assessment_config,
+            created_at, updated_at, assessments_id,
+            exam_categories!exam_category_id ( name ),
+            created_by_user:admin_users!fk_assessment_items_created_by ( name ),
+            last_modified_by_user:admin_users!fk_assessment_items_last_modified_by ( name )
+          `)
+          .order('created_at', { ascending: false }),
+        supabase.from('exam_categories').select('id, name').eq('is_active', true).order('display_order'),
+      ])
 
-    if (assessErr) console.error('Failed to load assessments:', assessErr)
+      if (assessErr) console.error('Failed to load assessments:', assessErr)
 
-    if (assessments) {
-      const mapped: Assessment[] = assessments.map((a: Record<string, unknown>) => ({
-        id: a.id as string,
-        title: a.title as string,
-        description: a.description as string | null,
-        test_type: a.test_type as string | null,
-        status: a.status as string,
-        assessment_type: (a.assessment_type as string) ?? 'LINEAR',
-        created_at: a.created_at as string,
-        updated_at: a.updated_at as string,
-        category_name: (a.exam_categories as { name: string } | null)?.name ?? null,
-        created_by_name: (a.created_by_user as { name: string } | null)?.name ?? null,
-        last_modified_by_name: (a.last_modified_by_user as { name: string } | null)?.name ?? null,
-        assessment_config: (a.assessment_config as AssessmentConfig | null) ?? null,
-      }))
+      let mapped: Assessment[] = []
+      if (assessments) {
+        mapped = assessments.map((a: Record<string, unknown>) => ({
+          id: a.id as string,
+          title: a.title as string,
+          description: a.description as string | null,
+          test_type: a.test_type as string | null,
+          status: a.status as string,
+          assessment_type: (a.assessment_type as string) ?? 'LINEAR',
+          created_at: a.created_at as string,
+          updated_at: a.updated_at as string,
+          category_name: (a.exam_categories as { name: string } | null)?.name ?? null,
+          created_by_name: (a.created_by_user as { name: string } | null)?.name ?? null,
+          last_modified_by_name: (a.last_modified_by_user as { name: string } | null)?.name ?? null,
+          assessment_config: (a.assessment_config as AssessmentConfig | null) ?? null,
+        }))
 
-      // Auto-revert expired maintenance windows
-      const now = new Date().toISOString()
-      const expired = mapped.filter(
-        a => a.status === 'MAINTENANCE' && a.assessment_config?.maintenance_window?.end_time
-          && a.assessment_config.maintenance_window.end_time < now
-      )
-      if (expired.length > 0) {
-        await Promise.all(
-          expired.map(a =>
-            supabase.from('assessment_items').update({
-              status: 'INACTIVE',
-              assessment_config: { ...a.assessment_config, maintenance_window: null },
-              updated_at: now,
-            }).eq('id', a.id)
-          )
+        const now = new Date().toISOString()
+        const expired = mapped.filter(
+          a => a.status === 'MAINTENANCE' && a.assessment_config?.maintenance_window?.end_time
+            && a.assessment_config.maintenance_window.end_time < now
         )
-        setRevertedCount(expired.length)
-        expired.forEach(a => { a.status = 'INACTIVE' })
+        if (expired.length > 0) {
+          await Promise.all(
+            expired.map(a =>
+              supabase.from('assessment_items').update({
+                status: 'INACTIVE',
+                assessment_config: { ...a.assessment_config, maintenance_window: null },
+                updated_at: now,
+              }).eq('id', a.id)
+            )
+          )
+          expired.forEach(a => { a.status = 'INACTIVE' })
+          return { mapped, cats, revertedCount: expired.length }
+        }
       }
 
-      setItems(mapped)
+      return { mapped, cats, revertedCount: 0 }
     }
-    if (cats) setCategories(cats as ExamCategory[])
-    setLoading(false)
+
+    doFetch().then(({ mapped, cats, revertedCount }) => {
+      setItems(mapped)
+      if (cats) setCategories(cats as ExamCategory[])
+      if (revertedCount > 0) setRevertedCount(revertedCount)
+      setLoading(false)
+    })
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])

@@ -26,10 +26,10 @@ export default function CertificateCard({
 
   return (
     <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-      <div className={`h-2 bg-gradient-to-r ${gradient}`} />
+      <div className={`h-2 bg-linear-to-r ${gradient}`} />
       <div className="p-4">
         <div className="flex items-start gap-3">
-          <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+          <div className={`w-10 h-10 rounded-lg bg-linear-to-br ${gradient} flex items-center justify-center shrink-0`}>
             <Award className="w-5 h-5 text-zinc-700" />
           </div>
 

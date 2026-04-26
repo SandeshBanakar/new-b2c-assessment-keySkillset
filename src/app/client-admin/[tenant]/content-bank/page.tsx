@@ -208,12 +208,10 @@ export default function ContentBankPage() {
       })
   }, [tenantId, tenantSlug, router])
 
-  const loadItems = useCallback(async () => {
+  const loadItems = useCallback(() => {
     if (!tenantId) return
-    setLoading(true)
 
-    // Fetch both TENANT_PRIVATE assessment_items and tenant-owned courses in parallel
-    const [assessmentRes, courseRes] = await Promise.all([
+    Promise.all([
       supabase
         .from('assessment_items')
         .select('id, title, test_type, status, created_at')
@@ -226,53 +224,52 @@ export default function ContentBankPage() {
         .eq('tenant_id', tenantId)
         .in('status', ['INACTIVE', 'LIVE', 'ARCHIVED'])
         .order('created_at', { ascending: false }),
-    ])
+    ]).then(([assessmentRes, courseRes]) => {
+      const assessmentItems: ContentItem[] = (
+        (assessmentRes.data ?? []) as {
+          id: string
+          title: string
+          test_type: string | null
+          status: string
+          created_at: string
+        }[]
+      ).map((c) => ({
+        id: c.id,
+        title: c.title,
+        item_type: c.test_type ?? '',
+        status: c.status as ContentStatus,
+        content_type: 'ASSESSMENT' as ContentKind,
+        created_at: c.created_at,
+      }))
 
-    const assessmentItems: ContentItem[] = (
-      (assessmentRes.data ?? []) as {
-        id: string
-        title: string
-        test_type: string | null
-        status: string
-        created_at: string
-      }[]
-    ).map((c) => ({
-      id: c.id,
-      title: c.title,
-      item_type: c.test_type ?? '',
-      status: c.status as ContentStatus,
-      content_type: 'ASSESSMENT' as ContentKind,
-      created_at: c.created_at,
-    }))
+      const courseItems: ContentItem[] = (
+        (courseRes.data ?? []) as {
+          id: string
+          title: string
+          course_type: string | null
+          status: string
+          created_at: string
+        }[]
+      ).map((c) => ({
+        id: c.id,
+        title: c.title,
+        item_type: c.course_type ?? '',
+        status: c.status as ContentStatus,
+        content_type: 'COURSE' as ContentKind,
+        created_at: c.created_at,
+      }))
 
-    const courseItems: ContentItem[] = (
-      (courseRes.data ?? []) as {
-        id: string
-        title: string
-        course_type: string | null
-        status: string
-        created_at: string
-      }[]
-    ).map((c) => ({
-      id: c.id,
-      title: c.title,
-      item_type: c.course_type ?? '',
-      status: c.status as ContentStatus,
-      content_type: 'COURSE' as ContentKind,
-      created_at: c.created_at,
-    }))
+      const merged = [...assessmentItems, ...courseItems].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
 
-    // Merge and sort by created_at descending
-    const merged = [...assessmentItems, ...courseItems].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-
-    setItems(merged)
-    setLoading(false)
+      setItems(merged)
+      setLoading(false)
+    })
   }, [tenantId])
 
   useEffect(() => {
-    void loadItems()
+    loadItems()
   }, [loadItems])
 
   // ── Actions ──────────────────────────────────────────────────────────────────

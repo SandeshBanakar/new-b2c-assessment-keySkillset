@@ -363,9 +363,8 @@ export default function SourceDetailPage() {
   const [deleteChapter, setDeleteChapter] = useState<Chapter | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    const [sourceRes, chaptersRes] = await Promise.all([
+  const fetchData = useCallback(() => {
+    Promise.all([
       supabase
         .from('sources')
         .select('id, name, exam_categories(name)')
@@ -379,18 +378,19 @@ export default function SourceDetailPage() {
         .eq('source_id', sourceId)
         .is('deleted_at', null)
         .order('order_index', { ascending: true }),
-    ])
+    ]).then(([sourceRes, chaptersRes]) => {
+      if (sourceRes.data) {
+        const d = sourceRes.data as Record<string, unknown>
+        const cat = d.exam_categories as { name?: string } | null
+        setSource({ id: d.id as string, name: d.name as string, exam_category_name: cat?.name ?? null })
+      }
 
-    if (sourceRes.data) {
-      const d = sourceRes.data as Record<string, unknown>
-      const cat = d.exam_categories as { name?: string } | null
-      setSource({ id: d.id as string, name: d.name as string, exam_category_name: cat?.name ?? null })
-    }
+      if (!chaptersRes.data) {
+        setLoading(false)
+        return
+      }
 
-    if (chaptersRes.data) {
       const chaptersRaw = chaptersRes.data as Record<string, unknown>[]
-
-      // Collect unique admin IDs across created_by + last_modified_by
       const adminIds = [
         ...new Set([
           ...chaptersRaw.map((c) => c.created_by as string | null).filter(Boolean),
@@ -398,51 +398,53 @@ export default function SourceDetailPage() {
         ]),
       ] as string[]
 
-      const adminMap = new Map<string, string>()
-      if (adminIds.length > 0) {
-        const { data: admins } = await supabase
-          .from('admin_users')
-          .select('id, name')
-          .in('id', adminIds)
-        for (const a of admins ?? []) {
-          const admin = a as { id: string; name: string }
-          adminMap.set(admin.id, admin.name)
-        }
+      const applyChapters = (adminMap: Map<string, string>) => {
+        setChapters(
+          chaptersRaw.map((row) => {
+            const qArr = Array.isArray(row.questions) ? row.questions : []
+            const questionCount =
+              qArr.length > 0 && typeof qArr[0] === 'object' && qArr[0] !== null
+                ? (qArr[0] as { count?: number }).count ?? 0
+                : 0
+            const createdById = row.created_by as string | null
+            const modifiedById = row.last_modified_by as string | null
+            return {
+              id: row.id as string,
+              source_id: row.source_id as string,
+              name: row.name as string,
+              order_index: (row.order_index as number) ?? 0,
+              difficulty: (row.difficulty as ChapterDifficulty) ?? 'medium',
+              created_by: createdById,
+              created_by_name: createdById ? (adminMap.get(createdById) ?? null) : null,
+              last_modified_by: modifiedById,
+              last_modified_by_name: modifiedById ? (adminMap.get(modifiedById) ?? null) : null,
+              question_count: questionCount,
+              created_at: row.created_at as string,
+              updated_at: row.updated_at as string,
+            }
+          }),
+        )
+        setLoading(false)
       }
 
-      setChapters(
-        chaptersRaw.map((row) => {
-          const qArr = Array.isArray(row.questions) ? row.questions : []
-          const questionCount =
-            qArr.length > 0 && typeof qArr[0] === 'object' && qArr[0] !== null
-              ? (qArr[0] as { count?: number }).count ?? 0
-              : 0
-          const createdById = row.created_by as string | null
-          const modifiedById = row.last_modified_by as string | null
-          return {
-            id: row.id as string,
-            source_id: row.source_id as string,
-            name: row.name as string,
-            order_index: (row.order_index as number) ?? 0,
-            difficulty: (row.difficulty as ChapterDifficulty) ?? 'medium',
-            created_by: createdById,
-            created_by_name: createdById ? (adminMap.get(createdById) ?? null) : null,
-            last_modified_by: modifiedById,
-            last_modified_by_name: modifiedById ? (adminMap.get(modifiedById) ?? null) : null,
-            question_count: questionCount,
-            created_at: row.created_at as string,
-            updated_at: row.updated_at as string,
+      if (adminIds.length === 0) {
+        applyChapters(new Map())
+        return
+      }
+
+      supabase.from('admin_users').select('id, name').in('id', adminIds)
+        .then(({ data: admins }) => {
+          const adminMap = new Map<string, string>()
+          for (const a of admins ?? []) {
+            const admin = a as { id: string; name: string }
+            adminMap.set(admin.id, admin.name)
           }
-        }),
-      )
-    }
-    setLoading(false)
+          applyChapters(adminMap)
+        })
+    })
   }, [sourceId])
 
   useEffect(() => { fetchData() }, [fetchData])
-
-  // Reset to page 1 whenever filters change
-  useEffect(() => { setPage(1) }, [search, difficultyFilter, creatorFilter])
 
   async function handleDelete() {
     if (!deleteChapter) return
@@ -472,7 +474,8 @@ export default function SourceDetailPage() {
   })
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const effectivePage = Math.min(page, totalPages)
+  const paginated = filtered.slice((effectivePage - 1) * pageSize, effectivePage * pageSize)
   const showingFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1
   const showingTo = Math.min(page * pageSize, filtered.length)
 

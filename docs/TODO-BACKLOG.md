@@ -1,5 +1,42 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 24 2026 — KSS-B2B-LEARNER-001 completed (B2B Learner Portal: login, navbar, courses, bug fixes). Active tasks only. Completed work → CLAUDE-HISTORY.md.
+# Last updated: Apr 26 2026 — Session end. KSS-LINT-001 COMPLETE: all react-hooks/set-state-in-effect errors resolved (0 remaining). Build ✅. Active tasks only. Completed work → CLAUDE-HISTORY.md.
+
+---
+
+## [COMPLETE] KSS-LINT-001 — React Hooks: set-state-in-effect Sweep (Apr 26 2026)
+
+**Rule:** `react-hooks/set-state-in-effect` — all violations resolved  
+**Build:** ✅ PASSED · **Lint errors remaining:** 0 (set-state-in-effect)
+
+| File | Fix Applied |
+|------|-------------|
+| `certificates/CertificateTabsContent.tsx` | Removed `setLoading(true)` from effect (prior session) |
+| `context/B2BLearnerContext.tsx` | `useState` lazy initializer for localStorage (prior session) |
+| `hooks/useUserAttempts.ts` | `useState(!!userId)` — removed sync guard setState (prior session) |
+| `b2b-learner/[tenant]/login/page.tsx` | `useState(!!tenantId)` — removed sync guard setState (prior session) |
+| `components/ui/Tooltip.tsx` | Removed `mounted` state + effect; portal rendered directly (prior session) |
+| `super-admin/content-creators/page.tsx` | Removed `setLoading(true)` from `load()` (prior session) |
+| `super-admin/plans-pricing/page.tsx` | Removed `setLoading(true)` from 4 effect bodies (prior session) |
+| `super-admin/sources-chapters/page.tsx` | Converted `fetchSources` async→Promise.then(); removed `setChapters([])` guard; `key={viewSource?.id}` on `ViewSourceModal`; `useState(!!(open && source))` (this session) |
+| `super-admin/sources-chapters/[sourceId]/page.tsx` | Converted `fetchData` async→Promise.then(); `effectivePage` clamping (prior session) |
+| `super-admin/sources-chapters/[sourceId]/[chapterId]/page.tsx` | Converted `fetchData` async→Promise.then(); removed `setPage(1)` effect; `effectivePage` clamping (this session) |
+| `super-admin/question-bank/page.tsx` | Converted `fetchQuestions` async→Promise.then(); removed `setPage(0)` effect; `setPage(0)` moved to onChange handlers; `key={previewId}` on modal (this session) |
+| `super-admin/question-bank/_components/QuestionForm.tsx` | `key={form.question_type}` on `FormPreview`; removed `setSubIdx(0)` effect (this session) |
+| `super-admin/question-bank/_components/QuestionPreviewModal.tsx` | Converted `fetchQuestion` async→Promise.then(); removed cleanup effect (state resets via key remount) (this session) |
+| `super-admin/platform-config/page.tsx` | Converted `loadCategories` + `loadTags` async→Promise.then(); `key={selectedCat.name}` on `ConceptTagsPanel`; removed 3-setState effect; converted `loadRows` to useCallback+Promise.then() (this session) |
+| `super-admin/create-assessments/page.tsx` | Converted `fetchData` to inner-async+.then() (this session) |
+| `client-admin/[tenant]/content-bank/page.tsx` | Converted `loadItems` async→Promise.then() (this session) |
+| `client-admin/[tenant]/dashboard/page.tsx` | `useState(!!tenantId)` — removed sync guard setState (prior session) |
+| `client-admin/[tenant]/learners/page.tsx` | `useState(!!tenantId)`; converted `fetchData` async→Promise.then() (this session) |
+| `client-admin/[tenant]/learners/[id]/page.tsx` | `useState(!!(tenantId && learnerId))` — removed sync guard setState (this session) |
+| `client-admin/[tenant]/catalog/page.tsx` | `useState(!!tenantId)`; converted `fetchCatalog` to inner-async+.then(); `useState(item.content_type === 'COURSE')` for `modulesLoading` (this session) |
+
+**Key patterns established:**
+- `useCallback(async () => {...})` called from `useEffect` → convert to `useCallback(() => { Promise.all([...]).then(([...]) => { setState }) })`
+- Sequential async logic → inner `async function doFetch() { return data }` + `doFetch().then(data => { setState })`
+- Sync guard `if (!dep) { setState(false); return }` → `useState(!!dep)` + just `return`
+- `useEffect(() => { setPage(0) }, [filters])` pagination reset → move `setPage(0)` to onChange handlers (server-side) or `effectivePage = Math.min(page, totalPages)` clamping (client-side)
+- `useEffect(() => { setState(x) }, [prop])` in sub-component → `key={prop}` on the component at call site
 
 ---
 
@@ -62,6 +99,20 @@
 | `prds/client_admin/PRD-CA-DASHBOARD.md` | New PRD |
 
 ### Build: ✅ PASSED
+
+---
+
+## [PENDING] KSS-SA-FIXES-001 — Super Admin Bug Fixes (5 items, Apr 24 2026)
+
+**Source:** `docs/linear_analytics/super_admin_changes.txt`
+
+| # | Fix | Status |
+|---|-----|--------|
+| SA-FIX-1 | Plans & Pricing page — subscriber count missing even though individual plan pages show subscribers | [ ] PENDING |
+| SA-FIX-2 | B2C Users table "Plan" column — not wired to DB; 3 demo users show "Free" but should reflect actual plan (professional / category plan) | [ ] PENDING — needs clarification on plan resolution logic |
+| SA-FIX-3 | Question Bank page — no questions showing despite DB having questions; investigate query | [x] DONE — Apr 26 2026. Fixed: (1) `concept_tag` dropped col → `concept_tags!concept_tag_id(concept_name)`, (2) named FK hints `!questions_created_by_fkey` → `!created_by` |
+| SA-FIX-4 | B2C Revenue tab — no data despite B2C Users and Plans & Pricing being wired | [ ] PENDING |
+| SA-FIX-5 | Platform Config → Exam Categories → SAT → Analytics Config — remove this section and its dependencies | [x] DONE — Apr 26 2026. Removed `analytics-display` sub-tab from drill-down nav and render. Component functions remain as dead code pending full cleanup decision. |
 
 ---
 
@@ -241,8 +292,8 @@
 ### Phase 1 — Quick Removals (no new components, fast wins)
 | # | Task | Status |
 |---|------|--------|
-| A2-0a | Remove `SATLeveragePanel` block from `SATAnalyticsTab.tsx` Block 6 | [ ] PENDING |
-| A2-0b | Remove `LeverageActions` block from `AnalyticsTab.tsx` | [ ] PENDING |
+| A2-0a | Remove `SATLeveragePanel` block from `SATAnalyticsTab.tsx` Block 6 | [x] DONE — Already removed from imports/code (confirmed Apr 26). File deleted. |
+| A2-0b | Remove `LeverageActions` block from `AnalyticsTab.tsx` | [x] DONE — Apr 24 2026 (file deleted) |
 | A2-0c | Remove "Reading & Writing" + "Math" group headings from SAT Section Breakdown in `SATAnalyticsTab.tsx` | [ ] PENDING |
 | A2-0d | Remove `PreviewSectionWrapper` wrapping from Pacing + MistakeTaxonomy in `SATAnalyticsTab.tsx` | [ ] PENDING |
 | A2-0e | Remove Block 1 Score Summary card (Score / Accuracy / Total Attempts grid) from `AnalyticsTab.tsx` | [ ] PENDING |
@@ -268,17 +319,17 @@
 ### Phase 4 — Shared: MistakeTaxonomy (unify)
 | # | Task | Status |
 |---|------|--------|
-| A2-3a | Add `concept_tag` + `section_id` to SAT `attempt_answers` query in `SATAnalyticsTab.tsx` | [ ] PENDING |
-| A2-3b | Wire `MistakeIntelligence` into `SATAnalyticsTab.tsx` — replaces `SATMistakeTaxonomy` block | [ ] PENDING |
-| A2-3c | Delete `SATMistakeTaxonomy.tsx` | [ ] PENDING |
+| A2-3a | Add `concept_tag` + `section_id` to SAT `attempt_answers` query in `SATAnalyticsTab.tsx` | [x] DONE — Apr 24 2026 |
+| A2-3b | Wire `MistakeIntelligence` into `SATAnalyticsTab.tsx` — replaces `SATMistakeTaxonomy` block | [x] DONE — Apr 24 2026 |
+| A2-3c | Delete `SATMistakeTaxonomy.tsx` | [x] DONE — Apr 26 2026 |
 
 ### Phase 5 — Shared: Live PacingAnalysis
 | # | Task | Status |
 |---|------|--------|
-| A2-4a | Build `src/components/assessment-detail/PacingAnalysis.tsx` — live `attempt_answers.time_spent_seconds`; target time from assessment config (time_minutes ÷ questions_per_attempt per module for SAT / duration × 60 ÷ questionCount for Linear); chip layout showing "Q{N} · {t}s" on each dot; visible formula line in section header | [ ] PENDING |
+| A2-4a | Build `src/components/assessment-detail/PacingAnalysis.tsx` — live `attempt_answers.time_spent_seconds`; target time from assessment config (time_minutes ÷ questions_per_attempt per module for SAT / duration × 60 ÷ questionCount for Linear); chip layout showing "Q{N} · {t}s" on each dot; visible formula line in section header | [x] DONE — Already built (confirmed Apr 26). Dot grid, summary stats, legend, sectionLabel prop. |
 | A2-4b | Wire `PacingAnalysis` into `SATAnalyticsTab.tsx` — replace `SATPacingChart` | [ ] PENDING |
 | A2-4c | Wire `PacingAnalysis` into `AnalyticsTab.tsx` (Linear) — target = `assessment.duration × 60 ÷ assessment.questionCount` | [ ] PENDING |
-| A2-4d | Delete `SATPacingChart.tsx` | [ ] PENDING |
+| A2-4d | Delete `SATPacingChart.tsx` | [x] DONE — Apr 26 2026 |
 
 ### Phase 6 — Shared: ConceptMastery (per section, per attempt)
 | # | Task | Status |
@@ -308,6 +359,19 @@
 | A2-8a | `npm run build` passes clean | [ ] PENDING |
 | A2-8b | Move completed tasks to `CLAUDE-HISTORY.md`, update `TODO-BACKLOG.md` | [ ] PENDING |
 | A2-8c | Update memory file `project_kss_ana_002.md` | [ ] PENDING |
+
+---
+
+## [IN-PROGRESS] KSS-ANA-DB-001 — Analytics DB Config + Score Fix (PENDING SA SQL RUNS)
+
+**SQL files ready — SA must run in order:**
+| # | File | ID | Status |
+|---|------|----|--------|
+| 1 | `docs/linear_analytics/fix_attempt_scores.sql` | KSS-DB-056 | [ ] SA RUNS |
+| 2 | `docs/linear_analytics/migration_exam_config.sql` | KSS-DB-057 | [ ] SA RUNS |
+
+**KSS-DB-056**: Recomputes attempt scores for seeded NEET/JEE/CLAT from marks_awarded. Fixes CLAT score 870→~45.
+**KSS-DB-057**: Adds `exam_categories.neg_mark`, creates `concept_tag_section_map` table (seeded for NEET/JEE/CLAT), adds `user_concept_mastery.section_name`. ⚠️ Contains `SET score_max = 1600 WHERE slug = 'sat'` — KSS-DB-050 previously set it to 800 (per-section). Confirm correct value before running.
 
 ---
 
@@ -348,8 +412,8 @@
 |---|---|---|
 | LA-C001 | `src/components/assessment-detail/ScoreTrajectoryChart.tsx` — 6-slot, target line, inline prompt | [ ] PENDING |
 | LA-C002 | `src/components/assessment-detail/RankPredictionCard.tsx` — NEET/CLAT AIR + JEE band, interpolation | [ ] PENDING |
-| LA-C003 | `src/components/assessment-detail/MistakeIntelligence.tsx` — 6 categories, empty state, INFERENCE-ENGINE rules | [ ] PENDING |
-| LA-C004 | `src/components/assessment-detail/LeverageActions.tsx` — top 3 by marks lost, mastery fallback, time insight | [ ] PENDING |
+| LA-C003 | `src/components/assessment-detail/MistakeIntelligence.tsx` — 6 categories, empty state, INFERENCE-ENGINE rules | [x] DONE — Apr 21 2026 |
+| LA-C004 | `src/components/assessment-detail/LeverageActions.tsx` — top 3 by marks lost, mastery fallback, time insight | [x] CANCELLED — file deleted Apr 24 2026, not needed |
 
 ### Phase 4 — AnalyticsTab.tsx Integration
 | # | Task | Status |
@@ -358,9 +422,9 @@
 | LA-I002 | Add attempt_answers fetch per selected attempt (shared by MistakeIntelligence + LeverageActions) | [ ] PENDING |
 | LA-I003 | Insert ScoreTrajectoryChart at Block 3 | [ ] PENDING |
 | LA-I004 | Insert RankPredictionCard at Block 4 (NEET/JEE/CLAT guard) | [ ] PENDING |
-| LA-I005 | Insert MistakeIntelligence after Section Breakdown | [ ] PENDING |
-| LA-I006 | Replace Strengths/WeakSpots with LeverageActions | [ ] PENDING |
-| LA-I007 | Wire target score read/write via AppContext | [ ] PENDING |
+| LA-I005 | Insert MistakeIntelligence after Section Breakdown | [x] DONE — Apr 24 2026 |
+| LA-I006 | Replace Strengths/WeakSpots with LeverageActions | [x] CANCELLED — LeverageActions deleted, block removed Apr 24 2026 |
+| LA-I007 | Wire target score read/write via AppContext | [x] DONE — Apr 21 2026 (updateTargetScore in AppContext) |
 
 ### Phase 5 — AppContext
 | # | Task | Status |

@@ -136,7 +136,7 @@ export default function B2BLoginPage() {
   const { login, learner, tenantInfo } = useB2BLearner();
 
   const [learners, setLearners] = useState<B2BLearner[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!tenantId);
 
   useEffect(() => {
     if (learner) {
@@ -145,10 +145,7 @@ export default function B2BLoginPage() {
   }, [learner, tenantSlug, router]);
 
   useEffect(() => {
-    if (!tenantId) {
-      setLoading(false);
-      return;
-    }
+    if (!tenantId) return;
     supabase
       .from('learners')
       .select('id, full_name, email, tenant_id, department_id')

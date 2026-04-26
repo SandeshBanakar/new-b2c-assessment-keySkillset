@@ -6,6 +6,47 @@
 
 ## COMPLETED WORK LOG
 
+### April 26, 2026 — KSS-LINT-001: react-hooks/set-state-in-effect Full Sweep
+
+**Ticket:** KSS-LINT-001 | **Rule:** `react-hooks/set-state-in-effect`  
+**Result:** 0 violations remaining (down from ~19 in this rule alone). Build ✅ PASSED.
+
+**Root cause:** The lint rule flags any `setState` call that runs synchronously inside a `useEffect` body, including inside `async useCallback` functions called from `useEffect` — because async/await within the same function scope is still treated as "within the effect body" by static analysis.
+
+**Safe patterns confirmed:**
+- `setState` inside `.then(callback)` is NOT flagged — the callback is a separate scope
+- `useState(!!dep)` replaces `if (!dep) { setState(false); return }` guard pattern
+- `key={prop}` at the call site remounts a component when `prop` changes, replacing `useEffect(() => { setState(init) }, [prop])`
+- `effectivePage = Math.min(page, totalPages)` replaces `useEffect(() => { setPage(1) }, [filters])` for client-side pagination
+- Moving `setPage(0)` into onChange handlers replaces the effect for server-side pagination
+
+**Files modified (20 total):**
+
+| File | Fix |
+|------|-----|
+| `certificates/CertificateTabsContent.tsx` | Removed `setLoading(true)` from effect body |
+| `context/B2BLearnerContext.tsx` | `useState` lazy initializer for localStorage read |
+| `hooks/useUserAttempts.ts` | `useState(!!userId)` |
+| `b2b-learner/[tenant]/login/page.tsx` | `useState(!!tenantId)` |
+| `components/ui/Tooltip.tsx` | Removed `mounted` state + effect; portal rendered directly |
+| `super-admin/content-creators/page.tsx` | Removed `setLoading(true)` from `load()` |
+| `super-admin/plans-pricing/page.tsx` | Removed `setLoading(true)` from 4 effect bodies |
+| `super-admin/sources-chapters/page.tsx` | `fetchSources` async→Promise.then(); `key={viewSource?.id}` |
+| `super-admin/sources-chapters/[sourceId]/page.tsx` | `fetchData` async→Promise.then(); `effectivePage` clamping |
+| `super-admin/sources-chapters/[sourceId]/[chapterId]/page.tsx` | `fetchData` async→Promise.then(); `effectivePage` clamping |
+| `super-admin/question-bank/page.tsx` | `fetchQuestions` async→Promise.then(); `setPage(0)` in onChange handlers; `key={previewId}` on modal |
+| `super-admin/question-bank/_components/QuestionForm.tsx` | `key={form.question_type}` on `FormPreview` |
+| `super-admin/question-bank/_components/QuestionPreviewModal.tsx` | `fetchQuestion` async→Promise.then(); cleanup via key remount |
+| `super-admin/platform-config/page.tsx` | `loadCategories` + `loadTags` async→Promise.then(); `key={selectedCat.name}` on `ConceptTagsPanel`; `loadRows` moved to useCallback+Promise.then() |
+| `super-admin/create-assessments/page.tsx` | `fetchData` → inner-async+.then() |
+| `client-admin/[tenant]/content-bank/page.tsx` | `loadItems` async→Promise.then() |
+| `client-admin/[tenant]/dashboard/page.tsx` | `useState(!!tenantId)` |
+| `client-admin/[tenant]/learners/page.tsx` | `fetchData` async→Promise.then() |
+| `client-admin/[tenant]/learners/[id]/page.tsx` | `useState(!!(tenantId && learnerId))` |
+| `client-admin/[tenant]/catalog/page.tsx` | `fetchCatalog` inner-async+.then(); `useState(!!tenantId)`; `useState(item.content_type === 'COURSE')` for modulesLoading |
+
+---
+
 ### April 23, 2026 — B2C End User Suspend/Revoke Email Templates
 
 **Ticket:** B2C-EML-001 | **PRD:** `prds/end-user/PRD-B2C-EML-001-SUSPEND-REVOKE-EMAILS.md`

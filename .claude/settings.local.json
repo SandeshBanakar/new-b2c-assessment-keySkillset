@@ -120,7 +120,9 @@
       "Bash(npx kill-port *)",
       "Bash(rm -f .next/lock)",
       "Bash(taskkill /f /im node.exe)",
-      "Bash(findstr /C:\"error\" /C:\"Error\" /C:\"Compiled\" /C:\"Failed\")"
+      "Bash(findstr /C:\"error\" /C:\"Error\" /C:\"Compiled\" /C:\"Failed\")",
+      "Bash(grep -E \"^C:\\\\\\\\\\\\\\\\.*\\\\.tsx?$\")",
+      "Bash(grep -v \"^$\")"
     ]
   },
   "enabledMcpjsonServers": [

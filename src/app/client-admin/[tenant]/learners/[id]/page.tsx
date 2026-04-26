@@ -174,16 +174,14 @@ export default function LearnerProfilePage() {
   const [assessmentPerf, setAssessmentPerf] = useState<AssessmentAttemptRow[]>([])
   const [coursePerf, setCoursePerf] = useState<CoursePerformanceRow[]>([])
   const [content, setContent] = useState<AssignedContent[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!!(tenantId && learnerId))
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (!tenantId || !learnerId) { setLoading(false); return }
+    if (!tenantId || !learnerId) return
 
     async function load() {
-      setLoading(true)
-
       // ── 1. Learner row ──────────────────────────────────────────────────────
       const { data: l } = await supabase
         .from('learners')

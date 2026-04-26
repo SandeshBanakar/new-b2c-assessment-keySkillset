@@ -34,27 +34,24 @@ function storageKey(slug: string) {
 }
 
 export function B2BLearnerProvider({ children, tenantSlug }: { children: ReactNode; tenantSlug: string }) {
-  const [learner, setLearner] = useState<B2BLearner | null>(null);
-  const [tenantInfo, setTenantInfo] = useState<TenantInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const tenantId = getTenantId(tenantSlug);
 
-  useEffect(() => {
+  const [learner, setLearner] = useState<B2BLearner | null>(() => {
+    if (typeof window === 'undefined') return null;
     const stored = localStorage.getItem(storageKey(tenantSlug));
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as B2BLearner;
-        if (parsed.tenant_id === tenantId) {
-          setLearner(parsed);
-        } else {
-          localStorage.removeItem(storageKey(tenantSlug));
-        }
-      } catch {
-        localStorage.removeItem(storageKey(tenantSlug));
-      }
+    if (!stored) return null;
+    try {
+      const parsed = JSON.parse(stored) as B2BLearner;
+      if (parsed.tenant_id === tenantId) return parsed;
+      localStorage.removeItem(storageKey(tenantSlug));
+      return null;
+    } catch {
+      localStorage.removeItem(storageKey(tenantSlug));
+      return null;
     }
-    setIsLoading(false);
-  }, [tenantSlug, tenantId]);
+  });
+  const [tenantInfo, setTenantInfo] = useState<TenantInfo | null>(null);
+  const [isLoading] = useState(false);
 
   useEffect(() => {
     if (!tenantId) return;

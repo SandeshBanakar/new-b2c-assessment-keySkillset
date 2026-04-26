@@ -105,13 +105,13 @@ export default function ConceptMasteryPanel({
           <table className="w-full text-sm">
             <thead>
               <tr>
-                <th className="sticky left-0 bg-white z-10 text-left text-xs font-medium text-zinc-400 pb-2 pr-4 min-w-[160px]">
+                <th className="sticky left-0 bg-white z-10 text-left text-xs font-medium text-zinc-400 pb-2 pr-4 min-w-40">
                   Skill
                 </th>
                 {attempts.map((a) => (
                   <th
                     key={a.attempt_number}
-                    className="text-center text-xs font-medium text-zinc-400 pb-2 px-2 whitespace-nowrap min-w-[90px]"
+                    className="text-center text-xs font-medium text-zinc-400 pb-2 px-2 whitespace-nowrap min-w-22.5"
                   >
                     <div>Attempt {a.attempt_number}</div>
                     {a.completed_at && (

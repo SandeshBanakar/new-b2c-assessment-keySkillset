@@ -478,7 +478,7 @@ export default function LearnersPage() {
   const [learners, setLearners] = useState<Learner[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [allTeams, setAllTeams] = useState<Team[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!!tenantId)
 
   const [filterTab, setFilterTab] = useState<FilterTab>('ACTIVE')
   const [search, setSearch] = useState('')
@@ -496,15 +496,10 @@ export default function LearnersPage() {
 
   // ── Fetch all data ─────────────────────────────────────────────────────────
 
-  const fetchData = useCallback(async () => {
-    if (!tenantId) { setLoading(false); return }
-    setLoading(true)
+  const fetchData = useCallback(() => {
+    if (!tenantId) return
 
-    const [
-      { data: rawLearners },
-      { data: depts },
-      { data: teams },
-    ] = await Promise.all([
+    Promise.all([
       supabase
         .from('learners')
         .select('id, tenant_id, full_name, email, phone, phone_country_code, department_id, team_id, status, employee_roll_number, notes, created_at')
@@ -520,23 +515,23 @@ export default function LearnersPage() {
         .select('id, department_id, name, status')
         .eq('tenant_id', tenantId)
         .order('name'),
-    ])
+    ]).then(([{ data: rawLearners }, { data: depts }, { data: teams }]) => {
+      const deptMap: Record<string, string> = {}
+      const teamMap: Record<string, string> = {}
+      depts?.forEach((d) => { deptMap[d.id] = d.name })
+      teams?.forEach((t) => { teamMap[t.id] = t.name })
 
-    const deptMap: Record<string, string> = {}
-    const teamMap: Record<string, string> = {}
-    depts?.forEach((d) => { deptMap[d.id] = d.name })
-    teams?.forEach((t) => { teamMap[t.id] = t.name })
+      const enriched: Learner[] = (rawLearners ?? []).map((l) => ({
+        ...l,
+        departmentName: l.department_id ? deptMap[l.department_id] : undefined,
+        teamName: l.team_id ? teamMap[l.team_id] : undefined,
+      }))
 
-    const enriched: Learner[] = (rawLearners ?? []).map((l) => ({
-      ...l,
-      departmentName: l.department_id ? deptMap[l.department_id] : undefined,
-      teamName: l.team_id ? teamMap[l.team_id] : undefined,
-    }))
-
-    setLearners(enriched)
-    setDepartments(depts ?? [])
-    setAllTeams(teams ?? [])
-    setLoading(false)
+      setLearners(enriched)
+      setDepartments(depts ?? [])
+      setAllTeams(teams ?? [])
+      setLoading(false)
+    })
   }, [tenantId])
 
   useEffect(() => { fetchData() }, [fetchData])

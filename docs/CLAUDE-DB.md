@@ -44,7 +44,19 @@ Pending decision: rename `name` vs add `display_name` column (see KSS-SA-PC-001 
 
 **KSS-DB-050 (Apr 21 2026 — KSS-SA-CA-001) — DONE:**
 Added `score_min INT NULL` + `score_max INT NULL` to `exam_categories`.
-SAT seeded: score_min=200, score_max=800. NEET/JEE/CLAT/BANK/SSC remain NULL.
+SAT seeded: score_min=200, score_max=800 (per-section SAT score, NOT 1600 total — see KSS-DB-057 conflict note). NEET/JEE/CLAT/BANK/SSC remain NULL.
+
+**KSS-DB-056 (Apr 24 2026 — KSS-ANA-DB-001) — PENDING SA RUN:**
+`docs/linear_analytics/fix_attempt_scores.sql`
+Recomputes `attempts.score` from `SUM(attempt_answers.marks_awarded)` for seeded user's NEET/JEE/CLAT attempts.
+CLAT was seeded with score=870 (wrong, max=120). Expected after fix: NEET~270, JEE~133, CLAT~45.
+
+**KSS-DB-057 (Apr 24 2026 — KSS-ANA-DB-001) — PENDING SA RUN:**
+`docs/linear_analytics/migration_exam_config.sql`
+- `exam_categories.neg_mark NUMERIC NOT NULL DEFAULT 0` — NEET=1, JEE=1, CLAT=0.25, SAT=0
+- `exam_categories.score_max` seeded for all 4 exams: NEET=720, JEE=300, CLAT=120, SAT=1600 (⚠️ CONFLICT: KSS-DB-050 set SAT to 800 per-section — confirm correct total before running)
+- New table `concept_tag_section_map (id uuid PK, exam_category_id uuid FK, concept_tag text, section_name text, section_display_order int, UNIQUE(exam_category_id, concept_tag))` — canonical SA-editable tag→section mapping per exam. Seeded: NEET(10 tags/3 sections), JEE(10 tags/3 sections), CLAT(8 tags/5 sections). SAT not seeded (derives section from section_id prefix via code).
+- `user_concept_mastery.section_name TEXT` — denormalized cache of section_name, backfilled from concept_tag_section_map.
 
 Confirmed IDs (DIAG-2):
 - BANK: `608a115b-194a-44b9-8511-030fcf1c15ef`

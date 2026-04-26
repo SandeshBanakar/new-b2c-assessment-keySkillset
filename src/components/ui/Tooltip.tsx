@@ -211,9 +211,6 @@ export function Tooltip({
 
   // ── Portal target ──────────────────────────────────────────────────────────
 
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
-
   return (
     <>
       <span
@@ -225,7 +222,7 @@ export function Tooltip({
         {children}
       </span>
 
-      {mounted && createPortal(
+      {createPortal(
         <div
           ref={bubbleRef}
           role="tooltip"

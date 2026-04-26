@@ -59,7 +59,7 @@ function AttemptsSummaryPanel({
   if (attempted === 0) return null;
 
   return (
-    <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-4">
+    <div className="bg-linear-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-4">
       <div className="flex items-center gap-2 mb-3">
         <BarChart2 className="w-4 h-4 text-teal-700" />
         <h2 className="text-sm font-semibold text-teal-900">Your Progress Summary</h2>
@@ -108,13 +108,13 @@ function AssessmentCard({
       className="bg-white border border-zinc-200 rounded-xl overflow-hidden cursor-pointer hover:border-teal-300 hover:shadow-md transition-all group"
     >
       {/* Gradient header strip */}
-      <div className={`h-2 bg-gradient-to-r ${gradient}`} />
+      <div className={`h-2 bg-linear-to-r ${gradient}`} />
 
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           {/* Icon + content */}
           <div className="flex items-start gap-3 min-w-0">
-            <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 mt-0.5`}>
+            <div className={`w-9 h-9 rounded-lg bg-linear-to-br ${gradient} flex items-center justify-center shrink-0 mt-0.5`}>
               <FileQuestion className="w-4 h-4 text-zinc-600" />
             </div>
             <div className="min-w-0">

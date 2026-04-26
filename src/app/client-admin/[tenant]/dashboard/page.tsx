@@ -262,17 +262,14 @@ export default function UnifiedDashboard() {
   const tenantId = getTenantId(tenantSlug)
 
   const [tenantMode, setTenantMode] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!!tenantId)
 
   // Tab state
   const [fullCreatorTab, setFullCreatorTab] = useState<FullCreatorTab>('content')
   const [runOnlyTab, setRunOnlyTab] = useState<RunOnlyTab>('overview')
 
   useEffect(() => {
-    if (!tenantId) {
-      setLoading(false)
-      return
-    }
+    if (!tenantId) return
 
     supabase
       .from('tenants')

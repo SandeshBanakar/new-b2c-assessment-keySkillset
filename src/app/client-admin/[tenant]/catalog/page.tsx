@@ -194,7 +194,7 @@ function ContentDetailSlideOver({
 }) {
   // Detail state
   const [modules, setModules] = useState<CourseModuleWithTopics[]>([])
-  const [modulesLoading, setModulesLoading] = useState(false)
+  const [modulesLoading, setModulesLoading] = useState(item.content_type === 'COURSE')
   const [tenantAttempts, setTenantAttempts] = useState<number | null>(null)
 
   // Assign state
@@ -239,7 +239,6 @@ function ContentDetailSlideOver({
 
     // Fetch content-specific detail data
     if (item.content_type === 'COURSE') {
-      setModulesLoading(true)
       async function loadModules() {
         const { data: moduleRows } = await supabase
           .from('course_modules')
@@ -623,7 +622,7 @@ export default function CatalogPage() {
   const adminUserId = tenantId ? (CA_ADMIN_USER_MAP[tenantId] ?? '') : ''
 
   const [items, setItems] = useState<CatalogItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!!tenantId)
   const [activeTab, setActiveTab] = useState<Tab>('COURSES')
   const [search, setSearch] = useState('')
   const [detailItem, setDetailItem] = useState<CatalogItem | null>(null)
@@ -635,107 +634,111 @@ export default function CatalogPage() {
       .then(({ data }) => { if (data) setTenantMode(data.feature_toggle_mode) })
   }, [tenantId])
 
-  const fetchCatalog = useCallback(async () => {
-    if (!tenantId) { setLoading(false); return }
-    setLoading(true)
+  const fetchCatalog = useCallback(() => {
+    if (!tenantId) return
 
-    const { data: planRows } = await supabase.from('tenant_plan_map').select('plan_id').eq('tenant_id', tenantId)
-    const planIds = (planRows ?? []).map(r => r.plan_id)
+    async function doFetch(): Promise<CatalogItem[]> {
+      const { data: planRows } = await supabase.from('tenant_plan_map').select('plan_id').eq('tenant_id', tenantId)
+      const planIds = (planRows ?? []).map(r => r.plan_id)
 
-    const globalAssessments: CatalogItem[] = []
-    if (planIds.length > 0) {
-      const { data: pcmRows } = await supabase
-        .from('plan_content_map').select('content_item_id').in('plan_id', planIds).eq('content_type', 'ASSESSMENT').eq('excluded', false)
-      const contentIds = [...new Set((pcmRows ?? []).map(r => r.content_item_id))]
-      if (contentIds.length > 0) {
-        const { data: ciRows } = await supabase
-          .from('assessment_items').select('id, title, test_type, audience_type, visibility_scope, exam_categories(name)')
-          .in('id', contentIds).eq('status', 'LIVE').eq('visibility_scope', 'GLOBAL')
-        for (const ci of ciRows ?? []) {
-          globalAssessments.push({
-            id: ci.id, title: ci.title, content_type: 'ASSESSMENT', item_type: ci.test_type ?? '',
-            category: (ci.exam_categories as unknown as { name: string } | null)?.name ?? null,
-            audience_type: ci.audience_type, source: 'GLOBAL', assignment_count: 0, assignment_targets: [],
+      const globalAssessments: CatalogItem[] = []
+      if (planIds.length > 0) {
+        const { data: pcmRows } = await supabase
+          .from('plan_content_map').select('content_item_id').in('plan_id', planIds).eq('content_type', 'ASSESSMENT').eq('excluded', false)
+        const contentIds = [...new Set((pcmRows ?? []).map(r => r.content_item_id))]
+        if (contentIds.length > 0) {
+          const { data: ciRows } = await supabase
+            .from('assessment_items').select('id, title, test_type, audience_type, visibility_scope, exam_categories(name)')
+            .in('id', contentIds).eq('status', 'LIVE').eq('visibility_scope', 'GLOBAL')
+          for (const ci of ciRows ?? []) {
+            globalAssessments.push({
+              id: ci.id, title: ci.title, content_type: 'ASSESSMENT', item_type: ci.test_type ?? '',
+              category: (ci.exam_categories as unknown as { name: string } | null)?.name ?? null,
+              audience_type: ci.audience_type, source: 'GLOBAL', assignment_count: 0, assignment_targets: [],
+            })
+          }
+        }
+      }
+
+      const privateAssessments: CatalogItem[] = []
+      const { data: privateRows } = await supabase
+        .from('assessment_items').select('id, title, test_type, audience_type, exam_categories(name)')
+        .eq('tenant_scope_id', tenantId).eq('status', 'LIVE').eq('visibility_scope', 'TENANT_PRIVATE')
+      for (const ci of privateRows ?? []) {
+        privateAssessments.push({
+          id: ci.id, title: ci.title, content_type: 'ASSESSMENT', item_type: ci.test_type ?? '',
+          category: (ci.exam_categories as unknown as { name: string } | null)?.name ?? null,
+          audience_type: ci.audience_type, source: 'TENANT_PRIVATE', assignment_count: 0, assignment_targets: [],
+        })
+      }
+
+      const courses: CatalogItem[] = []
+      if (planIds.length > 0) {
+        const { data: courseRows } = await supabase
+          .from('courses').select('id, title, course_type, audience_type').eq('status', 'LIVE').in('audience_type', ['B2B_ONLY', 'BOTH']).order('title')
+        for (const c of courseRows ?? []) {
+          courses.push({
+            id: c.id, title: c.title, content_type: 'COURSE', item_type: formatCourseType(c.course_type) ?? '',
+            category: null, audience_type: c.audience_type, source: 'GLOBAL', assignment_count: 0, assignment_targets: [],
           })
         }
       }
-    }
 
-    const privateAssessments: CatalogItem[] = []
-    const { data: privateRows } = await supabase
-      .from('assessment_items').select('id, title, test_type, audience_type, exam_categories(name)')
-      .eq('tenant_scope_id', tenantId).eq('status', 'LIVE').eq('visibility_scope', 'TENANT_PRIVATE')
-    for (const ci of privateRows ?? []) {
-      privateAssessments.push({
-        id: ci.id, title: ci.title, content_type: 'ASSESSMENT', item_type: ci.test_type ?? '',
-        category: (ci.exam_categories as unknown as { name: string } | null)?.name ?? null,
-        audience_type: ci.audience_type, source: 'TENANT_PRIVATE', assignment_count: 0, assignment_targets: [],
-      })
-    }
-
-    const courses: CatalogItem[] = []
-    if (planIds.length > 0) {
-      const { data: courseRows } = await supabase
-        .from('courses').select('id, title, course_type, audience_type').eq('status', 'LIVE').in('audience_type', ['B2B_ONLY', 'BOTH']).order('title')
-      for (const c of courseRows ?? []) {
-        courses.push({
-          id: c.id, title: c.title, content_type: 'COURSE', item_type: formatCourseType(c.course_type) ?? '',
-          category: null, audience_type: c.audience_type, source: 'GLOBAL', assignment_count: 0, assignment_targets: [],
-        })
+      if (tenantMode === 'FULL_CREATOR') {
+        const { data: privateCourseRows } = await supabase
+          .from('courses').select('id, title, course_type, audience_type').eq('tenant_id', tenantId).eq('status', 'LIVE').order('title')
+        for (const c of privateCourseRows ?? []) {
+          courses.push({
+            id: c.id, title: c.title, content_type: 'COURSE', item_type: formatCourseType(c.course_type) ?? '',
+            category: null, audience_type: c.audience_type, source: 'TENANT_PRIVATE', assignment_count: 0, assignment_targets: [],
+          })
+        }
       }
-    }
 
-    // TENANT_PRIVATE LIVE courses for FULL_CREATOR
-    if (tenantMode === 'FULL_CREATOR') {
-      const { data: privateCourseRows } = await supabase
-        .from('courses').select('id, title, course_type, audience_type').eq('tenant_id', tenantId).eq('status', 'LIVE').order('title')
-      for (const c of privateCourseRows ?? []) {
-        courses.push({
-          id: c.id, title: c.title, content_type: 'COURSE', item_type: formatCourseType(c.course_type) ?? '',
-          category: null, audience_type: c.audience_type, source: 'TENANT_PRIVATE', assignment_count: 0, assignment_targets: [],
-        })
+      const allItemIds = new Set<string>()
+      const merged: CatalogItem[] = []
+      for (const item of [...globalAssessments, ...privateAssessments, ...courses]) {
+        if (!allItemIds.has(item.id)) { allItemIds.add(item.id); merged.push(item) }
       }
+
+      const { data: assignmentRows } = await supabase
+        .from('content_assignments').select('content_id, target_type, target_id').eq('tenant_id', tenantId)
+        .is('removed_at', null).in('content_id', merged.map(i => i.id))
+
+      const rows = assignmentRows ?? []
+      const deptIds = [...new Set(rows.filter(a => a.target_type === 'DEPARTMENT').map(a => a.target_id))]
+      const teamIds = [...new Set(rows.filter(a => a.target_type === 'TEAM').map(a => a.target_id))]
+      const learnerIds = [...new Set(rows.filter(a => a.target_type === 'INDIVIDUAL').map(a => a.target_id))]
+
+      const [deptRes, teamRes, learnerRes] = await Promise.all([
+        deptIds.length > 0 ? supabase.from('departments').select('id, name').in('id', deptIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+        teamIds.length > 0 ? supabase.from('teams').select('id, name').in('id', teamIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+        learnerIds.length > 0 ? supabase.from('learners').select('id, full_name').in('id', learnerIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+      ])
+
+      const nameMap: Record<string, { name: string; type: 'DEPARTMENT' | 'TEAM' | 'INDIVIDUAL' }> = {}
+      for (const d of deptRes.data ?? []) nameMap[d.id] = { name: d.name, type: 'DEPARTMENT' }
+      for (const t of teamRes.data ?? []) nameMap[t.id] = { name: t.name, type: 'TEAM' }
+      for (const l of learnerRes.data ?? []) nameMap[l.id] = { name: l.full_name, type: 'INDIVIDUAL' }
+
+      const targetsByItem: Record<string, AssignmentTarget[]> = {}
+      for (const a of rows) {
+        if (!targetsByItem[a.content_id]) targetsByItem[a.content_id] = []
+        const entry = nameMap[a.target_id]
+        if (entry) targetsByItem[a.content_id].push({ type: entry.type, name: entry.name })
+      }
+      for (const item of merged) {
+        item.assignment_targets = targetsByItem[item.id] ?? []
+        item.assignment_count = item.assignment_targets.length
+      }
+
+      return merged
     }
 
-    const allItemIds = new Set<string>()
-    const merged: CatalogItem[] = []
-    for (const item of [...globalAssessments, ...privateAssessments, ...courses]) {
-      if (!allItemIds.has(item.id)) { allItemIds.add(item.id); merged.push(item) }
-    }
-
-    const { data: assignmentRows } = await supabase
-      .from('content_assignments').select('content_id, target_type, target_id').eq('tenant_id', tenantId)
-      .is('removed_at', null).in('content_id', merged.map(i => i.id))
-
-    const rows = assignmentRows ?? []
-    const deptIds = [...new Set(rows.filter(a => a.target_type === 'DEPARTMENT').map(a => a.target_id))]
-    const teamIds = [...new Set(rows.filter(a => a.target_type === 'TEAM').map(a => a.target_id))]
-    const learnerIds = [...new Set(rows.filter(a => a.target_type === 'INDIVIDUAL').map(a => a.target_id))]
-
-    const [deptRes, teamRes, learnerRes] = await Promise.all([
-      deptIds.length > 0 ? supabase.from('departments').select('id, name').in('id', deptIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-      teamIds.length > 0 ? supabase.from('teams').select('id, name').in('id', teamIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-      learnerIds.length > 0 ? supabase.from('learners').select('id, full_name').in('id', learnerIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
-    ])
-
-    const nameMap: Record<string, { name: string; type: 'DEPARTMENT' | 'TEAM' | 'INDIVIDUAL' }> = {}
-    for (const d of deptRes.data ?? []) nameMap[d.id] = { name: d.name, type: 'DEPARTMENT' }
-    for (const t of teamRes.data ?? []) nameMap[t.id] = { name: t.name, type: 'TEAM' }
-    for (const l of learnerRes.data ?? []) nameMap[l.id] = { name: l.full_name, type: 'INDIVIDUAL' }
-
-    const targetsByItem: Record<string, AssignmentTarget[]> = {}
-    for (const a of rows) {
-      if (!targetsByItem[a.content_id]) targetsByItem[a.content_id] = []
-      const entry = nameMap[a.target_id]
-      if (entry) targetsByItem[a.content_id].push({ type: entry.type, name: entry.name })
-    }
-    for (const item of merged) {
-      item.assignment_targets = targetsByItem[item.id] ?? []
-      item.assignment_count = item.assignment_targets.length
-    }
-
-    setItems(merged)
-    setLoading(false)
+    doFetch().then((merged) => {
+      setItems(merged)
+      setLoading(false)
+    })
   }, [tenantId, tenantMode])
 
   useEffect(() => { fetchCatalog() }, [fetchCatalog])

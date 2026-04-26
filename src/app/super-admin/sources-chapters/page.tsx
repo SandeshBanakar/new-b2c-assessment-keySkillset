@@ -348,11 +348,10 @@ function ViewSourceModal({
   source: Source | null
 }) {
   const [chapters, setChapters] = useState<ChapterPreview[]>([])
-  const [loadingChapters, setLoadingChapters] = useState(false)
+  const [loadingChapters, setLoadingChapters] = useState(!!(open && source !== null))
 
   useEffect(() => {
-    if (!open || !source) { setChapters([]); return }
-    setLoadingChapters(true)
+    if (!open || !source) return
     supabase
       .from('chapters')
       .select('id, name, difficulty')
@@ -529,11 +528,8 @@ export default function SourcesChaptersPage() {
       .then(({ data }) => { if (data) setExamCategories(data as ExamCategory[]) })
   }, [])
 
-  const fetchSources = useCallback(async () => {
-    setLoading(true)
-
-    // Two parallel queries: sources + chapter/question counts (filtered to non-deleted chapters)
-    const [sourcesRes, chaptersRes] = await Promise.all([
+  const fetchSources = useCallback(() => {
+    Promise.all([
       supabase
         .from('sources')
         .select('id, name, exam_category_id, description, difficulty, target_exam, status, created_at, updated_at, exam_categories(name)')
@@ -543,46 +539,45 @@ export default function SourcesChaptersPage() {
         .from('chapters')
         .select('source_id, questions(count)')
         .is('deleted_at', null),
-    ])
+    ]).then(([sourcesRes, chaptersRes]) => {
+      if (sourcesRes.error) {
+        console.error('Failed to fetch sources:', sourcesRes.error)
+        setLoading(false)
+        return
+      }
 
-    if (sourcesRes.error) {
-      console.error('Failed to fetch sources:', sourcesRes.error)
+      const countMap = new Map<string, { chapterCount: number; questionCount: number }>()
+      for (const ch of (chaptersRes.data ?? []) as { source_id: string; questions: { count: number }[] }[]) {
+        const entry = countMap.get(ch.source_id) ?? { chapterCount: 0, questionCount: 0 }
+        entry.chapterCount++
+        if (Array.isArray(ch.questions) && ch.questions.length > 0) {
+          entry.questionCount += ch.questions[0].count ?? 0
+        }
+        countMap.set(ch.source_id, entry)
+      }
+
+      const mapped: Source[] = (sourcesRes.data ?? []).map((row: Record<string, unknown>) => {
+        const examCat = row.exam_categories as { name?: string } | null
+        const counts = countMap.get(row.id as string) ?? { chapterCount: 0, questionCount: 0 }
+        return {
+          id: row.id as string,
+          name: row.name as string,
+          exam_category_id: (row.exam_category_id as string | null) ?? null,
+          exam_category_name: examCat?.name ?? null,
+          description: (row.description as string | null) ?? null,
+          difficulty: (row.difficulty as SourceDifficulty) ?? 'mixed',
+          target_exam: (row.target_exam as string | null) ?? null,
+          status: (row.status as SourceStatus) ?? 'DRAFT',
+          chapter_count: counts.chapterCount,
+          question_count: counts.questionCount,
+          created_at: row.created_at as string,
+          updated_at: row.updated_at as string,
+        }
+      })
+
+      setSources(mapped)
       setLoading(false)
-      return
-    }
-
-    // Aggregate chapter count + question count per source
-    const countMap = new Map<string, { chapterCount: number; questionCount: number }>()
-    for (const ch of (chaptersRes.data ?? []) as { source_id: string; questions: { count: number }[] }[]) {
-      const entry = countMap.get(ch.source_id) ?? { chapterCount: 0, questionCount: 0 }
-      entry.chapterCount++
-      if (Array.isArray(ch.questions) && ch.questions.length > 0) {
-        entry.questionCount += ch.questions[0].count ?? 0
-      }
-      countMap.set(ch.source_id, entry)
-    }
-
-    const mapped: Source[] = (sourcesRes.data ?? []).map((row: Record<string, unknown>) => {
-      const examCat = row.exam_categories as { name?: string } | null
-      const counts = countMap.get(row.id as string) ?? { chapterCount: 0, questionCount: 0 }
-      return {
-        id: row.id as string,
-        name: row.name as string,
-        exam_category_id: (row.exam_category_id as string | null) ?? null,
-        exam_category_name: examCat?.name ?? null,
-        description: (row.description as string | null) ?? null,
-        difficulty: (row.difficulty as SourceDifficulty) ?? 'mixed',
-        target_exam: (row.target_exam as string | null) ?? null,
-        status: (row.status as SourceStatus) ?? 'DRAFT',
-        chapter_count: counts.chapterCount,
-        question_count: counts.questionCount,
-        created_at: row.created_at as string,
-        updated_at: row.updated_at as string,
-      }
     })
-
-    setSources(mapped)
-    setLoading(false)
   }, [])
 
   useEffect(() => { fetchSources() }, [fetchSources])
@@ -825,6 +820,7 @@ export default function SourcesChaptersPage() {
         initial={editSource ?? undefined}
       />
       <ViewSourceModal
+        key={viewSource?.id ?? 'none'}
         open={!!viewSource}
         onClose={() => setViewSource(null)}
         source={viewSource}
