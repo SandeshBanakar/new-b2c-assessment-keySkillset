@@ -26,8 +26,6 @@
 
 ---
 
----
-
 ## [IN PROGRESS] KSS-SA-SCALE-SCORE-FIX-001 — Adaptive Scale Score Table Bug Fix (Apr 28 2026)
 
 **Source:** `docs/requirements/super_admin_changes.txt` — Task 3

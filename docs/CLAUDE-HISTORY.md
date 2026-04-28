@@ -6,6 +6,33 @@
 
 ## COMPLETED WORK LOG
 
+### April 28, 2026 — KSS-B2B-RC-001: B2B Learner Report Card + Salesforce Email Template (COMPLETE)
+
+**Build:** ✅ PASSED · **PRD:** `prds/b2b-learner/PRD-B2B-REPORT-CARD-001.md` (LOCKED — revised from Apr 27 draft)
+
+**Source:** `docs/requirements/email_login_b2b.txt`
+
+**Key decisions locked:**
+- Report card is **auto-sent after every attempt** via Salesforce (not on-demand). Previous draft had it as a learner request — corrected.
+- Modal redesigned: shows 13 specific Salesforce payload fields by name (learner's info + company co-brand + score + pass/fail + time_taken + `time_per_question[]` array + `attempt_history[]` + cert status). "Request Re-send" secondary button — disabled if 0 attempts; copy tells learner they should have already received it.
+- `extraContext?: Record<string, string>` added to `EmailTemplatePayload` and merged last in `buildEmailTemplateTokenMap` — allows Salesforce-specific tokens without touching existing SES pipeline.
+- New `TenantEmailSlug: 'b2b-learner'` + `featureMode/featureApplicability: 'B2B_LEARNER'` threaded through all type/data layers.
+- Per-question time: raw array `time_per_question[]` in payload (production exam engine only; not in demo). Summary stats (avg/slowest/fastest) shown in email.
+- Co-brand: `{{company_name}}` + "powered by {{platform_name}}" in hero header and footer.
+- V2 placeholder sections (Section Breakdown, Concept Mastery, Pacing Analysis, Mistake Taxonomy) shown at 50% opacity in template with `{{field_name}}` tokens + HTML comments — Salesforce developer reference for when exam engine data is available.
+
+**Files changed:**
+- `src/app/b2b-learner/[tenant]/assessments/[id]/page.tsx` — Modal redesign, "Download"→"Details"+(Info icon), `REPORT_CARD_PAYLOAD_FIELDS`, `handleResend`
+- `src/lib/email-templates/types.ts` — 4 type additions (EmailTemplateId, TenantEmailSlug, featureApplicability, featureMode, extraContext on payload)
+- `src/lib/email-templates/render.ts` — `...payload.extraContext` spread into token map
+- `src/lib/email-templates/data.ts` — `b2b-learner` profile, `b2b-learner-report-card` definition, `getTemplatesForTenant` B2B_LEARNER case, `buildPreviewPayload` branch with `extraContext`
+- `src/email-templates/html/b2b-learner-report-card.html` — NEW: full Salesforce PDF template (12 sections, V2 placeholders with SF dev comments)
+- `src/app/page.tsx` — "B2B End User Emails" tile (emerald) added to Email Templates section
+- `src/app/email-templates/[tenant]/page.tsx` — B2B_LEARNER label handling
+- `src/app/email-templates/[tenant]/[template]/page.tsx` — Salesforce badge for B2B_LEARNER, all-variables display (hardcoded filter removed), back link + page label fixes
+
+---
+
 ### April 28, 2026 — KSS-SA-BILLING-001 + KSS-B2C-BUNDLE-001 (COMPLETE)
 
 **Build:** ✅ PASSED · **DB:** KSS-DB-058 ✅ ALL STEPS (including DROP arr_usd_cents)
