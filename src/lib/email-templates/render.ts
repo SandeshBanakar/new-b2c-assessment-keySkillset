@@ -40,6 +40,7 @@ export function buildEmailTemplateTokenMap(payload: EmailTemplatePayload): Recor
     terms_url: payload.context.termsUrl,
     unsubscribe_url: payload.context.unsubscribeUrl,
     current_year: '2026',
+    ...payload.extraContext,
   }
 }
 

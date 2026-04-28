@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, X, ChevronRight, RotateCcw, AlertCircle } from 'lucide-react'
 import { SourceChapterPicker, Source, Chapter } from '../linear/_components'
 export type { Source, Chapter }
@@ -633,12 +633,6 @@ export function ScoreScoreTab({
   scoreMin: number | null
   scoreMax: number | null
 }) {
-  const [scoreData, setScoreData] = useState<ScoreModule[]>([])
-  const [loaded, setLoaded] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [warning, setWarning] = useState<ScoreChangeWarning | null>(null)
-  const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
-
   // Build initial score modules from FM/VM structure
   function buildScoreModules(): ScoreModule[] {
     const result: ScoreModule[] = []
@@ -663,6 +657,43 @@ export function ScoreScoreTab({
     return result
   }
 
+  // scoreData is the source of truth — initialized from module structure, then populated from DB
+  const [scoreData, setScoreData] = useState<ScoreModule[]>(() => buildScoreModules())
+  const [loaded, setLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [warning, setWarning] = useState<ScoreChangeWarning | null>(null)
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
+
+  // Load existing scores from DB when assessmentId is available
+  useEffect(() => {
+    if (!assessmentId) return
+    async function loadScores() {
+      try {
+        const { supabase } = await import('@/lib/supabase/client')
+        const { data } = await supabase
+          .from('assessment_scale_scores')
+          .select('module_id, raw_score, scaled_score')
+          .eq('assessment_id', assessmentId)
+
+        if (data && data.length > 0) {
+          const rows = data as { module_id: string; raw_score: number; scaled_score: number }[]
+          setScoreData(prev => prev.map(mod => ({
+            ...mod,
+            rows: mod.rows.map(row => {
+              const dbRow = rows.find(d => d.module_id === mod.module_id && d.raw_score === row.raw_score)
+              return dbRow ? { ...row, scaled_score: String(dbRow.scaled_score) } : row
+            }),
+          })))
+        }
+      } catch (err) {
+        console.error('Failed to load scale scores:', err)
+      } finally {
+        setLoaded(true)
+      }
+    }
+    loadScores()
+  }, [assessmentId])
+
   if (!assessmentId) {
     return (
       <div className="bg-zinc-50 border border-zinc-200 rounded-lg px-6 py-10 text-center">
@@ -674,7 +705,8 @@ export function ScoreScoreTab({
     )
   }
 
-  const allModules = buildScoreModules()
+  // Derive display modules from state — never rebuild from props (that discards edits)
+  const allModules = scoreData
   const active = activeModuleId ?? allModules[0]?.module_id ?? null
 
   const currentModule = allModules.find(m => m.module_id === active)
@@ -685,7 +717,7 @@ export function ScoreScoreTab({
     setSaving(true)
     try {
       const { supabase } = await import('@/lib/supabase/client')
-      const mod = allModules.find(m => m.module_id === active)
+      const mod = scoreData.find(m => m.module_id === active)
       if (!mod) return
       const foundationOrder = modules.findIndex(fm =>
         fm.id === active || fm.variant_modules.some(v => v.id === active)
@@ -718,17 +750,11 @@ export function ScoreScoreTab({
   }
 
   function updateScaledScore(rawScore: number, scaled: string) {
-    const mod = allModules.find(m => m.module_id === active)
-    if (!mod) return
-    mod.rows = mod.rows.map(r => r.raw_score === rawScore ? { ...r, scaled_score: scaled } : r)
-    setScoreData(prev => {
-      const updated = prev.map(m =>
-        m.module_id === active
-          ? { ...m, rows: m.rows.map(r => r.raw_score === rawScore ? { ...r, scaled_score: scaled } : r) }
-          : m
-      )
-      return updated
-    })
+    setScoreData(prev => prev.map(m =>
+      m.module_id === active
+        ? { ...m, rows: m.rows.map(r => r.raw_score === rawScore ? { ...r, scaled_score: scaled } : r) }
+        : m
+    ))
   }
 
   return (

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { fetchPlansContainingContent, type PlanUsageItem } from '@/lib/supabase/plans'
+import { ContentPlanUsageModal } from '@/components/plans/ContentPlanUsageModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -458,8 +459,27 @@ export default function CreateAssessmentsPage() {
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [modalTarget, setModalTarget] = useState<Assessment | null>(null)
 
+  // Plan usage badge state
+  const [planCounts, setPlanCounts] = useState<Record<string, number>>({})
+  const [planModal, setPlanModal] = useState<{ id: string; title: string } | null>(null)
+
   // Maintenance auto-revert banner
   const [revertedCount, setRevertedCount] = useState(0)
+
+  const fetchPlanCounts = useCallback(async (assessmentIds: string[]) => {
+    if (assessmentIds.length === 0) return
+    const { data } = await supabase
+      .from('plan_content_map')
+      .select('content_item_id')
+      .in('content_item_id', assessmentIds)
+      .eq('content_type', 'ASSESSMENT')
+    if (!data) return
+    const counts: Record<string, number> = {}
+    ;(data as { content_item_id: string }[]).forEach(r => {
+      counts[r.content_item_id] = (counts[r.content_item_id] ?? 0) + 1
+    })
+    setPlanCounts(counts)
+  }, [])
 
   const fetchData = useCallback(() => {
     async function doFetch() {
@@ -524,8 +544,9 @@ export default function CreateAssessmentsPage() {
       if (cats) setCategories(cats as ExamCategory[])
       if (revertedCount > 0) setRevertedCount(revertedCount)
       setLoading(false)
+      fetchPlanCounts(mapped.map(a => a.id))
     })
-  }, [])
+  }, [fetchPlanCounts])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -781,7 +802,18 @@ export default function CreateAssessmentsPage() {
                   <tr key={item.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
                     <td className="px-4 py-3">
                       <div>
-                        <p className="font-medium text-zinc-900 leading-snug">{item.title}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-zinc-900 leading-snug">{item.title}</p>
+                          {(planCounts[item.id] ?? 0) > 0 && (
+                            <button
+                              onClick={() => setPlanModal({ id: item.id, title: item.title })}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors shrink-0"
+                            >
+                              <AlertCircle className="w-3 h-3" />
+                              In {planCounts[item.id]} plan{planCounts[item.id] !== 1 ? 's' : ''}
+                            </button>
+                          )}
+                        </div>
                         {item.description && (
                           <p className="text-xs text-zinc-400 mt-0.5 truncate max-w-64">{item.description}</p>
                         )}
@@ -900,6 +932,15 @@ export default function CreateAssessmentsPage() {
           loading={actionLoading}
           onConfirm={handleDelete}
           onCancel={closeModal}
+        />
+      )}
+
+      {planModal && (
+        <ContentPlanUsageModal
+          contentId={planModal.id}
+          contentTitle={planModal.title}
+          onClose={() => setPlanModal(null)}
+          onRemoved={() => fetchPlanCounts(items.map(a => a.id))}
         />
       )}
     </div>

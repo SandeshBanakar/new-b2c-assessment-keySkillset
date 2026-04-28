@@ -9,8 +9,9 @@ export type EmailTemplateId =
   | 'b2c-access-restored'
   | 'client-admin-deactivated'
   | 'client-admin-reactivated'
+  | 'b2b-learner-report-card'
 
-export type TenantEmailSlug = 'akash' | 'techcorp' | 'keyskillset'
+export type TenantEmailSlug = 'akash' | 'techcorp' | 'keyskillset' | 'b2b-learner'
 
 export interface EmailBranding {
   companyName: string
@@ -61,6 +62,7 @@ export interface EmailTemplatePayload {
   branding: EmailBranding
   recipient: EmailRecipient
   context: EmailTemplateContext
+  extraContext?: Record<string, string>
 }
 
 export interface B2CUserActionPayload {
@@ -74,7 +76,7 @@ export interface TenantEmailPreviewProfile {
   tenantId: string
   displayName: string
   companyName: string
-  featureMode: 'FULL_CREATOR' | 'RUN_ONLY' | 'B2C_END_USER'
+  featureMode: 'FULL_CREATOR' | 'RUN_ONLY' | 'B2C_END_USER' | 'B2B_LEARNER'
   companyLogoUrl: string | null
   supportEmail: string
   accentClass: string
@@ -88,7 +90,7 @@ export interface EmailTemplateDefinition {
   filename: string
   recipient: string
   triggerEvent: string
-  featureApplicability: 'ALL' | 'FULL_CREATOR' | 'RUN_ONLY' | 'B2C_END_USER'
+  featureApplicability: 'ALL' | 'FULL_CREATOR' | 'RUN_ONLY' | 'B2C_END_USER' | 'B2B_LEARNER'
   primaryCtaStyle: string
   subject: string
   summary: string

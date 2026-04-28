@@ -47,6 +47,18 @@ export const TENANT_EMAIL_PREVIEW_PROFILES: Record<TenantEmailSlug, TenantEmailP
     badgeClass: 'bg-blue-50 text-blue-700 border border-blue-200',
     description: 'B2C End User Emails - keySkillset branded emails for B2C user account actions.',
   },
+  'b2b-learner': {
+    slug: 'b2b-learner',
+    tenantId: 'b2b-learner',
+    displayName: 'B2B Learner',
+    companyName: 'Akash Institute',
+    featureMode: 'B2B_LEARNER',
+    companyLogoUrl: 'https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute',
+    supportEmail: 'contact@keyskillset.com',
+    accentClass: 'bg-emerald-700',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    description: 'B2B Learner Emails — Salesforce-powered report cards sent automatically after each assessment attempt.',
+  },
 }
 
 export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
@@ -263,6 +275,41 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     ],
     previewHeight: 800,
   },
+  {
+    id: 'b2b-learner-report-card',
+    name: 'B2B Learner Assessment Report Card',
+    filename: 'b2b-learner-report-card.html',
+    recipient: 'B2B Learner',
+    triggerEvent: 'Sent automatically after each assessment attempt is completed.',
+    featureApplicability: 'B2B_LEARNER',
+    primaryCtaStyle: 'Salesforce PDF — informational report, no primary CTA',
+    subject: '[{{company_name}}] Your Assessment Report Card — {{assessment_title}} · Attempt {{attempt_number}}',
+    summary: 'Per-attempt performance report card sent via Salesforce after every attempt. Covers score, pass/fail, time analysis, attempt history for trend context, certificate status, and placeholder sections for future detailed analytics (Section Breakdown, Concept Mastery, Pacing, Mistake Taxonomy).',
+    whenTriggered: 'Trigger on every learner_attempts record creation. Production: exam engine completion webhook → Salesforce journey trigger with payload. Demo: not wired — session state only.',
+    variables: [
+      '{{full_name}}',
+      '{{recipient_email}}',
+      '{{company_name}}',
+      '{{platform_name}}',
+      '{{support_email}}',
+      '{{assessment_title}}',
+      '{{attempt_number}}',
+      '{{score_pct}}',
+      '{{passed}}',
+      '{{time_taken_display}}',
+      '{{attempted_at}}',
+      '{{avg_time_per_question_display}}',
+      '{{slowest_question_display}}',
+      '{{fastest_question_display}}',
+      '{{average_score_pct}}',
+      '{{best_score_pct}}',
+      '{{certificate_eligible}}',
+      '{{certificate_number}}',
+      '{{certificate_status_display}}',
+      '{{unsubscribe_url}}',
+    ],
+    previewHeight: 2600,
+  },
 ]
 
 export function getEmailTemplateDefinition(templateId: EmailTemplateId): EmailTemplateDefinition | null {
@@ -275,7 +322,12 @@ export function getTemplatesForTenant(tenantSlug: TenantEmailSlug): EmailTemplat
     if (tenant.featureMode === 'B2C_END_USER') {
       return template.featureApplicability === 'B2C_END_USER'
     }
+    if (tenant.featureMode === 'B2B_LEARNER') {
+      return template.featureApplicability === 'B2B_LEARNER'
+    }
     if (template.featureApplicability === 'ALL') return true
+    if (template.featureApplicability === 'B2C_END_USER') return false
+    if (template.featureApplicability === 'B2B_LEARNER') return false
     return template.featureApplicability === tenant.featureMode
   })
 }
@@ -302,9 +354,13 @@ export function buildPreviewPayload(
       supportEmail: tenant.supportEmail,
     },
     recipient: {
-      fullName: templateId === 'client-admin-onboarding' || templateId === 'client-admin-deactivated' || templateId === 'client-admin-reactivated' ? 'Rahul Sharma' : 'Priya Nair',
+      fullName: templateId === 'client-admin-onboarding' || templateId === 'client-admin-deactivated' || templateId === 'client-admin-reactivated' ? 'Rahul Sharma'
+        : templateId === 'b2b-learner-report-card' ? 'Ananya Krishnan'
+        : 'Priya Nair',
       email: templateId === 'learner-onboarding-invite' || templateId === 'course-completion' || templateId === 'certificate-of-completion'
         ? 'learner@example.com'
+        : templateId === 'b2b-learner-report-card'
+        ? 'ananya.krishnan@akash.example.com'
         : 'admin@example.com',
     },
     context: {
@@ -486,6 +542,38 @@ export function buildPreviewPayload(
         heroTitle: 'You completed your course.',
         heroSubtitle: 'Your result has been recorded and your completion credentials are ready to review.',
         completionSummary: 'All required modules are complete and your final status has been marked as achieved.',
+      },
+    }
+  }
+
+  if (templateId === 'b2b-learner-report-card') {
+    return {
+      ...basePayload,
+      recipient: {
+        fullName: 'Ananya Krishnan',
+        email: 'ananya.krishnan@akash.example.com',
+      },
+      context: {
+        ...basePayload.context,
+        heroTitle: 'Assessment Report Card — SAT Full Mock Test 1',
+        heroSubtitle: 'Attempt 2 · 22 Apr 2026 · Akash Institute — powered by keySkillset',
+        unsubscribeUrl: 'https://www.keyskillset.com/unsubscribe',
+      },
+      extraContext: {
+        assessment_title: 'SAT Full Mock Test 1',
+        attempt_number: '2',
+        score_pct: '72',
+        passed: 'PASS',
+        time_taken_display: '90 min 0 sec',
+        attempted_at: '22 Apr 2026, 10:45 AM',
+        avg_time_per_question_display: '2 min 15 sec',
+        slowest_question_display: '7 min 0 sec',
+        fastest_question_display: '18 sec',
+        average_score_pct: '65',
+        best_score_pct: '72',
+        certificate_eligible: 'Yes',
+        certificate_number: 'KSS-2026-0042',
+        certificate_status_display: 'Certificate Earned',
       },
     }
   }

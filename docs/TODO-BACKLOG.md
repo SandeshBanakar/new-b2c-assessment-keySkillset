@@ -1,5 +1,121 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 28 2026 — KSS-SA-BILLING-001 + KSS-B2C-BUNDLE-001 code complete. SQL KSS-DB-058 pending SA run. Build ✅ PASSED.
+# Last updated: Apr 28 2026 — KSS-B2B-RC-001 COMPLETE. B2B report card modal redesigned, b2b-learner email persona added, PRD locked. Build ✅ PASSED.
+
+## [COMPLETE] KSS-B2B-RC-001 — B2B Learner Report Card + Salesforce Email Template (Apr 28 2026)
+
+**PRD:** `prds/b2b-learner/PRD-B2B-REPORT-CARD-001.md` (LOCKED — revised from Apr 27 draft)  
+**Build:** ✅ PASSED
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| RC-1 | Redesign ReportCardModal — payload field reference, re-send UX, auto-send copy | `b2b-learner/.../assessments/[id]/page.tsx` | [x] DONE |
+| RC-2 | Rename "Download" banner button → "Details" with Info icon | same | [x] DONE |
+| RC-3 | Add `REPORT_CARD_PAYLOAD_FIELDS` — 13 specific Salesforce payload fields | same | [x] DONE |
+| RC-4 | Update `types.ts` — `b2b-learner-report-card` EmailTemplateId, `b2b-learner` TenantEmailSlug, `B2B_LEARNER` featureApplicability + featureMode | `src/lib/email-templates/types.ts` | [x] DONE |
+| RC-5 | Add `extraContext?: Record<string, string>` to EmailTemplatePayload + merge in render pipeline | `types.ts`, `render.ts` | [x] DONE |
+| RC-6 | Add `b2b-learner` profile to `TENANT_EMAIL_PREVIEW_PROFILES` | `data.ts` | [x] DONE |
+| RC-7 | Add `b2b-learner-report-card` to `EMAIL_TEMPLATE_DEFINITIONS` | `data.ts` | [x] DONE |
+| RC-8 | Update `getTemplatesForTenant` — B2B_LEARNER case | `data.ts` | [x] DONE |
+| RC-9 | Add `buildPreviewPayload` branch for `b2b-learner-report-card` with `extraContext` | `data.ts` | [x] DONE |
+| RC-10 | Create `b2b-learner-report-card.html` — full Salesforce template with V2 placeholders | `src/email-templates/html/` | [x] DONE |
+| RC-11 | Add "B2B End User Emails" tile in persona selector → `/email-templates/b2b-learner` | `src/app/page.tsx` | [x] DONE |
+| RC-12 | Update `[tenant]/page.tsx` — B2B_LEARNER label handling | `email-templates/[tenant]/page.tsx` | [x] DONE |
+| RC-13 | Update `[template]/page.tsx` — Salesforce badge, all-variables display, back link, B2B_LEARNER label | `email-templates/[tenant]/[template]/page.tsx` | [x] DONE |
+| RC-14 | PRD revised and locked | `prds/b2b-learner/PRD-B2B-REPORT-CARD-001.md` | [x] DONE |
+| RC-15 | `npm run build` passes | — | [x] DONE ✅ |
+
+---
+
+---
+
+## [IN PROGRESS] KSS-SA-SCALE-SCORE-FIX-001 — Adaptive Scale Score Table Bug Fix (Apr 28 2026)
+
+**Source:** `docs/requirements/super_admin_changes.txt` — Task 3
+**File:** `src/app/super-admin/create-assessments/adaptive/_components.tsx`
+**Build:** ✅ TypeScript clean
+
+| # | Task | Status |
+|---|------|--------|
+| SSF-1 | Root cause: `allModules` rebuilt fresh from props every render → edits discarded on re-render | [x] DONE |
+| SSF-2 | Init `scoreData` state with `() => buildScoreModules()` lazy initializer (was `[]`) | [x] DONE |
+| SSF-3 | Add `useEffect` to load existing scores from DB when `assessmentId` provided | [x] DONE |
+| SSF-4 | Replace `const allModules = buildScoreModules()` with `const allModules = scoreData` | [x] DONE |
+| SSF-5 | Fix `updateScaledScore` — remove direct mutation, pure state update only | [x] DONE |
+| SSF-6 | `handleSave` reads from `scoreData` not ephemeral `allModules` | [x] DONE |
+
+---
+
+## [COMPLETE] KSS-SA-CONTRACT-001 — New Contract Fields (Create Form + SA Contract + CA Billing) (Apr 28 2026)
+
+**Source:** `docs/requirements/super_admin_changes.txt` — Task 1 + TechCorp billing fix
+**SQL:** `docs/requirements/KSS-DB-059.sql` — ✅ RUN Apr 28 2026
+**Build:** ✅ TypeScript clean
+
+### DB Migration KSS-DB-059
+| # | Task | Status |
+|---|------|--------|
+| DB-1 | ADD `contract_amount numeric(12,2) DEFAULT NULL` to `contracts` | [x] SQL WRITTEN |
+| DB-2 | ADD `contract_currency text DEFAULT 'INR'` to `contracts` | [x] SQL WRITTEN |
+| DB-3 | ADD `trial_period_days int DEFAULT 0` to `contracts` | [x] SQL WRITTEN |
+| DB-4 | ADD `coupon_code text DEFAULT NULL` to `contracts` | [x] SQL WRITTEN |
+| DB-5 | ADD `pay_now boolean DEFAULT false` to `contracts` | [x] SQL WRITTEN |
+| DB-6 | UPDATE TechCorp contract — seed payment_method_brand/last4/email + contract_amount + pay_now | [x] SQL WRITTEN |
+| DB-7 | INSERT 4 rows into `contract_payment_history` for TechCorp (₹1.2L each, 3 paid + 1 pending) | [x] SQL WRITTEN |
+| DB-8 | **SA MUST RUN:** `docs/requirements/KSS-DB-059.sql` | [x] DONE Apr 28 2026 |
+
+### CreateTenantSlideOver.tsx
+| # | Task | Status |
+|---|------|--------|
+| CT-1 | Add `contractAmount`, `contractCurrency`, `payNow`, `trialPeriodDays`, `couponCode` to `FormState` + `INITIAL_FORM` | [x] DONE |
+| CT-2 | Contract section UI — Contract Amount + Currency (grid-cols-2 row) | [x] DONE |
+| CT-3 | Contract section UI — payNow toggle with label | [x] DONE |
+| CT-4 | Contract section UI — trialPeriodDays (conditional: hidden when `payNow=true`) | [x] DONE |
+| CT-5 | Contract section UI — Coupon Code (optional text input) | [x] DONE |
+| CT-6 | Save function — include new fields in `contracts.insert` payload | [x] DONE |
+| CT-7 | Retry contract — include new fields in retry payload | [x] DONE |
+
+### SA Tenant [id] Contract Tab
+| # | Task | Status |
+|---|------|--------|
+| SC-1 | Add new fields to `Contract` interface | [x] DONE |
+| SC-2 | Read-only display: Contract Amount, Billing Mode (contextual), Coupon Code | [x] DONE |
+| SC-3 | Edit mode: Contract Amount, Currency dropdown, payNow toggle, trialPeriodDays (conditional), Coupon Code | [x] DONE |
+| SC-4 | Include new fields in `contracts.update` payload in `saveContract()` | [x] DONE |
+| SC-5 | Include new fields in `contractForm` state + `startEditContract` | [x] DONE |
+
+### CA Billing Page (display-only)
+| # | Task | Status |
+|---|------|--------|
+| CB-1 | Add new fields to CA `Contract` interface | [x] DONE |
+| CB-2 | Update Supabase select to fetch new fields | [x] DONE |
+| CB-3 | Display Contract Value (₹/$ formatted) inside Section 1 card | [x] DONE |
+| CB-4 | Display Billing Mode contextually (Immediate / N-day trial / Deferred) with descriptive subtitle | [x] DONE |
+| CB-5 | Display Coupon Code (Discount Applied) if present | [x] DONE |
+
+### TechCorp CA Billing Fix
+| # | Task | Status |
+|---|------|--------|
+| TC-1 | SQL seeds Visa 4242, finance@techcorp.com, ₹4.8L contract, 4 payment history rows | [x] SQL WRITTEN |
+| TC-2 | **SA MUST RUN** KSS-DB-059.sql for data to appear in TechCorp CA Billing | [x] DONE Apr 28 2026 |
+
+---
+
+## [PENDING] KSS-SA-ASSESS-PLANS-001 — Assessment Plan Associations in Create Assessments Table (Apr 28 2026)
+
+**Source:** `docs/requirements/super_admin_changes.txt` — Task 2
+
+| # | Task | Status |
+|---|------|--------|
+| AP-1 | Batch fetch plan counts after assessments load — single query: `plan_content_map GROUP BY content_item_id` | [ ] PENDING |
+| AP-2 | Build `Map<assessmentId, number>` for plan counts | [ ] PENDING |
+| AP-3 | Add `planCounts` state to `CreateAssessmentsPage` | [ ] PENDING |
+| AP-4 | Add "Plans" column header to table (after "Status", before "Created by") | [ ] PENDING |
+| AP-5 | Render amber "⚠ In N plans" badge per row (only when count > 0) — matching Plans & Pricing style | [ ] PENDING |
+| AP-6 | Wire `ContentPlanUsageModal` on badge click (reuse existing component, remove enabled) | [ ] PENDING |
+| AP-7 | Handle modal `onRemoved` → re-fetch plan counts | [ ] PENDING |
+| AP-8 | `npm run build` / TypeScript check passes | [ ] PENDING |
+
+---
 
 ## [COMPLETE] KSS-SA-BILLING-001 — SA Contracts Payment & Billing + CA Billing Enhancements (Apr 28 2026)
 

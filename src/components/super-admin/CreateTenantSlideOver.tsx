@@ -39,6 +39,12 @@ interface FormState {
   contentCreatorSeats: string
   startDate: string
   endDate: string
+  // Section 4 (contract) — billing config
+  contractAmount: string
+  contractCurrency: 'INR' | 'USD'
+  payNow: boolean
+  trialPeriodDays: string
+  couponCode: string
   notes: string
   // Control
   isDirty: boolean
@@ -67,6 +73,11 @@ const INITIAL_FORM: FormState = {
   contentCreatorSeats: '',
   startDate: '',
   endDate: '',
+  contractAmount: '',
+  contractCurrency: 'INR',
+  payNow: false,
+  trialPeriodDays: '',
+  couponCode: '',
   notes: '',
   isDirty: false,
   isSubmitting: false,
@@ -534,6 +545,11 @@ export default function CreateTenantSlideOver({
           end_date: form.endDate,
           notes: form.notes.trim() || null,
           content_creator_seats: form.featureMode === 'FULL_CREATOR' ? parseInt(form.contentCreatorSeats) : 0,
+          contract_amount: form.contractAmount ? parseFloat(form.contractAmount) : null,
+          contract_currency: form.contractCurrency,
+          pay_now: form.payNow,
+          trial_period_days: form.payNow ? 0 : (parseInt(form.trialPeriodDays) || 0),
+          coupon_code: form.couponCode.trim() || null,
         })
 
         if (cErr) {
@@ -592,6 +608,11 @@ export default function CreateTenantSlideOver({
       end_date: form.endDate,
       notes: form.notes.trim() || null,
       content_creator_seats: form.featureMode === 'FULL_CREATOR' ? parseInt(form.contentCreatorSeats) : 0,
+      contract_amount: form.contractAmount ? parseFloat(form.contractAmount) : null,
+      contract_currency: form.contractCurrency,
+      pay_now: form.payNow,
+      trial_period_days: form.payNow ? 0 : (parseInt(form.trialPeriodDays) || 0),
+      coupon_code: form.couponCode.trim() || null,
     })
     if (!cErr) {
       setContractError(false)
@@ -976,6 +997,78 @@ export default function CreateTenantSlideOver({
                 }`}
               />
               <FieldError msg={form.errors.endDate} />
+            </div>
+
+            {/* Contract Amount + Currency */}
+            <div>
+              <FieldLabel>Contract Amount</FieldLabel>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.contractAmount}
+                onChange={e => setForm(f => ({ ...f, contractAmount: e.target.value, isDirty: true }))}
+                placeholder="e.g. 480000"
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700"
+              />
+            </div>
+            <div>
+              <FieldLabel>Currency</FieldLabel>
+              <select
+                value={form.contractCurrency}
+                onChange={e => setForm(f => ({ ...f, contractCurrency: e.target.value as 'INR' | 'USD', isDirty: true }))}
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700 bg-white"
+              >
+                <option value="INR">INR — Indian Rupee</option>
+                <option value="USD">USD — US Dollar</option>
+              </select>
+            </div>
+
+            {/* Pay Now toggle */}
+            <div className="col-span-2">
+              <FieldLabel>Billing Mode</FieldLabel>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, payNow: !f.payNow, isDirty: true }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  form.payNow ? 'bg-blue-700' : 'bg-zinc-300'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  form.payNow ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+              <span className="ml-3 text-sm text-zinc-700">
+                {form.payNow ? 'Pay Now — billing starts immediately' : 'Trial first — set trial period below'}
+              </span>
+            </div>
+
+            {/* Trial Period Days — only when payNow=false */}
+            {!form.payNow && (
+              <div className="col-span-2">
+                <FieldLabel>Trial Period (days)</FieldLabel>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.trialPeriodDays}
+                  onChange={e => setForm(f => ({ ...f, trialPeriodDays: e.target.value, isDirty: true }))}
+                  placeholder="e.g. 14 or 30 — enter 0 for no trial"
+                  className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700"
+                />
+                <p className="mt-1 text-xs text-zinc-400">Billing begins after this many days. Enter 0 to skip the trial.</p>
+              </div>
+            )}
+
+            {/* Coupon Code */}
+            <div className="col-span-2">
+              <FieldLabel>Coupon Code <span className="text-zinc-400 font-normal text-xs">(optional)</span></FieldLabel>
+              <input
+                type="text"
+                value={form.couponCode}
+                onChange={e => setForm(f => ({ ...f, couponCode: e.target.value, isDirty: true }))}
+                placeholder="e.g. LAUNCH20"
+                className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-700"
+              />
             </div>
 
             <div className="col-span-2">

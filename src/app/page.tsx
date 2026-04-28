@@ -180,6 +180,20 @@ function PersonaSelector() {
             QA PERSONA
           </span>
         </div>
+        <div
+          onClick={() => handleAdminSelect('/email-templates/b2b-learner')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-emerald-700">
+            <Mail className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">
+            B2B End User Emails
+          </span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-emerald-900 text-emerald-300">
+            QA PERSONA
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 w-full max-w-lg mx-auto">

@@ -19,6 +19,11 @@ interface Contract {
   payment_method_brand: string | null
   payment_method_last4: string | null
   payment_billing_email: string | null
+  contract_amount: number | null
+  contract_currency: string | null
+  pay_now: boolean | null
+  trial_period_days: number | null
+  coupon_code: string | null
 }
 
 interface PaymentHistoryRow {
@@ -145,7 +150,7 @@ export default function BillingPage() {
         .single(),
       supabase
         .from('contracts')
-        .select('id, seat_count, content_creator_seats, start_date, end_date, notes, updated_at, payment_method_brand, payment_method_last4, payment_billing_email')
+        .select('id, seat_count, content_creator_seats, start_date, end_date, notes, updated_at, payment_method_brand, payment_method_last4, payment_billing_email, contract_amount, contract_currency, pay_now, trial_period_days, coupon_code')
         .eq('tenant_id', tenantId)
         .maybeSingle(),
       supabase
@@ -272,6 +277,54 @@ export default function BillingPage() {
                 </p>
               </div>
             </div>
+
+            {/* Billing Config — contract value, billing mode, coupon */}
+            {(contract.contract_amount != null || contract.pay_now != null || contract.coupon_code) && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {contract.contract_amount != null && (
+                  <div className="bg-zinc-50 border border-zinc-200 rounded-md px-4 py-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <FileText className="w-3.5 h-3.5 text-zinc-400" />
+                      <p className="text-xs text-zinc-500">Contract Value</p>
+                    </div>
+                    <p className="text-sm font-semibold text-zinc-900">
+                      {contract.contract_currency === 'USD' ? '$' : '₹'}
+                      {contract.contract_amount.toLocaleString('en-IN')}
+                      {' '}<span className="text-xs font-normal text-zinc-400">{contract.contract_currency ?? 'INR'}</span>
+                    </p>
+                  </div>
+                )}
+                <div className="bg-zinc-50 border border-zinc-200 rounded-md px-4 py-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <CreditCard className="w-3.5 h-3.5 text-zinc-400" />
+                    <p className="text-xs text-zinc-500">Billing Mode</p>
+                  </div>
+                  <p className="text-sm font-semibold text-zinc-900">
+                    {contract.pay_now
+                      ? 'Immediate'
+                      : contract.trial_period_days && contract.trial_period_days > 0
+                        ? `${contract.trial_period_days}-day trial`
+                        : 'Deferred'}
+                  </p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {contract.pay_now
+                      ? 'Billing started immediately upon activation'
+                      : contract.trial_period_days && contract.trial_period_days > 0
+                        ? `Billing begins after a ${contract.trial_period_days}-day trial period`
+                        : 'Billing deferred — contact your account manager'}
+                  </p>
+                </div>
+                {contract.coupon_code && (
+                  <div className="bg-zinc-50 border border-zinc-200 rounded-md px-4 py-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Info className="w-3.5 h-3.5 text-zinc-400" />
+                      <p className="text-xs text-zinc-500">Discount Applied</p>
+                    </div>
+                    <p className="text-sm font-semibold text-zinc-900 font-mono">{contract.coupon_code}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Section 2 — Seat Usage */}

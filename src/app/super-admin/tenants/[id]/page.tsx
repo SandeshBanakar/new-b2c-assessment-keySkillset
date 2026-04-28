@@ -40,6 +40,11 @@ interface Contract {
   payment_method_brand?: string | null
   payment_method_last4?: string | null
   payment_billing_email?: string | null
+  contract_amount?: number | null
+  contract_currency?: string | null
+  pay_now?: boolean | null
+  trial_period_days?: number | null
+  coupon_code?: string | null
 }
 
 interface PaymentHistoryRow {
@@ -1832,6 +1837,11 @@ function TabContract({
     start_date: contract?.start_date?.split('T')[0] ?? '',
     end_date: contract?.end_date?.split('T')[0] ?? '',
     notes: contract?.notes ?? '',
+    contract_amount: contract?.contract_amount != null ? String(contract.contract_amount) : '',
+    contract_currency: (contract?.contract_currency ?? 'INR') as 'INR' | 'USD',
+    pay_now: contract?.pay_now ?? false,
+    trial_period_days: contract?.trial_period_days != null ? String(contract.trial_period_days) : '',
+    coupon_code: contract?.coupon_code ?? '',
     ccSeatsErr: '',
     seatCountErr: '',
     endDateErr: '',
@@ -1853,6 +1863,11 @@ function TabContract({
       start_date: contract?.start_date?.split('T')[0] ?? '',
       end_date: contract?.end_date?.split('T')[0] ?? '',
       notes: contract?.notes ?? '',
+      contract_amount: contract?.contract_amount != null ? String(contract.contract_amount) : '',
+      contract_currency: (contract?.contract_currency ?? 'INR') as 'INR' | 'USD',
+      pay_now: contract?.pay_now ?? false,
+      trial_period_days: contract?.trial_period_days != null ? String(contract.trial_period_days) : '',
+      coupon_code: contract?.coupon_code ?? '',
       ccSeatsErr: '',
       seatCountErr: '',
       endDateErr: '',
@@ -1926,6 +1941,11 @@ function TabContract({
         stripe_subscription_id: contract?.stripe_subscription_id ?? '',
         notes: contractForm.notes,
         updated_at: new Date().toISOString(),
+        contract_amount: contractForm.contract_amount ? parseFloat(contractForm.contract_amount) : null,
+        contract_currency: contractForm.contract_currency,
+        pay_now: contractForm.pay_now,
+        trial_period_days: contractForm.pay_now ? 0 : (parseInt(contractForm.trial_period_days) || 0),
+        coupon_code: contractForm.coupon_code.trim() || null,
       }
 
       let savedId = contract?.id
@@ -2113,6 +2133,79 @@ function TabContract({
                 )}
               </div>
             </div>
+            {/* Contract Amount + Currency */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1.5">Contract Amount</label>
+                <input
+                  type="number" min={0} step="0.01"
+                  value={contractForm.contract_amount}
+                  onChange={e => setContractForm(f => ({ ...f, contract_amount: e.target.value }))}
+                  placeholder="e.g. 480000"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1.5">Currency</label>
+                <select
+                  value={contractForm.contract_currency}
+                  onChange={e => setContractForm(f => ({ ...f, contract_currency: e.target.value as 'INR' | 'USD' }))}
+                  className={`${inputCls} bg-white`}
+                >
+                  <option value="INR">INR — Indian Rupee</option>
+                  <option value="USD">USD — US Dollar</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Pay Now toggle */}
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Billing Mode</label>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setContractForm(f => ({ ...f, pay_now: !f.pay_now }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    contractForm.pay_now ? 'bg-blue-700' : 'bg-zinc-300'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    contractForm.pay_now ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+                <span className="text-sm text-zinc-700">
+                  {contractForm.pay_now ? 'Pay Now — billing starts immediately' : 'Trial first — billing deferred'}
+                </span>
+              </div>
+            </div>
+
+            {/* Trial Period Days — only when pay_now=false */}
+            {!contractForm.pay_now && (
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1.5">Trial Period (days)</label>
+                <input
+                  type="number" min={0}
+                  value={contractForm.trial_period_days}
+                  onChange={e => setContractForm(f => ({ ...f, trial_period_days: e.target.value }))}
+                  placeholder="e.g. 14 — enter 0 for no trial"
+                  className={inputCls}
+                />
+                <p className="text-xs text-zinc-400 mt-1">Billing begins after this many days.</p>
+              </div>
+            )}
+
+            {/* Coupon Code */}
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Coupon Code <span className="text-zinc-400 font-normal">(optional)</span></label>
+              <input
+                type="text"
+                value={contractForm.coupon_code}
+                onChange={e => setContractForm(f => ({ ...f, coupon_code: e.target.value }))}
+                placeholder="e.g. LAUNCH20"
+                className={inputCls}
+              />
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-zinc-600 mb-1.5">Notes</label>
               <textarea rows={3} value={contractForm.notes}
@@ -2177,6 +2270,32 @@ function TabContract({
                 <p className="text-xs text-zinc-400">End Date</p>
                 <p className="text-sm font-medium text-zinc-900 mt-0.5">{contract?.end_date ? formatDate(contract.end_date) : '—'}</p>
               </div>
+              {contract?.contract_amount != null && (
+                <div>
+                  <p className="text-xs text-zinc-400">Contract Amount</p>
+                  <p className="text-sm font-medium text-zinc-900 mt-0.5">
+                    {contract.contract_currency === 'USD' ? '$' : '₹'}
+                    {contract.contract_amount.toLocaleString('en-IN')}
+                    {' '}<span className="text-xs text-zinc-400">{contract.contract_currency ?? 'INR'}</span>
+                  </p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-zinc-400">Billing Mode</p>
+                <p className="text-sm font-medium text-zinc-900 mt-0.5">
+                  {contract?.pay_now
+                    ? 'Pay Now — billing starts immediately'
+                    : contract?.trial_period_days && contract.trial_period_days > 0
+                      ? `Trial first — ${contract.trial_period_days} day${contract.trial_period_days !== 1 ? 's' : ''} before billing`
+                      : 'Trial first — no trial days set'}
+                </p>
+              </div>
+              {contract?.coupon_code && (
+                <div>
+                  <p className="text-xs text-zinc-400">Coupon Code</p>
+                  <p className="text-sm font-medium text-zinc-900 mt-0.5 font-mono">{contract.coupon_code}</p>
+                </div>
+              )}
             </div>
             {contract?.notes && (
               <div>

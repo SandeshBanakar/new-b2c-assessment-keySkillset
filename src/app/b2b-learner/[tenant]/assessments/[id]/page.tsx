@@ -13,6 +13,7 @@ import {
   FileText,
   CheckCircle2,
   XCircle,
+  Info,
   Download,
   TrendingUp,
   Layers,
@@ -23,6 +24,7 @@ import {
   X,
   Lock,
   Mail,
+  RefreshCw,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useB2BLearner } from '@/context/B2BLearnerContext';
@@ -317,36 +319,43 @@ function B2BAttemptsTab({
 
 // ─── Report Card Modal ────────────────────────────────────────────────────────
 
-const REPORT_CARD_SECTIONS = [
-  'Score summary across all attempts',
-  'Pass / Fail status per attempt',
-  'Time taken per attempt',
-  'Certificate eligibility status',
-  'Performance trend analysis',
-  'Improvement recommendations',
+const REPORT_CARD_PAYLOAD_FIELDS: { label: string; field: string; note?: string }[] = [
+  { label: 'Learner name & email',       field: 'learner_name, learner_email' },
+  { label: 'Institution (co-branded)',   field: 'company_name + platform_name' },
+  { label: 'Assessment title',           field: 'assessment_title' },
+  { label: 'Attempt number',             field: 'attempt_number' },
+  { label: 'Score percentage',           field: 'score_pct' },
+  { label: 'Pass / Fail outcome',        field: 'passed' },
+  { label: 'Total time taken',           field: 'time_taken_seconds' },
+  { label: 'Per-question time (raw)',    field: 'time_per_question[]', note: 'Production exam engine only' },
+  { label: 'Avg · Slowest · Fastest time', field: 'avg / slowest / fastest_question_time_seconds' },
+  { label: 'All attempt scores (trend)', field: 'attempt_history[]' },
+  { label: 'Average & best score',       field: 'average_score_pct, best_score_pct' },
+  { label: 'Certificate eligibility',   field: 'certificate_eligible' },
+  { label: 'Certificate number',         field: 'certificate_number' },
 ];
 
 function ReportCardModal({
   onClose,
-  onRequest,
+  onResend,
   hasAttempts,
 }: {
   onClose: () => void;
-  onRequest: () => void;
+  onResend: () => void;
   hasAttempts: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-zinc-100">
+        <div className="flex items-center justify-between p-5 border-b border-zinc-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
               <FileSpreadsheet className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-zinc-900">Request Report Card</h2>
-              <p className="text-xs text-zinc-500">Assessment performance summary</p>
+              <h2 className="text-sm font-semibold text-zinc-900">Assessment Report Card</h2>
+              <p className="text-xs text-zinc-500">Auto-delivered via Salesforce after every attempt</p>
             </div>
           </div>
           <button
@@ -357,58 +366,80 @@ function ReportCardModal({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-5 space-y-4">
-          {/* What's included */}
+        {/* Body — scrollable */}
+        <div className="p-5 space-y-4 overflow-y-auto">
+          {/* Delivery status */}
+          {hasAttempts ? (
+            <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <Mail className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-800 leading-relaxed">
+                Your report card was <span className="font-semibold">automatically emailed</span> to
+                your registered address after completing this attempt. Please check your inbox.
+                <br />
+                <span className="text-blue-600 mt-1 block">
+                  Didn&apos;t receive it? Use &ldquo;Request Re-send&rdquo; below.
+                </span>
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 bg-zinc-50 border border-zinc-200 rounded-xl p-3">
+              <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                Your report card will be automatically emailed to your registered address after
+                you complete your first attempt. No action needed — it&apos;s sent by Salesforce.
+              </p>
+            </div>
+          )}
+
+          {/* Salesforce payload fields */}
           <div className="bg-zinc-50 rounded-xl p-4 space-y-3">
             <p className="text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              What&apos;s included
+              What&apos;s in your report card
+            </p>
+            <p className="text-xs text-zinc-400">
+              Salesforce generates a PDF from these data fields and emails it to you.
             </p>
             <ul className="space-y-1.5">
-              {REPORT_CARD_SECTIONS.map((item) => (
-                <li key={item} className="flex items-center gap-2 text-xs text-zinc-600">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                  {item}
+              {REPORT_CARD_PAYLOAD_FIELDS.map((item) => (
+                <li key={item.field} className="flex items-start gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <span className="text-xs text-zinc-700">{item.label}</span>
+                    {item.note && (
+                      <span className="ml-1.5 text-xs text-amber-600 font-medium">· {item.note}</span>
+                    )}
+                    <code className="block text-xs text-zinc-400 font-mono">{item.field}</code>
+                  </div>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Eligibility */}
-          {!hasAttempts && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-              <p className="text-xs font-semibold text-amber-900 mb-0.5">Eligibility</p>
-              <p className="text-xs text-amber-700">
-                Complete at least one assessment attempt to request your report card.
-              </p>
-            </div>
-          )}
-
-          {/* Delivery */}
-          <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
-            <Mail className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-800 leading-relaxed">
-              Your report card will be generated and sent to your registered email address via
-              our Salesforce-powered communication platform within{' '}
-              <span className="font-semibold">24 hours</span> of your request.
+          {/* Placeholder sections note */}
+          <div className="bg-teal-50 border border-teal-100 rounded-xl p-3">
+            <p className="text-xs font-semibold text-teal-800 mb-0.5">Coming in V2</p>
+            <p className="text-xs text-teal-700">
+              Section Breakdown · Concept Mastery · Pacing Analysis · Mistake Taxonomy —
+              these will be added once the exam engine surfaces per-question analytics.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 px-5 pb-5">
+        <div className="flex gap-3 px-5 pb-5 shrink-0">
           <button
             onClick={onClose}
             className="flex-1 py-2 text-sm text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
           >
-            Cancel
+            Close
           </button>
           <button
-            onClick={onRequest}
+            onClick={onResend}
             disabled={!hasAttempts}
-            className="flex-1 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Request Report Card
+            <RefreshCw className="w-3.5 h-3.5" />
+            Request Re-send
           </button>
         </div>
       </div>
@@ -449,7 +480,7 @@ function B2BAnalyticsTab({
     }
   }
 
-  function handleRequest() {
+  function handleResend() {
     setRequested(true);
     setShowModal(false);
   }
@@ -466,31 +497,26 @@ function B2BAnalyticsTab({
             <p className="text-sm font-semibold text-blue-900">Report Card</p>
             <p className="text-xs text-blue-700 mt-0.5">
               {requested
-                ? 'Request submitted — your report card will be emailed within 24 hours.'
-                : 'Comprehensive performance report delivered to your email.'}
+                ? 'Re-send requested — check your registered email inbox.'
+                : attempts.length === 0
+                ? 'Will be automatically emailed after your first attempt.'
+                : 'Sent to your email after each attempt via Salesforce.'}
             </p>
           </div>
         </div>
-        {!requested ? (
-          <button
-            onClick={() => setShowModal(true)}
-            disabled={attempts.length === 0}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Download
-          </button>
-        ) : (
-          <span className="shrink-0 text-xs font-medium text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">
-            Requested
-          </span>
-        )}
+        <button
+          onClick={() => setShowModal(true)}
+          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-blue-300 text-blue-700 bg-white rounded-lg hover:bg-blue-50 transition-colors"
+        >
+          <Info className="w-3.5 h-3.5" />
+          Details
+        </button>
       </div>
 
       {showModal && (
         <ReportCardModal
           onClose={() => setShowModal(false)}
-          onRequest={handleRequest}
+          onResend={handleResend}
           hasAttempts={attempts.length > 0}
         />
       )}

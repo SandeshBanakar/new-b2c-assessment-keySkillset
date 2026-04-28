@@ -399,12 +399,24 @@ id, tenant_id (FK→tenants), plan_id (FK→plans), created_at
 
 ### contracts
 ```
-seat_count, arr, start_date, end_date, stripe_subscription_id, notes,
-updated_at, content_creator_seats (DEFAULT 0)
+seat_count, arr_inr (numeric nullable — replaces arr_usd_cents, KSS-DB-058),
+start_date, end_date, stripe_subscription_id, notes,
+updated_at, content_creator_seats (DEFAULT 0),
+payment_method_brand (text nullable), payment_method_last4 (text nullable),
+payment_billing_email (text nullable),
+contract_amount (numeric 12,2 nullable — KSS-DB-059),
+contract_currency (text DEFAULT 'INR' — 'INR'|'USD', KSS-DB-059),
+trial_period_days (int DEFAULT 0 — KSS-DB-059),
+coupon_code (text nullable — KSS-DB-059),
+pay_now (boolean DEFAULT false — KSS-DB-059)
 ```
 - `content_creator_seats` visible ONLY when `feature_toggle_mode='FULL_CREATOR'`
 - ARR display: `Math.max(0, Number || 0)` — never show negative
 - Label: "Learner Seats" (NOT "Seat Count")
+- `arr_usd_cents` DROPPED in KSS-DB-058 — use `arr_inr` (raw INR value, not cents)
+- `pay_now=true` → `trial_period_days` forced to 0 in save payload regardless of UI input
+- CA Billing shows billing mode with contextual text (not raw field values)
+- KSS-DB-059: migration SQL at `docs/requirements/KSS-DB-059.sql` — adds 5 new columns + seeds TechCorp
 
 ### b2c_assessment_subscriptions
 ```
