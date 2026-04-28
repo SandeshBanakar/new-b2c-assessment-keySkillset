@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Calendar, Users, UserCog, HardDrive, Mail, FileText } from 'lucide-react'
+import { Calendar, Users, UserCog, HardDrive, Mail, FileText, CreditCard, Info } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId } from '@/lib/client-admin/tenants'
 
@@ -16,6 +16,18 @@ interface Contract {
   end_date: string
   notes: string | null
   updated_at: string | null
+  payment_method_brand: string | null
+  payment_method_last4: string | null
+  payment_billing_email: string | null
+}
+
+interface PaymentHistoryRow {
+  id: string
+  invoice_id: string | null
+  amount_inr: number
+  status: string
+  payment_date: string
+  description: string | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -120,6 +132,7 @@ export default function BillingPage() {
   const [tenantMode, setTenantMode] = useState<string | null>(null)
   const [activeLearners, setActiveLearners] = useState(0)
   const [activeCCs, setActiveCCs] = useState(0)
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -132,7 +145,7 @@ export default function BillingPage() {
         .single(),
       supabase
         .from('contracts')
-        .select('id, seat_count, content_creator_seats, start_date, end_date, notes, updated_at')
+        .select('id, seat_count, content_creator_seats, start_date, end_date, notes, updated_at, payment_method_brand, payment_method_last4, payment_billing_email')
         .eq('tenant_id', tenantId)
         .maybeSingle(),
       supabase
@@ -148,9 +161,20 @@ export default function BillingPage() {
         .eq('is_active', true),
     ]).then(([tenantRes, contractRes, learnersRes, ccsRes]) => {
       setTenantMode(tenantRes.data?.feature_toggle_mode ?? null)
-      setContract(contractRes.data as Contract | null)
+      const c = contractRes.data as Contract | null
+      setContract(c)
       setActiveLearners(learnersRes.count ?? 0)
       setActiveCCs(ccsRes.count ?? 0)
+
+      if (c?.id) {
+        supabase
+          .from('contract_payment_history')
+          .select('id, invoice_id, amount_inr, status, payment_date, description')
+          .eq('contract_id', c.id)
+          .order('payment_date', { ascending: false })
+          .then(({ data }) => setPaymentHistory(data ?? []))
+      }
+
       setLoading(false)
     })
   }, [tenantId])
@@ -306,7 +330,80 @@ export default function BillingPage() {
             </div>
           )}
 
-          {/* Section 4 — Notes (conditional) */}
+          {/* Section 4 — Payment Details */}
+          {(contract.payment_method_brand || contract.payment_billing_email) && (
+            <div className="bg-white border border-zinc-200 rounded-md px-6 py-5">
+              <div className="flex items-center gap-2 mb-4">
+                <CreditCard className="w-4 h-4 text-zinc-400" />
+                <p className="text-sm font-semibold text-zinc-900">Payment Details</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-zinc-50 border border-zinc-200 rounded-md px-4 py-3">
+                  <p className="text-xs text-zinc-500 mb-1">Card on File</p>
+                  <p className="text-sm font-semibold text-zinc-900">
+                    {contract.payment_method_brand && contract.payment_method_last4
+                      ? `${contract.payment_method_brand.charAt(0).toUpperCase()}${contract.payment_method_brand.slice(1)} •••• ${contract.payment_method_last4}`
+                      : '—'
+                    }
+                  </p>
+                </div>
+                <div className="bg-zinc-50 border border-zinc-200 rounded-md px-4 py-3">
+                  <p className="text-xs text-zinc-500 mb-1">Billing Email</p>
+                  <p className="text-sm font-semibold text-zinc-900 break-all">
+                    {contract.payment_billing_email ?? '—'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 mt-3">
+                <Info className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <p className="text-xs text-zinc-400">Payment details are managed via Stripe and updated by your keySkillset account manager.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Section 5 — Payment History */}
+          {paymentHistory.length > 0 && (
+            <div className="bg-white border border-zinc-200 rounded-md px-6 py-5">
+              <p className="text-sm font-semibold text-zinc-900 mb-4">Payment History</p>
+              <div className="border border-zinc-200 rounded-md overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-zinc-50 border-b border-zinc-200">
+                    <tr>
+                      <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">DATE</th>
+                      <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5 hidden sm:table-cell">DESCRIPTION</th>
+                      <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">AMOUNT</th>
+                      <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2.5">STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {paymentHistory.map((row) => (
+                      <tr key={row.id}>
+                        <td className="px-4 py-3 text-xs text-zinc-600">
+                          {new Date(row.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-zinc-600 hidden sm:table-cell">{row.description ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-zinc-900">
+                          ₹{row.amount_inr.toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
+                            row.status === 'paid'    ? 'bg-green-50 text-green-700' :
+                            row.status === 'failed'  ? 'bg-rose-50 text-rose-700' :
+                            row.status === 'refunded'? 'bg-amber-50 text-amber-700' :
+                            'bg-zinc-100 text-zinc-500'
+                          }`}>
+                            {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Section 6 — Notes (conditional) */}
           {contract.notes && (
             <div className="bg-white border border-zinc-200 rounded-md px-6 py-5">
               <p className="text-sm font-semibold text-zinc-900 mb-2">Contract Notes</p>
@@ -314,7 +411,7 @@ export default function BillingPage() {
             </div>
           )}
 
-          {/* Section 5 — Contact CTA */}
+          {/* Section 7 — Contact CTA */}
           <div className="bg-violet-50 border border-violet-200 rounded-md px-6 py-5">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>

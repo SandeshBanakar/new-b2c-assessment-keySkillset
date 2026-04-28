@@ -6,6 +6,81 @@
 
 ## COMPLETED WORK LOG
 
+### April 28, 2026 — KSS-SA-BILLING-001 + KSS-B2C-BUNDLE-001 (COMPLETE)
+
+**Build:** ✅ PASSED · **DB:** KSS-DB-058 ✅ ALL STEPS (including DROP arr_usd_cents)
+
+**KSS-SA-BILLING-001 — SA Contracts Payment & Billing + CA Billing:**
+- **DB-058:** Added `arr_inr INTEGER`, `payment_method_brand`, `payment_method_last4`, `payment_billing_email` to `contracts`. Created `contract_payment_history` table. Seeded Akash: `cus_SQkRm7AkashDelhi24`, `sub_SQkRm7AkashInst01`, Visa ••••4242, ARR ₹12,00,000, 4× quarterly payment history rows. Dropped `arr_usd_cents`.
+- `analytics.ts`: `arr_usd_cents` → `arr_inr`, removed USD×83 conversion (direct INR).
+- SA `tenants/[id]/page.tsx`: Contract interface updated, `arrDisplay` now shows `₹12,00,000 / year`. Payment & Billing section expanded with **Payment Details** (card on file, billing email, next charge) and **Payment History** table — both DB-driven from `contract_payment_history`.
+- CA `billing/page.tsx`: Added Payment Details card + Payment History table sections (conditional on data presence, with Stripe provenance note).
+
+**KSS-B2C-BUNDLE-001 — B2C User Bundle Courses:**
+- `b2c-users/[id]/page.tsx`: Added hardcoded `BUNDLE_DATA` for Divya Patel (2 complete, 1 in-progress) and Siddharth Bose (2 complete, 1 in-progress) — Excel Bundle × 5 courses (Excel Basics, Excel Intermediate, Excel Advanced, VLOOKUP Mastery, Pivot Tables).
+- Three new components: `BundleRow` (expandable bundle header), `BundleCourseRow` (expandable per-course with progress bar), `BundleModuleBreakdown` (reuses same module+topic pattern as `CoursePlanRow`).
+- Section renders below Course Plans, matched by `user.displayName`.
+
+---
+
+### April 28, 2026 — KSS-AUTH-001: B2C Auth Screens + Suspended/Deactivated States + CA Email Templates + PRD (COMPLETE)
+
+**Build:** ✅ PASSED  
+**PRD:** `prds/end-user/PRD-B2C-CA-AUTH-SCREENS-001.md` (LOCKED)
+
+**New Pages (3):**
+
+`/login` (`src/app/login/page.tsx`):
+- Production-matching B2C login — split-panel layout (form left, dark illustration right), hidden on mobile.
+- Fields: Email Address *, Password * (eye toggle), Forgot Password? right-aligned.
+- CTAs: Log In (green-600 rounded-full), Sign Up (outlined dark border) → `/signup`, blue-50 info note.
+- Suspended user state via `?state=suspended&reason=...` URL param — replaces form with rose AlertTriangle panel (reason box + support email + back link).
+- Demo state switcher at bottom of form for QA navigation.
+
+`/signup` (`src/app/signup/page.tsx`):
+- Production-matching B2C signup — same split-panel layout.
+- Fields: First Name * + Last Name (grid row), Email *, Phone (country selector stub), Create Password * (eye toggle), Terms checkbox (gates button).
+- CTAs: Create Account (green-600 rounded-full, disabled until checkbox), "Already have an account? Login" link.
+
+`/client-admin/login` (`src/app/client-admin/login/page.tsx`):
+- CA-specific login — violet-700 branding throughout (ring, CTA, focus ring).
+- Portal badge row: Building2 icon + "Client Admin Portal".
+- Info note: violet-50 box clarifying CA-only use + link to `/login` for B2C users.
+- Deactivated CA state via `?state=deactivated` — amber AlertTriangle panel listing 4 implications + support contact + back link.
+- No routing conflict: Next.js resolves `/client-admin/login` (static) before `/client-admin/[tenant]` (dynamic).
+
+**Persona Selector — Auth Screens section** (`src/app/page.tsx`):
+- 5 new tiles added between Email Templates and Content Creator Personas sections.
+- LogIn, UserPlus, AlertTriangle icons imported from lucide-react.
+- Tiles: B2C Sign Up (green), B2C Login (blue), Login-Suspended (rose), CA Login (violet), CA Login-Deactivated (amber).
+
+**Email Templates — Client Admin Emails (2 new):**
+
+`client-admin-deactivated.html`:
+- amber-800 hero (`#92400E`), keySkillset logo, informational-only (no CTA).
+- Body: greeting, amber-50 box with 4 bullet implications (portal access removed, learners unaffected, data preserved, can be reactivated), escalation sentence.
+- Variables: `{{full_name}}`, `{{company_name}}`, `{{platform_name}}`, `{{support_email}}`.
+
+`client-admin-reactivated.html`:
+- green-800 hero (`#166534`), keySkillset logo, green "Log In to Admin Portal" CTA button.
+- Body: greeting, green-50 box with 4 restored capabilities (portal access, learner management, catalog/billing/config, data preserved), CTA + fallback URL.
+- Variables: `{{full_name}}`, `{{company_name}}`, `{{platform_name}}`, `{{support_email}}`, `{{cta_url}}`.
+
+**Types & Data wired:**
+- `types.ts`: `EmailTemplateId` union extended with `'client-admin-deactivated' | 'client-admin-reactivated'`.
+- `data.ts`: Both templates added to `EMAIL_TEMPLATE_DEFINITIONS` with `featureApplicability: 'ALL'` — appear in Akash + TechCorp tenant email template index.
+- `buildPreviewPayload()`: dedicated branches for both new template IDs with correct recipient names + context.
+
+**PRD scope:** B2C signup/login layout spec, suspended-user state BDD, CA login spec, CA deactivated-state BDD, Salesforce payload schema for CA deactivation trigger, production hook approach (not yet built — deferred), email design system compliance notes.
+
+**Key decisions locked (Apr 28 2026):**
+- Suspended state: URL param `?state=suspended` for demo; production resolves from auth server response.
+- Deactivated CA state: URL param `?state=deactivated`; production resolves from DB `admin_users.is_active`.
+- Salesforce hook (production — deferred): POST payload on SA Deactivate/Reactivate clicks. Not built in V1.
+- CA deactivated/reactivated templates scoped `ALL` tenants — not B2C-only.
+
+---
+
 ### April 28, 2026 — KSS-CA-CHANGES-001: Client Admin Dashboard + Users & Roles Fix + Billing Page (COMPLETE)
 
 **Build:** ✅ PASSED

@@ -7,6 +7,8 @@ export type EmailTemplateId =
   | 'certificate-of-completion'
   | 'b2c-user-suspended'
   | 'b2c-access-restored'
+  | 'client-admin-deactivated'
+  | 'client-admin-reactivated'
 
 export type TenantEmailSlug = 'akash' | 'techcorp' | 'keyskillset'
 

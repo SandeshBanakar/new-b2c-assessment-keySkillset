@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool, FlaskConical, Atom, Scale, Mail, GraduationCap } from 'lucide-react';
+import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool, FlaskConical, Atom, Scale, Mail, GraduationCap, LogIn, UserPlus, AlertTriangle } from 'lucide-react';
 import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
 import type { DemoUser } from '@/data/demoUsers';
@@ -179,6 +179,65 @@ function PersonaSelector() {
           <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-blue-900 text-blue-300">
             QA PERSONA
           </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 w-full max-w-lg mx-auto">
+        <div className="flex-1 h-px bg-zinc-800" />
+        <p className="text-xs text-zinc-600 whitespace-nowrap">Auth Screens</p>
+        <div className="flex-1 h-px bg-zinc-800" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6">
+        <div
+          onClick={() => handleAdminSelect('/signup')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-green-700">
+            <UserPlus className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">B2C Sign Up</span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-green-900 text-green-300">AUTH_SCREEN</span>
+        </div>
+        <div
+          onClick={() => handleAdminSelect('/login')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-blue-700">
+            <LogIn className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">B2C Login</span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-blue-900 text-blue-300">AUTH_SCREEN</span>
+        </div>
+        <div
+          onClick={() => handleAdminSelect('/login?state=suspended&reason=Your+account+was+flagged+for+suspicious+activity.')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-rose-700">
+            <AlertTriangle className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">Login — Suspended</span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-rose-900 text-rose-300">SUSPENDED</span>
+        </div>
+        <div
+          onClick={() => handleAdminSelect('/client-admin/login')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-violet-700">
+            <LogIn className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">CA Login</span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-violet-900 text-violet-300">AUTH_SCREEN</span>
+        </div>
+        <div
+          onClick={() => handleAdminSelect('/client-admin/login?state=deactivated')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-amber-700">
+            <AlertTriangle className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">CA Login — Deactivated</span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-amber-900 text-amber-300">DEACTIVATED</span>
         </div>
       </div>
 

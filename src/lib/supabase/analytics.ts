@@ -83,7 +83,7 @@ export type TenantRow = {
   isActive: boolean
   totalLearners: number
   activeLearners: number       // learner_attempts in range
-  arr: number                  // arr_usd_cents ÷ 100 × 83 (INR)
+  arr: number                  // arr_inr (whole rupees, from contracts.arr_inr)
   contractEnd: string | null   // end_date ISO
   isExpiringSoon: boolean      // end_date within range
 }
@@ -225,7 +225,7 @@ export async function fetchTenantsAnalytics(range: DateRange): Promise<TenantsDa
   const [tenantsRes, contractsRes, learnersRes, attemptsByTenantRes] = await Promise.all([
     supabase.from('tenants').select('id, name, is_active'),
 
-    supabase.from('contracts').select('tenant_id, arr_usd_cents, end_date'),
+    supabase.from('contracts').select('tenant_id, arr_inr, end_date'),
 
     supabase.from('learners').select('id, tenant_id, status'),
 
@@ -241,10 +241,10 @@ export async function fetchTenantsAnalytics(range: DateRange): Promise<TenantsDa
   const learners = learnersRes.data ?? []
   const b2bAttempts = attemptsByTenantRes.data ?? []
 
-  const contractMap: Record<string, { arrUsdCents: number; endDate: string | null }> = {}
+  const contractMap: Record<string, { arrInr: number; endDate: string | null }> = {}
   for (const c of contracts) {
     contractMap[c.tenant_id] = {
-      arrUsdCents: c.arr_usd_cents ?? 0,
+      arrInr: c.arr_inr ?? 0,
       endDate: c.end_date ?? null,
     }
   }
@@ -270,8 +270,8 @@ export async function fetchTenantsAnalytics(range: DateRange): Promise<TenantsDa
   const rangeEndMs = new Date(range.to).getTime()
 
   const tenantRows: TenantRow[] = tenants.map((t) => {
-    const contract = contractMap[t.id] ?? { arrUsdCents: 0, endDate: null }
-    const arrInr = Math.round((contract.arrUsdCents / 100) * 83)
+    const contract = contractMap[t.id] ?? { arrInr: 0, endDate: null }
+    const arrInr = contract.arrInr
     const endDate = contract.endDate ?? null
     const isExpiringSoon = endDate
       ? new Date(endDate).getTime() <= rangeEndMs &&

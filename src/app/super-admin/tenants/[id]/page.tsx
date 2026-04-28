@@ -30,13 +30,25 @@ interface Contract {
   tenant_id: string
   seat_count: number
   content_creator_seats?: number | null
-  arr_usd_cents: number
+  arr_inr?: number | null
   start_date: string
   end_date: string
   stripe_subscription_id: string
   notes: string
   updated_at?: string
   plan_id?: string | null
+  payment_method_brand?: string | null
+  payment_method_last4?: string | null
+  payment_billing_email?: string | null
+}
+
+interface PaymentHistoryRow {
+  id: string
+  invoice_id: string | null
+  amount_inr: number
+  status: string
+  payment_date: string
+  description: string | null
 }
 
 interface AdminUser {
@@ -1799,6 +1811,19 @@ function TabContract({
   const { showToast } = useToast()
   const isFullCreator = featureToggleMode === 'FULL_CREATOR'
 
+  // Payment history
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryRow[]>([])
+
+  useEffect(() => {
+    if (!contract?.id) return
+    supabase
+      .from('contract_payment_history')
+      .select('id, invoice_id, amount_inr, status, payment_date, description')
+      .eq('contract_id', contract.id)
+      .order('payment_date', { ascending: false })
+      .then(({ data }) => setPaymentHistory(data ?? []))
+  }, [contract?.id])
+
   // Contract Terms edit state
   const [editingContract, setEditingContract] = useState(false)
   const [contractForm, setContractForm] = useState({
@@ -1895,7 +1920,7 @@ function TabContract({
         tenant_id: tenantId,
         seat_count: seatNum,
         content_creator_seats: isFullCreator ? ccNum : 0,
-        arr_usd_cents: contract?.arr_usd_cents ?? 0,
+        arr_inr: contract?.arr_inr ?? null,
         start_date: contractForm.start_date,
         end_date: contractForm.end_date,
         stripe_subscription_id: contract?.stripe_subscription_id ?? '',
@@ -1981,8 +2006,8 @@ function TabContract({
   const readVal = (v: string | number | null | undefined) =>
     v != null && v !== '' ? String(v) : <span className="text-zinc-400">—</span>
 
-  const arrDisplay = contract?.arr_usd_cents != null && contract.arr_usd_cents > 0
-    ? `$${(contract.arr_usd_cents / 100).toFixed(2)} / year`
+  const arrDisplay = contract?.arr_inr != null && contract.arr_inr > 0
+    ? `₹${contract.arr_inr.toLocaleString('en-IN')} / year`
     : null
 
   return (
@@ -2167,8 +2192,8 @@ function TabContract({
       </div>
 
       {/* Section 2 — Payment & Billing */}
-      <div className="bg-white rounded-md border border-zinc-200 p-5">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-md border border-zinc-200 p-5 space-y-5">
+        <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-zinc-900">Payment &amp; Billing</p>
           {!editingStripe && (
             <button
@@ -2176,11 +2201,12 @@ function TabContract({
               className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800 border border-blue-200 rounded-md px-3 py-1.5 hover:bg-blue-50 transition-colors"
             >
               <Pencil className="w-3 h-3" />
-              Edit Stripe
+              Edit Stripe IDs
             </button>
           )}
         </div>
 
+        {/* Stripe IDs — editable */}
         {editingStripe ? (
           <div className="space-y-4">
             <div>
@@ -2213,13 +2239,13 @@ function TabContract({
           <div className="grid grid-cols-2 gap-x-8 gap-y-3">
             <div>
               <p className="text-xs text-zinc-400">Stripe Customer ID</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5 font-mono text-xs">
+              <p className="mt-0.5 font-mono text-xs font-medium text-zinc-900">
                 {readVal(tenantStripeCustomerId)}
               </p>
             </div>
             <div>
               <p className="text-xs text-zinc-400">Subscription ID</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5 font-mono text-xs">
+              <p className="mt-0.5 font-mono text-xs font-medium text-zinc-900">
                 {readVal(contract?.stripe_subscription_id)}
               </p>
             </div>
@@ -2228,17 +2254,100 @@ function TabContract({
               {arrDisplay ? (
                 <>
                   <p className="text-sm font-medium text-zinc-900 mt-0.5">{arrDisplay}</p>
-                  <p className="text-xs text-zinc-400 mt-0.5">Calculated from Stripe</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">Backfilled from Stripe</p>
                 </>
               ) : (
                 <>
                   <p className="text-sm font-medium text-zinc-400 mt-0.5">—</p>
-                  <p className="text-xs text-zinc-400 mt-0.5">Calculated from Stripe</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">Backfilled from Stripe</p>
                 </>
               )}
             </div>
           </div>
         )}
+
+        {/* Payment Details — backfilled from Stripe */}
+        <div className="border-t border-zinc-100 pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Payment Details</p>
+            <span className="text-xs text-zinc-400 font-normal normal-case tracking-normal">· Backfilled from Stripe</span>
+          </div>
+          <div className="grid grid-cols-3 gap-x-8 gap-y-3">
+            <div>
+              <p className="text-xs text-zinc-400">Card on File</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5">
+                {contract?.payment_method_brand && contract?.payment_method_last4
+                  ? `${contract.payment_method_brand.charAt(0).toUpperCase()}${contract.payment_method_brand.slice(1)} •••• ${contract.payment_method_last4}`
+                  : <span className="text-zinc-400">—</span>
+                }
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-400">Billing Email</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5">
+                {readVal(contract?.payment_billing_email)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-400">Next Charge</p>
+              <p className="text-sm font-medium text-zinc-900 mt-0.5">
+                {contract?.end_date
+                  ? formatDate(contract.end_date)
+                  : <span className="text-zinc-400">—</span>
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment History — backfilled from Stripe */}
+        <div className="border-t border-zinc-100 pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Payment History</p>
+            <span className="text-xs text-zinc-400 font-normal normal-case tracking-normal">· Backfilled from Stripe</span>
+          </div>
+          {paymentHistory.length === 0 ? (
+            <p className="text-xs text-zinc-400 py-2">No payment history on record.</p>
+          ) : (
+            <div className="border border-zinc-200 rounded-md overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-zinc-50 border-b border-zinc-200">
+                  <tr>
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">DATE</th>
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">DESCRIPTION</th>
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">INVOICE ID</th>
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">AMOUNT</th>
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {paymentHistory.map((row) => (
+                    <tr key={row.id} className="hover:bg-zinc-50 transition-colors">
+                      <td className="px-4 py-3 text-xs text-zinc-500">
+                        {new Date(row.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-zinc-700">{row.description ?? '—'}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-zinc-500">{row.invoice_id ?? '—'}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-zinc-900">
+                        ₹{row.amount_inr.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
+                          row.status === 'paid'    ? 'bg-green-50 text-green-700' :
+                          row.status === 'failed'  ? 'bg-rose-50 text-rose-700' :
+                          row.status === 'refunded'? 'bg-amber-50 text-amber-700' :
+                          'bg-zinc-100 text-zinc-500'
+                        }`}>
+                          {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Section 3 — Storage & Hosting (FULL_CREATOR only) */}

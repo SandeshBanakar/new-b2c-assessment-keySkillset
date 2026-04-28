@@ -185,6 +185,45 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     previewHeight: 1160,
   },
   {
+    id: 'client-admin-deactivated',
+    name: 'Client Admin Account Deactivated',
+    filename: 'client-admin-deactivated.html',
+    recipient: 'Client Admin',
+    triggerEvent: 'Sent when a Super Admin deactivates a tenant (Client Admin loses portal access).',
+    featureApplicability: 'ALL',
+    primaryCtaStyle: 'Informational — no CTA',
+    subject: 'Your Client Admin access has been deactivated — {{company_name}}',
+    summary: 'Notifies the Client Admin that their portal access has been deactivated, explains implications, and provides support contact.',
+    whenTriggered: 'Trigger when Super Admin clicks "Deactivate" on a tenant in the Tenant Overview tab.',
+    variables: [
+      '{{full_name}}',
+      '{{company_name}}',
+      '{{platform_name}}',
+      '{{support_email}}',
+    ],
+    previewHeight: 900,
+  },
+  {
+    id: 'client-admin-reactivated',
+    name: 'Client Admin Account Reactivated',
+    filename: 'client-admin-reactivated.html',
+    recipient: 'Client Admin',
+    triggerEvent: 'Sent when a Super Admin reactivates a previously deactivated tenant.',
+    featureApplicability: 'ALL',
+    primaryCtaStyle: 'Tour-first CTA with login support',
+    subject: 'Your Client Admin access has been restored — {{company_name}}',
+    summary: 'Notifies the Client Admin that their portal access has been restored with a direct login CTA.',
+    whenTriggered: 'Trigger when Super Admin clicks "Reactivate" on a deactivated tenant in the Tenant Overview tab.',
+    variables: [
+      '{{full_name}}',
+      '{{company_name}}',
+      '{{platform_name}}',
+      '{{support_email}}',
+      '{{cta_url}}',
+    ],
+    previewHeight: 960,
+  },
+  {
     id: 'b2c-user-suspended',
     name: 'Account Suspended',
     filename: 'b2c-user-suspended.html',
@@ -263,7 +302,7 @@ export function buildPreviewPayload(
       supportEmail: tenant.supportEmail,
     },
     recipient: {
-      fullName: templateId === 'client-admin-onboarding' ? 'Rahul Sharma' : 'Priya Nair',
+      fullName: templateId === 'client-admin-onboarding' || templateId === 'client-admin-deactivated' || templateId === 'client-admin-reactivated' ? 'Rahul Sharma' : 'Priya Nair',
       email: templateId === 'learner-onboarding-invite' || templateId === 'course-completion' || templateId === 'certificate-of-completion'
         ? 'learner@example.com'
         : 'admin@example.com',
@@ -358,6 +397,44 @@ export function buildPreviewPayload(
         introEyebrow: 'Run-Only access',
         heroTitle: 'Here is how content works for your tenant.',
         heroSubtitle: 'You can track the experience, but keySkillset manages the content supply model for this workspace.',
+      },
+    }
+  }
+
+  if (templateId === 'client-admin-deactivated') {
+    return {
+      ...basePayload,
+      recipient: {
+        fullName: tenant.slug === 'akash' ? 'Rahul Sharma' : 'Priya Nair',
+        email: tenant.slug === 'akash' ? 'rahul.sharma@akash.example.com' : 'priya.nair@techcorp.example.com',
+      },
+      context: {
+        ...basePayload.context,
+        roleLabel: 'Client Admin',
+        teamName: tenant.displayName,
+        introEyebrow: 'Account status change',
+        heroTitle: `${tenant.displayName} admin access deactivated.`,
+        heroSubtitle: 'Your administrator access to the portal has been suspended. Contact support to reactivate.',
+      },
+    }
+  }
+
+  if (templateId === 'client-admin-reactivated') {
+    return {
+      ...basePayload,
+      recipient: {
+        fullName: tenant.slug === 'akash' ? 'Rahul Sharma' : 'Priya Nair',
+        email: tenant.slug === 'akash' ? 'rahul.sharma@akash.example.com' : 'priya.nair@techcorp.example.com',
+      },
+      context: {
+        ...basePayload.context,
+        roleLabel: 'Client Admin',
+        ctaLabel: 'Log In to Admin Portal',
+        ctaUrl: `https://app.keyskillset.com/client-admin/${tenant.slug}/dashboard`,
+        teamName: tenant.displayName,
+        introEyebrow: 'Account restored',
+        heroTitle: `${tenant.displayName} admin access restored.`,
+        heroSubtitle: 'Your Client Admin access is fully restored. Log in to continue managing your organisation.',
       },
     }
   }

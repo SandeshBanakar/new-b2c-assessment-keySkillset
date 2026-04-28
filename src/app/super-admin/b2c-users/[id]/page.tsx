@@ -31,6 +31,178 @@ import {
 } from '@/lib/supabase/b2c-users'
 import { formatCourseType } from '@/lib/utils'
 
+// ─── Bundle Courses — Hardcoded demo data ────────────────────────────────────
+
+interface BundleTopicItem { id: string; title: string; completed: boolean }
+interface BundleModuleItem { id: string; title: string; progressPct: number; status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED'; topics: BundleTopicItem[] }
+interface BundleCourseItem { id: string; title: string; progressPct: number; status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED'; modules: BundleModuleItem[] }
+interface BundleData { bundleId: string; bundleName: string; purchasedAt: string; courses: BundleCourseItem[] }
+
+const BUNDLE_DATA: Record<string, BundleData[]> = {
+  'Divya Patel': [{
+    bundleId: 'excel-bundle-dp',
+    bundleName: 'Excel Bundle',
+    purchasedAt: '2026-01-15',
+    courses: [
+      {
+        id: 'eb-c1', title: 'Excel Basics', progressPct: 100, status: 'COMPLETED',
+        modules: [
+          { id: 'm1', title: 'Introduction to Excel', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 't1', title: 'Navigating the Interface', completed: true },
+            { id: 't2', title: 'Rows, Columns & Cells', completed: true },
+            { id: 't3', title: 'Saving & Workbook Basics', completed: true },
+          ]},
+          { id: 'm2', title: 'Data Entry & Formatting', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 't4', title: 'Entering and Editing Data', completed: true },
+            { id: 't5', title: 'Cell Formatting & Borders', completed: true },
+            { id: 't6', title: 'Conditional Formatting', completed: true },
+          ]},
+          { id: 'm3', title: 'Basic Formulas', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 't7', title: 'SUM, AVERAGE, COUNT', completed: true },
+            { id: 't8', title: 'IF Statements', completed: true },
+            { id: 't9', title: 'Cell References', completed: true },
+          ]},
+        ],
+      },
+      {
+        id: 'eb-c2', title: 'Excel Intermediate', progressPct: 65, status: 'IN_PROGRESS',
+        modules: [
+          { id: 'm4', title: 'Lookup Functions', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 't10', title: 'VLOOKUP Fundamentals', completed: true },
+            { id: 't11', title: 'HLOOKUP & INDEX-MATCH', completed: true },
+            { id: 't12', title: 'Nested Lookups', completed: true },
+          ]},
+          { id: 'm5', title: 'Data Analysis Tools', progressPct: 33, status: 'IN_PROGRESS', topics: [
+            { id: 't13', title: 'Sorting & Filtering', completed: true },
+            { id: 't14', title: 'Data Validation', completed: false },
+            { id: 't15', title: 'Text Functions', completed: false },
+          ]},
+        ],
+      },
+      {
+        id: 'eb-c3', title: 'Excel Advanced', progressPct: 0, status: 'NOT_STARTED',
+        modules: [
+          { id: 'm6', title: 'Power Pivot', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 't16', title: 'Data Modelling Concepts', completed: false },
+            { id: 't17', title: 'Relationships & DAX Basics', completed: false },
+          ]},
+          { id: 'm7', title: 'VBA Introduction', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 't18', title: 'Macros & the VBA Editor', completed: false },
+            { id: 't19', title: 'Writing Your First Script', completed: false },
+          ]},
+        ],
+      },
+      {
+        id: 'eb-c4', title: 'VLOOKUP Mastery', progressPct: 0, status: 'NOT_STARTED',
+        modules: [
+          { id: 'm8', title: 'Core VLOOKUP Patterns', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 't20', title: 'Exact & Approximate Match', completed: false },
+            { id: 't21', title: 'Multi-column Lookups', completed: false },
+          ]},
+          { id: 'm9', title: 'Advanced VLOOKUP Techniques', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 't22', title: 'Dynamic Range References', completed: false },
+            { id: 't23', title: 'Error Handling with IFERROR', completed: false },
+          ]},
+        ],
+      },
+      {
+        id: 'eb-c5', title: 'Pivot Tables', progressPct: 0, status: 'NOT_STARTED',
+        modules: [
+          { id: 'm10', title: 'Creating Pivot Tables', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 't24', title: 'Source Data & Layout', completed: false },
+            { id: 't25', title: 'Rows, Columns & Values', completed: false },
+          ]},
+          { id: 'm11', title: 'Customising & Analysing', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 't26', title: 'Slicers & Timelines', completed: false },
+            { id: 't27', title: 'Calculated Fields', completed: false },
+          ]},
+        ],
+      },
+    ],
+  }],
+  'Siddharth Bose': [{
+    bundleId: 'excel-bundle-sb',
+    bundleName: 'Excel Bundle',
+    purchasedAt: '2025-11-20',
+    courses: [
+      {
+        id: 'sb-c1', title: 'Excel Basics', progressPct: 100, status: 'COMPLETED',
+        modules: [
+          { id: 'sm1', title: 'Introduction to Excel', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 'st1', title: 'Navigating the Interface', completed: true },
+            { id: 'st2', title: 'Rows, Columns & Cells', completed: true },
+            { id: 'st3', title: 'Saving & Workbook Basics', completed: true },
+          ]},
+          { id: 'sm2', title: 'Data Entry & Formatting', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 'st4', title: 'Entering and Editing Data', completed: true },
+            { id: 'st5', title: 'Cell Formatting & Borders', completed: true },
+            { id: 'st6', title: 'Conditional Formatting', completed: true },
+          ]},
+          { id: 'sm3', title: 'Basic Formulas', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 'st7', title: 'SUM, AVERAGE, COUNT', completed: true },
+            { id: 'st8', title: 'IF Statements', completed: true },
+            { id: 'st9', title: 'Cell References', completed: true },
+          ]},
+        ],
+      },
+      {
+        id: 'sb-c2', title: 'Excel Intermediate', progressPct: 100, status: 'COMPLETED',
+        modules: [
+          { id: 'sm4', title: 'Lookup Functions', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 'st10', title: 'VLOOKUP Fundamentals', completed: true },
+            { id: 'st11', title: 'HLOOKUP & INDEX-MATCH', completed: true },
+            { id: 'st12', title: 'Nested Lookups', completed: true },
+          ]},
+          { id: 'sm5', title: 'Data Analysis Tools', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 'st13', title: 'Sorting & Filtering', completed: true },
+            { id: 'st14', title: 'Data Validation', completed: true },
+            { id: 'st15', title: 'Text Functions', completed: true },
+          ]},
+        ],
+      },
+      {
+        id: 'sb-c3', title: 'Excel Advanced', progressPct: 40, status: 'IN_PROGRESS',
+        modules: [
+          { id: 'sm6', title: 'Power Pivot', progressPct: 100, status: 'COMPLETED', topics: [
+            { id: 'st16', title: 'Data Modelling Concepts', completed: true },
+            { id: 'st17', title: 'Relationships & DAX Basics', completed: true },
+          ]},
+          { id: 'sm7', title: 'VBA Introduction', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 'st18', title: 'Macros & the VBA Editor', completed: false },
+            { id: 'st19', title: 'Writing Your First Script', completed: false },
+          ]},
+        ],
+      },
+      {
+        id: 'sb-c4', title: 'VLOOKUP Mastery', progressPct: 0, status: 'NOT_STARTED',
+        modules: [
+          { id: 'sm8', title: 'Core VLOOKUP Patterns', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 'st20', title: 'Exact & Approximate Match', completed: false },
+            { id: 'st21', title: 'Multi-column Lookups', completed: false },
+          ]},
+          { id: 'sm9', title: 'Advanced VLOOKUP Techniques', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 'st22', title: 'Dynamic Range References', completed: false },
+            { id: 'st23', title: 'Error Handling with IFERROR', completed: false },
+          ]},
+        ],
+      },
+      {
+        id: 'sb-c5', title: 'Pivot Tables', progressPct: 0, status: 'NOT_STARTED',
+        modules: [
+          { id: 'sm10', title: 'Creating Pivot Tables', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 'st24', title: 'Source Data & Layout', completed: false },
+            { id: 'st25', title: 'Rows, Columns & Values', completed: false },
+          ]},
+          { id: 'sm11', title: 'Customising & Analysing', progressPct: 0, status: 'NOT_STARTED', topics: [
+            { id: 'st26', title: 'Slicers & Timelines', completed: false },
+            { id: 'st27', title: 'Calculated Fields', completed: false },
+          ]},
+        ],
+      },
+    ],
+  }],
+}
+
 // ─── Formatting Helpers ───────────────────────────────────────────────────────
 
 const TIER_BADGE: Record<string, string> = {
@@ -895,6 +1067,139 @@ function FreeAccessActivity({
   )
 }
 
+// ─── Bundle Course Components ─────────────────────────────────────────────────
+
+function BundleModuleBreakdown({ modules }: { modules: BundleModuleItem[] }) {
+  return (
+    <div className="space-y-2 mt-3">
+      {modules.map((mod) => (
+        <div key={mod.id} className="bg-white border border-zinc-200 rounded-md overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100">
+            <div className="flex items-center gap-2">
+              {mod.status === 'COMPLETED'
+                ? <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                : mod.status === 'IN_PROGRESS'
+                ? <CircleDot className="w-4 h-4 text-blue-700 shrink-0" />
+                : <Circle className="w-4 h-4 text-zinc-300 shrink-0" />
+              }
+              <span className="text-xs font-medium text-zinc-800">{mod.title}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-16 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-700" style={{ width: `${mod.progressPct}%` }} />
+                </div>
+                <span className="text-xs text-zinc-500">{mod.progressPct}%</span>
+              </div>
+              {mod.status === 'COMPLETED'
+                ? <span className="text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-md">Done</span>
+                : mod.status === 'IN_PROGRESS'
+                ? <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">In Progress</span>
+                : <span className="text-xs font-medium bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">Not Started</span>
+              }
+            </div>
+          </div>
+          {mod.topics.length > 0 && (
+            <ul className="divide-y divide-zinc-50">
+              {mod.topics.map((topic) => (
+                <li key={topic.id} className="flex items-center gap-2.5 px-4 py-2">
+                  {topic.completed
+                    ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                    : <Circle className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
+                  }
+                  <span className={`text-xs ${topic.completed ? 'text-zinc-700' : 'text-zinc-400'}`}>{topic.title}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function BundleCourseRow({ course }: { course: BundleCourseItem }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const completedModules = course.modules.filter((m) => m.status === 'COMPLETED').length
+
+  return (
+    <div className="border border-zinc-200 rounded-md overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-zinc-50 transition-colors text-left"
+      >
+        <span className="text-zinc-400 shrink-0">
+          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </span>
+        <div className="flex-1 min-w-0 flex items-center gap-4">
+          <span className="text-sm font-medium text-zinc-900 min-w-0 truncate">{course.title}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="w-20 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
+              <div className="h-full rounded-full bg-blue-700" style={{ width: `${course.progressPct}%` }} />
+            </div>
+            <span className="text-xs text-zinc-500 w-8">{course.progressPct}%</span>
+          </div>
+          <span className="text-xs text-zinc-400 shrink-0">{completedModules}/{course.modules.length} modules</span>
+        </div>
+        <div className="shrink-0">
+          {course.status === 'COMPLETED'
+            ? <span className="text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-md">Completed</span>
+            : course.status === 'IN_PROGRESS'
+            ? <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">In Progress</span>
+            : <span className="text-xs font-medium bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">Not Started</span>
+          }
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-4 py-4 bg-zinc-50 border-t border-zinc-200">
+          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Module Progress</p>
+          <BundleModuleBreakdown modules={course.modules} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BundleRow({ bundle }: { bundle: BundleData }) {
+  const [expanded, setExpanded] = useState(false)
+  const completedCourses = bundle.courses.filter((c) => c.status === 'COMPLETED').length
+
+  return (
+    <div className="border border-zinc-200 rounded-md overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 bg-white hover:bg-zinc-50 transition-colors text-left"
+      >
+        <span className="text-zinc-400 shrink-0">
+          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </span>
+        <div className="flex-1 min-w-0 grid grid-cols-3 gap-4 items-center">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-zinc-900 truncate block">{bundle.bundleName}</span>
+          </div>
+          <span className="text-xs text-zinc-500">
+            {completedCourses}/{bundle.courses.length} courses completed
+          </span>
+          <span className="text-xs text-zinc-400">
+            Purchased {fmt(bundle.purchasedAt)}
+          </span>
+        </div>
+        <span className="text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-md shrink-0">
+          Active
+        </span>
+      </button>
+      {expanded && (
+        <div className="px-4 py-4 bg-zinc-50 border-t border-zinc-200 space-y-2">
+          {bundle.courses.map((course) => (
+            <BundleCourseRow key={course.id} course={course} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Profile Page ────────────────────────────────────────────────────────
 
 export default function B2CUserProfilePage() {
@@ -1129,6 +1434,21 @@ export default function B2CUserProfilePage() {
             </div>
           )}
         </div>
+
+        {/* Bundle Courses — hardcoded demo for seeded Premium users */}
+        {user.displayName && BUNDLE_DATA[user.displayName] && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Bundle Courses</h3>
+              <span className="text-xs font-medium bg-violet-50 text-violet-700 px-2 py-0.5 rounded-md">
+                {BUNDLE_DATA[user.displayName].length} bundle{BUNDLE_DATA[user.displayName].length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {BUNDLE_DATA[user.displayName].map((bundle) => (
+              <BundleRow key={bundle.bundleId} bundle={bundle} />
+            ))}
+          </div>
+        )}
 
         {/* Free Access Activity — lazy, only shown if orphaned attempts exist */}
         <FreeAccessActivity

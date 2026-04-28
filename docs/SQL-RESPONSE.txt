@@ -1,0 +1,74 @@
+-- KSS-DB-058 — Contracts: INR billing fields + Payment History table
+-- Replaces arr_usd_cents with arr_inr. Adds payment method + history support.
+-- Run STEPS 1–5 now. Run STEP 6 ONLY after code is deployed (drops old column).
+
+-- STEP 1: Add new columns to contracts
+ALTER TABLE contracts ADD COLUMN IF NOT EXISTS arr_inr INTEGER;
+ALTER TABLE contracts ADD COLUMN IF NOT EXISTS payment_method_brand VARCHAR(30);
+ALTER TABLE contracts ADD COLUMN IF NOT EXISTS payment_method_last4 CHAR(4);
+ALTER TABLE contracts ADD COLUMN IF NOT EXISTS payment_billing_email TEXT;
+
+--Response: Success. No rows returned.
+
+-- STEP 2: Backfill arr_inr from arr_usd_cents for any existing non-Akash contracts
+UPDATE contracts
+SET arr_inr = ROUND(arr_usd_cents / 100.0 * 83)
+WHERE arr_usd_cents > 0 AND arr_inr IS NULL;
+
+--Response: Success. No rows returned.
+
+-- STEP 3: Seed Akash Institute Delhi stripe_customer_id on tenants
+UPDATE tenants
+SET stripe_customer_id = 'cus_SQkRm7AkashDelhi24'
+WHERE id = 'ec1bc005-e76d-4208-ab0f-abe0d316e260';
+
+--Response: Success. No rows returned
+
+-- STEP 4: Seed Akash Institute Delhi payment fields on contracts
+  UPDATE contracts
+  SET
+    arr_inr             = 1200000,
+    stripe_subscription_id = 'sub_SQkRm7AkashInst01',
+    payment_method_brand   = 'visa',
+    payment_method_last4   = '4242',
+    payment_billing_email  = 'finance@akashinstitutedelhi.in'
+  WHERE tenant_id = 'ec1bc005-e76d-4208-ab0f-abe0d316e260';
+
+  --Response: Success. No rows returned.
+
+-- STEP 5: Create contract_payment_history table + seed Akash data
+CREATE TABLE IF NOT EXISTS contract_payment_history (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  contract_id   UUID NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
+  invoice_id    TEXT,
+  amount_inr    INTEGER NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'paid',
+  payment_date  TIMESTAMPTZ NOT NULL,
+  description   TEXT,
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO contract_payment_history (contract_id, invoice_id, amount_inr, status, payment_date, description)
+SELECT
+  c.id,
+  v.invoice_id,
+  v.amount_inr,
+  v.status,
+  v.payment_date::TIMESTAMPTZ,
+  v.description
+FROM contracts c
+CROSS JOIN (VALUES
+  ('in_SQkAkash_2026_Q1', 300000, 'paid', '2026-01-15 10:00:00+05:30', 'Q1 2026 — Platform License'),
+  ('in_SQkAkash_2025_Q4', 300000, 'paid', '2025-10-15 10:00:00+05:30', 'Q4 2025 — Platform License'),
+  ('in_SQkAkash_2025_Q3', 300000, 'paid', '2025-07-15 10:00:00+05:30', 'Q3 2025 — Platform License'),
+  ('in_SQkAkash_2025_Q2', 300000, 'paid', '2025-04-15 10:00:00+05:30', 'Q2 2025 — Platform License')
+) AS v(invoice_id, amount_inr, status, payment_date, description)
+WHERE c.tenant_id = 'ec1bc005-e76d-4208-ab0f-abe0d316e260';
+
+--Response: Success. No rows returned.
+
+-- STEP 6: Drop legacy arr_usd_cents (run AFTER code is deployed and verified)
+ALTER TABLE contracts DROP COLUMN IF EXISTS arr_usd_cents;
+
+--Response: Success. No rows returned.
+

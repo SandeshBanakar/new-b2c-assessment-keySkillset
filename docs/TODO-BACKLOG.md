@@ -1,5 +1,55 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 28 2026 — KSS-CA-CHANGES-001 complete. CA dashboard refactor + Users & Roles fix + Billing page + PRD-CA-BILLING shipped. npm run build ✅ PASSED.
+# Last updated: Apr 28 2026 — KSS-SA-BILLING-001 + KSS-B2C-BUNDLE-001 code complete. SQL KSS-DB-058 pending SA run. Build ✅ PASSED.
+
+## [COMPLETE] KSS-SA-BILLING-001 — SA Contracts Payment & Billing + CA Billing Enhancements (Apr 28 2026)
+
+**Source:** `docs/requirements/super_admin_changes.txt`
+**SQL:** KSS-DB-058 ✅ ALL STEPS RAN (including STEP 6 — arr_usd_cents dropped)
+**Build:** ✅ PASSED
+
+| # | Task | Status |
+|---|------|--------|
+| SAB-1 | KSS-DB-058 SQL — arr_inr, payment fields, contract_payment_history, Akash seed | [x] DONE |
+| SAB-2 | analytics.ts — arr_usd_cents → arr_inr (direct INR) | [x] DONE |
+| SAB-3–7 | SA tenants/[id]/page.tsx — Contract interface, arrDisplay ₹INR, Payment Details + History UI | [x] DONE |
+| SAB-8–10 | CA billing/page.tsx — Payment Details + History sections | [x] DONE |
+| SAB-11 | npm run build passes | [x] DONE ✅ |
+| SAB-12–13 | DB migration run + arr_usd_cents dropped | [x] DONE ✅ |
+
+## [COMPLETE] KSS-B2C-BUNDLE-001 — B2C User Bundle Courses Section (Apr 28 2026)
+
+**Source:** `docs/requirements/super_admin_changes.txt`
+**Build:** ✅ PASSED
+
+| # | Task | Status |
+|---|------|--------|
+| BB-1 | BUNDLE_DATA hardcoded — Divya Patel + Siddharth Bose, Excel Bundle × 5 courses | [x] DONE |
+| BB-2 | BundleModuleBreakdown + BundleCourseRow + BundleRow components | [x] DONE |
+| BB-3 | Bundle Courses section below Course Plans, matching by displayName | [x] DONE |
+
+---
+
+## [COMPLETE] KSS-AUTH-001 — Auth Screens + Suspended/Deactivated States + CA Email Templates + PRD (Apr 28 2026)
+
+**PRD:** `prds/end-user/PRD-B2C-CA-AUTH-SCREENS-001.md` (LOCKED)  
+**Build:** ✅ PASSED
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| AUTH-1 | B2C Login page (`/login`) — production-matching layout, normal state | `src/app/login/page.tsx` | [x] DONE |
+| AUTH-2 | B2C Login page — suspended user state (URL param `?state=suspended`) | `src/app/login/page.tsx` | [x] DONE |
+| AUTH-3 | B2C Signup page (`/signup`) — production-matching layout | `src/app/signup/page.tsx` | [x] DONE |
+| AUTH-4 | CA Login page (`/client-admin/login`) — normal + deactivated state (`?state=deactivated`) | `src/app/client-admin/login/page.tsx` | [x] DONE |
+| AUTH-5 | Persona selector — add "Auth Screens" section with 5 tiles | `src/app/page.tsx` | [x] DONE |
+| AUTH-6 | Email HTML: `client-admin-deactivated.html` | `src/email-templates/html/` | [x] DONE |
+| AUTH-7 | Email HTML: `client-admin-reactivated.html` | `src/email-templates/html/` | [x] DONE |
+| AUTH-8 | Update `types.ts` — add `client-admin-deactivated`, `client-admin-reactivated` to `EmailTemplateId` | `src/lib/email-templates/types.ts` | [x] DONE |
+| AUTH-9 | Update `data.ts` — add definitions + preview payloads for both CA email templates | `src/lib/email-templates/data.ts` | [x] DONE |
+| AUTH-10 | PRD — `prds/end-user/PRD-B2C-CA-AUTH-SCREENS-001.md` | `prds/end-user/` | [x] DONE |
+| AUTH-11 | `npm run build` passes | — | [x] DONE ✅ |
+| AUTH-12 | Update TODO-BACKLOG.md | — | [x] DONE |
+
+---
 
 ## [COMPLETE] KSS-B2B-PORTAL-POLISH — B2B Portal Polish + PRD (Apr 28 2026)
 
