@@ -24,8 +24,13 @@ import type { Assessment } from '@/types';
 // ── Local types for DB-sourced exam config ────────────────────────────────────
 interface ExamCatConfig {
   id: string;
-  score_max: number | null;
-  neg_mark: number | null;
+}
+
+interface AssessmentItemConfig {
+  assessment_config: {
+    total_marks?: number | null;
+    negative_marks?: number | null;
+  } | null;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -298,9 +303,9 @@ export default function AnalyticsTab({
           : completed[completed.length - 1].id;
       setSelectedAttemptId(initId);
 
-      // Concept mastery + exam category config — fetched in parallel
+      // Concept mastery + exam category config + assessment_items config — fetched in parallel
       const attemptNums = completed.map((a) => a.attempt_number);
-      const [masteryRes, examCatRes] = await Promise.all([
+      const [masteryRes, examCatRes, itemRes] = await Promise.all([
         supabase
           .from('user_concept_mastery')
           .select('concept_tag, attempt_number, correct_count, total_count, mastery_percent')
@@ -310,17 +315,27 @@ export default function AnalyticsTab({
           .order('concept_tag'),
         supabase
           .from('exam_categories')
-          .select('id, score_max, neg_mark')
+          .select('id')
           .eq('slug', assessment.exam.toLowerCase())
+          .maybeSingle(),
+        supabase
+          .from('assessment_items')
+          .select('assessment_config')
+          .eq('assessments_id', assessmentId)
           .maybeSingle(),
       ]);
       setConceptMastery(masteryRes.data ?? []);
 
-      // Exam config: score_max, neg_mark, tag→section map, rank prediction
+      // Source neg_mark and score_max from assessment_items.assessment_config JSONB
+      const itemData = itemRes.data as AssessmentItemConfig | null;
+      const negMarkValue = itemData?.assessment_config?.negative_marks ?? 0;
+      const scoreTotalMarks = itemData?.assessment_config?.total_marks ?? null;
+      setNegMark(negMarkValue);
+      setScoreMax(scoreTotalMarks ?? assessment.questionCount ?? 100);
+
+      // Exam config: tag→section map, rank prediction (needs exam_categories.id only)
       const examCat = examCatRes.data as ExamCatConfig | null;
       if (examCat) {
-        setScoreMax(examCat.score_max ?? assessment.questionCount ?? 100);
-        setNegMark(examCat.neg_mark ?? 0);
 
         const [tagMapRes, rankRes] = await Promise.all([
           supabase

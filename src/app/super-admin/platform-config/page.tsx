@@ -8,13 +8,13 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
-  SortableContext, rectSortingStrategy, useSortable, arrayMove,
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
   Plus, Pencil, Trash2, Search, Tag, X, GripVertical, ChevronLeft,
   TriangleAlert as AlertTriangle, Settings2, GraduationCap,
-  ToggleLeft, ToggleRight, Save, Clock, TrendingUp,
+  ToggleLeft, ToggleRight, Clock, TrendingUp,
 } from 'lucide-react'
 
 const DEMO_SA_ID = '3bd6101b-1fb9-4c96-a9a5-c958a3deb54a'
@@ -65,12 +65,6 @@ interface CollegeForm {
   name: string; country: 'US' | 'IN'; cutoff_score: string; aid_pct: string; logo_initials: string
 }
 
-interface AnalyticsConfig {
-  show_college_ladder: boolean
-  show_pacing_preview: boolean
-  show_mistake_taxonomy_preview: boolean
-}
-
 interface RankPredictionRow {
   id: string
   year: number
@@ -83,7 +77,7 @@ interface AddYearForm {
   json: string
 }
 
-type SubTab = 'concept-tags' | 'rank-prediction'
+type SubTab = 'concept-tags' | 'analytics-display' | 'rank-prediction'
 
 const RANK_PREDICTION_CATS = new Set(['NEET', 'JEE', 'CLAT'])
 
@@ -128,9 +122,9 @@ function computeTierForScore(cutoff: number, bands: TierBand[]): TierBand | null
 
 const inputCls = 'block w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500'
 
-// ─── Sortable Exam Card ────────────────────────────────────────────────────────
+// ─── Sortable Exam Row ────────────────────────────────────────────────────────
 
-function SortableExamCard({
+function SortableExamRow({
   category,
   onEdit,
   onDrillDown,
@@ -148,67 +142,55 @@ function SortableExamCard({
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const badgeClass = EXAM_BADGE[category.name] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200'
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="bg-white border border-zinc-200 rounded-md p-5 hover:border-zinc-300 hover:shadow-sm transition-all"
-    >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {/* Drag handle */}
-          <button
-            {...attributes}
-            {...listeners}
-            className="p-1 text-zinc-300 hover:text-zinc-500 cursor-grab active:cursor-grabbing shrink-0 touch-none"
-          >
-            <GripVertical className="w-4 h-4" />
-          </button>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeClass}`}>
-            {category.name}
-          </span>
-        </div>
-        {!category.is_active && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 shrink-0">
-            Inactive
-          </span>
+    <tr ref={setNodeRef} style={style} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+      <td className="pl-4 pr-2 py-3 hidden sm:table-cell w-8">
+        <button
+          {...attributes}
+          {...listeners}
+          className="p-1 text-zinc-300 hover:text-zinc-500 cursor-grab active:cursor-grabbing touch-none"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+      </td>
+      <td className="px-4 py-3">
+        {category.is_active ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">Inactive</span>
         )}
-      </div>
-
-      <h3
-        className="text-base font-medium text-zinc-900 mb-1 cursor-pointer hover:text-blue-700 transition-colors"
-        onClick={() => onDrillDown(category)}
-      >
-        {category.display_name}
-      </h3>
-
-      {category.description && (
-        <p className="text-xs text-zinc-500 mb-3 line-clamp-2">{category.description}</p>
-      )}
-
-      <div className="flex items-center gap-2 mt-3">
-        <span className="text-xs text-zinc-400 flex items-center gap-1">
-          <Tag className="w-3 h-3" />
-          {tagCount} concept {tagCount === 1 ? 'tag' : 'tags'}
+      </td>
+      <td className="px-4 py-3">
+        <span className="text-sm font-medium text-zinc-900">{category.display_name}</span>
+      </td>
+      <td className="px-4 py-3 hidden sm:table-cell">
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${EXAM_BADGE[category.name] ?? 'bg-zinc-50 text-zinc-700 border border-zinc-200'}`}>
+          {category.name}
         </span>
-        <span className="ml-auto flex items-center gap-1">
+      </td>
+      <td className="px-4 py-3 hidden sm:table-cell">
+        <span className="text-xs text-zinc-500 flex items-center gap-1">
+          <Tag className="w-3 h-3" />
+          {tagCount}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-2">
           <button
             onClick={() => onEdit(category)}
-            className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-md transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-zinc-200 rounded-md text-zinc-600 hover:bg-zinc-50 transition-colors"
           >
-            <Pencil className="w-3.5 h-3.5" />
+            <Pencil className="w-3 h-3" /> Edit
           </button>
           <button
             onClick={() => onDrillDown(category)}
-            className="px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-zinc-200 rounded-md text-zinc-600 hover:bg-zinc-50 transition-colors"
           >
-            Manage →
+            View →
           </button>
-        </span>
-      </div>
-    </div>
+        </div>
+      </td>
+    </tr>
   )
 }
 
@@ -402,6 +384,8 @@ function PlatformConfigInner() {
   const [categories, setCategories] = useState<ExamCategory[]>([])
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({})
   const [loadingCats, setLoadingCats] = useState(true)
+  const [catPage, setCatPage] = useState(0)
+  const CAT_PAGE_SIZE = 10
 
   // Create/Edit slide-over state
   const [showCreate, setShowCreate] = useState(false)
@@ -474,16 +458,12 @@ function PlatformConfigInner() {
     // Optimistic update
     setCategories(reordered)
 
-    // Batch upsert display_order
-    const updates = reordered.map((c, i) => ({
-      id: c.id,
-      display_order: i + 1,
-    }))
-
-    for (const { id, display_order } of updates) {
-      await supabase.from('exam_categories').update({ display_order }).eq('id', id)
-    }
-
+    const updates = reordered.map((c, i) => ({ id: c.id, display_order: i + 1 }))
+    await Promise.all(
+      updates.map(({ id, display_order }) =>
+        supabase.from('exam_categories').update({ display_order }).eq('id', id)
+      )
+    )
     setCategories(reordered.map((c, i) => ({ ...c, display_order: i + 1 })))
   }
 
@@ -629,6 +609,7 @@ function PlatformConfigInner() {
         <div className="flex items-center gap-1 mb-5 flex-wrap">
           {([
             'concept-tags',
+            ...(selectedCat.name === 'SAT' ? ['analytics-display'] : []),
             ...(RANK_PREDICTION_CATS.has(selectedCat.name) ? ['rank-prediction'] : []),
           ] as SubTab[]).map(tab => (
             <button
@@ -642,55 +623,108 @@ function PlatformConfigInner() {
             >
               {tab === 'concept-tags'
                 ? <><Tag className="w-3.5 h-3.5" /> Concept Tags</>
-                : <><TrendingUp className="w-3.5 h-3.5" /> Rank Prediction</>}
+                : tab === 'analytics-display'
+                  ? <><Settings2 className="w-3.5 h-3.5" /> Analytics Config</>
+                  : <><TrendingUp className="w-3.5 h-3.5" /> Rank Prediction</>}
             </button>
           ))}
         </div>
 
         {activeSubTab === 'concept-tags' && <ConceptTagsPanel key={selectedCat.name} categoryName={selectedCat.name} />}
+        {activeSubTab === 'analytics-display' && <AnalyticsDisplayPanel category={selectedCat} />}
         {activeSubTab === 'rank-prediction' && <RankPredictionPanel category={selectedCat} />}
       </div>
     )
   }
 
-  // Card grid view
+  // Table view
+  const pagedCats = categories.slice(catPage * CAT_PAGE_SIZE, (catPage + 1) * CAT_PAGE_SIZE)
+  const totalCatPages = Math.ceil(categories.length / CAT_PAGE_SIZE)
+
   return (
     <div className="px-4 sm:px-6 py-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-900">Platform Config</h1>
-          <p className="text-sm text-zinc-500 mt-1">Manage exam categories, concept tags, and analytics display.</p>
-        </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Create Exam Category
-        </button>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-zinc-900">Platform Config</h1>
+        <p className="text-sm text-zinc-500 mt-1">Manage exam categories, concept tags, and analytics display.</p>
       </div>
 
-      {categories.length === 0 ? (
-        <div className="border border-dashed border-zinc-200 rounded-md py-16 text-center">
-          <Settings2 className="w-8 h-8 text-zinc-300 mx-auto mb-3" />
-          <p className="text-sm text-zinc-500">No exam categories yet.</p>
+      {/* Exam Category card */}
+      <div className="bg-white border border-zinc-200 rounded-md shadow-sm">
+        {/* Card header */}
+        <div className="px-5 py-4 bg-zinc-50 border-b border-zinc-200 rounded-t-md flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-zinc-900">Exam Category</h2>
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-200 text-zinc-600">
+            {categories.length} {categories.length === 1 ? 'category' : 'categories'}
+          </span>
         </div>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {categories.map(cat => (
-                <SortableExamCard
-                  key={cat.id}
-                  category={cat}
-                  tagCount={tagCounts[cat.name] ?? 0}
-                  onEdit={openEdit}
-                  onDrillDown={drillDown}
-                />
-              ))}
+
+        {/* Create button above table */}
+        <div className="px-5 pt-4 pb-3 flex justify-end">
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Create Exam Category
+          </button>
+        </div>
+
+        {categories.length === 0 ? (
+          <div className="py-16 text-center">
+            <Settings2 className="w-8 h-8 text-zinc-300 mx-auto mb-3" />
+            <p className="text-sm text-zinc-500">No exam categories yet.</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={pagedCats.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-100">
+                        <th className="pl-4 pr-2 py-2.5 hidden sm:table-cell w-8" />
+                        <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">Display Name</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide hidden sm:table-cell">Internal Name</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide hidden sm:table-cell">Concept Tags</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-medium text-zinc-500 uppercase tracking-wide">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedCats.map(cat => (
+                        <SortableExamRow
+                          key={cat.id}
+                          category={cat}
+                          tagCount={tagCounts[cat.name] ?? 0}
+                          onEdit={openEdit}
+                          onDrillDown={drillDown}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </SortableContext>
+              </DndContext>
             </div>
-          </SortableContext>
-        </DndContext>
-      )}
+
+            {totalCatPages > 1 && (
+              <div className="px-5 py-3 border-t border-zinc-100 flex items-center justify-between text-xs text-zinc-500">
+                <span>{categories.length} total · page {catPage + 1} of {totalCatPages}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCatPage(p => Math.max(0, p - 1))}
+                    disabled={catPage === 0}
+                    className="px-2.5 py-1 border border-zinc-200 rounded-md hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >← Prev</button>
+                  <button
+                    onClick={() => setCatPage(p => Math.min(totalCatPages - 1, p + 1))}
+                    disabled={catPage >= totalCatPages - 1}
+                    className="px-2.5 py-1 border border-zinc-200 rounded-md hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >Next →</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Create slide-over */}
       {showCreate && (
@@ -970,12 +1004,7 @@ function AnalyticsDisplayPanel({ category }: { category: ExamCategory }) {
 function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
   const [tierBands, setTierBands] = useState<TierBand[]>([])
   const [colleges, setColleges] = useState<College[]>([])
-  const [analyticsConfig, setAnalyticsConfig] = useState<AnalyticsConfig>({
-    show_college_ladder: true, show_pacing_preview: true, show_mistake_taxonomy_preview: true,
-  })
   const [loading, setLoading] = useState(true)
-  const [configSaving, setConfigSaving] = useState(false)
-  const [configSaved, setConfigSaved] = useState(false)
 
   const [editingBand, setEditingBand] = useState<string | null>(null)
   const [bandEdits, setBandEdits] = useState<Record<string, { min_score: string; max_score: string }>>({})
@@ -991,35 +1020,16 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
 
   useEffect(() => {
     async function load() {
-      const [bandsRes, collegesRes, configRes] = await Promise.all([
+      const [bandsRes, collegesRes] = await Promise.all([
         supabase.from('sat_tier_bands').select('*').order('display_order'),
         supabase.from('sat_colleges').select('*').order('cutoff_score', { ascending: false }),
-        supabase.from('platform_analytics_config').select('config_key, config_value').eq('exam_category_id', categoryId),
       ])
       setTierBands(bandsRes.data ?? [])
       setColleges(collegesRes.data ?? [])
-      if (configRes.data) {
-        const map: Partial<AnalyticsConfig> = {}
-        for (const row of configRes.data) {
-          (map as Record<string, boolean>)[row.config_key] = row.config_value
-        }
-        setAnalyticsConfig(c => ({ ...c, ...map }))
-      }
       setLoading(false)
     }
     load()
   }, [categoryId])
-
-  async function saveConfig() {
-    setConfigSaving(true)
-    const upserts = (Object.entries(analyticsConfig) as [string, boolean][]).map(([key, val]) => ({
-      exam_category_id: categoryId, config_key: key, config_value: val,
-      updated_by: DEMO_SA_ID, updated_at: new Date().toISOString(),
-    }))
-    await supabase.from('platform_analytics_config').upsert(upserts, { onConflict: 'exam_category_id,config_key' })
-    setConfigSaving(false); setConfigSaved(true)
-    setTimeout(() => setConfigSaved(false), 2000)
-  }
 
   function startBandEdit(band: TierBand) {
     setEditingBand(band.id)
@@ -1085,40 +1095,6 @@ function SATAnalyticsDisplayConfig({ categoryId }: { categoryId: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Section Visibility */}
-      <div className="bg-white border border-zinc-200 rounded-md">
-        <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-900">Section Visibility</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Control which analytics sections appear for SAT students.</p>
-          </div>
-          <button
-            onClick={saveConfig} disabled={configSaving}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-700 text-white rounded-md hover:bg-blue-800 disabled:opacity-50 transition-colors shrink-0"
-          >
-            {configSaved ? <><span className="w-3.5 h-3.5 text-emerald-300">✓</span> Saved</> : <><Save className="w-3.5 h-3.5" /> {configSaving ? 'Saving…' : 'Save'}</>}
-          </button>
-        </div>
-        <div className="divide-y divide-zinc-100">
-          {([ ['show_college_ladder', 'College Ladder', 'Show college eligibility ladder on full test analytics'],
-              ['show_pacing_preview', 'Pacing (Preview)', 'Show pacing chart with demo data — "Preview" badge shown to students'],
-              ['show_mistake_taxonomy_preview', 'Mistake Taxonomy (Preview)', 'Show mistake donut with demo data — "Preview" badge shown to students'],
-          ] as [keyof AnalyticsConfig, string, string][]).map(([key, label, desc]) => (
-            <div key={key} className="px-5 py-3.5 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-zinc-900">{label}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
-              </div>
-              <button onClick={() => setAnalyticsConfig(c => ({ ...c, [key]: !c[key] }))} className="shrink-0">
-                {analyticsConfig[key]
-                  ? <ToggleRight className="w-8 h-8 text-blue-700" />
-                  : <ToggleLeft className="w-8 h-8 text-zinc-300" />}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Tier Bands */}
       <div className="bg-white border border-zinc-200 rounded-md">
         <div className="px-5 py-4 border-b border-zinc-100">

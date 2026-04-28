@@ -1,5 +1,212 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 26 2026 — Session end. KSS-LINT-001 COMPLETE: all react-hooks/set-state-in-effect errors resolved (0 remaining). Build ✅. Active tasks only. Completed work → CLAUDE-HISTORY.md.
+# Last updated: Apr 28 2026 — KSS-CA-CHANGES-001 complete. CA dashboard refactor + Users & Roles fix + Billing page + PRD-CA-BILLING shipped. npm run build ✅ PASSED.
+
+## [COMPLETE] KSS-B2B-PORTAL-POLISH — B2B Portal Polish + PRD (Apr 28 2026)
+
+**Build:** ✅ PASSED
+**PRD:** `prds/b2b-learner/PRD-B2B-PORTAL-001.md` (LOCKED)
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| POL-1 | Navbar — remove orphaned divider div (4th child in 3-col grid causing learner to wrap to row 2) | `B2BNavbar.tsx` | [x] DONE |
+| POL-2 | Attempts tab — "View Analysis" button moved to rightmost position (after score + badge) | `assessments/[id]/page.tsx` | [x] DONE |
+| POL-3 | Analytics tab — each section placeholder now has description + "Everything in B2C is finalised…" teal note | `assessments/[id]/page.tsx` | [x] DONE |
+| POL-4 | Certificate cards — redesigned to vertical layout (accent bar → body → footer), grid capped at sm:grid-cols-2 | `CertificateCard.tsx`, `CertificateTabsContent.tsx` | [x] DONE |
+| POL-5 | Assessment filters — category dropdown + status pills (All/Not Started/In Progress/Exhausted) mirroring courses page | `assessments/page.tsx` | [x] DONE |
+| POL-6 | Cert page UI banner — fixed from 60% to 80% to match application logic and PRD rule | `certificates/page.tsx` | [x] DONE |
+| POL-7 | PRD-B2B-PORTAL-001 — spec-as-built for all 4 portal pages, cert rules locked, assignment flow documented | `prds/b2b-learner/PRD-B2B-PORTAL-001.md` | [x] DONE |
+
+---
+
+## [COMPLETE] KSS-CA-CHANGES-001 — Client Admin Dashboard + Users & Roles + Billing (Apr 28 2026)
+
+**Source:** `docs/requirements/client_admin_changes.txt`  
+**Build:** ✅ PASSED Apr 28 2026
+
+### Item 1 — TechCorp Dashboard (RUN_ONLY)
+| # | Task | File | Status |
+|---|------|------|--------|
+| CA-CHG-1a | Remove tabs (Overview/Performance) — render 3 cards directly | `dashboard/page.tsx` | [x] DONE |
+| CA-CHG-1b | Remove metric cards: Completion Rate, Certificate Rate, Average Score, Total Attempts | `dashboard/page.tsx` | [x] DONE |
+| CA-CHG-1c | Add "Courses Completed" card — `learner_course_progress` WHERE status='COMPLETED', subtext "out of N assigned" | `dashboard/page.tsx` | [x] DONE |
+| CA-CHG-1d | Add "Certificates Generated" card — raw count from `certificates` table | `dashboard/page.tsx` | [x] DONE |
+| CA-CHG-1e | Remove dead code: `TabButton`, tab state, tab type aliases | `dashboard/page.tsx` | [x] DONE |
+
+### Item 2 — Akash Dashboard (FULL_CREATOR)
+| # | Task | File | Status |
+|---|------|------|--------|
+| CA-CHG-2a | Remove tabs (Content/Analytics) — render 6 cards directly | `dashboard/page.tsx` | [x] DONE |
+| CA-CHG-2b | Retain Content 3 cards (Courses Created, Assessments Created, Questions Added) | `dashboard/page.tsx` | [x] DONE |
+| CA-CHG-2c | Add 3 learner cards (Active Learners, Courses Completed, Certificates Generated) | `dashboard/page.tsx` | [x] DONE |
+| CA-CHG-2d | Unified 6-card data fetch (single Promise.all in FullCreatorStats) | `dashboard/page.tsx` | [x] DONE |
+
+### Item 3 — Users & Roles: Client Admin Data Fix
+| # | Task | File | Status |
+|---|------|------|--------|
+| CA-CHG-3a | Root cause: no `is_active=true` filter on CLIENT_ADMIN query → returns Rahul Sharma (first, inactive) not Sandesh | — | [x] DONE |
+| CA-CHG-3b | Add `.eq('is_active', true)` to CLIENT_ADMIN query in `users-roles/page.tsx` | `users-roles/page.tsx` | [x] DONE |
+| CA-CHG-3c | Add `.eq('is_active', true)` to CLIENT_ADMIN query in `layout.tsx` (nav footer) | `layout.tsx` | [x] DONE |
+| CA-CHG-3d | Update `CA_ADMIN_USER_MAP` in `tenants.ts` — Akash → c0f26275 (Sandesh Banakar) | `src/lib/client-admin/tenants.ts` | [x] DONE |
+
+### Item 4 — Billing Page (new feature)
+| # | Task | File | Status |
+|---|------|------|--------|
+| CA-CHG-4a | PRD — `prds/client_admin/PRD-CA-BILLING.md` written | — | [x] DONE |
+| CA-CHG-4b | Add "Billing" nav item under Settings in layout (CreditCard icon) | `layout.tsx` | [x] DONE |
+| CA-CHG-4c | Build `billing/page.tsx` — contract overview, seat usage bars, storage (FC), notes, CTA | `billing/page.tsx` | [x] DONE |
+| CA-CHG-4d | Contract status badge: Active/Expiring Soon/Expired. Days remaining countdown. | `billing/page.tsx` | [x] DONE |
+| CA-CHG-4e | UsageBar: violet/amber/rose progress bar, over-limit warnings | `billing/page.tsx` | [x] DONE |
+| CA-CHG-4f | Storage section (FULL_CREATOR only): static 12.4GB / $18.60/mo / Mar 18 | `billing/page.tsx` | [x] DONE |
+| CA-CHG-4g | Empty state + "Contact Support" `mailto:contact@keyskillset.com` CTA | `billing/page.tsx` | [x] DONE |
+| CA-CHG-4h | 2-business-day SLA note added to CTA section (violet highlighted callout) | `billing/page.tsx` | [x] DONE |
+| CA-CHG-4i | `npm run build` passes | — | [x] DONE ✅ |
+
+**V1 Planned — Separate Ticket Required:**
+- Platform hard-lock on expired contracts (middleware/layout gate — PRD §6.3). Currently Billing page shows "Expired" badge only; no cross-portal access gate exists.
+
+---
+
+## [COMPLETE] KSS-B2B-UI-FIXES — B2B UI Fixes, Report Card + Gradient Bug Sweep (Apr 27 2026)
+
+**Build:** ✅ PASSED  
+**PRD:** `prds/b2b-learner/PRD-B2B-REPORT-CARD-001.md` (Phase 1 COMPLETE)
+
+| # | Fix | File | Status |
+|---|-----|------|--------|
+| FIX-1 | Navbar — 3-col grid single row (brand \| centered tabs \| learner), mobile overflow-x-auto confirmed | `B2BNavbar.tsx` | [x] DONE |
+| FIX-2 | Course detail hero gradient — replaced dynamic Tailwind classes with `React.CSSProperties` inline styles | `courses/[id]/page.tsx` | [x] DONE |
+| FIX-3 | Assessment list + detail — two-step fetch replacing broken `assessments!assessments_id` PostgREST join | `assessments/page.tsx`, `assessments/[id]/page.tsx` | [x] DONE |
+| FIX-4 | Assessment card gradient header — same inline style fix (`EXAM_GRADIENT_STYLE` CSSProperties map) | `assessments/page.tsx` | [x] DONE |
+| FIX-5 | AttemptsSummaryPanel gradient — inline style fix | `assessments/page.tsx` | [x] DONE |
+| FIX-6 | Attempts tab — all 5 slots rendered (filled rows + dashed placeholders with Lock icon) | `assessments/[id]/page.tsx` | [x] DONE |
+| FIX-7 | "View Analysis" button on each completed attempt — switches to Analytics tab (`onSwitchTab`) | `assessments/[id]/page.tsx` | [x] DONE |
+| FIX-8 | Report Card section in Analytics tab (blue card, disabled if 0 attempts, modal on click) | `assessments/[id]/page.tsx` | [x] DONE |
+| FIX-9 | ReportCardModal — 6 sections, eligibility, Salesforce 24hr delivery notice, Request CTA + session state | `assessments/[id]/page.tsx` | [x] DONE |
+| FIX-10 | PRD KSS-B2B-RC-001 — Report Card + Salesforce spec written (Phase 1 shipped, Phase 2/3 deferred) | `prds/b2b-learner/PRD-B2B-REPORT-CARD-001.md` | [x] DONE |
+
+**Confirmed decisions this session:**
+- CQ-A: Navbar mobile = single row horizontal scroll (option a) ✓
+- CQ-1: "View Analysis" → switches to Analytics tab (option a) ✓
+- CQ-2: "View Analysis" shows on both Pass and Fail rows ✓
+
+**Deferred (future tickets):**
+- Report Card Phase 2: Salesforce webhook API integration + `report_card_requests` DB table
+- Report Card Phase 3: PDF generation + CA audit view + white-label PDF
+- Exam engine routing for B2B (Start/Continue Assessment not wired to exam engine)
+- Per-attempt deep-dive analytics (no `learner_attempt_answers` table yet)
+
+---
+
+## [COMPLETE] KSS-ANA-002 — Linear Analytics V2 (Apr 27 2026)
+
+**PRD:** `prds/analytics/PRD-LINEAR-ANALYTICS-V2.md` | **Build:** ✅ PASSED
+
+### KSS-ANA-DB-001 — Database Migrations
+| # | Task | Status |
+|---|------|--------|
+| DB-056-write | Write KSS-DB-056.sql — assessment_items config correction + attempts.score recalc | [x] DONE Apr 27 2026 |
+| DB-057-write | Write KSS-DB-057.sql — concept_tag_section_map + user_concept_mastery.section_name | [x] DONE Apr 27 2026 |
+| DB-056-run | SA runs KSS-DB-056 in Supabase | [x] DONE Apr 27 2026 |
+| DB-057-run | SA runs KSS-DB-057 in Supabase | [x] DONE Apr 27 2026 |
+
+### Code — AnalyticsTab.tsx Data Source Fix
+| # | Task | Status |
+|---|------|--------|
+| A2-fix-1 | `ExamCatConfig` interface: remove `score_max` / `neg_mark` (not columns on exam_categories) | [x] DONE Apr 27 2026 |
+| A2-fix-2 | Add `assessment_items` query to Promise.all — source `assessment_config.negative_marks` + `total_marks` | [x] DONE Apr 27 2026 |
+| A2-fix-3 | `setNegMark` / `setScoreMax` now derived from `assessment_items.assessment_config` JSONB | [x] DONE Apr 27 2026 |
+| A2-fix-4 | Build passes clean | [x] DONE Apr 27 2026 |
+
+### Remaining Phases — Verified Status
+| # | Task | Status |
+|---|------|--------|
+| A2-8a | PacingAnalysis | [CANCELLED] — not in PRD. CLAT passage pacing explicitly locked out. |
+| A2-8b | SectionBreakdown | [x] DONE — already existed at Block 5, sourced from `attempt_section_results` |
+| A2-8c | ConceptMasterySection — group by section | [x] DONE — code was already ready; now live via DB-057 `concept_tag_section_map` |
+| A2-8d | SATHeroScore fixes | [CANCELLED] — SAT is out of PRD scope; `SATAnalyticsTab.tsx` is a separate component |
+| A2-8e | Solutions Panel UI | [x] DONE — already existed at Block 7 (unchanged per PRD) |
+
+### Known data quality notes (non-blocking)
+- CLAT concept_tags has 3 subject names that don't match canonical section names ("Current Affairs and GK", "English", "General Knowledge") — seeded in concept_tag_section_map with display_order=99. Appear at bottom of CLAT section tabs.
+- 46 UCM rows remain null for section_name (concept_tags in UCM don't match concept_tags.concept_name). Tags invisible in ConceptMasteryPanel section view — benign.
+
+---
+
+## [COMPLETE] KSS-B2B-UI-001 — B2B Learner Portal: UI Overhaul (Apr 27 2026)
+
+**PRD:** `prds/b2b-learner/PRD-B2B-UI-001.md` (COMPLETE)  
+**Build:** ✅ PASSED
+
+### Phase 1 — Course Cards
+| # | Task | File | Status |
+|---|------|------|--------|
+| B2B-UI-1a-1 | CourseCard — two pills (Tag+category, Monitor+course type), colored placeholder | `courses/page.tsx` | [x] DONE |
+| B2B-UI-1a-2 | CourseCard — progress bar + N% label for ALL states | `courses/page.tsx` | [x] DONE |
+| B2B-UI-1a-3 | CourseCard — "Completed on: DD-MMM-YYYY" for COMPLETED state | `courses/page.tsx` | [x] DONE |
+| B2B-UI-1a-4 | CourseCard — CTA button ("Continue Learning" / "View Certificate") | `courses/page.tsx` | [x] DONE |
+| B2B-UI-1a-5 | CourseCard — removed status badge overlay; revoked_at IS NULL gate added | `courses/page.tsx` | [x] DONE |
+
+### Phase 2 — Course Detail 3-Tab
+| # | Task | File | Status |
+|---|------|------|--------|
+| B2B-UI-1b-1 | Tab bar (Overview / Curriculum / Achievements) + useSearchParams ?tab= | `courses/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1b-2 | Overview tab — gradient hero, static rating, 4 stat cards, About, What You'll Learn, Assigned panel with ProgressRing | `courses/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1b-3 | Curriculum tab — 5-milestone stepper (Trophy icons, progress_pct thresholds) + curriculum accordion | `courses/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1b-4 | Achievements tab — Certifications + 5 medal tiles (Trophy icon) + reference note | `courses/[id]/page.tsx` | [x] DONE |
+
+### Phase 3 — Assessment List Cards
+| # | Task | File | Status |
+|---|------|------|--------|
+| B2B-UI-1c-1 | Query — JOIN assessments!assessments_id + countMap + latestMap + revoked_at IS NULL | `assessments/page.tsx` | [x] DONE |
+| B2B-UI-1c-2 | AssessmentCard — gradient header (h-20), exam badge pill, title, metadata row | `assessments/page.tsx` | [x] DONE |
+| B2B-UI-1c-3 | AssessmentCard — X/5 attempt progress bar (shown when >0 attempts) | `assessments/page.tsx` | [x] DONE |
+| B2B-UI-1c-4 | AssessmentCard — B2B CTAs: Start / Start New Attempt (+N left chip) / View Analysis | `assessments/page.tsx` | [x] DONE |
+
+### Phase 4 — Assessment Detail 3-Tab
+| # | Task | File | Status |
+|---|------|------|--------|
+| B2B-UI-1d-1 | Replaced getAssessmentBySlug → assessment_items + JOIN assessments!assessments_id | `assessments/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1d-2 | Tab bar + useSearchParams ?tab= (overview/attempts/analytics); attempts count badge | `assessments/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1d-3 | B2BOverviewTab — zinc-900 hero, 4 stat cards, About, What You'll Learn, state CTA (non-functional placeholder) | `assessments/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1d-4 | B2BAttemptsTab — real learner_attempts sorted ASC, per-row score/pass/date/time, empty state | `assessments/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1d-5 | B2BAnalyticsTab — Certificate Status top section (amber card / pending card / caption) | `assessments/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1d-6 | B2BAnalyticsTab — Score trajectory bar chart + Passed/Failed/Avg stat grid | `assessments/[id]/page.tsx` | [x] DONE |
+| B2B-UI-1d-7 | B2BAnalyticsTab — 4 "Detailed analytics coming soon" placeholder sections | `assessments/[id]/page.tsx` | [x] DONE |
+
+### Phase 5 — Post-Build
+| # | Task | Status |
+|---|------|--------|
+| B2B-UI-POST-1 | npm run build passes clean | [x] DONE |
+| B2B-UI-POST-2 | Update TODO-BACKLOG.md + CLAUDE-HISTORY.md | [x] DONE |
+| B2B-UI-POST-3 | PRD status → COMPLETE | [x] DONE |
+
+---
+
+## [COMPLETE] KSS-CA-LEARNER-FIXES — Client Admin Learner Portal: Bug Fixes (Apr 26–27 2026)
+
+**Scope:** Sequential UX/bug fixes in the B2B learner portal and client-admin learners pages.
+
+| # | Fix | File | Status |
+|---|-----|------|--------|
+| CLF-1 | Add "← Back To Personas" button to B2B login page header | `b2b-learner/[tenant]/login/page.tsx` | [x] DONE |
+| CLF-2 | Dashboard — stat cards (4) inside WelcomeHeader banner | `b2b-learner/[tenant]/page.tsx` | [x] DONE |
+| CLF-3 | Dashboard — all queries filtered through `learner_content_access` | `b2b-learner/[tenant]/page.tsx` | [x] DONE |
+| CLF-4 | Dashboard — "Newly Assigned" section (2 sub-sections + info icon tooltip) | `b2b-learner/[tenant]/page.tsx` | [x] DONE |
+| CLF-5 | Courses page — filter all content through `learner_content_access` | `b2b-learner/[tenant]/courses/page.tsx` | [x] DONE |
+| CLF-6 | Assessments page — filter all content through `learner_content_access` | `b2b-learner/[tenant]/assessments/page.tsx` | [x] DONE |
+| CLF-7 | Course detail page — access gate redirect | `b2b-learner/[tenant]/courses/[id]/page.tsx` | [x] DONE |
+| CLF-8 | Assessment detail page — access gate redirect | `b2b-learner/[tenant]/assessments/[id]/page.tsx` | [x] DONE |
+| CLF-11 | Persona selector → always routes to `/login` (not dashboard) for B2B portals | `src/app/page.tsx` | [x] DONE Apr 27 |
+| CLF-12 | Login page — removed auto-redirect when learner in localStorage (always show picker) | `b2b-learner/[tenant]/login/page.tsx` | [x] DONE Apr 27 |
+| CLF-13 | Login page — `PersonaGuide` fully dynamic from DB (`learner_course_progress` + `learner_attempts`) | `b2b-learner/[tenant]/login/page.tsx` | [x] DONE Apr 27 |
+| CLF-14 | Dashboard — "Assessments Done" card gets `Info` icon tooltip explaining ≥5 threshold | `b2b-learner/[tenant]/page.tsx` | [x] DONE Apr 27 |
+| CLF-15 | SQL data fix — 3 orphan `learner_course_progress` rows fixed (null learner_id → correct UUIDs); Aditya Shah access to NEET Prep added; Nisha/Rahul Employee Policy Handbook removed + PF Basics added | `docs/requirements/b2b_data_fix.txt` | [x] DONE Apr 27 |
+| CLF-9 | Courses page — "Newly Assigned Courses" sub-section | `b2b-learner/[tenant]/page.tsx` (dashboard covers this) | [x] DONE — covered by dashboard NewlyAssignedSection |
+| CLF-10 | Assessments page — "Newly Assigned Assessments" sub-section | `b2b-learner/[tenant]/page.tsx` (dashboard covers this) | [x] DONE — covered by dashboard NewlyAssignedSection |
+| CLF-16 | Dashboard — `created_at` → `granted_at` column fix in `learner_content_access` query (was returning null → all stats showing 0). Added `revoked_at IS NULL` filter. | `b2b-learner/[tenant]/page.tsx` | [x] DONE Apr 27 |
+| CLF-17 | Remove `.eq('status', 'LIVE')` from all 4 B2B content queries — `learner_content_access` is the sole gate | `page.tsx` (×2), `courses/page.tsx`, `assessments/page.tsx` | [x] DONE Apr 27 |
+
+**Build:** ✅ PASSED (CLF-1 through CLF-17)
 
 ---
 
@@ -102,46 +309,67 @@
 
 ---
 
-## [PENDING] KSS-SA-FIXES-001 — Super Admin Bug Fixes (5 items, Apr 24 2026)
+## [COMPLETE] KSS-SA-FIXES-001 — Super Admin Bug Fixes (5 items, Apr 27 2026)
 
 **Source:** `docs/linear_analytics/super_admin_changes.txt`
 
 | # | Fix | Status |
 |---|-----|--------|
-| SA-FIX-1 | Plans & Pricing page — subscriber count missing even though individual plan pages show subscribers | [ ] PENDING |
-| SA-FIX-2 | B2C Users table "Plan" column — not wired to DB; 3 demo users show "Free" but should reflect actual plan (professional / category plan) | [ ] PENDING — needs clarification on plan resolution logic |
-| SA-FIX-3 | Question Bank page — no questions showing despite DB having questions; investigate query | [x] DONE — Apr 26 2026. Fixed: (1) `concept_tag` dropped col → `concept_tags!concept_tag_id(concept_name)`, (2) named FK hints `!questions_created_by_fkey` → `!created_by` |
-| SA-FIX-4 | B2C Revenue tab — no data despite B2C Users and Plans & Pricing being wired | [ ] PENDING |
-| SA-FIX-5 | Platform Config → Exam Categories → SAT → Analytics Config — remove this section and its dependencies | [x] DONE — Apr 26 2026. Removed `analytics-display` sub-tab from drill-down nav and render. Component functions remain as dead code pending full cleanup decision. |
+| SA-FIX-1 | Plans & Pricing page — subscriber count = 0 on all cards | [x] DONE — Apr 27 2026. Data fix: `plan_subscribers.subscriber_count` recalculated from `b2c_assessment_subscriptions`. Platform Pro now shows 11 subscribers. KSS-DB-SA-FIXES-001.sql |
+| SA-FIX-2 | B2C Users "Plan" column shows "Free" | [x] DONE — Apr 27 2026. Root cause: all subscription plan_ids were from superseded seed batch (no rows in plans table). Remapped all 11 stale subs → Platform Pro. KSS-DB-SA-FIXES-001.sql |
+| SA-FIX-3 | Question Bank page — no questions showing | [x] DONE — Apr 26 2026. Fixed: `concept_tags!concept_tag_id(concept_name)`, FK hints `!created_by` |
+| SA-FIX-4 | B2C Revenue tab — no data | [x] DONE — Apr 27 2026. Plans exist + LIVE ✓. Root cause same as SA-FIX-1: subscriber_count = 0 → MRR = 0. Fixed by same KSS-DB-SA-FIXES-001.sql migration. MRR now ₹5,489/mo (11 × ₹499). |
+| SA-FIX-5 | Platform Config — Section Visibility toggles removed (dead code). Table redesign. Analytics Config widget on Adaptive form. | [x] DONE — Apr 27 2026 |
 
 ---
 
-## [IN-PROGRESS] KSS-CA-EMAIL-001 - Client Admin White-Label Email Template Center
+## [DONE] KSS-SA-PC-001 V2 — Platform Config Table Redesign + Analytics Config Cleanup (Apr 27 2026)
 
-**PRD:** Not requested for this session
-**Scope:** Shared Email Templates persona -> tenant chooser -> client-admin email index -> template detail with iframe preview -> raw white-label HTML templates + SES-safe token rendering
+**PRD:** `prds/super-admin/PRD-SA-PLATFORM-CONFIG.md` (updated)
+
+| Item | Status |
+|---|---|
+| Exam Category card grid → sortable table inside "Exam Category" card | [x] DONE |
+| DnD: `rectSortingStrategy` → `verticalListSortingStrategy` | [x] DONE |
+| DnD save: sequential for-loop → `Promise.all` | [x] DONE |
+| Pagination: 10/page with Prev/Next controls | [x] DONE |
+| Table columns: Drag \| Status \| Display Name \| Internal Name \| Concept Tags \| Actions | [x] DONE |
+| Mobile: hide Drag/Internal Name/Concept Tags below `sm` breakpoint | [x] DONE |
+| Create button moved inside card above table | [x] DONE |
+| Section Visibility toggles removed from SAT Analytics Config | [x] DONE |
+| `AnalyticsConfig` interface + related state/functions removed | [x] DONE |
+| Analytics Config read-only widget on Create Adaptive form (SAT only) | [x] DONE |
+| Analytics Config read-only widget on Edit Adaptive form (SAT only) | [x] DONE |
+| Build | ✅ PASSED |
+
+---
+
+## [COMPLETE] KSS-CA-EMAIL-001 - Client Admin White-Label Email Template Center
+
+**PRD:** Not written (bug-fix/feature build, PRD not requested)
+**Build:** ✅ PASSED
 
 ### Phase 1 - Raw Template System
 | # | Task | Status |
 |---|------|--------|
-| CAE-1a | Create dedicated raw HTML email template folder with 6 white-label templates | [ ] IN PROGRESS |
-| CAE-1b | Add shared token renderer + preview payload contract | [ ] PENDING |
-| CAE-1c | Add sample tenant/template data with tenant-first branding fallback | [ ] PENDING |
+| CAE-1a | Create dedicated raw HTML email template folder with 6 white-label templates | [x] DONE — `src/email-templates/html/` (b2c-access-restored, b2c-user-suspended, certificate-of-completion, client-admin-onboarding, content-creator-full, content-creator-run-only) |
+| CAE-1b | Add shared token renderer + preview payload contract | [x] DONE — `src/lib/email-templates/render.ts` + `types.ts` |
+| CAE-1c | Add sample tenant/template data with tenant-first branding fallback | [x] DONE — `src/lib/email-templates/data.ts` (TENANT_EMAIL_PREVIEW_PROFILES) |
 
 ### Phase 2 - Persona Flow
 | # | Task | Status |
 |---|------|--------|
-| CAE-2a | Add shared Email Templates persona tile on root selector | [ ] PENDING |
-| CAE-2b | Build tenant chooser page using existing tenant slug mapping | [ ] PENDING |
-| CAE-2c | Build client-admin email template index page | [ ] PENDING |
-| CAE-2d | Build template detail page with trigger context, variables, payload, and iframe preview | [ ] PENDING |
+| CAE-2a | Add shared Email Templates persona tile on root selector | [x] DONE — `src/app/page.tsx` (Client Admin Emails + B2C End User Emails tiles) |
+| CAE-2b | Build tenant chooser page using existing tenant slug mapping | [x] DONE — `src/app/email-templates/page.tsx` + `TenantChooserCard` |
+| CAE-2c | Build client-admin email template index page | [x] DONE — `src/app/email-templates/[tenant]/page.tsx` + `EmailTemplateCard` |
+| CAE-2d | Build template detail page with trigger context, variables, payload, and iframe preview | [x] DONE — `src/app/email-templates/[tenant]/[template]/page.tsx` |
 
 ### Phase 3 - Verification + Documentation
 | # | Task | Status |
 |---|------|--------|
-| CAE-3a | Verify no Sandesh Banakar references or hardcoded old-brand support contact remain in new templates | [ ] PENDING |
-| CAE-3b | Run `npm run build` | [ ] PENDING |
-| CAE-3c | Move completed work to `CLAUDE-HISTORY.md` and mark backlog done | [ ] PENDING |
+| CAE-3a | Verify no Sandesh Banakar references or hardcoded old-brand support contact remain in new templates | [x] DONE |
+| CAE-3b | Run `npm run build` | [x] DONE — ✅ PASSED |
+| CAE-3c | Move completed work to `CLAUDE-HISTORY.md` and mark backlog done | [x] DONE — Apr 27 2026 |
 
 ---
 
@@ -238,7 +466,7 @@
 
 ---
 
-## [NEW] KSS-ANA-002 — Analytics V2: Shared Components + SAT + Linear Fixes
+## [IN-PROGRESS] KSS-ANA-002 — Analytics V2: Shared Components + SAT + Linear Fixes
 
 **PRD:** `prds/analytics/PRD-ANA-002.md` (to be written)
 **Scope:** Shared SectionBreakdown · Unified ConceptMastery (per section/attempt, dynamic pills) · MistakeTaxonomy (live 6-cat) · Live PacingAnalysis · Solutions Panel fixes · SAT HeroScore bugs · Linear stats card removal · Attempt naming
@@ -349,7 +577,7 @@
 ### Phase 8 — Linear Score Trajectory Target Input
 | # | Task | Status |
 |---|------|--------|
-| A2-7a | KSS-DB-048 SQL: `users` ADD `target_neet_score`, `target_jee_score`, `target_clat_score` INT NULL — write to `docs/requirements/SQL-ANA-002.txt`, SA runs in Supabase | [ ] PENDING |
+| A2-7a | KSS-DB-048 SQL: `users` ADD `target_neet_score`, `target_jee_score`, `target_clat_score` INT NULL | [x] DONE — KSS-DB-048 already ran and verified (see A2-DB048) |
 | A2-7b | Add inline `<input type="number">` to `ScoreTrajectoryChart.tsx` when target is null (shows "Set a target →" prompt) | [ ] PENDING |
 | A2-7c | Verify `AppContext.updateTargetScore()` writes to KSS-DB-048 columns (referenced in AnalyticsTab but columns may not exist yet) | [ ] PENDING |
 

@@ -587,6 +587,7 @@ export default function UsersRolesPage() {
         .select('id, name, first_name, last_name, email, role, is_active, created_at')
         .eq('tenant_id', tenantId)
         .eq('role', 'CLIENT_ADMIN')
+        .eq('is_active', true)
         .limit(1)
         .single(),
       supabase

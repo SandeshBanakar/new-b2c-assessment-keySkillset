@@ -119,7 +119,7 @@ export default function CertificateTabsContent() {
               <p className="text-sm text-zinc-500">No course certificates yet.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {courseCerts.map((c) => (
                 <CertificateCard key={c.id} certificate={c} onDownload={handleDownload} />
               ))}
@@ -152,7 +152,7 @@ export default function CertificateTabsContent() {
               <p className="text-sm text-zinc-500">No assessment attempts or certificates yet.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* show assessment certificates first */}
               {assessmentCerts.map((c) => (
                 <CertificateCard key={c.id} certificate={c} onDownload={handleDownload} />

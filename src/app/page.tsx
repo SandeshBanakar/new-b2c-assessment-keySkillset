@@ -115,7 +115,7 @@ function PersonaSelector() {
 
       <div className="flex items-center justify-center gap-6">
         <div
-          onClick={() => handleAdminSelect('/b2b-learner/akash')}
+          onClick={() => handleAdminSelect('/b2b-learner/akash/login')}
           className="cursor-pointer group flex flex-col items-center gap-3"
         >
           <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-violet-700">
@@ -130,7 +130,7 @@ function PersonaSelector() {
         </div>
 
         <div
-          onClick={() => handleAdminSelect('/b2b-learner/techcorp')}
+          onClick={() => handleAdminSelect('/b2b-learner/techcorp/login')}
           className="cursor-pointer group flex flex-col items-center gap-3"
         >
           <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-teal-700">

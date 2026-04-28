@@ -8,17 +8,12 @@ import {
   Users,
   BarChart2,
   Award,
-  Activity,
+  CheckCircle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getTenantId } from '@/lib/client-admin/tenants'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type FullCreatorTab = 'content' | 'analytics'
-type RunOnlyTab = 'overview' | 'performance'
-
-// ─── Shared UI Components ────────────────────────────────────────────────────
+// ─── StatCard ─────────────────────────────────────────────────────────────────
 
 function StatCard({
   label,
@@ -47,83 +42,158 @@ function StatCard({
   )
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-        active
-          ? 'bg-violet-700 text-white'
-          : 'text-zinc-600 hover:bg-zinc-100'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
+// ─── RUN_ONLY: 3 cards ────────────────────────────────────────────────────────
 
-// ─── FULL_CREATOR: Content Tab ───────────────────────────────────────────────
-
-function ContentStats({ tenantId }: { tenantId: string }) {
+function RunOnlyStats({ tenantId }: { tenantId: string }) {
   const [stats, setStats] = useState<{
-    courses: number
-    assessments: number
-    questions: number
-  }>({ courses: 0, assessments: 0, questions: 0 })
+    activeLearners: number | null
+    coursesCompleted: number | null
+    coursesAssigned: number | null
+    certificatesGenerated: number | null
+  }>({ activeLearners: null, coursesCompleted: null, coursesAssigned: null, certificatesGenerated: null })
 
   useEffect(() => {
     if (!tenantId) return
-
     Promise.all([
-      // Courses created by this tenant
       supabase
-        .from('courses')
+        .from('learners')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('status', 'ACTIVE'),
+      supabase
+        .from('learner_course_progress')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('status', 'COMPLETED'),
+      supabase
+        .from('content_assignments')
+        .select('content_id')
+        .eq('tenant_id', tenantId)
+        .eq('content_type', 'COURSE')
+        .is('removed_at', null),
+      supabase
+        .from('certificates')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenantId),
-      // Assessments created by this tenant (tenant_scope_id)
-      supabase
-        .from('assessment_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_scope_id', tenantId),
-      // Questions created by Content Creators in this tenant
-      supabase
-        .from('admin_users')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('role', 'CONTENT_CREATOR')
-        .then(async ({ data: ccUsers }) => {
-          if (!ccUsers || ccUsers.length === 0) return { count: 0 }
-          const ccIds = ccUsers.map((u: { id: string }) => u.id)
-          const questionsRes = await supabase
-            .from('questions')
-            .select('id', { count: 'exact', head: true })
-            .in('created_by', ccIds)
-          return { count: questionsRes.count ?? 0 }
-        }),
-    ]).then(([courses, assessments, questions]) => {
+    ]).then(([learners, completed, assignments, certs]) => {
+      const uniqueAssigned = new Set(
+        (assignments.data ?? []).map((r: { content_id: string }) => r.content_id)
+      ).size
       setStats({
-        courses: courses.count ?? 0,
-        assessments: assessments.count ?? 0,
-        questions: questions.count ?? 0,
+        activeLearners: learners.count ?? 0,
+        coursesCompleted: completed.count ?? 0,
+        coursesAssigned: uniqueAssigned,
+        certificatesGenerated: certs.count ?? 0,
       })
     })
   }, [tenantId])
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <StatCard label="Active Learners" value={stats.activeLearners} icon={Users} />
       <StatCard
-        label="Courses Created"
-        value={stats.courses}
-        icon={BookOpen}
+        label="Courses Completed"
+        value={stats.coursesCompleted}
+        icon={CheckCircle}
+        subtext={
+          stats.coursesAssigned !== null
+            ? `out of ${stats.coursesAssigned} assigned`
+            : undefined
+        }
       />
+      <StatCard label="Certificates Generated" value={stats.certificatesGenerated} icon={Award} />
+    </div>
+  )
+}
+
+// ─── FULL_CREATOR: 6 cards (unified fetch) ────────────────────────────────────
+
+function FullCreatorStats({ tenantId }: { tenantId: string }) {
+  const [stats, setStats] = useState<{
+    courses: number | null
+    assessments: number | null
+    questions: number | null
+    activeLearners: number | null
+    coursesCompleted: number | null
+    coursesAssigned: number | null
+    certificatesGenerated: number | null
+  }>({
+    courses: null,
+    assessments: null,
+    questions: null,
+    activeLearners: null,
+    coursesCompleted: null,
+    coursesAssigned: null,
+    certificatesGenerated: null,
+  })
+
+  useEffect(() => {
+    if (!tenantId) return
+
+    const questionsQuery = supabase
+      .from('admin_users')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('role', 'CONTENT_CREATOR')
+      .then(async ({ data: ccUsers }) => {
+        if (!ccUsers || ccUsers.length === 0) return { count: 0 }
+        const ccIds = ccUsers.map((u: { id: string }) => u.id)
+        const { count } = await supabase
+          .from('questions')
+          .select('id', { count: 'exact', head: true })
+          .in('created_by', ccIds)
+        return { count: count ?? 0 }
+      })
+
+    Promise.all([
+      supabase
+        .from('courses')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId),
+      supabase
+        .from('assessment_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_scope_id', tenantId),
+      questionsQuery,
+      supabase
+        .from('learners')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('status', 'ACTIVE'),
+      supabase
+        .from('learner_course_progress')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('status', 'COMPLETED'),
+      supabase
+        .from('content_assignments')
+        .select('content_id')
+        .eq('tenant_id', tenantId)
+        .eq('content_type', 'COURSE')
+        .is('removed_at', null),
+      supabase
+        .from('certificates')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId),
+    ]).then(([courses, assessments, questions, learners, completed, assignments, certs]) => {
+      const uniqueAssigned = new Set(
+        (assignments.data ?? []).map((r: { content_id: string }) => r.content_id)
+      ).size
+      setStats({
+        courses: courses.count ?? 0,
+        assessments: assessments.count ?? 0,
+        questions: questions.count ?? 0,
+        activeLearners: learners.count ?? 0,
+        coursesCompleted: completed.count ?? 0,
+        coursesAssigned: uniqueAssigned,
+        certificatesGenerated: certs.count ?? 0,
+      })
+    })
+  }, [tenantId])
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <StatCard label="Courses Created" value={stats.courses} icon={BookOpen} />
       <StatCard
         label="Assessments Created"
         value={stats.assessments}
@@ -136,125 +206,23 @@ function ContentStats({ tenantId }: { tenantId: string }) {
         icon={BarChart2}
         subtext="By Content Creators"
       />
+      <StatCard label="Active Learners" value={stats.activeLearners} icon={Users} />
+      <StatCard
+        label="Courses Completed"
+        value={stats.coursesCompleted}
+        icon={CheckCircle}
+        subtext={
+          stats.coursesAssigned !== null
+            ? `out of ${stats.coursesAssigned} assigned`
+            : undefined
+        }
+      />
+      <StatCard label="Certificates Generated" value={stats.certificatesGenerated} icon={Award} />
     </div>
   )
 }
 
-// ─── RUN_ONLY: Overview Tab ──────────────────────────────────────────────────
-
-function OverviewStats({ tenantId }: { tenantId: string }) {
-  const [stats, setStats] = useState<{
-    activeLearners: number
-    completionRate: number
-    certificateRate: number
-    avgScore: number
-    totalAttempts: number
-  }>({
-    activeLearners: 0,
-    completionRate: 0,
-    certificateRate: 0,
-    avgScore: 0,
-    totalAttempts: 0,
-  })
-
-  useEffect(() => {
-    if (!tenantId) return
-
-    Promise.all([
-      // Active learners
-      supabase
-        .from('learners')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .eq('status', 'ACTIVE'),
-      // Learners with completed attempts - get all and count unique in JS
-      supabase
-        .from('learner_attempts')
-        .select('learner_id')
-        .eq('tenant_id', tenantId),
-      // Learners with certificates - get all and count unique in JS
-      supabase
-        .from('certificates')
-        .select('learner_id')
-        .eq('tenant_id', tenantId),
-      // Total active learners for rate calculation
-      supabase
-        .from('learners')
-        .select('id', { count: 'exact' })
-        .eq('tenant_id', tenantId)
-        .eq('status', 'ACTIVE'),
-      // Average score from attempts
-      supabase
-        .from('learner_attempts')
-        .select('score')
-        .eq('tenant_id', tenantId)
-        .not('score', 'is', null),
-      // Total attempts
-      supabase
-        .from('learner_attempts')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId),
-    ]).then(([activeLearners, completedAttempts, certificates, totalLearners, scores, attempts]) => {
-      const total = totalLearners.count ?? 0
-      
-      // Count unique learners from attempts
-      const attemptData = completedAttempts.data ?? []
-      const uniqueCompletedLearners = new Set(attemptData.map((r: { learner_id: string }) => r.learner_id)).size
-      
-      // Count unique learners from certificates
-      const certData = certificates.data ?? []
-      const uniqueCertLearners = new Set(certData.map((r: { learner_id: string }) => r.learner_id)).size
-      
-      // Calculate average score
-      const scoreData = scores.data ?? []
-      const avgScore = scoreData.length > 0
-        ? Math.round(scoreData.reduce((sum: number, r: { score: number }) => sum + (r.score ?? 0), 0) / scoreData.length)
-        : 0
-
-      setStats({
-        activeLearners: activeLearners.count ?? 0,
-        completionRate: total > 0 ? Math.round((uniqueCompletedLearners / total) * 100) : 0,
-        certificateRate: total > 0 ? Math.round((uniqueCertLearners / total) * 100) : 0,
-        avgScore,
-        totalAttempts: attempts.count ?? 0,
-      })
-    })
-  }, [tenantId])
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <StatCard
-        label="Active Learners"
-        value={stats.activeLearners}
-        icon={Users}
-      />
-      <StatCard
-        label="Completion Rate"
-        value={`${stats.completionRate}%`}
-        icon={Activity}
-        subtext="Learners with ≥1 completed attempt"
-      />
-      <StatCard
-        label="Certificate Rate"
-        value={`${stats.certificateRate}%`}
-        icon={Award}
-        subtext="Learners who earned a certificate"
-      />
-      <StatCard
-        label="Average Score"
-        value={stats.avgScore ? `${stats.avgScore}%` : '—'}
-        icon={BarChart2}
-      />
-      <StatCard
-        label="Total Attempts"
-        value={stats.totalAttempts}
-        icon={FileQuestion}
-      />
-    </div>
-  )
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function UnifiedDashboard() {
   const params = useParams()
@@ -264,13 +232,8 @@ export default function UnifiedDashboard() {
   const [tenantMode, setTenantMode] = useState<string | null>(null)
   const [loading, setLoading] = useState(!!tenantId)
 
-  // Tab state
-  const [fullCreatorTab, setFullCreatorTab] = useState<FullCreatorTab>('content')
-  const [runOnlyTab, setRunOnlyTab] = useState<RunOnlyTab>('overview')
-
   useEffect(() => {
     if (!tenantId) return
-
     supabase
       .from('tenants')
       .select('feature_toggle_mode')
@@ -294,80 +257,18 @@ export default function UnifiedDashboard() {
 
   return (
     <div className="px-8 py-8 space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-xl font-semibold text-zinc-900">Dashboard</h1>
         <p className="text-sm text-zinc-500 mt-0.5">
           {isFullCreator
-            ? 'Monitor your content and learner analytics'
+            ? 'Monitor your content creation and learner progress'
             : 'Monitor your learner progress and performance'}
         </p>
       </div>
-
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 pb-4">
-        {isFullCreator ? (
-          <>
-            <TabButton
-              active={fullCreatorTab === 'content'}
-              onClick={() => setFullCreatorTab('content')}
-            >
-              Content
-            </TabButton>
-            <TabButton
-              active={fullCreatorTab === 'analytics'}
-              onClick={() => setFullCreatorTab('analytics')}
-            >
-              Analytics
-            </TabButton>
-          </>
-        ) : (
-          <>
-            <TabButton
-              active={runOnlyTab === 'overview'}
-              onClick={() => setRunOnlyTab('overview')}
-            >
-              Overview
-            </TabButton>
-            <TabButton
-              active={runOnlyTab === 'performance'}
-              onClick={() => setRunOnlyTab('performance')}
-            >
-              Performance
-            </TabButton>
-          </>
-        )}
-      </div>
-
-      {/* Tab Content */}
-      {isFullCreator ? (
-        fullCreatorTab === 'content' ? (
-          <ContentStats tenantId={tenantId!} />
-        ) : (
-          <div className="bg-white border border-zinc-200 rounded-md px-6 py-12 flex flex-col items-center justify-center text-center">
-            <BarChart2 className="w-8 h-8 text-zinc-300 mb-3" />
-            <p className="text-sm font-medium text-zinc-500">
-              Analytics features coming soon
-            </p>
-            <p className="text-xs text-zinc-400 mt-1">
-              Full analytics available at /reports
-            </p>
-          </div>
-        )
-      ) : (
-        runOnlyTab === 'overview' ? (
-          <OverviewStats tenantId={tenantId!} />
-        ) : (
-          <div className="bg-white border border-zinc-200 rounded-md px-6 py-12 flex flex-col items-center justify-center text-center">
-            <BarChart2 className="w-8 h-8 text-zinc-300 mb-3" />
-            <p className="text-sm font-medium text-zinc-500">
-              Performance analytics coming soon
-            </p>
-            <p className="text-xs text-zinc-400 mt-1">
-              Full reports available at /reports
-            </p>
-          </div>
-        )
+      {tenantId && (
+        isFullCreator
+          ? <FullCreatorStats tenantId={tenantId} />
+          : <RunOnlyStats tenantId={tenantId} />
       )}
     </div>
   )

@@ -514,6 +514,38 @@ Tenant slugs: akash (FULL_CREATOR) | techcorp (RUN_ONLY) — IDs in CLAUDE-DB.md
 
 ---
 
+## B2B LEARNER PORTAL (LOCKED — Apr 26 2026)
+
+```
+Routes: /b2b-learner/[tenant]/login | / | /courses | /courses/[id]
+        /assessments | /assessments/[id] | /certificates
+```
+
+**CRITICAL — Content Visibility Rule (NEVER VIOLATE):**
+- A B2B learner MUST ONLY see content that has been explicitly assigned to them via `learner_content_access`.
+- `learner_content_access` is populated when a Client Admin uses the "Assign" button in the Global Catalogue.
+- Every query on every B2B learner page (dashboard, courses list, assessments list, course detail, assessment detail) MUST filter through `learner_content_access WHERE learner_id = currentLearnerId`.
+- If a learner navigates directly to a detail page for unassigned content, redirect them to the list page. NEVER render unassigned content — not on the dashboard, not on list pages, not on detail pages.
+- This rule applies regardless of whether content is GLOBAL (keySkillset) or TENANT_PRIVATE (in-house). Assignment is the only gate.
+
+**Stat Cards (inside WelcomeHeader banner — translucent white, white text):**
+- Card 1 — Courses In Progress: `learner_content_access (COURSE)` → `learner_course_progress.status = IN_PROGRESS`
+- Card 2 — Courses Completed: `learner_content_access (COURSE)` → `learner_course_progress.status = COMPLETED`
+- Card 3 — Assessments Completed: `learner_content_access (ASSESSMENT)` → `COUNT(learner_attempts) >= 5` per assessment (B2B plan = 5 attempts fixed)
+- Card 4 — Certificates Earned: `certificates WHERE learner_id = currentLearnerId AND tenant_id = currentTenantId`
+- Mobile layout: 2×2 grid. Desktop: 4-column row.
+
+**"Newly Assigned" Section (dashboard only — tab pages in later ticket):**
+- Source: `learner_content_access ORDER BY created_at DESC`
+- Two sub-sections side by side: "New Courses" (2 items) + "New Assessments" (2 items). Stack vertically on mobile.
+- `created_at` on `learner_content_access` is the assignment timestamp — no separate `assigned_at` column needed.
+- Show info icon (click-to-toggle tooltip) explaining: "This is when your administrator assigned this content to you."
+- Hide sub-section entirely if learner has no assigned content of that type.
+
+**Attempts (B2B):** Fixed at 5 per assessment. "Assessment Completed" = `COUNT(learner_attempts) >= 5`.
+
+---
+
 ## GLOBAL UI RULES
 
 - Email never editable after creation — all edit forms (learners, CCs, CA Users & Roles)

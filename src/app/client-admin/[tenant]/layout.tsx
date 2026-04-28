@@ -12,6 +12,7 @@ import {
   BarChart2,
   UserCog,
   ClipboardList,
+  CreditCard,
   MoreHorizontal,
   LogOut,
   type LucideIcon,
@@ -99,6 +100,7 @@ export default function ClientAdminLayout({
         .select('name, email')
         .eq('tenant_id', tenantId)
         .eq('role', 'CLIENT_ADMIN')
+        .eq('is_active', true)
         .limit(1)
         .single(),
     ]).then(([{ data: tenantData }, { data: adminData }]) => {
@@ -172,6 +174,7 @@ export default function ClientAdminLayout({
             Settings
           </p>
           <NavItem href={`${base}/users-roles`} icon={UserCog} label="Users & Roles" />
+          <NavItem href={`${base}/billing`} icon={CreditCard} label="Billing" />
           <NavItem href={`${base}/audit-log`} icon={ClipboardList} label="Audit Log" />
         </nav>
 

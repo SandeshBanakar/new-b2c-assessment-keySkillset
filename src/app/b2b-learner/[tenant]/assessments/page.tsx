@@ -1,22 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileQuestion, ChevronRight, BarChart2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { FileQuestion, BarChart2, Clock, HelpCircle, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useB2BLearner } from '@/context/B2BLearnerContext';
 import { B2BAuthGuard } from '@/components/shared/B2BAuthGuard';
 import B2BNavbar from '@/components/layout/B2BNavbar';
 
-// Gradient placeholder per exam category
-const EXAM_GRADIENT: Record<string, string> = {
-  SAT:   'from-blue-100 to-blue-200',
-  JEE:   'from-orange-100 to-orange-200',
-  NEET:  'from-green-100 to-green-200',
-  PMP:   'from-purple-100 to-purple-200',
-  CLAT:  'from-rose-100 to-rose-200',
-  BANK:  'from-teal-100 to-teal-200',
-  SSC:   'from-amber-100 to-amber-200',
+const EXAM_GRADIENT_STYLE: Record<string, React.CSSProperties> = {
+  SAT:  { background: 'linear-gradient(135deg, #3b82f6, #4f46e5)' },
+  JEE:  { background: 'linear-gradient(135deg, #f97316, #dc2626)' },
+  NEET: { background: 'linear-gradient(135deg, #22c55e, #059669)' },
+  PMP:  { background: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
+  CLAT: { background: 'linear-gradient(135deg, #f43f5e, #db2777)' },
+  BANK: { background: 'linear-gradient(135deg, #14b8a6, #0891b2)' },
+  SSC:  { background: 'linear-gradient(135deg, #f59e0b, #ca8a04)' },
+};
+const DEFAULT_GRADIENT_STYLE: React.CSSProperties = {
+  background: 'linear-gradient(135deg, #a1a1aa, #52525b)',
 };
 
 const EXAM_BADGE: Record<string, string> = {
@@ -29,11 +31,24 @@ const EXAM_BADGE: Record<string, string> = {
   SSC:   'bg-amber-50 text-amber-700 border border-amber-200',
 };
 
-interface Assessment {
+const MAX_ATTEMPTS = 5;
+
+interface AssessmentMeta {
+  duration_minutes: number | null;
+  total_questions: number | null;
+  difficulty: string | null;
+}
+
+interface AssessmentItemRaw {
   id: string;
   title: string;
   test_type: string;
-  exam_categories: { name: string }[] | null;
+  assessments_id: string | null;
+  exam_categories: { name: string; display_name: string | null }[] | null;
+}
+
+interface AssessmentItem extends AssessmentItemRaw {
+  assessments: AssessmentMeta | null;
 }
 
 interface LearnerAttempt {
@@ -45,42 +60,50 @@ interface LearnerAttempt {
 }
 
 function AttemptsSummaryPanel({
-  assessments,
-  attemptMap,
+  totalAssessments,
+  countMap,
+  latestMap,
 }: {
-  assessments: Assessment[];
-  attemptMap: Record<string, LearnerAttempt>;
+  totalAssessments: number;
+  countMap: Record<string, number>;
+  latestMap: Record<string, LearnerAttempt>;
 }) {
-  const attempted = Object.keys(attemptMap).length;
-  const passed = Object.values(attemptMap).filter((a) => a.passed).length;
-  const scores = Object.values(attemptMap).map((a) => a.score_pct);
-  const avgScore = scores.length > 0 ? Math.round(scores.reduce((s, n) => s + n, 0) / scores.length) : null;
+  const attemptedCount = Object.values(countMap).filter((n) => n > 0).length;
+  const passedCount = Object.values(latestMap).filter((a) => a.passed).length;
+  const scores = Object.values(latestMap).map((a) => a.score_pct);
+  const avgScore =
+    scores.length > 0
+      ? Math.round(scores.reduce((s, n) => s + n, 0) / scores.length)
+      : null;
 
-  if (attempted === 0) return null;
+  if (attemptedCount === 0) return null;
 
   return (
-    <div className="bg-linear-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-4">
+    <div className="border border-teal-200 rounded-xl p-4" style={{ background: 'linear-gradient(to right, #f0fdfa, #ecfdf5)' }}>
       <div className="flex items-center gap-2 mb-3">
         <BarChart2 className="w-4 h-4 text-teal-700" />
         <h2 className="text-sm font-semibold text-teal-900">Your Progress Summary</h2>
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white/70 rounded-lg p-3 text-center">
-          <p className="text-xl font-bold text-teal-700">{attempted}</p>
+          <p className="text-xl font-bold text-teal-700">{attemptedCount}</p>
           <p className="text-xs text-zinc-500 mt-0.5">Attempted</p>
         </div>
         <div className="bg-white/70 rounded-lg p-3 text-center">
-          <p className="text-xl font-bold text-emerald-600">{passed}</p>
+          <p className="text-xl font-bold text-emerald-600">{passedCount}</p>
           <p className="text-xs text-zinc-500 mt-0.5">Passed</p>
         </div>
         <div className="bg-white/70 rounded-lg p-3 text-center">
-          <p className="text-xl font-bold text-zinc-800">{avgScore !== null ? `${avgScore}%` : '—'}</p>
+          <p className="text-xl font-bold text-zinc-800">
+            {avgScore !== null ? `${avgScore}%` : '—'}
+          </p>
           <p className="text-xs text-zinc-500 mt-0.5">Avg Score</p>
         </div>
       </div>
-      {attempted < assessments.length && (
+      {attemptedCount < totalAssessments && (
         <p className="text-xs text-teal-600 mt-3">
-          {assessments.length - attempted} assessment{assessments.length - attempted !== 1 ? 's' : ''} not yet attempted
+          {totalAssessments - attemptedCount} assessment
+          {totalAssessments - attemptedCount !== 1 ? 's' : ''} not yet attempted
         </p>
       )}
     </div>
@@ -89,84 +112,137 @@ function AttemptsSummaryPanel({
 
 function AssessmentCard({
   assessment,
-  attempt,
+  attemptCount,
   tenantSlug,
 }: {
-  assessment: Assessment;
-  attempt: LearnerAttempt | undefined;
+  assessment: AssessmentItem;
+  attemptCount: number;
   tenantSlug: string;
 }) {
   const router = useRouter();
   const categoryName = assessment.exam_categories?.[0]?.name ?? '';
-  const gradient = EXAM_GRADIENT[categoryName] ?? 'from-zinc-100 to-zinc-200';
-  const examBadgeClass = EXAM_BADGE[categoryName] ?? 'bg-zinc-100 text-zinc-600 border border-zinc-200';
+  const gradientStyle = EXAM_GRADIENT_STYLE[categoryName] ?? DEFAULT_GRADIENT_STYLE;
+  const examBadgeClass =
+    EXAM_BADGE[categoryName] ?? 'bg-zinc-100 text-zinc-600 border border-zinc-200';
   const testTypeLabel = assessment.test_type?.replace(/_/g, ' ') ?? '—';
+  const meta = assessment.assessments;
+  const isExhausted = attemptCount >= MAX_ATTEMPTS;
+  const hasAttempts = attemptCount > 0;
+
+  const detailUrl = `/b2b-learner/${tenantSlug}/assessments/${assessment.id}`;
+  const ctaUrl = isExhausted ? `${detailUrl}?tab=attempts` : detailUrl;
+
+  function handleCta(e: React.MouseEvent) {
+    e.stopPropagation();
+    router.push(ctaUrl);
+  }
 
   return (
     <div
-      onClick={() => router.push(`/b2b-learner/${tenantSlug}/assessments/${assessment.id}`)}
-      className="bg-white border border-zinc-200 rounded-xl overflow-hidden cursor-pointer hover:border-teal-300 hover:shadow-md transition-all group"
+      onClick={() => router.push(detailUrl)}
+      className="bg-white border border-zinc-200 rounded-xl overflow-hidden cursor-pointer hover:border-teal-300 hover:shadow-md transition-all flex flex-col"
     >
-      {/* Gradient header strip */}
-      <div className={`h-2 bg-linear-to-r ${gradient}`} />
-
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          {/* Icon + content */}
-          <div className="flex items-start gap-3 min-w-0">
-            <div className={`w-9 h-9 rounded-lg bg-linear-to-br ${gradient} flex items-center justify-center shrink-0 mt-0.5`}>
-              <FileQuestion className="w-4 h-4 text-zinc-600" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-zinc-900 group-hover:text-teal-700 transition-colors truncate">
-                {assessment.title}
-              </h3>
-              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                {categoryName && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${examBadgeClass}`}>
-                    {categoryName}
-                  </span>
-                )}
-                <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 font-medium capitalize">
-                  {testTypeLabel}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Attempt chip */}
-          <div className="shrink-0">
-            {attempt ? (
-              <div className="flex flex-col items-end gap-1">
-                <div className={`flex items-center gap-1 text-sm font-bold ${attempt.passed ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {attempt.passed
-                    ? <CheckCircle2 className="w-3.5 h-3.5" />
-                    : <XCircle className="w-3.5 h-3.5" />}
-                  {attempt.score_pct}%
-                </div>
-                <div className="flex items-center gap-1 text-xs text-zinc-400">
-                  <Clock className="w-3 h-3" />
-                  {new Date(attempt.attempted_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-xs text-zinc-400">
-                <span>Start</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Attempt status bar */}
-        {attempt && (
-          <div className={`mt-3 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs`}>
-            <span className={`font-medium ${attempt.passed ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {attempt.passed ? '✓ Passed' : '✗ Did not pass'}
-            </span>
-            <span className="text-zinc-400">Last attempt</span>
+      {/* Gradient header */}
+      <div
+        className="h-20 flex items-center justify-center relative"
+        style={gradientStyle}
+      >
+        <FileQuestion className="w-8 h-8 text-white/80" />
+        {isExhausted && (
+          <div className="absolute top-2 right-2 bg-black/20 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+            All Done
           </div>
         )}
+      </div>
+
+      {/* Card body */}
+      <div className="p-4 flex flex-col flex-1 gap-3">
+        {/* Pills */}
+        <div className="flex flex-wrap gap-1.5">
+          {categoryName && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${examBadgeClass}`}>
+              {categoryName}
+            </span>
+          )}
+          <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200 font-medium capitalize">
+            {testTypeLabel}
+          </span>
+        </div>
+
+        {/* Title */}
+        <h3 className="font-semibold text-zinc-900 text-sm leading-snug line-clamp-2">
+          {assessment.title}
+        </h3>
+
+        {/* Metadata row */}
+        {meta && (
+          <div className="flex items-center gap-2 text-xs text-zinc-500 flex-wrap">
+            {meta.total_questions !== null && (
+              <span className="flex items-center gap-1">
+                <HelpCircle className="w-3 h-3 shrink-0" />
+                {meta.total_questions} questions
+              </span>
+            )}
+            {meta.duration_minutes !== null && (
+              <>
+                <span className="text-zinc-300">·</span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3 shrink-0" />
+                  {meta.duration_minutes} min
+                </span>
+              </>
+            )}
+            {meta.difficulty && (
+              <>
+                <span className="text-zinc-300">·</span>
+                <span className="flex items-center gap-1">
+                  <Zap className="w-3 h-3 shrink-0" />
+                  {meta.difficulty}
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Attempt progress — shown when at least one attempt exists */}
+        {hasAttempts && (
+          <div className="mt-auto space-y-1">
+            <p className="text-xs text-zinc-500">
+              {attemptCount}/{MAX_ATTEMPTS} attempts used
+            </p>
+            <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  isExhausted ? 'bg-rose-500' : 'bg-teal-600'
+                }`}
+                style={{ width: `${(attemptCount / MAX_ATTEMPTS) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* CTA button */}
+        <button
+          onClick={handleCta}
+          className={`w-full mt-auto py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 ${
+            isExhausted
+              ? 'border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          {attemptCount === 0 ? (
+            'Start Assessment'
+          ) : isExhausted ? (
+            'View Analysis'
+          ) : (
+            <>
+              Start New Attempt
+              <span className="bg-white/25 text-xs px-1.5 py-0.5 rounded-full font-normal">
+                {MAX_ATTEMPTS - attemptCount} left
+              </span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
@@ -176,43 +252,123 @@ function AssessmentsContent() {
   const { learner, tenantId, tenantSlug } = useB2BLearner();
   const router = useRouter();
 
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [attemptMap, setAttemptMap] = useState<Record<string, LearnerAttempt>>({});
+  const [assessments, setAssessments] = useState<AssessmentItem[]>([]);
+  const [countMap, setCountMap] = useState<Record<string, number>>({});
+  const [latestMap, setLatestMap] = useState<Record<string, LearnerAttempt>>({});
   const [loading, setLoading] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'NOT_STARTED' | 'IN_PROGRESS' | 'EXHAUSTED'>('ALL');
 
   const learnerId = learner!.id;
 
   useEffect(() => {
     if (!tenantId || !learnerId) return;
 
-    Promise.all([
-      supabase
-        .from('assessment_items')
-        .select('id, title, test_type, exam_categories(name)')
-        .eq('status', 'LIVE')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('learner_attempts')
-        .select('id, content_id, score_pct, passed, attempted_at')
+    async function doFetch() {
+      const { data: accessData } = await supabase
+        .from('learner_content_access')
+        .select('content_id')
         .eq('learner_id', learnerId)
         .eq('tenant_id', tenantId)
-        .eq('content_type', 'ASSESSMENT'),
-    ]).then(([assessRes, attemptsRes]) => {
-      const assessData = (assessRes.data ?? []) as Assessment[];
-      const attemptData = attemptsRes.data ?? [];
+        .eq('content_type', 'ASSESSMENT')
+        .is('revoked_at', null);
 
-      const map: Record<string, LearnerAttempt> = {};
-      attemptData.forEach((a: LearnerAttempt) => {
-        if (!map[a.content_id] || new Date(a.attempted_at) > new Date(map[a.content_id].attempted_at)) {
-          map[a.content_id] = a;
+      const assessmentIds = (accessData ?? []).map(
+        (a: { content_id: string }) => a.content_id,
+      );
+
+      if (assessmentIds.length === 0) {
+        return { assessments: [], countMap: {}, latestMap: {} };
+      }
+
+      // Step 1 — fetch assessment_items + attempts in parallel
+      const [itemsRes, attemptsRes] = await Promise.all([
+        supabase
+          .from('assessment_items')
+          .select('id, title, test_type, assessments_id, exam_categories(name, display_name)')
+          .in('id', assessmentIds),
+        supabase
+          .from('learner_attempts')
+          .select('id, content_id, score_pct, passed, attempted_at')
+          .eq('learner_id', learnerId)
+          .eq('tenant_id', tenantId)
+          .eq('content_type', 'ASSESSMENT'),
+      ]);
+
+      const rawItems = (itemsRes.data ?? []) as AssessmentItemRaw[];
+
+      // Step 2 — fetch assessments metadata for any linked assessment_ids
+      const linkedIds = [...new Set(rawItems.map((i) => i.assessments_id).filter((id): id is string => !!id))];
+      let metaMap: Record<string, AssessmentMeta> = {};
+
+      if (linkedIds.length > 0) {
+        const metaRes = await supabase
+          .from('assessments')
+          .select('id, duration_minutes, total_questions, difficulty')
+          .in('id', linkedIds);
+        (metaRes.data ?? []).forEach((m: AssessmentMeta & { id: string }) => {
+          metaMap[m.id] = { duration_minutes: m.duration_minutes, total_questions: m.total_questions, difficulty: m.difficulty };
+        });
+      }
+
+      const mergedItems: AssessmentItem[] = rawItems.map((item) => ({
+        ...item,
+        assessments: item.assessments_id ? (metaMap[item.assessments_id] ?? null) : null,
+      }));
+
+      const cMap: Record<string, number> = {};
+      const lMap: Record<string, LearnerAttempt> = {};
+
+      (attemptsRes.data ?? []).forEach((a: LearnerAttempt) => {
+        cMap[a.content_id] = (cMap[a.content_id] ?? 0) + 1;
+        if (
+          !lMap[a.content_id] ||
+          new Date(a.attempted_at) > new Date(lMap[a.content_id].attempted_at)
+        ) {
+          lMap[a.content_id] = a;
         }
       });
 
-      setAssessments(assessData);
-      setAttemptMap(map);
+      return {
+        assessments: mergedItems,
+        countMap: cMap,
+        latestMap: lMap,
+      };
+    }
+
+    doFetch().then(({ assessments, countMap, latestMap }) => {
+      setAssessments(assessments);
+      setCountMap(countMap);
+      setLatestMap(latestMap);
       setLoading(false);
     });
   }, [tenantId, learnerId]);
+
+  const categories = useMemo(() => {
+    const cats = new Set(
+      assessments
+        .map((a) => a.exam_categories?.[0]?.name)
+        .filter((c): c is string => !!c),
+    );
+    return ['ALL', ...Array.from(cats).sort()];
+  }, [assessments]);
+
+  const statusOf = (id: string) => {
+    const n = countMap[id] ?? 0;
+    if (n === 0) return 'NOT_STARTED';
+    if (n >= MAX_ATTEMPTS) return 'EXHAUSTED';
+    return 'IN_PROGRESS';
+  };
+
+  const countByStatus = (s: 'NOT_STARTED' | 'IN_PROGRESS' | 'EXHAUSTED') =>
+    assessments.filter((a) => statusOf(a.id) === s).length;
+
+  const filtered = assessments.filter((a) => {
+    const cat = a.exam_categories?.[0]?.name ?? '';
+    const matchesCat = categoryFilter === 'ALL' || cat === categoryFilter;
+    const matchesStatus = statusFilter === 'ALL' || statusOf(a.id) === statusFilter;
+    return matchesCat && matchesStatus;
+  });
 
   if (loading) {
     return (
@@ -228,7 +384,8 @@ function AssessmentsContent() {
         <div>
           <h1 className="text-lg font-semibold text-zinc-900">Assessments</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            {assessments.length} available · {Object.keys(attemptMap).length} attempted
+            {assessments.length} assigned ·{' '}
+            {Object.values(countMap).filter((n) => n > 0).length} attempted
           </p>
         </div>
         <button
@@ -239,21 +396,72 @@ function AssessmentsContent() {
         </button>
       </div>
 
-      {/* Attempt summary panel — only shown if there are attempts */}
-      <AttemptsSummaryPanel assessments={assessments} attemptMap={attemptMap} />
+      <AttemptsSummaryPanel
+        totalAssessments={assessments.length}
+        countMap={countMap}
+        latestMap={latestMap}
+      />
+
+      {/* Filters */}
+      {assessments.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {categories.length > 2 && (
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-zinc-200 rounded-md bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-teal-600"
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat === 'ALL' ? 'All Categories' : cat}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {(['ALL', 'NOT_STARTED', 'IN_PROGRESS', 'EXHAUSTED'] as const).map((s) => {
+            const label =
+              s === 'ALL'         ? 'All' :
+              s === 'NOT_STARTED' ? 'Not Started' :
+              s === 'IN_PROGRESS' ? 'In Progress' : 'Exhausted';
+            const count = s === 'ALL' ? assessments.length : countByStatus(s);
+            return (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                  statusFilter === s
+                    ? 'bg-teal-700 text-white'
+                    : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                {label}
+                <span className="ml-1.5 opacity-70">({count})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {assessments.length === 0 ? (
         <div className="text-center py-16 bg-zinc-50 rounded-xl border border-zinc-200">
           <FileQuestion className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
-          <p className="text-sm text-zinc-500">No assessments available yet.</p>
+          <p className="text-sm text-zinc-500">
+            No assessments assigned yet. Contact your administrator.
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 bg-zinc-50 rounded-xl border border-zinc-200">
+          <FileQuestion className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
+          <p className="text-sm text-zinc-500">No assessments match your filters.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {assessments.map((assessment) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((assessment) => (
             <AssessmentCard
               key={assessment.id}
               assessment={assessment}
-              attempt={attemptMap[assessment.id]}
+              attemptCount={countMap[assessment.id] ?? 0}
               tenantSlug={tenantSlug}
             />
           ))}

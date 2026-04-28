@@ -19,7 +19,7 @@ function CertificatesContent() {
       <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
         <p className="text-sm text-blue-800">
-          Pass any assessment with <strong>60% or higher</strong> to show here. Your best attempt counts.
+          Pass any assessment with <strong>80% or higher</strong> to show here. Your best attempt counts.
         </p>
       </div>
 

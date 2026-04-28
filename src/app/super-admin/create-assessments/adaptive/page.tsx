@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft, Plus, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import type { TopicEntry, DisplayConfig } from '@/types'
 import {
@@ -53,6 +53,21 @@ export default function CreateAdaptiveAssessmentPage() {
   const selectedCategory = categories.find(c => c.id === examCategoryId) ?? null
   const isSubjectTest = testType === 'SUBJECT_TEST'
   const canAddMoreFMs = !isSubjectTest && foundationModules.length < 5
+
+  // Analytics Config widget — SAT only
+  const [satBandCount, setSatBandCount] = useState<number | null>(null)
+  const [satCollegeCounts, setSatCollegeCounts] = useState<{ us: number; in: number } | null>(null)
+  const [satCatId, setSatCatId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (selectedCategory?.name !== 'SAT') return
+    setSatCatId(selectedCategory.id)
+    supabase.from('sat_tier_bands').select('id').then(({ data }) => setSatBandCount((data ?? []).length))
+    supabase.from('sat_colleges').select('country').then(({ data }) => {
+      const rows = (data ?? []) as { country: string }[]
+      setSatCollegeCounts({ us: rows.filter(r => r.country === 'US').length, in: rows.filter(r => r.country === 'IN').length })
+    })
+  }, [selectedCategory?.name, selectedCategory?.id])
 
   // Load categories on mount
   useEffect(() => {
@@ -300,6 +315,35 @@ export default function CreateAdaptiveAssessmentPage() {
             </div>
 
           </SectionCard>
+
+          {/* Analytics Config reference — SAT only */}
+          {selectedCategory?.name === 'SAT' && (
+            <div className="rounded-md border border-zinc-200 bg-white px-5 py-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-zinc-900 mb-1">Analytics Config</p>
+                {satBandCount === null ? (
+                  <p className="text-xs text-zinc-400">Loading…</p>
+                ) : satBandCount === 0 ? (
+                  <p className="text-xs text-zinc-400">Not configured — set up tier bands and colleges in Platform Config.</p>
+                ) : (
+                  <p className="text-xs text-zinc-500">
+                    {satBandCount} tier {satBandCount === 1 ? 'band' : 'bands'} configured
+                    {satCollegeCounts && satCollegeCounts.us + satCollegeCounts.in > 0
+                      ? ` · ${satCollegeCounts.us + satCollegeCounts.in} colleges (${satCollegeCounts.us} US · ${satCollegeCounts.in} IN)`
+                      : ' · No colleges configured'}
+                  </p>
+                )}
+              </div>
+              <a
+                href={satCatId ? `/super-admin/platform-config?cat=${satCatId}` : '/super-admin/platform-config'}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 text-xs font-medium border border-zinc-200 rounded-md text-zinc-600 hover:bg-zinc-50 transition-colors"
+              >
+                Edit in Platform Config <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
 
           {/* Foundation Modules */}
           <div className="space-y-4">

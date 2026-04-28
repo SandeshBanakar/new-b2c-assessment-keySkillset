@@ -24,6 +24,7 @@ export function groupByPeriod(
   const map: Record<string, number> = {}
   for (const d of dates) {
     const dt = new Date(d)
+    if (isNaN(dt.getTime())) continue
     let key: string
     if (granularity === 'daily') {
       key = dt.toISOString().slice(0, 10)
@@ -133,6 +134,7 @@ export async function fetchPlatformHealth(range: DateRange): Promise<PlatformHea
   const userDayMap: Record<string, Set<string>> = {}
   for (const r of attemptsInRange) {
     const dt = new Date(r.created_at as string)
+    if (isNaN(dt.getTime())) continue
     let key: string
     if (granularity === 'daily') {
       key = dt.toISOString().slice(0, 10)
@@ -211,7 +213,7 @@ export async function fetchRevenue(range: DateRange): Promise<RevenueData> {
   const totalMrr = planRows.reduce((s, r) => s + r.mrr, 0)
 
   const subDates = (signupsRes.data ?? [])
-    .map((r) => (r.subscription_start_date as string) + 'T00:00:00Z')
+    .map((r) => r.subscription_start_date as string)
   const newSubsSeries = groupByPeriod(subDates, granularity)
 
   return { totalMrr, planRows, newSubsSeries }
@@ -348,6 +350,7 @@ export async function fetchAssessmentsAnalytics(range: DateRange): Promise<Asses
   const usersByDay: Record<string, Set<string>> = {}
   for (const a of attempts) {
     const dt = new Date(a.created_at as string)
+    if (isNaN(dt.getTime())) continue
     let key: string
     if (granularity === 'daily') {
       key = dt.toISOString().slice(0, 10)

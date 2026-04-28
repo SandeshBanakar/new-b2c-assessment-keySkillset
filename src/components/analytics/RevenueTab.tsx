@@ -21,10 +21,6 @@ const TOOLTIP_NEW_SUBS = 'In production, this value is pulled from Stripe and re
 const TOOLTIP_CHURN = 'In production, churn rate is pulled directly from Stripe. No manual calculation is applied.'
 const TOOLTIP_PLAN = 'This column has entries of all course and assessment plans, including single course + bundle course + platform plans + category plans. The list is displayed with recently added as first.'
 
-function formatAxisDate(d: string) {
-  return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
-}
-
 function formatInr(n: number) {
   if (n >= 100000) return `₹${(n / 100000).toFixed(2)}L`
   if (n >= 1000)   return `₹${(n / 1000).toFixed(1)}K`
@@ -122,7 +118,7 @@ export default function RevenueTab({ range }: { range: DateRange }) {
               <YAxis
                 type="category"
                 dataKey="name"
-                width={90}
+                width={120}
                 tick={{ fontSize: 10, fill: chartColors.zinc500 }}
               />
               <Tooltip
@@ -134,28 +130,6 @@ export default function RevenueTab({ range }: { range: DateRange }) {
           </ResponsiveContainer>
         </div>
       </div>
-
-      {/* New subscriptions over time */}
-      {data.newSubsSeries.length > 0 && (
-        <div className="bg-white border border-zinc-200 rounded-md p-4">
-          <p className="text-sm font-medium text-zinc-900">New Subscriptions Over Time</p>
-          <p className="text-xs text-zinc-400">Based on subscription start date in selected period</p>
-          <div className="mt-4" style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.newSubsSeries} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.zinc300} />
-                <XAxis dataKey="date" tickFormatter={formatAxisDate} tick={{ fontSize: 11, fill: chartColors.zinc500 }} />
-                <YAxis tick={{ fontSize: 11, fill: chartColors.zinc500 }} width={28} allowDecimals={false} />
-                <Tooltip
-                  labelFormatter={(v) => formatAxisDate(v as string)}
-                  contentStyle={{ fontSize: 12, borderColor: chartColors.zinc200, borderRadius: 6 }}
-                />
-                <Bar dataKey="count" name="New Subscriptions" fill={chartColors.violet600} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
 
       {/* Plan table */}
       <div className="bg-white border border-zinc-200 rounded-md overflow-hidden">

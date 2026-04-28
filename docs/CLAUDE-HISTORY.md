@@ -6,6 +6,332 @@
 
 ## COMPLETED WORK LOG
 
+### April 28, 2026 — KSS-CA-CHANGES-001: Client Admin Dashboard + Users & Roles Fix + Billing Page (COMPLETE)
+
+**Build:** ✅ PASSED
+
+**Item 1 & 2 — Dashboard refactor** (`dashboard/page.tsx`):
+- Removed all tabs (Overview/Performance for RUN_ONLY; Content/Analytics for FULL_CREATOR) — cards render directly.
+- **TechCorp (RUN_ONLY):** 3 cards — Active Learners, Courses Completed (out of N assigned, `content_assignments` distinct `content_id` where `content_type='COURSE'` and `removed_at IS NULL`), Certificates Generated (raw count). Removed: Completion Rate %, Certificate Rate %, Average Score, Total Attempts.
+- **Akash (FULL_CREATOR):** 6 cards unified `Promise.all` — Courses Created, Assessments Created, Questions Added (by CCs), Active Learners, Courses Completed, Certificates Generated.
+- Dead code removed: `TabButton`, type aliases, all tab state.
+
+**Item 3 — Users & Roles + layout data fix** (3 files):
+- Root cause: no `is_active=true` filter on CLIENT_ADMIN query — Rahul Sharma (inactive, inserted first) returned before Sandesh (active).
+- Added `.eq('is_active', true)` to CLIENT_ADMIN query in `users-roles/page.tsx` and `layout.tsx`.
+- `CA_ADMIN_USER_MAP` in `tenants.ts` updated — Akash → Sandesh Banakar UUID `c0f26275-d060-4910-9e05-9fb126ef69e9` (was Rahul Sharma `7e1c0560...`).
+
+**Item 4 — Billing page** (new route `/client-admin/[tenant]/billing`):
+- 5 sections: Contract Overview (status badge + date grid + days remaining), Seat Usage (progress bars), Storage & Hosting (FULL_CREATOR only, static placeholder), Contract Notes (conditional), Contact CTA.
+- Status badge logic: Active (>30d) → green, Expiring Soon (≤30d) → amber, Expired → red.
+- `UsageBar`: violet/amber/rose at <90%/≥90%/≥100%. Over-limit error text shown.
+- Empty state when no `contracts` row exists.
+- Contact CTA: `mailto:contact@keyskillset.com` + violet SLA callout "We typically respond within 2 business days."
+- "Billing" nav item added to Settings section in `layout.tsx` (CreditCard icon), between Users & Roles and Audit Log.
+- **PRD:** `prds/client_admin/PRD-CA-BILLING.md` — REVIEW. 6 BDD scenarios, state machine, V2 deferrals, §6.3 V1 planned hard-lock.
+- **V1 Planned (separate ticket):** Platform hard-lock on expired contracts — middleware/layout gate not yet built.
+
+---
+
+### April 28, 2026 — KSS-B2B-PORTAL-POLISH: B2B Portal Polish + PRD-B2B-PORTAL-001 (COMPLETE)
+
+**Build:** ✅ PASSED
+
+**UI fixes:**
+- **Navbar second row bug** (`B2BNavbar.tsx`): Orphaned `<div class="w-px..."/>` was a 4th child in a 3-column CSS grid (`auto 1fr auto`), causing learner avatar/logout to wrap to row 2. Fix: removed the standalone divider div.
+- **"View Analysis" button position** (`assessments/[id]/page.tsx`): Moved from leftmost position in the right flex group to rightmost (after score % and Pass/Fail badge).
+- **Analytics section placeholders** (`assessments/[id]/page.tsx`): Each of the 4 sections (Section Breakdown, Concept Mastery, Pacing Analysis, Mistake Taxonomy) now shows a section-specific description + teal note "Everything in B2C is finalised — we use the same sections here."
+- **Certificate cards** (`CertificateCard.tsx`): Redesigned from cramped horizontal (`ml-auto` column) to vertical layout — colored accent bar on top, award icon + title + type badge body, certificate number, footer with issued date + Download. Grid capped at `sm:grid-cols-2` (max 2 columns).
+- **Cert page threshold** (`certificates/page.tsx`): Corrected UI banner from 60% to 80% — now consistent with `assessments/[id]/page.tsx` qualifying score logic and PRD spec.
+
+**New feature:**
+- **Assessment filters** (`assessments/page.tsx`): Added category dropdown (visible only when >2 distinct categories) + status pill buttons (All / Not Started / In Progress / Exhausted) with per-status counts. Client-side filtering via `useMemo` + `statusOf()` helper. Mirrors the exact pattern from `courses/page.tsx`. Empty state distinguishes "no access" from "no filter matches".
+
+**PRD written:**
+- `prds/b2b-learner/PRD-B2B-PORTAL-001.md` — spec-as-built for all 4 B2B portal pages. Locked certification rules: courses = `progress_pct = 100` (excluding module tests), assessments = `score_pct >= 80` any single attempt. Assignment flow: FULL CREATOR CA creates + assigns; RUN ONLY CA assigns SA-pushed content; SA can assign directly for RUN ONLY tenants. Success metrics: content start rate ≥70% in 7 days, attempt rate ≥60%, cert conversion ≥25% of exhausted learners.
+
+---
+
+### April 27, 2026 — KSS-B2B-UI-FIXES + KSS-B2B-RC-001: B2B UI Fixes, Report Card PRD (COMPLETE)
+
+**Build:** ✅ PASSED throughout all fixes
+
+**Bug fixes (root causes and solutions):**
+- **Course hero blank** (`courses/[id]/page.tsx`): Dynamic Tailwind gradient classes from Record lookup (`bg-linear-to-br ${heroBg}`) not generated at build time in Tailwind v4. Fixed with `COURSE_TYPE_HERO_STYLE: Record<string, React.CSSProperties>` using inline `linear-gradient()` hex values. Same pattern applied to all gradient uses across B2B pages.
+- **Assessment 400 Bad Request** (`assessments/page.tsx` + `assessments/[id]/page.tsx`): PostgREST join hint `assessments!assessments_id(...)` requires a registered FK constraint. Replaced with two-step fetch: (1) query `assessment_items` selecting `assessments_id` column, (2) separately query `assessments` by that ID. Applied in both list and detail pages.
+- **Assessment card gradient white** (`assessments/page.tsx`): Same dynamic Tailwind class issue. Replaced `EXAM_GRADIENT` (Tailwind strings) with `EXAM_GRADIENT_STYLE` (inline CSSProperties). `AttemptsSummaryPanel` gradient also changed to inline style.
+
+**New features:**
+- **Navbar single row** (`B2BNavbar.tsx`): 3-column grid layout (`auto | 1fr | auto`). Brand on left, tabs centered (justify-center), learner+logout on right. Tabs overflow-x-auto on mobile (confirmed CQ-A = option a). Brand name hidden on mobile (`hidden md:block`), learner name hidden below `lg`.
+- **5 attempt slots** (`assessments/[id]/page.tsx`): `B2BAttemptsTab` renders all 5 rows always. Filled rows show real data. Unused rows show dashed border + Lock icon + "Not yet attempted".
+- **"View Analysis" on attempt cards**: Ghost button per completed attempt (both Pass and Fail — confirmed CQ-2 = yes both). Calls `onSwitchTab('analytics')` — switches to Analytics tab aggregate view (per-attempt deep-dive deferred). `onSwitchTab` prop passed from `B2bAssessmentDetail`.
+- **Report Card modal** (`assessments/[id]/page.tsx`): Blue-50 section in Analytics tab. Download button (disabled if 0 attempts) opens `ReportCardModal`. Modal lists 6 content sections, amber eligibility notice, blue Salesforce 24hr delivery notice, "Request Report Card" CTA. On request: modal closes, "Requested" pill shown, subtitle updated. Session-state only (V1 — no DB write).
+- **PRD KSS-B2B-RC-001** (`prds/b2b-learner/PRD-B2B-REPORT-CARD-001.md`): Full spec for Report Card + Salesforce delivery. Covers in-app flow, 7-section content spec, Salesforce data payload schema (JSON), Salesforce object mapping, DB migration spec for V2 (`report_card_requests` table), 3-phase build roadmap.
+
+**Pattern to remember:** In this Tailwind v4 project, never use dynamic gradient classes from Record/variable lookups. Always use inline `React.CSSProperties` with `linear-gradient()` for any gradient computed at runtime. Static gradient classes (hardcoded in JSX) can use `bg-linear-to-*` (v4 syntax).
+
+---
+
+### April 27, 2026 — KSS-ANA-002: Linear Analytics V2 — COMPLETE
+
+**SQL:** `docs/requirements/KSS-DB-056.sql` (ran ✓) · `docs/requirements/KSS-DB-057.sql` (ran ✓) | **Build:** ✅ PASSED
+
+All PRD deliverables confirmed complete. Summary of what the DB migrations fixed and what was already in place:
+
+**KSS-DB-056 (ran Apr 27 2026):**
+- Patched `assessment_items.assessment_config` JSONB for NEET (180Q/4mpq/720/neg=1), JEE (75Q/4mpq/300/neg=1), CLAT (120Q/1mpq/120/neg=0.25). Root bug: KSS-DB-055 seed only wrote `duration_minutes` + wrong `total_questions` counts.
+- Note: `total_questions`, `marks_per_question`, `negative_marks` are JSONB-only — no top-level columns of those names on `assessment_items`.
+- Recalculated `attempts.score = SUM(attempt_answers.marks_awarded)` for all NEET/JEE/CLAT attempts. Results: CLAT=45, JEE=133, NEET=270.
+
+**KSS-DB-057 (ran Apr 27 2026):**
+- Created `concept_tag_section_map` table, seeded from `concept_tags` (subject IS section name).
+- Added `user_concept_mastery.section_name` column + backfilled from concept_tag_section_map.
+- 46 UCM rows remain null (concept_tags in seed data don't match concept_tags.concept_name — orphaned). Non-blocking.
+- CLAT data quality: 3 subjects in concept_tags use non-canonical names ("Current Affairs and GK", "English", "General Knowledge") → display_order=99. Non-blocking.
+
+**AnalyticsTab.tsx code fix:**
+- Silent bug: `exam_categories` was queried for `score_max, neg_mark` (columns that don't exist) → silent PostgREST failure → examCatRes.data=null → entire config block (scoreMax, negMark, concept_tag_section_map, rank_prediction) skipped.
+- Fix: Added third `assessment_items` query to Promise.all (select `assessment_config` only). `negMark = itemData?.assessment_config?.negative_marks ?? 0`. `scoreMax = itemData?.assessment_config?.total_marks ?? assessment.questionCount ?? 100`. `exam_categories` select reduced to `id` only (still needed for FK joins to `concept_tag_section_map` + `rank_prediction_tables`).
+
+**Verified complete per PRD:**
+- Block 3 ScoreTrajectory, Block 4 RankPrediction, Block 5 SectionBreakdown, Block 7 MistakeIntelligence, Block 8 ConceptMastery (now DB-driven section grouping), Block 10 AI Insight, Solutions Panel — all present.
+- PacingAnalysis + SATHeroScore: cancelled — out of PRD scope (SAT uses separate `SATAnalyticsTab.tsx`).
+
+---
+
+### April 27, 2026 — KSS-ANA-DB-001: Analytics DB Migrations + AnalyticsTab Data Source Fix
+
+**SQL files written:** `docs/requirements/KSS-DB-056.sql` · `docs/requirements/KSS-DB-057.sql` (both pending SA run)
+**Code:** `src/components/assessment-detail/AnalyticsTab.tsx` | **Build:** ✅ PASSED
+
+**KSS-DB-056 — Assessment Config Correction + Score Recalculation:**
+- STEP 1: UPDATE `assessment_items` for NEET (180Q / 4mpq / 720 total / neg=1), JEE (75Q / 4mpq / 300 total / neg=1), CLAT (120Q / 1mpq / 120 total / neg=0.25). Patches both top-level columns (`total_questions`, `marks_per_question`, `negative_marks`) and `assessment_config` JSONB (merges `total_marks`, `total_questions`, `marks_per_question`, `negative_marks`). Root cause: KSS-DB-055 seed had wrong question counts (CLAT=25, JEE=15, NEET=15) and null marks fields.
+- STEP 2: UPDATE `attempts.score = SUM(attempt_answers.marks_awarded)` for all NEET/JEE/CLAT assessment IDs. CLAT scores were wildly wrong (870 instead of ~45) from original seeding. Verify queries included.
+
+**KSS-DB-057 — concept_tag_section_map + user_concept_mastery.section_name:**
+- STEP 1: CREATE TABLE `concept_tag_section_map (id UUID PK, exam_category_id UUID FK→exam_categories CASCADE, concept_tag TEXT, section_name TEXT, section_display_order INT, UNIQUE(exam_category_id, concept_tag))`.
+- STEP 2: Seed from `concept_tags` JOIN `exam_categories` — `concept_tags.subject` IS the section name. Canonical display order per exam: NEET (Physics=1, Chemistry=2, Biology=3), JEE (Physics=1, Chemistry=2, Mathematics=3), CLAT (English Language=1, Current Affairs=2, Legal Reasoning=3, Logical Reasoning=4, Quantitative Techniques=5). SAT not seeded (handled in code via section_id prefix).
+- STEP 3: `ALTER TABLE user_concept_mastery ADD COLUMN IF NOT EXISTS section_name TEXT`.
+- STEP 4: Backfill `user_concept_mastery.section_name` from `concept_tag_section_map` via concept_tag join + assessments.exam match.
+
+**AnalyticsTab.tsx Fix (Option A — self-query, no parent props):**
+- Root cause: `ExamCatConfig` referenced `score_max` and `neg_mark` columns that don't exist on `exam_categories`. Silent PostgREST failure → `examCatRes.data = null` → entire config block skipped → `scoreMax` and `negMark` never set → concept_tag_section_map and rank_prediction never queried.
+- Fix: `ExamCatConfig` interface now only has `id: string`. New `AssessmentItemConfig` interface added. Third query in `Promise.all` fetches `assessment_items WHERE assessments_id = assessmentId` (reverse FK lookup — `assessmentId` is `assessments.id` passed from parent). `setNegMark` sourced from `itemData.negative_marks ?? 0`. `setScoreMax` sourced from `itemData.assessment_config.total_marks ?? assessment.questionCount ?? 100`. `exam_categories` query retained (select `id` only) for `concept_tag_section_map` and `rank_prediction_tables` lookups.
+
+---
+
+### April 27, 2026 — KSS-B2B-UI-001: B2B Learner Portal UI Overhaul (COMPLETE)
+
+**PRD:** `prds/b2b-learner/PRD-B2B-UI-001.md` | **Build:** ✅ PASSED
+
+**Phase 1 — Course Cards (`courses/page.tsx`):**
+Full `CourseCard` redesign. Two pills (Tag icon + category, Monitor icon + course type). Progress bar on ALL states (not just IN_PROGRESS) with "N% completed" label. "Completed on: DD-MMM-YYYY" shown for COMPLETED state. CTA button inside card: "Continue Learning" → detail page / "View Certificate" → `?tab=achievements`. `e.stopPropagation()` on CTA to prevent double-navigation. `revoked_at IS NULL` added to access gate query.
+
+**Phase 2 — Course Detail 3-Tab (`courses/[id]/page.tsx`):**
+Full rewrite. `useSearchParams` reads `?tab=` for pre-selection. Three tabs:
+- Overview: gradient hero (per course_type), static 4.9⭐ rating, 4 stat cards (Flexible Time / N Modules / formatCourseType / English), About section, 4 what-you'll-learn bullets, sticky right "Assigned" panel with ProgressRing + CTA + metadata.
+- Curriculum: 5-milestone stepper (overflow-x-auto, Trophy icon amber=unlocked/zinc=locked, connector lines). Milestone unlock: `threshold=0 → isStarted (started_at IS NOT NULL)`, others `→ pct >= threshold`. Existing curriculum accordion below.
+- Achievements: Certifications section (inline card + Download → `/certificates/[id]/preview`). 5 medal tiles (Trophy lucide, amber/zinc). Reference note: "Course achievement medals shown here are for reference only. The production medal images will replace these icons." + `// TODO: Replace lucide Trophy with final production medal images when available`.
+
+**Phase 3 — Assessment List Cards (`assessments/page.tsx`):**
+Full `AssessmentCard` redesign matching B2C visual. Query updated: JOIN `assessments!assessments_id(duration_minutes, total_questions, difficulty)` + `revoked_at IS NULL`. `countMap` (total attempts per assessment) + `latestMap` (most recent attempt per assessment). Card: h-20 gradient header, exam badge pill, test type pill, title, metadata row (questions/duration/difficulty with icons). X/5 attempt progress bar (shown when >0). B2B state CTAs: 0 → "Start Assessment" (blue), 1-4 → "Start New Attempt" + "N left" chip (blue), 5 → "View Analysis" → `?tab=attempts` (ghost zinc). Type cast `as unknown as AssessmentItem[]` needed due to Supabase inferred array for FK join.
+
+**Phase 4 — Assessment Detail 3-Tab (`assessments/[id]/page.tsx`):**
+Full rewrite replacing `getAssessmentBySlug` (B2C utility) with direct `assessment_items + JOIN assessments!assessments_id` query. `useSearchParams` reads `?tab=`. Three tabs:
+- B2BOverviewTab: zinc-900 dark hero (exam badge + test type pill), 4 stat cards (Duration/Questions/Total Marks/Difficulty), About section, what-you'll-learn (from `display_config.what_youll_get` or 4 hardcoded fallback bullets), state-based CTA (disabled/placeholder — exam engine not wired to B2B auth).
+- B2BAttemptsTab: real data from `learner_attempts` ordered `attempted_at ASC`. Per-row: "Attempt N" label, date, time taken, score %, Pass/Fail badge. Empty state with message.
+- B2BAnalyticsTab: Certificate Status top section (amber-50 card with Download if cert found; zinc-50 "Pending" if score≥80 but no cert; caption otherwise). Score trajectory div-based bar chart (emerald=pass, rose=fail). Pass/Failed/Avg stat grid. 4 "Detailed analytics coming soon" placeholder sections (Section Breakdown / Concept Mastery / Pacing Analysis / Mistake Taxonomy).
+
+**Deferred (separate tickets):**
+- Exam engine routing for B2B (B2BLearnerContext not wired to exam engine AppContext)
+- Course thumbnail images (no `thumbnail_url` on courses table)
+- Per-question B2B analytics (no `learner_attempt_answers` table)
+- Achievement milestone names from DB (hardcoded for now)
+- Language field per course (no column — hardcoded "English")
+
+---
+
+### April 27, 2026 — KSS-CA-EMAIL-001: White-Label Email Template Center (COMPLETE)
+
+**Tickets:** CAE-1a through CAE-3c | **Build:** ✅ PASSED
+
+**Raw HTML templates (`src/email-templates/html/`):**
+6 SES-safe white-label templates: `b2c-access-restored.html`, `b2c-user-suspended.html`, `certificate-of-completion.html`, `client-admin-onboarding.html`, `content-creator-full.html`, `content-creator-run-only.html`. Table-based layouts, `{{token}}` placeholders, no Sandesh Banakar / old-brand references.
+
+**Lib layer (`src/lib/email-templates/`):**
+- `types.ts` — `EmailTemplateId` union, `TenantEmailProfile`, `TemplateDefinition`
+- `data.ts` — `TENANT_EMAIL_PREVIEW_PROFILES` + `getEmailTemplateDefinition()`
+- `load.ts` — `loadEmailTemplateHtml(templateId)` reads from `src/email-templates/html/` at runtime
+- `render.ts` — `renderEmailTemplate(html, tokens)` — `{{token}}` replacement, tenant-first branding fallback
+
+**Pages:**
+- `src/app/email-templates/page.tsx` — Tenant chooser (filters out `B2C_END_USER` featureMode)
+- `src/app/email-templates/[tenant]/page.tsx` — Template index per tenant using `EmailTemplateCard`
+- `src/app/email-templates/[tenant]/[template]/page.tsx` — Detail: trigger context, payload contract, iframe-rendered HTML preview, text fallback
+
+**Components:** `TenantChooserCard` + `EmailTemplateCard` in `src/components/email-templates/`
+
+**Root selector:** "Client Admin Emails" → `/email-templates` · "B2C End User Emails" → `/email-templates/keyskillset`
+
+---
+
+### April 27, 2026 — KSS-SA-FIXES-001 + KSS-SA-PC-001 V2 + RevenueTab Cleanup
+
+**Tickets:** SA-FIX-1, SA-FIX-2, SA-FIX-4, SA-FIX-5, KSS-SA-PC-001 V2 | **Build:** ✅ PASSED
+
+**Root cause (SA-FIX-1, SA-FIX-2, SA-FIX-4) — shared origin:**
+All three bugs traced to a single source: `b2c_assessment_subscriptions` had 8 plan_ids from a superseded seed batch (pre-KSS-DB-040c). None of those IDs existed in the `plans` table.
+- SA-FIX-2 ("Plan = Free"): `fetchB2CUsers()` builds a `planDetails` map from `plans WHERE id IN (uniquePlanIds)`. All 8 IDs returned zero rows → map empty → every user fell through to "Free".
+- SA-FIX-1 (subscriber_count = 0): `plan_subscribers.subscriber_count` is a denormalized counter seeded at 0, never updated.
+- SA-FIX-4 (Revenue tab no data): `fetchRevenue()` joins `plan_subscribers` for MRR. subscriber_count = 0 → MRR = 0 → revenue tab empty.
+
+**Fix — `docs/requirements/KSS-DB-SA-FIXES-001.sql`:**
+- Step 1: `UPDATE b2c_assessment_subscriptions SET plan_id = 'a1000001-0000-4000-8000-000000000002'` (Platform Pro, ₹499/mo MONTHLY) WHERE plan_id IN (8 stale UUIDs). All 11 active subscriptions now reference a real plan.
+- Step 2: `UPDATE plan_subscribers SET subscriber_count = COUNT(DISTINCT user_id) FROM b2c_assessment_subscriptions WHERE status='active' AND current_period_end > NOW()`.
+- Verify result: Platform Pro `subscriber_count = 11`. MRR = 11 × ₹499 = ₹5,489/mo. All 3 bugs resolved.
+
+**SA-FIX-5 reversal (`src/app/super-admin/platform-config/page.tsx`):**
+Prior session had incorrectly removed `analytics-display` from the sub-tab type and conditional render. Restored:
+- `type SubTab = 'concept-tags' | 'analytics-display' | 'rank-prediction'`
+- Sub-tab array entry for SAT: `...(selectedCat.name === 'SAT' ? ['analytics-display'] : [])`
+- Conditional render: `{activeSubTab === 'analytics-display' && <AnalyticsDisplayPanel category={selectedCat} />}`
+
+**KSS-SA-PC-001 V2 — Platform Config table redesign (`src/app/super-admin/platform-config/page.tsx`):**
+- Replaced `SortableExamCard` (card grid) with `SortableExamRow` (table `<tr>`) — 6 columns: drag handle | Status badge | Display Name | Internal Name (hidden sm) | Concept Tags (hidden sm) | Actions (Edit + View).
+- DnD strategy: `rectSortingStrategy` → `verticalListSortingStrategy`.
+- DnD save: sequential for-loop → `Promise.all` batch.
+- Added `catPage` state + `CAT_PAGE_SIZE = 10` + Prev/Next pagination inside the "Exam Category" card.
+- Create button moved inside card header above the table.
+- "Exam Category" card: zinc-50 header with count badge, sortable table body inside.
+
+**Section Visibility toggles removed (`src/app/super-admin/platform-config/page.tsx` + `AnalyticsDisplayPanel` component):**
+- Removed `AnalyticsConfig` interface, `analyticsConfig`/`configSaving`/`configSaved` states, `saveConfig()`, `platform_analytics_config` query, and the entire "Section Visibility" JSX block.
+- Confirmed via grep: `show_college_ladder`, `show_pacing_preview`, `show_mistake_taxonomy_preview` — only ever read/written in this file; zero consumer components read these flags. Dead code.
+
+**Analytics Config reference widget — Create + Edit Adaptive forms:**
+- Added to `src/app/super-admin/create-assessments/adaptive/page.tsx` and `adaptive/[id]/page.tsx`.
+- SAT-only: reads `sat_tier_bands` count + `sat_colleges` count on mount when `selectedCategory?.name === 'SAT'`.
+- Read-only widget between Basic Info and Foundation Modules cards.
+- "Edit in Platform Config" button: `<a href="/super-admin/platform-config?cat={satCatId}" target="_blank">` with `ExternalLink` icon.
+
+**RevenueTab cleanup (`src/components/analytics/RevenueTab.tsx`):**
+- Retained horizontal `BarChart layout="vertical"` for MRR by Plan (blue700 bars, `formatInr` tick labels).
+- Removed "New Subscriptions Over Time" chart block entirely (was violet600 BarChart).
+- Removed `formatAxisDate` function (only used by deleted chart).
+- `YAxis width`: 90 → 120 (accommodates "Platform Premium Plan" label length).
+- "New Subscriptions" KPI card in top strip retained (still uses `data.newSubsSeries.reduce(...)` for count).
+- No unused code remaining.
+
+**PRD updated:** `prds/super-admin/PRD-SA-PLATFORM-CONFIG.md` — V2 section added, V1 completed items table, status REVIEW.
+
+---
+
+### April 27, 2026 (continued) — KSS-CA-LEARNER-FIXES CLF-16/17: B2B Dashboard Data Mismatch (Second Pass)
+
+**Tickets:** CLF-16, CLF-17 | **Build:** ✅ PASSED
+
+**CLF-16 — `granted_at` column mismatch (root cause of all dashboard stat cards showing 0) (`b2b-learner/[tenant]/page.tsx`):**
+- The `learner_content_access` table has a `granted_at` column (confirmed from `client-admin/[tenant]/learners/[id]/page.tsx` line 309 which selects it correctly).
+- The dashboard was querying `.select('content_id, content_type, created_at')` and `.order('created_at', ...)` — a column that does not exist.
+- Supabase PostgREST returns `{ data: null, error }` for non-existent column references. The code's `accessRes.data ?? []` evaluated to `[]`, making `courseIds = []`. The courses query short-circuited (`courseIds.length === 0 → Promise.resolve({ data: [] })`), leaving `courses = []` and every stat card at 0.
+- Fix: renamed `created_at` → `granted_at` in the select, order, `AssignedAccess` interface, and `accessMap` construction.
+- Added `.is('revoked_at', null)` to match the client admin's access query behaviour.
+
+**CLF-17 — `.eq('status', 'LIVE')` filter removed from all B2B learner content queries:**
+- All four B2B content queries (dashboard courses, dashboard assessments, courses list, assessments list) were filtering with `.eq('status', 'LIVE')` after fetching IDs from `learner_content_access`.
+- If any assigned course/assessment has a different status (e.g. `PUBLISHED`, `ACTIVE`, `DRAFT`), it would silently disappear from the result, making `completedCount`, `inProgressCount`, and `assessmentsCompletedCount` incorrect.
+- Fix: removed `.eq('status', 'LIVE')` from all four query sites. `learner_content_access` is the sole gate (locked architectural decision from CLF session).
+- Files changed: `b2b-learner/[tenant]/page.tsx` (×2), `b2b-learner/[tenant]/courses/page.tsx` (×1), `b2b-learner/[tenant]/assessments/page.tsx` (×1).
+
+**Diagnostic file created:** `docs/requirements/dashboard_debug.txt` — SQL to confirm course status values for all B2B-assigned courses.
+
+---
+
+### April 27, 2026 — KSS-CA-LEARNER-FIXES CLF-11–15: B2B Portal Redirect Fix + Dynamic Persona Guide + Data Fix
+
+**Tickets:** CLF-11, CLF-12, CLF-13, CLF-14, CLF-15 | **Build:** ✅ PASSED
+
+**CLF-11 — Persona selector (`src/app/page.tsx`):**
+- Both B2B Learner tiles now route to `/b2b-learner/[tenant]/login` instead of `/b2b-learner/[tenant]` (dashboard root).
+- Prevents stale localStorage session bypassing the learner picker entirely.
+
+**CLF-12 — Login page auto-redirect removed (`b2b-learner/[tenant]/login/page.tsx`):**
+- Removed `useEffect` (lines 142–146 in old file) that redirected to dashboard if a learner was already stored in localStorage.
+- Login page now always shows the learner picker — no session persistence across visits from the persona selector.
+- `learner` was removed from `useB2BLearner()` destructuring since it was only used for the redirect.
+
+**CLF-13 — Dynamic `PersonaGuide` (`b2b-learner/[tenant]/login/page.tsx`):**
+- Replaced hardcoded `PERSONA_GUIDE` constant with live DB fetch inside the same `useEffect` as the learners query.
+- Pattern: inner-async `fetchAll()` + `.then()` — fetches learners → then parallel `learner_course_progress` + `learner_attempts` → then course titles → builds `guideData: Record<string, GuideRow>`.
+- State derivation: COMPLETED (any completed row) → IN_PROGRESS (any in-progress row) → EMPTY (no rows).
+- Course label: `"{title} — {progress_pct}%"` for completed/in-progress; `"No course progress"` for empty.
+- Assessment label: count of distinct `content_id` from `learner_attempts WHERE content_type='ASSESSMENT'`.
+- `PersonaGuide` component now accepts `{ learners, guideData }` props instead of a static tenant slug key.
+- Loading skeleton unified — guide and cards both wait for the single `fetchAll` to complete.
+
+**CLF-14 — "Assessments Done" tooltip (`b2b-learner/[tenant]/page.tsx`):**
+- Added optional `info` field to the stats array in `WelcomeHeader`.
+- "Assessments Done" card renders a `<span title={info}><Info /></span>` native tooltip: "Counts assessments with 5 or more completed attempts".
+- Other 3 stat cards unchanged (`info: null`).
+
+**CLF-15 — SQL data fix (`docs/requirements/b2b_data_fix.txt`):**
+- Root cause: 3 `learner_course_progress` rows seeded with `learner_id = NULL` — invisible to all queries.
+- Fix 1: UPDATE 3 orphan rows to set correct `learner_id` + `tenant_id` (Aditya Shah COMPLETED, Nisha Kapoor COMPLETED, Rahul Bose IN_PROGRESS).
+- Fix 2: INSERT missing `learner_content_access` row for Aditya Shah → NEET Prep (`96a8eebd`).
+- Fix 3: DELETE Employee Policy Handbook (`e15bfedc`) access from Nisha Kapoor + Rahul Bose.
+- Fix 4: INSERT PF Basics (`bee02480`) access for Nisha Kapoor + Rahul Bose.
+- Fix 5 (Q3 backfill): UPDATE `started_at` + `completed_at` on all 4 progress rows — realistic dates (Aditya: Feb 15 → Mar 21, Nisha: Mar 1 → Mar 28, Divya: started Mar 15, Rahul: started Mar 25).
+- All fixes use idempotent WHERE NOT EXISTS / specific WHERE clauses.
+- Verification query confirmed: 4 rows correct (Aditya COMPLETED, Divya IN_PROGRESS 45%, Nisha COMPLETED, Rahul IN_PROGRESS 30%). Arjun Gupta absent (empty state — 1 course assigned, no progress).
+
+**SQL protocol change (permanent):** `docs/SQL-RESPONSE.txt` is deprecated. All SQL queries now go into `docs/requirements/[query_name].txt`. User runs in Supabase and pastes results into the same file.
+
+---
+
+### April 26, 2026 — KSS-CA-LEARNER-FIXES CLF-2–8: B2B Dashboard Overhaul + Content Access Gate
+
+**Tickets:** CLF-2, CLF-3, CLF-4, CLF-5, CLF-6, CLF-7, CLF-8 | **Build:** ✅ PASSED
+
+**CLF-2/3/4 — Dashboard (`b2b-learner/[tenant]/page.tsx`) — full rewrite:**
+- `WelcomeHeader` now accepts 4 stat values and renders them as translucent cards (`bg-white/10 border border-white/20`) inside the banner. 2×2 grid on mobile, 4-col on `sm+`.
+- Cards: Courses In Progress · Courses Completed · Assessments Done (≥5 attempts) · Certificates.
+- All queries now go through `learner_content_access` first (get IDs), then fetch content by IDs. Two-step async pattern (`doFetch` inner async + `.then()`).
+- Attempt counts keyed by `content_id`; "Assessments Done" = `count >= 5` (B2B fixed limit).
+- Certificate count from `certificates` table (head-only count query).
+- Department fetch merged into main `doFetch()` — no separate `useEffect`.
+- `NewlyAssignedSection` component: 2 sub-sections side by side (stack on mobile), "New Courses" + "New Assessments", 2 items each ordered by `created_at DESC` from `learner_content_access`. Info icon (click-to-toggle) explains assignment date. Section hidden if no assigned content.
+- "Continue Learning" empty state copy updated: "Browse your assigned courses to get started."
+
+**CLF-5 — Courses page (`b2b-learner/[tenant]/courses/page.tsx`):**
+- Query rewritten: `learner_content_access WHERE content_type='COURSE'` → IDs → `courses.in(courseIds)`. Removed old audience_type + tenant_id OR filters.
+- Title: "Course Catalogue" → "My Courses". Subtitle: "X courses assigned to you."
+- Empty state: "No courses assigned yet. Contact your administrator."
+
+**CLF-6 — Assessments page (`b2b-learner/[tenant]/assessments/page.tsx`):**
+- Query rewritten: `learner_content_access WHERE content_type='ASSESSMENT'` → IDs → `assessment_items.in(assessmentIds)`.
+- Subtitle: "X assigned · Y attempted."
+- Empty state: "No assessments assigned yet. Contact your administrator."
+
+**CLF-7 — Course detail page (`b2b-learner/[tenant]/courses/[id]/page.tsx`):**
+- Access gate `useEffect`: checks `learner_content_access` count for this course. If 0, `router.replace('/b2b-learner/[tenant]')`.
+
+**CLF-8 — Assessment detail page (`b2b-learner/[tenant]/assessments/[id]/page.tsx`):**
+- Added `supabase` import. Destructured `learner, tenantId` from `useB2BLearner()`.
+- Same access gate pattern as CLF-7.
+
+**Platform rule locked in `CLAUDE-PLATFORM.md`:** B2B Learner Portal section added — content visibility is gated exclusively by `learner_content_access`. Unassigned content is never shown anywhere.
+
+---
+
+### April 26, 2026 — KSS-CA-LEARNER-FIXES CLF-1: B2B Login "Back To Personas" Button
+
+**Ticket:** KSS-CA-LEARNER-FIXES CLF-1 | **File:** `src/app/b2b-learner/[tenant]/login/page.tsx`  
+**Result:** Back button added. Build ✅ PASSED.
+
+**Change:** Added `← Back To Personas` (desktop `sm+`) / `← Back` (mobile) link to the right side of the B2B login page header, navigating to `/`. Header inner div changed from `flex items-center gap-3` to `flex items-center justify-between gap-3`; tenant branding wrapped in its own div; `<Link href="/">` added on the right using `ArrowLeft` icon from lucide-react. Styling matches B2BNavbar's logout button tone (`text-zinc-500 hover:text-zinc-700`).
+
+---
+
 ### April 26, 2026 — KSS-LINT-001: react-hooks/set-state-in-effect Full Sweep
 
 **Ticket:** KSS-LINT-001 | **Rule:** `react-hooks/set-state-in-effect`  
