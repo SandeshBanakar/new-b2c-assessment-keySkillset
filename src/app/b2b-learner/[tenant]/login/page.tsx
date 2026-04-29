@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, AlertTriangle, User, BookOpen, FileQuestion, ArrowLeft } from 'lucide-react';
+import { Building2, AlertTriangle, User, BookOpen, FileQuestion, ArrowLeft, ShieldOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { getTenantId } from '@/lib/client-admin/tenants';
 import { useB2BLearner, type B2BLearner } from '@/context/B2BLearnerContext';
@@ -99,19 +99,77 @@ function PersonaGuide({
   );
 }
 
-export default function B2BLoginPage() {
+// ── Access revoked panel ──────────────────────────────────────────────────────
+
+function LearnerAccessRevokedPanel() {
+  return (
+    <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-12">
+      <div className="flex flex-col items-center text-center gap-6">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-100">
+          <ShieldOff className="h-8 w-8 text-rose-600" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900">Access Suspended</h1>
+          <p className="mt-2 text-sm text-zinc-500 max-w-sm mx-auto">
+            Your organisation&apos;s admin account has been deactivated. Your learning portal access is temporarily unavailable.
+          </p>
+        </div>
+
+        <div className="w-full max-w-md rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-left">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-rose-700">
+            What this means
+          </p>
+          <ul className="space-y-1.5 text-sm text-zinc-700 leading-relaxed list-disc list-inside">
+            <li>You can no longer access your assigned courses</li>
+            <li>Your assessments and scores are temporarily inaccessible</li>
+            <li>Your earned certificates are temporarily unavailable</li>
+          </ul>
+        </div>
+
+        <div className="w-full max-w-md rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-left">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            Your data is safe
+          </p>
+          <p className="text-sm text-zinc-600 leading-relaxed">
+            All your progress records and completion history are preserved. If your organisation&apos;s access is reinstated, everything will be restored automatically.
+          </p>
+        </div>
+
+        <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-4 text-left">
+          <p className="mb-1 text-sm font-medium text-zinc-700">Need help?</p>
+          <p className="text-sm text-zinc-500 leading-relaxed">
+            Contact your HR or Learning &amp; Development team to understand next steps, or reach out to keySkillset support:
+          </p>
+          <a
+            href="mailto:contact@keyskillset.com"
+            className="mt-1.5 block text-sm font-medium text-blue-600 hover:underline"
+          >
+            contact@keyskillset.com
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Login page content ────────────────────────────────────────────────────────
+
+function B2BLoginContent() {
   const params = useParams<{ tenant: string }>();
   const tenantSlug = params.tenant;
+  const searchParams = useSearchParams();
+  const isDeactivated = searchParams.get('state') === 'deactivated';
+
   const tenantId = getTenantId(tenantSlug);
   const router = useRouter();
   const { login, tenantInfo } = useB2BLearner();
 
   const [learners, setLearners] = useState<B2BLearner[]>([]);
   const [guideData, setGuideData] = useState<Record<string, GuideRow>>({});
-  const [loading, setLoading] = useState(!!tenantId);
+  const [loading, setLoading] = useState(!!tenantId && !isDeactivated);
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || isDeactivated) return;
 
     async function fetchAll() {
       const { data: learnersData } = await supabase
@@ -188,7 +246,7 @@ export default function B2BLoginPage() {
       setGuideData(guide);
       setLoading(false);
     });
-  }, [tenantId]);
+  }, [tenantId, isDeactivated]);
 
   function handleSelect(l: B2BLearner) {
     login(l);
@@ -231,66 +289,121 @@ export default function B2BLoginPage() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-8 space-y-6">
-        {/* Demo warning */}
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700">
-            <span className="font-semibold">Demo login only.</span> Click any learner card to sign in as that person. This flow is not intended for production use.
-          </p>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-6 h-6 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <>
-            {/* Persona guide — dynamic from DB */}
-            <PersonaGuide learners={learners} guideData={guideData} />
-
-            <div>
-              <h1 className="text-xl font-semibold text-zinc-900">Select your profile</h1>
-              <p className="text-sm text-zinc-500 mt-1">Who are you learning as today?</p>
+      {isDeactivated ? (
+        <>
+          <LearnerAccessRevokedPanel />
+          {/* Demo state switcher */}
+          <div className="border-t border-zinc-100 py-6 px-4">
+            <p className="mb-3 text-center text-[10px] font-medium uppercase tracking-widest text-zinc-400">
+              Demo States
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link
+                href={`/b2b-learner/${tenantSlug}/login`}
+                className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+              >
+                Normal Login
+              </Link>
+              <Link
+                href={`/b2b-learner/${tenantSlug}/login?state=deactivated`}
+                className="rounded-md border border-rose-600 bg-rose-600 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+              >
+                Org Deactivated
+              </Link>
             </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-8 space-y-6">
+          {/* Demo warning */}
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700">
+              <span className="font-semibold">Demo login only.</span> Click any learner card to sign in as that person. This flow is not intended for production use.
+            </p>
+          </div>
 
-            {learners.length === 0 ? (
-              <div className="text-center py-16">
-                <User className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
-                <p className="text-sm text-zinc-500">No active learners found for this organisation.</p>
+          {/* Demo state switcher */}
+          <div className="border border-zinc-100 rounded-lg py-4 px-4">
+            <p className="mb-3 text-center text-[10px] font-medium uppercase tracking-widest text-zinc-400">
+              Demo States
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link
+                href={`/b2b-learner/${tenantSlug}/login`}
+                className="rounded-md border border-teal-700 bg-teal-700 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+              >
+                Normal Login
+              </Link>
+              <Link
+                href={`/b2b-learner/${tenantSlug}/login?state=deactivated`}
+                className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+              >
+                Org Deactivated
+              </Link>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-6 h-6 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* Persona guide — dynamic from DB */}
+              <PersonaGuide learners={learners} guideData={guideData} />
+
+              <div>
+                <h1 className="text-xl font-semibold text-zinc-900">Select your profile</h1>
+                <p className="text-sm text-zinc-500 mt-1">Who are you learning as today?</p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {learners.map((l, i) => {
-                  const guideRow = guideData[l.id];
-                  return (
-                    <button
-                      key={l.id}
-                      onClick={() => handleSelect(l)}
-                      className="flex items-center gap-4 bg-white border border-zinc-200 rounded-lg p-4 text-left hover:border-teal-300 hover:shadow-sm transition-all group"
-                    >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${avatarColor(i)}`}>
-                        {getInitials(l.full_name)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-zinc-900 truncate group-hover:text-teal-700 transition-colors">
-                          {l.full_name}
-                        </p>
-                        <p className="text-xs text-zinc-400 truncate">{l.email}</p>
-                      </div>
-                      {guideRow && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0 ${STATE_BADGE[guideRow.state].cls}`}>
-                          {STATE_BADGE[guideRow.state].label}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+
+              {learners.length === 0 ? (
+                <div className="text-center py-16">
+                  <User className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
+                  <p className="text-sm text-zinc-500">No active learners found for this organisation.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {learners.map((l, i) => {
+                    const guideRow = guideData[l.id];
+                    return (
+                      <button
+                        key={l.id}
+                        onClick={() => handleSelect(l)}
+                        className="flex items-center gap-4 bg-white border border-zinc-200 rounded-lg p-4 text-left hover:border-teal-300 hover:shadow-sm transition-all group"
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${avatarColor(i)}`}>
+                          {getInitials(l.full_name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-zinc-900 truncate group-hover:text-teal-700 transition-colors">
+                            {l.full_name}
+                          </p>
+                          <p className="text-xs text-zinc-400 truncate">{l.email}</p>
+                        </div>
+                        {guideRow && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0 ${STATE_BADGE[guideRow.state].cls}`}>
+                            {STATE_BADGE[guideRow.state].label}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function B2BLoginPage() {
+  return (
+    <Suspense>
+      <B2BLoginContent />
+    </Suspense>
   );
 }

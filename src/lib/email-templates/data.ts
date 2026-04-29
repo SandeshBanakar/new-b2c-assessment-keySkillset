@@ -134,7 +134,7 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     filename: 'learner-onboarding-invite.html',
     recipient: 'Learner',
     triggerEvent: 'Sent when a learner is invited or enrolled into the tenant learning experience.',
-    featureApplicability: 'ALL',
+    featureApplicability: 'B2B_LEARNER',
     primaryCtaStyle: 'Tour-first CTA with setup support',
     subject: 'You have been invited to learn with {{company_name}}',
     summary: 'Invites the learner, introduces assigned learning, and drives them into first access.',
@@ -157,7 +157,7 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     filename: 'course-completion.html',
     recipient: 'Learner',
     triggerEvent: 'Sent when a learner completes an assigned course.',
-    featureApplicability: 'ALL',
+    featureApplicability: 'B2B_LEARNER',
     primaryCtaStyle: 'Celebrate completion and drive next action',
     subject: 'You completed {{course_title}}',
     summary: 'Celebrates completion, summarizes the outcome, and points the learner to certificate or next learning.',
@@ -180,7 +180,7 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     filename: 'certificate-of-completion.html',
     recipient: 'Learner / External Viewer',
     triggerEvent: 'Rendered when a certificate is issued or shared.',
-    featureApplicability: 'ALL',
+    featureApplicability: 'B2B_LEARNER',
     primaryCtaStyle: 'Certificate-first presentation',
     subject: 'Certificate of Completion - {{course_title}}',
     summary: 'Printable white-label certificate HTML with tenant/company branding and completion identity.',
@@ -274,6 +274,25 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
       '{{action}}',
     ],
     previewHeight: 800,
+  },
+  {
+    id: 'b2b-learner-ca-deactivated',
+    name: 'B2B Learner Access Suspended (CA Deactivated)',
+    filename: 'b2b-learner-ca-deactivated.html',
+    recipient: 'B2B Learner',
+    triggerEvent: 'Sent to all active learners in a tenant when their Client Admin account is deactivated by a Super Admin.',
+    featureApplicability: 'B2B_LEARNER',
+    primaryCtaStyle: 'Informational — no CTA',
+    subject: 'Your access to {{company_name}} on {{platform_name}} has been suspended',
+    summary: 'Notifies the B2B learner that their organisation\'s admin account has been deactivated, explains what they have lost access to (courses, assessments, certificates), and confirms their progress data is safely preserved. Provides support contact.',
+    whenTriggered: 'Trigger when Super Admin clicks "Deactivate" on a tenant. Fire to all ACTIVE learners in that tenant alongside the CA deactivation email.',
+    variables: [
+      '{{full_name}}',
+      '{{company_name}}',
+      '{{platform_name}}',
+      '{{support_email}}',
+    ],
+    previewHeight: 960,
   },
   {
     id: 'b2b-learner-report-card',
@@ -542,6 +561,24 @@ export function buildPreviewPayload(
         heroTitle: 'You completed your course.',
         heroSubtitle: 'Your result has been recorded and your completion credentials are ready to review.',
         completionSummary: 'All required modules are complete and your final status has been marked as achieved.',
+      },
+    }
+  }
+
+  if (templateId === 'b2b-learner-ca-deactivated') {
+    return {
+      ...basePayload,
+      recipient: {
+        fullName: 'Ananya Krishnan',
+        email: 'ananya.krishnan@akash.example.com',
+      },
+      context: {
+        ...basePayload.context,
+        roleLabel: 'Learner',
+        teamName: tenant.displayName,
+        introEyebrow: 'Account access suspended',
+        heroTitle: 'Your access to the learning portal has been suspended.',
+        heroSubtitle: `${tenant.displayName}'s admin account has been deactivated. Your courses, assessments, and certificates are temporarily inaccessible.`,
       },
     }
   }

@@ -23,9 +23,12 @@ export default async function TenantEmailTemplatesPage({
   return (
     <main className="min-h-screen bg-zinc-50">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <Link href="/email-templates" className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900">
+        <Link
+          href={tenantSlug === 'keyskillset' || tenantSlug === 'b2b-learner' ? '/' : '/email-templates'}
+          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900"
+        >
           <ArrowLeft className="h-4 w-4" />
-          Back to Tenant Chooser
+          {tenantSlug === 'keyskillset' || tenantSlug === 'b2b-learner' ? 'Back to Persona Selector' : 'Back to Tenant Chooser'}
         </Link>
 
         <div className="mt-6 rounded-md border border-zinc-200 bg-white p-6 sm:p-8">
@@ -84,12 +87,14 @@ export default async function TenantEmailTemplatesPage({
                     <td className="px-3 py-3 text-zinc-600">{template.recipient}</td>
                     <td className="px-3 py-3 text-zinc-600">
                       {template.featureApplicability === 'ALL'
-                        ? 'All tenants'
+                        ? 'All CA tenants'
                         : template.featureApplicability === 'FULL_CREATOR'
                           ? 'Full Creator only'
                           : template.featureApplicability === 'RUN_ONLY'
                             ? 'Run Only only'
-                            : 'B2C End Users'}
+                            : template.featureApplicability === 'B2B_LEARNER'
+                              ? 'B2B Learner'
+                              : 'B2C End Users'}
                     </td>
                     <td className="px-3 py-3 text-zinc-600">{template.primaryCtaStyle}</td>
                   </tr>

@@ -6,6 +6,86 @@
 
 ## COMPLETED WORK LOG
 
+### April 29, 2026 — KSS-B2B-CAD-001: B2B Learner Access Revocation on CA Deactivation (COMPLETE)
+
+**Build:** ✅ PASSED · **PRD:** `prds/b2b-learner/PRD-B2B-LEARNER-CA-DEACTIVATED-001.md` (DRAFT)
+
+**Email Template QA Structure Fixes (4 bugs resolved):**
+- `email-templates/page.tsx`: Filtered out `B2B_LEARNER` from tenant chooser — B2B is a direct persona from the selector, not a tenant to choose from. Filter now excludes both `B2C_END_USER` and `B2B_LEARNER`.
+- `email-templates/[tenant]/page.tsx`: Back navigation fixed — `keyskillset` and `b2b-learner` slugs now point to `/` ("Back to Persona Selector") instead of `/email-templates` ("Back to Tenant Chooser").
+- `lib/email-templates/data.ts`: `learner-onboarding-invite`, `course-completion`, `certificate-of-completion` changed from `featureApplicability: 'ALL'` → `'B2B_LEARNER'`. These are learner-facing templates and no longer appear in CA tenant pages (Akash / TechCorp).
+- `email-templates/[tenant]/page.tsx`: Applicability column in template inventory table now handles `B2B_LEARNER` case correctly (was falling through to "B2C End Users").
+
+**New Email Template — `b2b-learner-ca-deactivated`:**
+- `types.ts`: Added `'b2b-learner-ca-deactivated'` to `EmailTemplateId` union.
+- `data.ts`: Template definition (`featureApplicability: 'B2B_LEARNER'`, `primaryCtaStyle: 'Informational — no CTA'`) + preview payload (recipient: Ananya Krishnan, `b2b-learner` tenant).
+- `src/email-templates/html/b2b-learner-ca-deactivated.html`: Rose hero (`#881337`), keySkillset logo, rose-50 impact list (courses/assessments/certs inaccessible), green-50 data-safe box (progress preserved), support contact footer.
+- Variables: `{{full_name}}`, `{{company_name}}`, `{{platform_name}}`, `{{support_email}}`.
+
+**New Auth Screen — B2B Learner Login Deactivated State:**
+- `b2b-learner/[tenant]/login/page.tsx`: Added `useSearchParams` (with Suspense wrapper added to `B2BLoginPage` default export). `?state=deactivated` renders `LearnerAccessRevokedPanel` instead of learner card picker. Panel: rose-100 ShieldOff icon, "Access Suspended" heading, rose-50 impact list (3 bullets), emerald-50 data-safe box, zinc-50 contact block (HR/L&D + keySkillset email). Demo state switcher (Normal / Org Deactivated) on both states.
+- `src/app/page.tsx`: "B2B Login — Org Deactivated" auth screen tile added — `bg-rose-700`, `ShieldOff` icon, routes to `/b2b-learner/akash/login?state=deactivated`, badge `DEACTIVATED`.
+
+**B2B Learner email persona now shows (5 templates):** Learner Onboarding Invite, Course Completion, Certificate of Completion, B2B Learner Report Card, B2B Learner CA Deactivated.
+**CA tenant pages now show (CA-only templates):** CA Onboarding, Content Creator Full/Run-Only, CA Deactivated, CA Reactivated.
+
+---
+
+### April 29, 2026 — KSS-PC-SST-001: Scale Score Templates + Platform Config Refactor (COMPLETE)
+
+**Build:** ✅ PASSED · **PRD:** `prds/super-admin/PRD-SA-SCALE-SCORE-TEMPLATES-001.md` (COMPLETE)  
+**DB Migration:** `docs/requirements/KSS-DB-060.sql` — ✅ RUN Apr 29 2026
+
+**Key decisions locked:**
+- Scale score configuration moved from per-assessment "Scale Score" tab → Platform Config → exam category → Analytics Config sub-tab. Tab removed from Create/Edit Adaptive Assessment permanently.
+- Templates are two-step: Step 1 defines module structure (`max_foundation_modules`, `questions_per_attempt` per FM + VM); Step 2 defines raw→scaled score rows per module (row-by-row or CSV paste).
+- Templates are shared across all assessments of the same exam category. Selecting a template locks `questions_per_attempt` on all FM + VM cards — inputs are disabled/greyed with "Locked by scale score template" caption.
+- `supported_assessment_types text[]` added to `exam_categories`. Replaces hardcoded `category.name === 'SAT'` gate for Analytics Config sub-tab. Stored as single-element array (radio, not multi-select) — "Not set / Adaptive / Linear" — no category can be both.
+- `ScaleScoreTemplatePicker` placed immediately below Basic Info card (above Analytics Config widget and Foundation Modules) so SA sees the structural constraint before configuring modules.
+- FM cap enforced: "Add Foundation Module" button hidden when `foundationModules.length >= templateMaxFM`. Amber warning shown if existing FM count exceeds template cap.
+- Edit form load-order handled via `useEffect([templates, templateId])` — fires `onTemplateSelect` when templates load with pre-set ID, ensuring `templateMaxFM` is restored correctly.
+- Delete guard on templates: counts `assessment_items WHERE scale_score_template_id = X`, blocks deletion if >0.
+- `assessment_items.scale_score_template_id uuid` FK nullable — existing assessments with `null` fall back to legacy `assessment_scale_scores` path (untouched).
+
+**Files changed:**
+- `src/app/super-admin/platform-config/page.tsx` — `ExamCategory`/`ExamCategoryForm` types + `supported_assessment_types` radio group in `CategorySlideOver`, Analytics Config sub-tab gate, `AdaptiveAnalyticsDisplayConfig` (renamed from SAT), `ScaleScoreTemplatesPanel`, `ScaleScoreTemplateSlideOver` (two-step)
+- `src/app/super-admin/create-assessments/adaptive/_components.tsx` — `ScaleScoreTemplatePicker` component; `qpaLocked?: boolean` prop on `FoundationModuleCard` and `VariantModuleCard` (disabled input + caption + threaded from FM → VM)
+- `src/app/super-admin/create-assessments/adaptive/page.tsx` — Scale Score tab removed, `ScaleScoreTemplatePicker` below Basic Info, `qpaLocked={!!scaleScoreTemplateId}` on FM cards, `templateMaxFM` state + `fmCap` derived cap
+- `src/app/super-admin/create-assessments/adaptive/[id]/page.tsx` — same as create form + edit-mode load of `scale_score_template_id`
+- `docs/requirements/KSS-DB-060.sql` — 5 DB changes (exam_categories column, 3 new tables, assessment_items FK + index)
+
+---
+
+### April 28, 2026 — KSS-SA-CONTRACT-001: SA Contract New Fields + CreateTenant + CA Billing Display (COMPLETE)
+
+**Build:** ✅ TypeScript clean · **DB:** KSS-DB-059 ✅ RAN Apr 28 2026
+
+**DB-059 (5 new columns on `contracts`):**
+`contract_amount NUMERIC(12,2)`, `contract_currency TEXT DEFAULT 'INR'`, `trial_period_days INT DEFAULT 0`, `coupon_code TEXT`, `pay_now BOOLEAN DEFAULT false`.
+TechCorp seeded: Visa 4242, `finance@techcorp.com`, ₹4,80,000 ARR, 4× payment history rows.
+
+**CreateTenantSlideOver.tsx:** 5 new form fields — Contract Amount + Currency (grid-cols-2), Pay Now toggle (hides Trial Days when true), Trial Period Days (conditional), Coupon Code. All included in `contracts.insert` and retry payload.
+
+**SA Tenant [id] Contract Tab:** New fields in `Contract` interface. Read-only display shows Contract Amount, Billing Mode (contextual: Immediate / N-day Trial / Deferred), Coupon Code. Edit mode includes all 5 fields with conditional rendering. `saveContract()` includes new fields.
+
+**CA Billing Page:** Contract Value (₹/$ formatted), Billing Mode contextually labelled, Coupon Code (if present) — all display-only.
+
+---
+
+### April 28, 2026 — KSS-SA-SCALE-SCORE-FIX-001: Adaptive Scale Score Table Input Reset Bug Fix (COMPLETE)
+
+**Build:** ✅ TypeScript clean · **File:** `src/app/super-admin/create-assessments/adaptive/_components.tsx`
+
+Root cause: `allModules` was rebuilt fresh from props (`buildScoreModules()`) on every render — any keystroke that triggered re-render discarded in-progress edits. Fix:
+
+- `useState(() => buildScoreModules())` lazy initializer (was `useState([])`). Inputs now hold value across renders.
+- `useEffect` added to load existing scores from DB when `assessmentId` is provided (edit mode).
+- `const allModules = scoreData` (previously `const allModules = buildScoreModules()`).
+- `updateScaledScore` refactored: removed direct mutation, pure functional state update via `prev.map(...)`.
+- `handleSave` reads from `scoreData` state (not ephemeral `allModules` variable).
+
+---
+
 ### April 28, 2026 — KSS-B2B-RC-001: B2B Learner Report Card + Salesforce Email Template (COMPLETE)
 
 **Build:** ✅ PASSED · **PRD:** `prds/b2b-learner/PRD-B2B-REPORT-CARD-001.md` (LOCKED — revised from Apr 27 draft)

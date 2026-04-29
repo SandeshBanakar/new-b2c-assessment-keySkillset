@@ -5,7 +5,9 @@ import TenantChooserCard from '@/components/email-templates/TenantChooserCard'
 import { TENANT_EMAIL_PREVIEW_PROFILES } from '@/lib/email-templates/data'
 
 export default function EmailTemplatesTenantChooserPage() {
-  const tenants = Object.values(TENANT_EMAIL_PREVIEW_PROFILES).filter((t) => t.featureMode !== 'B2C_END_USER')
+  const tenants = Object.values(TENANT_EMAIL_PREVIEW_PROFILES).filter(
+    (t) => t.featureMode !== 'B2C_END_USER' && t.featureMode !== 'B2B_LEARNER',
+  )
 
   return (
     <main className="min-h-screen bg-zinc-50">
@@ -30,6 +32,7 @@ export default function EmailTemplatesTenantChooserPage() {
             <div className="rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
               <p className="font-medium">Flow</p>
               <p className="mt-1">Persona Selector &rarr; Tenant Chooser &rarr; Client Admin Emails &rarr; Template Detail &rarr; iframe Preview</p>
+              <p className="mt-1 text-xs text-blue-600">B2C and B2B Learner emails are accessed directly from the Persona Selector.</p>
             </div>
           </div>
         </div>

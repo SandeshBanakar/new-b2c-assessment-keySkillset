@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool, FlaskConical, Atom, Scale, Mail, GraduationCap, LogIn, UserPlus, AlertTriangle } from 'lucide-react';
+import { Lock, Star, Zap, Trophy, Shield, Building2, Briefcase, PenTool, FlaskConical, Atom, Scale, Mail, GraduationCap, LogIn, UserPlus, AlertTriangle, ShieldOff } from 'lucide-react';
 import { DEMO_USERS } from '@/data/demoUsers';
 import { useAppContext } from '@/context/AppContext';
 import type { DemoUser } from '@/data/demoUsers';
@@ -252,6 +252,16 @@ function PersonaSelector() {
           </div>
           <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">CA Login — Deactivated</span>
           <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-amber-900 text-amber-300">DEACTIVATED</span>
+        </div>
+        <div
+          onClick={() => handleAdminSelect('/b2b-learner/akash/login?state=deactivated')}
+          className="cursor-pointer group flex flex-col items-center gap-3"
+        >
+          <div className="w-24 h-24 rounded-md flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-hover:ring-offset-2 group-hover:ring-offset-zinc-950 group-hover:scale-105 transition duration-150 bg-rose-700">
+            <ShieldOff className="w-10 h-10 text-white" />
+          </div>
+          <span className="text-sm font-medium text-zinc-300 group-hover:text-white text-center">B2B Login — Org Deactivated</span>
+          <span className="text-xs rounded-md px-2.5 py-0.5 font-medium bg-rose-900 text-rose-300">DEACTIVATED</span>
         </div>
       </div>
 

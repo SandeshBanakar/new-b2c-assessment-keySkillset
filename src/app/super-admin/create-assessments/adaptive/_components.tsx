@@ -231,12 +231,13 @@ export function BranchingConfig({
 // ─── Variant Module Card ──────────────────────────────────────────────────────
 
 export function VariantModuleCard({
-  vm, sources, chaptersMap, onChange,
+  vm, sources, chaptersMap, onChange, qpaLocked,
 }: {
   vm: VariantModule
   sources: Source[]
   chaptersMap: Record<string, Chapter[]>
   onChange: (updated: VariantModule) => void
+  qpaLocked?: boolean
 }) {
   const diff = DIFFICULTY_LABELS[vm.difficulty]
   const [open, setOpen] = useState(true)
@@ -288,8 +289,12 @@ export function VariantModuleCard({
               value={vm.questions_per_attempt}
               onChange={e => onChange({ ...vm, questions_per_attempt: e.target.value })}
               placeholder="e.g. 27"
-              className={inputCls()}
+              disabled={qpaLocked}
+              className={`${inputCls()} ${qpaLocked ? 'bg-zinc-50 text-zinc-400 cursor-not-allowed' : ''}`}
             />
+            {qpaLocked && (
+              <p className="mt-1 text-[10px] text-zinc-400">Locked by scale score template</p>
+            )}
           </div>
 
           <div>
@@ -363,7 +368,7 @@ function BreakScreenCard({
 // ─── Foundation Module Card ───────────────────────────────────────────────────
 
 export function FoundationModuleCard({
-  fm, sources, chaptersMap, onUpdate, onRemove, canRemove,
+  fm, sources, chaptersMap, onUpdate, onRemove, canRemove, qpaLocked,
 }: {
   fm: FoundationModule
   sources: Source[]
@@ -371,6 +376,7 @@ export function FoundationModuleCard({
   onUpdate: (updated: FoundationModule) => void
   onRemove: () => void
   canRemove: boolean
+  qpaLocked?: boolean
 }) {
   const [open, setOpen] = useState(true)
 
@@ -442,8 +448,12 @@ export function FoundationModuleCard({
                 value={fm.questions_per_attempt}
                 onChange={e => onUpdate({ ...fm, questions_per_attempt: e.target.value })}
                 placeholder="e.g. 27"
-                className={inputCls()}
+                disabled={qpaLocked}
+                className={`${inputCls()} ${qpaLocked ? 'bg-zinc-50 text-zinc-400 cursor-not-allowed' : ''}`}
               />
+              {qpaLocked && (
+                <p className="mt-1 text-[10px] text-zinc-400">Locked by scale score template</p>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-1">
@@ -520,6 +530,7 @@ export function FoundationModuleCard({
                 sources={sources}
                 chaptersMap={chaptersMap}
                 onChange={updated => updateVM(vm.difficulty, updated)}
+                qpaLocked={qpaLocked}
               />
             ))}
           </div>
@@ -823,6 +834,189 @@ export function ScoreScoreTab({
         <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-2.5">
           <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
           <p className="text-sm text-amber-700">Add Foundation Modules on the Edit tab first to configure scale scores.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Scale Score Template Picker ──────────────────────────────────────────────
+
+interface ScaleScoreTemplateOption {
+  id: string
+  name: string
+  description: string | null
+  max_foundation_modules: number
+}
+
+interface TemplateModuleSummary {
+  id: string
+  module_type: 'foundation' | 'variant'
+  foundation_index: number
+  difficulty: string | null
+  questions_per_attempt: number
+  display_order: number
+}
+
+const LOCK_ICON = (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-zinc-400 inline ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+)
+
+export function ScaleScoreTemplatePicker({
+  examCategoryId,
+  templateId,
+  onSelect,
+  onTemplateSelect,
+  foundationModules,
+  onModulesChange,
+}: {
+  examCategoryId: string
+  templateId: string | null
+  onSelect: (id: string | null) => void
+  onTemplateSelect: (template: { max_foundation_modules: number } | null) => void
+  foundationModules: FoundationModule[]
+  onModulesChange: (modules: FoundationModule[]) => void
+}) {
+  const [templates, setTemplates] = useState<ScaleScoreTemplateOption[]>([])
+  const [loading, setLoading] = useState(false)
+  const [templateModules, setTemplateModules] = useState<TemplateModuleSummary[]>([])
+
+  useEffect(() => {
+    if (!examCategoryId) { setTemplates([]); return }
+    setLoading(true)
+    import('@/lib/supabase/client').then(({ supabase }) => {
+      supabase
+        .from('scale_score_templates')
+        .select('id, name, description, max_foundation_modules')
+        .eq('exam_category_id', examCategoryId)
+        .eq('is_active', true)
+        .order('name')
+        .then(({ data }) => {
+          setTemplates((data ?? []) as ScaleScoreTemplateOption[])
+          setLoading(false)
+        })
+    })
+  }, [examCategoryId])
+
+  // When templates load and a templateId is already set (edit form), surface max_foundation_modules
+  useEffect(() => {
+    if (!templateId || templates.length === 0) return
+    const t = templates.find(x => x.id === templateId)
+    if (t) onTemplateSelect(t)
+  }, [templates, templateId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load template modules when a template is selected
+  useEffect(() => {
+    if (!templateId) { setTemplateModules([]); return }
+    import('@/lib/supabase/client').then(({ supabase }) => {
+      supabase
+        .from('scale_score_template_modules')
+        .select('id, module_type, foundation_index, difficulty, questions_per_attempt, display_order')
+        .eq('template_id', templateId)
+        .order('display_order')
+        .then(({ data }) => {
+          const mods = (data ?? []) as TemplateModuleSummary[]
+          setTemplateModules(mods)
+          applyTemplateToModules(mods)
+        })
+    })
+  }, [templateId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyTemplateToModules(mods: TemplateModuleSummary[]) {
+    const updated = foundationModules.map((fm, fmIdx) => {
+      const fmDef = mods.find(m => m.module_type === 'foundation' && m.foundation_index === fmIdx + 1)
+      const updatedVariants = fm.variant_modules.map(vm => {
+        const vmDef = mods.find(m =>
+          m.module_type === 'variant' &&
+          m.foundation_index === fmIdx + 1 &&
+          m.difficulty === vm.difficulty
+        )
+        return vmDef ? { ...vm, questions_per_attempt: String(vmDef.questions_per_attempt) } : vm
+      })
+      return {
+        ...fm,
+        questions_per_attempt: fmDef ? String(fmDef.questions_per_attempt) : fm.questions_per_attempt,
+        variant_modules: updatedVariants,
+      }
+    })
+    onModulesChange(updated)
+  }
+
+  function handleSelect(id: string) {
+    const chosen = id === '' ? null : templates.find(t => t.id === id) ?? null
+    onSelect(id === '' ? null : id)
+    onTemplateSelect(chosen)
+    if (id === '') setTemplateModules([])
+  }
+
+  const selectedTemplate = templates.find(t => t.id === templateId)
+  const fmExceedsTemplate =
+    selectedTemplate != null &&
+    foundationModules.length > selectedTemplate.max_foundation_modules
+
+  if (!examCategoryId) return null
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-md p-5">
+      <div className="mb-3">
+        <p className="text-sm font-semibold text-zinc-900">Scale Score Template</p>
+        <p className="text-xs text-zinc-500 mt-0.5">
+          Assigns a raw→scaled conversion table. Locks <code className="text-[10px] bg-zinc-100 px-1 rounded">questions_per_attempt</code> on all modules.
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="h-9 bg-zinc-100 rounded-md animate-pulse" />
+      ) : templates.length === 0 ? (
+        <div className="px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs text-zinc-500">
+          No active scale score templates for this exam category. Create one in Platform Config → Analytics Config.
+        </div>
+      ) : (
+        <select
+          value={templateId ?? ''}
+          onChange={e => handleSelect(e.target.value)}
+          className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm text-zinc-900 focus:ring-2 focus:ring-blue-700 focus:border-transparent outline-none bg-white"
+        >
+          <option value="">— No template selected —</option>
+          {templates.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+      )}
+
+      {selectedTemplate && templateModules.length > 0 && (
+        <div className="mt-3 px-3 py-2.5 bg-blue-50 border border-blue-100 rounded-md space-y-1">
+          <p className="text-xs font-medium text-blue-800">{selectedTemplate.name}</p>
+          {selectedTemplate.description && (
+            <p className="text-xs text-blue-600">{selectedTemplate.description}</p>
+          )}
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {templateModules.map(m => (
+              <span
+                key={m.id}
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700"
+              >
+                {m.module_type === 'foundation'
+                  ? `FM${m.foundation_index}: ${m.questions_per_attempt}Q`
+                  : `${m.difficulty} FM${m.foundation_index}: ${m.questions_per_attempt}Q`}
+                {LOCK_ICON}
+              </span>
+            ))}
+          </div>
+          <p className="text-[10px] text-blue-500 mt-1">Questions per attempt fields are locked to match this template.</p>
+        </div>
+      )}
+
+      {fmExceedsTemplate && selectedTemplate && (
+        <div className="mt-3 flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-md">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-800">
+            This assessment has <strong>{foundationModules.length} Foundation Modules</strong> but the selected template allows a maximum of <strong>{selectedTemplate.max_foundation_modules}</strong>.
+            Remove the extra modules or choose a different template before saving.
+          </p>
         </div>
       )}
     </div>

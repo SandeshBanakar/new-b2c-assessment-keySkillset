@@ -10,6 +10,7 @@ export type EmailTemplateId =
   | 'client-admin-deactivated'
   | 'client-admin-reactivated'
   | 'b2b-learner-report-card'
+  | 'b2b-learner-ca-deactivated'
 
 export type TenantEmailSlug = 'akash' | 'techcorp' | 'keyskillset' | 'b2b-learner'
 

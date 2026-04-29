@@ -16,7 +16,7 @@ import {
   newFoundationModule,
   FoundationModuleCard,
   AdaptivePreviewTab,
-  ScoreScoreTab,
+  ScaleScoreTemplatePicker,
 } from './_components'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,7 +29,9 @@ export default function CreateAdaptiveAssessmentPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [tab, setTab] = useState<'edit' | 'scale_score' | 'preview'>('edit')
+  const [tab, setTab] = useState<'edit' | 'preview'>('edit')
+  const [scaleScoreTemplateId, setScaleScoreTemplateId] = useState<string | null>(null)
+  const [templateMaxFM, setTemplateMaxFM] = useState<number | null>(null)
 
   // Catalog
   const [categories, setCategories] = useState<ExamCategory[]>([])
@@ -52,7 +54,8 @@ export default function CreateAdaptiveAssessmentPage() {
 
   const selectedCategory = categories.find(c => c.id === examCategoryId) ?? null
   const isSubjectTest = testType === 'SUBJECT_TEST'
-  const canAddMoreFMs = !isSubjectTest && foundationModules.length < 5
+  const fmCap = templateMaxFM ?? 5
+  const canAddMoreFMs = !isSubjectTest && foundationModules.length < fmCap
 
   // Analytics Config widget — SAT only
   const [satBandCount, setSatBandCount] = useState<number | null>(null)
@@ -192,6 +195,7 @@ export default function CreateAdaptiveAssessmentPage() {
         assessment_config: assessmentConfig,
         audience_type: 'B2C_ONLY',
         visibility_scope: 'GLOBAL',
+        scale_score_template_id: scaleScoreTemplateId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -224,9 +228,8 @@ export default function CreateAdaptiveAssessmentPage() {
       {/* Tab bar */}
       <div className="inline-flex items-center bg-zinc-100 border border-zinc-200 rounded-md p-0.5 mb-6">
         {([
-          { key: 'edit',        label: 'Edit' },
-          { key: 'scale_score', label: 'Scale Score' },
-          { key: 'preview',     label: 'Preview' },
+          { key: 'edit',    label: 'Edit' },
+          { key: 'preview', label: 'Preview' },
         ] as const).map(t => (
           <button
             key={t.key}
@@ -249,16 +252,6 @@ export default function CreateAdaptiveAssessmentPage() {
           <p className="text-sm font-medium text-zinc-700 mb-4">Assessment Flow</p>
           <AdaptivePreviewTab modules={foundationModules} />
         </div>
-      )}
-
-      {/* ── Scale Score tab ──────────────────────────────────────────────────── */}
-      {tab === 'scale_score' && (
-        <ScoreScoreTab
-          assessmentId={null}
-          modules={foundationModules}
-          scoreMin={selectedCategory?.score_min ?? null}
-          scoreMax={selectedCategory?.score_max ?? null}
-        />
       )}
 
       {/* ── Edit tab ─────────────────────────────────────────────────────────── */}
@@ -316,6 +309,16 @@ export default function CreateAdaptiveAssessmentPage() {
 
           </SectionCard>
 
+          {/* Scale Score Template */}
+          <ScaleScoreTemplatePicker
+            examCategoryId={examCategoryId}
+            templateId={scaleScoreTemplateId}
+            onSelect={setScaleScoreTemplateId}
+            onTemplateSelect={t => setTemplateMaxFM(t?.max_foundation_modules ?? null)}
+            foundationModules={foundationModules}
+            onModulesChange={setFoundationModules}
+          />
+
           {/* Analytics Config reference — SAT only */}
           {selectedCategory?.name === 'SAT' && (
             <div className="rounded-md border border-zinc-200 bg-white px-5 py-4 flex items-start justify-between gap-4">
@@ -351,7 +354,7 @@ export default function CreateAdaptiveAssessmentPage() {
               <div>
                 <p className="text-sm font-semibold text-zinc-900">Foundation Modules</p>
                 <p className="text-xs text-zinc-500 mt-0.5">
-                  {isSubjectTest ? 'Subject Test: exactly 1 FM' : `Full Test: 1–5 FMs (${foundationModules.length}/5)`}
+                  {isSubjectTest ? 'Subject Test: exactly 1 FM' : `Full Test: 1–${fmCap} FMs (${foundationModules.length}/${fmCap})`}
                 </p>
               </div>
               {canAddMoreFMs && (
@@ -379,6 +382,7 @@ export default function CreateAdaptiveAssessmentPage() {
                 onUpdate={updated => updateModule(fm.id, updated)}
                 onRemove={() => removeModule(fm.id)}
                 canRemove={foundationModules.length > 1 && !isSubjectTest}
+                qpaLocked={!!scaleScoreTemplateId}
               />
             ))}
           </div>
