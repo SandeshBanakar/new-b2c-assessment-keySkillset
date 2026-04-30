@@ -6,6 +6,62 @@
 
 ## COMPLETED WORK LOG
 
+### April 30, 2026 - KSS-EMAIL-FIX-002: Hardcoded Purpose Copy in Email HTML (COMPLETE)
+
+**Build:** PASSED
+
+**Issue fixed:**
+- Removed purpose-copy placeholders from the email HTML templates after the correction that fields like intro eyebrow, hero title/subtitle, assignment summary, completion summary, role labels, CTA labels, platform name, and support email should be fixed template copy rather than Salesforce/SES payload values.
+
+**Implementation details:**
+- Replaced all `{{intro_eyebrow}}`, `{{hero_title}}`, `{{hero_subtitle}}`, `{{assignment_summary}}`, `{{completion_summary}}`, `{{cta_label}}`, `{{secondary_cta_label}}`, `{{role_label}}`, `{{feature_mode_label}}`, `{{platform_name}}`, `{{support_email}}`, and `teamName`-style template dependencies in HTML.
+- Kept true business variables dynamic: recipient name/email, company name/logo where tenant branding is needed, URLs, course/certificate dates and numbers, and report-card metrics.
+- Removed purpose-copy fields from the shared `EmailTemplateContext` and token map so the preview payload no longer advertises those values as required dynamic data.
+- Included `content-creator-run-only.html` in the cleanup because it had the same inherited dynamic purpose-copy pattern.
+
+**Result:**
+- The email previews now render solid messaging directly from HTML, with only agreed dynamic values remaining. `npm run build` passes.
+
+---
+
+### April 30, 2026 - KSS-EMAIL-FIX-001: Email Template Payload + HTML Refinement (COMPLETE)
+
+**Build:** PASSED
+
+**Issue fixed:**
+- Refined the email template preview payloads and HTML rendering for the requested Client Admin, Content Creator, B2C End User, and B2B Learner emails from `docs/requirements/emails_fix.txt`.
+
+**Implementation details:**
+- Removed `teamName` from the shared email context/render contract after impact review showed it was inherited preview metadata and not required by the active HTML templates.
+- Made CTA/login/feature-mode fields optional so deactivated/suspended/report-card emails do not need fake primary CTA values.
+- Updated preview payloads for CA onboarding, Content Creator Full Creator, CA deactivated/reactivated, B2C suspended/restored certificate previews, B2B learner onboarding/completion/deactivated, and B2B report card.
+- Reworked the B2C suspended/restored HTML away from legacy `first_name`/`last_name`/`reason` action tokens to the unified email payload tokens.
+- Updated selected HTML CTAs/hero sections so the rendered previews reflect the refined labels, URLs, and status-specific copy.
+
+**Result:**
+- Email preview rendering is aligned to the refined payload direction, avoids placeholder `teamName`/fake CTA values where inappropriate, and `npm run build` passes.
+
+---
+ 
+### April 30, 2026 - KSS-ANA-KEY-001: AnalyticsTab Duplicate React Key Warning (COMPLETE)
+
+**Build:** PASSED
+
+**Issue fixed:**
+- `src/components/assessment-detail/AnalyticsTab.tsx`: Resolved React duplicate child key warning triggered by malformed question option data where multiple options could arrive with missing or blank `key` values, producing duplicate keys like `{questionId}-undefined`.
+
+**Implementation details:**
+- Added `getOptionMeta()` helper to normalize option identity before rendering.
+- Stable fallback keys now use `option-{index + 1}` when `options[].key` is missing or blank.
+- Option labels in the UI now fall back to ordinal numbering instead of rendering `undefined.`.
+- Applied the same normalization to both option render paths in the solutions/analytics accordion so behavior stays consistent across views.
+- Kept `getCorrectDisplay()` defensive for numeric and MCQ answer display handling.
+
+**Result:**
+- Analytics detail rendering is now resilient to incomplete option payloads and no longer emits duplicate-key console warnings for those cases.
+
+---
+
 ### April 29, 2026 — KSS-B2B-CAD-001: B2B Learner Access Revocation on CA Deactivation (COMPLETE)
 
 **Build:** ✅ PASSED · **PRD:** `prds/b2b-learner/PRD-B2B-LEARNER-CA-DEACTIVATED-001.md` (DRAFT)

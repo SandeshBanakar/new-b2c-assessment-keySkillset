@@ -45,9 +45,6 @@ next-env.d.ts
 # local env files
 .env.local
 
-# local doc reference
-/docs/requirements/
-
 # email rules references folder
 /docs/email_rules/
 

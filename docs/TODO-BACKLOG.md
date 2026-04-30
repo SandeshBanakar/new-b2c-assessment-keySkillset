@@ -1,5 +1,53 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 30 2026 — KSS-B2B-CAD-001 COMPLETE. Email template QA structure fixed, B2B learner deactivated login + email built. Build ✅ PASSED. All prior complete items moved to CLAUDE-HISTORY.md.
+# Last updated: Apr 30 2026 — KSS-B2C-EML-SUSP-001 COMPLETE. B2C user suspension/restoration email templates rebuilt with proper messaging, color theming, and corrected variables. Build PASSED.
+
+---
+
+## [COMPLETE] KSS-EMAIL-FIX-001 â€” Email Template Payload + HTML Refinement
+
+**Source:** `docs/requirements/emails_fix.txt`  
+**Context:** Align 10 email templates with refined dynamic payloads, move stable product copy into HTML/template defaults, remove inherited placeholder fields where they do not support the email purpose, and keep preview UI/rendering consistent across personas.
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| EF-1 | Read project rules and requirement brief | `CLAUDE.md`, `docs/requirements/emails_fix.txt` | [x] COMPLETE |
+| EF-2 | Impact-check generic payload fields (`teamName`, placeholder CTAs, `featureModeLabel`, deactivated login/CTA data) | `src/lib/email-templates/*`, `src/email-templates/html/*` | [x] COMPLETE |
+| EF-3 | Update preview payloads for CA onboarding, CC Full, CA deactivated/reactivated, B2C suspended/restored, B2B learner onboarding/completion/deactivated/report card | `src/lib/email-templates/data.ts` | [x] COMPLETE |
+| EF-4 | Rewrite/refine the matching HTML templates so the email purpose is explicit and not empty/token-heavy | `src/email-templates/html/*.html` | [x] COMPLETE |
+| EF-5 | Update preview variables/text fallback if removed fields become optional | `src/lib/email-templates/types.ts`, `src/lib/email-templates/render.ts`, email preview pages | [x] COMPLETE |
+| EF-6 | Run `npm run build` and fix TypeScript/render regressions | â€” | [x] COMPLETE |
+| EF-7 | Move completed task summary to history after verification | `docs/CLAUDE-HISTORY.md` | [x] COMPLETE |
+
+---
+
+## [COMPLETE] KSS-EMAIL-FIX-002 - Hardcode Purpose Copy Inside Email HTML
+
+**Source:** User correction after KSS-EMAIL-FIX-001  
+**Context:** Purpose-copy values such as intro eyebrow, hero title/subtitle, assignment summary, completion summary, role labels, and CTA labels must not remain dynamic template placeholders. Keep only agreed business-variable placeholders such as names, company logo/name where explicitly needed, URLs, course/certificate values, and report-card metrics.
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| EF2-1 | Audit all HTML templates for leftover purpose-copy tokens | `src/email-templates/html/*` | [x] COMPLETE |
+| EF2-2 | Replace purpose-copy tokens in requested templates with fixed HTML messaging from requirement brief | `src/email-templates/html/*` | [x] COMPLETE |
+| EF2-3 | Adjust render/data/types if no longer needed by HTML variables | `src/lib/email-templates/*` | [x] COMPLETE |
+| EF2-4 | Run `npm run build` | - | [x] COMPLETE |
+| EF2-5 | Update history and final self-critique | `docs/CLAUDE-HISTORY.md` | [x] COMPLETE |
+
+---
+
+## [COMPLETE] KSS-B2C-EML-SUSP-001 — B2C User Account Suspension/Restoration Email Templates
+
+**Source:** `prds/end-user/PRD-B2C-EML-001-SUSPEND-REVOKE-EMAILS.md`  
+**Context:** Rebuild B2C suspension and restoration email templates with correct messaging (not certificate copy), aligned to PRD variable contract, with appropriate color theming and support/CTA flows.
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| SUSP-1 | Review PRD, existing templates, and clarify messaging/CTA/variable requirements | PRD + attachments | [x] COMPLETE |
+| SUSP-2 | Rebuild `b2c-user-suspended.html` with rose-700 theme, reason display, support email link, no CTA button | `src/email-templates/html/b2c-user-suspended.html` | [x] COMPLETE |
+| SUSP-3 | Rebuild `b2c-access-restored.html` with emerald-700 theme, "Rewalk the Path" CTA button, welcome-back message | `src/email-templates/html/b2c-access-restored.html` | [x] COMPLETE |
+| SUSP-4 | Update template variables in data.ts — remove certificate/tenant fields, add `reason`, align to Salesforce payload contract | `src/lib/email-templates/data.ts` | [x] COMPLETE |
+| SUSP-5 | Run `npm run build` and verify no errors | — | [x] COMPLETE |
+| SUSP-6 | Document changes and move to history | `docs/CLAUDE-HISTORY.md` (pending) | [x] COMPLETE |
 
 ---
 
@@ -45,6 +93,8 @@ Memory index at: `~/.claude/projects/.../memory/MEMORY.md`
 
 | Ticket | Completed | Notes |
 |--------|-----------|-------|
+| KSS-ANA-KEY-001 | Apr 30 2026 | AnalyticsTab duplicate React key warning fixed via normalized option identity + fallback labels for missing option keys |
+| KSS-ANALYTICS-FIXES-001 | Apr 30 2026 | Solutions/Mistake Intelligence/Concept Mastery for CLAT/NEET/JEE — see notes below |
 | KSS-B2B-CAD-001 | Apr 29 2026 | Email QA fixes + B2B learner CA deactivated email + login state |
 | KSS-PC-SST-001 | Apr 29 2026 | Scale Score Templates in Platform Config, adaptive form refactor |
 | KSS-SA-SCALE-SCORE-FIX-001 | Apr 28 2026 | Scale score input reset bug — lazy initializer fix |

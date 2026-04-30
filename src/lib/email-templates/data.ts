@@ -70,15 +70,13 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     triggerEvent: 'Sent after the tenant and Client Admin account are created.',
     featureApplicability: 'ALL',
     primaryCtaStyle: 'Tour-first CTA with setup/login support',
-    subject: 'Welcome to {{platform_name}} for {{company_name}}',
+    subject: 'Welcome to keySkillset for {{company_name}}',
     summary: 'Welcomes the Client Admin, explains responsibilities, and points them to their first setup steps.',
     whenTriggered: 'Trigger after Super Admin creates the tenant and assigns the primary Client Admin.',
     variables: [
       '{{full_name}}',
       '{{company_name}}',
       '{{company_logo_url}}',
-      '{{platform_name}}',
-      '{{support_email}}',
       '{{login_url}}',
       '{{cta_url}}',
     ],
@@ -99,34 +97,10 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
       '{{full_name}}',
       '{{company_name}}',
       '{{company_logo_url}}',
-      '{{platform_name}}',
-      '{{support_email}}',
       '{{login_url}}',
       '{{cta_url}}',
     ],
     previewHeight: 1540,
-  },
-  {
-    id: 'content-creator-run-only',
-    name: 'Content Creator Onboarding - Run Only',
-    filename: 'content-creator-run-only.html',
-    recipient: 'Content Creator / Content Contact',
-    triggerEvent: 'Sent for Run-Only tenants where content access is limited or coordinated via keySkillset.',
-    featureApplicability: 'RUN_ONLY',
-    primaryCtaStyle: 'Tour-first CTA with limited-access clarification',
-    subject: 'Your access overview for {{company_name}} on {{platform_name}}',
-    summary: 'Clarifies run-only operating model, what access is available, and where to coordinate content requests.',
-    whenTriggered: 'Trigger when a content-side stakeholder needs guided access context for a RUN_ONLY tenant.',
-    variables: [
-      '{{full_name}}',
-      '{{company_name}}',
-      '{{company_logo_url}}',
-      '{{platform_name}}',
-      '{{support_email}}',
-      '{{login_url}}',
-      '{{cta_url}}',
-    ],
-    previewHeight: 1500,
   },
   {
     id: 'learner-onboarding-invite',
@@ -143,8 +117,6 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
       '{{full_name}}',
       '{{company_name}}',
       '{{company_logo_url}}',
-      '{{platform_name}}',
-      '{{support_email}}',
       '{{login_url}}',
       '{{cta_url}}',
       '{{course_title}}',
@@ -166,8 +138,6 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
       '{{full_name}}',
       '{{company_name}}',
       '{{company_logo_url}}',
-      '{{platform_name}}',
-      '{{support_email}}',
       '{{cta_url}}',
       '{{course_title}}',
       '{{completion_date}}',
@@ -189,7 +159,6 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
       '{{full_name}}',
       '{{company_name}}',
       '{{company_logo_url}}',
-      '{{platform_name}}',
       '{{course_title}}',
       '{{completion_date}}',
       '{{certificate_number}}',
@@ -210,8 +179,6 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     variables: [
       '{{full_name}}',
       '{{company_name}}',
-      '{{platform_name}}',
-      '{{support_email}}',
     ],
     previewHeight: 900,
   },
@@ -229,8 +196,6 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     variables: [
       '{{full_name}}',
       '{{company_name}}',
-      '{{platform_name}}',
-      '{{support_email}}',
       '{{cta_url}}',
     ],
     previewHeight: 960,
@@ -242,18 +207,19 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     recipient: 'B2C End User',
     triggerEvent: 'Sent when a Super Admin suspends a B2C user account.',
     featureApplicability: 'B2C_END_USER',
-    primaryCtaStyle: 'Informational - no CTA',
+    primaryCtaStyle: 'Informational - support email only',
     subject: 'Your keySkillset account has been suspended',
-    summary: 'Notifies the user that their account has been suspended by a Super Admin.',
+    summary: 'Notifies the user that their account has been suspended by a Super Admin with the reason and support contact.',
     whenTriggered: 'Trigger when Super Admin clicks Suspend User on a B2C user profile.',
     variables: [
-      '{{first_name}}',
-      '{{last_name}}',
-      '{{email}}',
+      '{{full_name}}',
+      '{{company_logo_url}}',
       '{{reason}}',
-      '{{action}}',
+      '{{privacy_url}}',
+      '{{terms_url}}',
+      '{{unsubscribe_url}}',
     ],
-    previewHeight: 800,
+    previewHeight: 920,
   },
   {
     id: 'b2c-access-restored',
@@ -262,18 +228,19 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     recipient: 'B2C End User',
     triggerEvent: 'Sent when a Super Admin removes suspension (revokes) from a B2C user account.',
     featureApplicability: 'B2C_END_USER',
-    primaryCtaStyle: 'Tour-first CTA with login support',
+    primaryCtaStyle: 'Welcome-back CTA — Rewalk the Path',
     subject: 'Your keySkillset access has been restored',
-    summary: 'Notifies the user that their account access has been restored.',
+    summary: 'Notifies the user that their account access has been restored with welcome-back messaging.',
     whenTriggered: 'Trigger when Super Admin clicks Remove Suspension on a suspended B2C user profile.',
     variables: [
-      '{{first_name}}',
-      '{{last_name}}',
-      '{{email}}',
-      '{{reason}}',
-      '{{action}}',
+      '{{full_name}}',
+      '{{company_logo_url}}',
+      '{{cta_url}}',
+      '{{privacy_url}}',
+      '{{terms_url}}',
+      '{{unsubscribe_url}}',
     ],
-    previewHeight: 800,
+    previewHeight: 880,
   },
   {
     id: 'b2b-learner-ca-deactivated',
@@ -283,14 +250,12 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     triggerEvent: 'Sent to all active learners in a tenant when their Client Admin account is deactivated by a Super Admin.',
     featureApplicability: 'B2B_LEARNER',
     primaryCtaStyle: 'Informational — no CTA',
-    subject: 'Your access to {{company_name}} on {{platform_name}} has been suspended',
+    subject: 'Your access to {{company_name}} on keySkillset has been suspended',
     summary: 'Notifies the B2B learner that their organisation\'s admin account has been deactivated, explains what they have lost access to (courses, assessments, certificates), and confirms their progress data is safely preserved. Provides support contact.',
     whenTriggered: 'Trigger when Super Admin clicks "Deactivate" on a tenant. Fire to all ACTIVE learners in that tenant alongside the CA deactivation email.',
     variables: [
       '{{full_name}}',
       '{{company_name}}',
-      '{{platform_name}}',
-      '{{support_email}}',
     ],
     previewHeight: 960,
   },
@@ -309,8 +274,6 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
       '{{full_name}}',
       '{{recipient_email}}',
       '{{company_name}}',
-      '{{platform_name}}',
-      '{{support_email}}',
       '{{assessment_title}}',
       '{{attempt_number}}',
       '{{score_pct}}',
@@ -337,6 +300,9 @@ export function getEmailTemplateDefinition(templateId: EmailTemplateId): EmailTe
 
 export function getTemplatesForTenant(tenantSlug: TenantEmailSlug): EmailTemplateDefinition[] {
   const tenant = TENANT_EMAIL_PREVIEW_PROFILES[tenantSlug]
+  const tenantPathSlug = tenantSlug === 'keyskillset' || tenantSlug === 'b2b-learner' ? tenantSlug : tenant.slug
+  const defaultLoginUrl = `https://app.keyskillset.com/client-admin/${tenantPathSlug}/dashboard`
+  const defaultCertificateUrl = `https://app.keyskillset.com/certificates/${tenantPathSlug}/preview`
   return EMAIL_TEMPLATE_DEFINITIONS.filter((template) => {
     if (tenant.featureMode === 'B2C_END_USER') {
       return template.featureApplicability === 'B2C_END_USER'
@@ -364,13 +330,16 @@ export function buildPreviewPayload(
   templateId: EmailTemplateId,
 ): EmailTemplatePayload {
   const tenant = TENANT_EMAIL_PREVIEW_PROFILES[tenantSlug]
+  const tenantPathSlug = tenantSlug === 'keyskillset' || tenantSlug === 'b2b-learner' ? tenantSlug : tenant.slug
+  const defaultLoginUrl = `https://app.keyskillset.com/client-admin/${tenantPathSlug}/dashboard`
+  const defaultCertificateUrl = `https://app.keyskillset.com/certificates/${tenantPathSlug}/preview`
 
   const basePayload: EmailTemplatePayload = {
     branding: {
       companyName: getBrandingName(tenant),
       companyLogoUrl: getBrandingLogo(tenant),
       platformName: 'keySkillset',
-      supportEmail: tenant.supportEmail,
+      supportEmail: 'contact@keyskillset.com',
     },
     recipient: {
       fullName: templateId === 'client-admin-onboarding' || templateId === 'client-admin-deactivated' || templateId === 'client-admin-reactivated' ? 'Rahul Sharma'
@@ -385,22 +354,16 @@ export function buildPreviewPayload(
     context: {
       roleLabel: 'Client Admin',
       featureModeLabel: tenant.featureMode === 'FULL_CREATOR' ? 'Full Creator' : 'Run Only',
-      loginUrl: `https://app.keyskillset.com/client-admin/${tenant.slug}/dashboard`,
-      ctaUrl: `https://app.keyskillset.com/email-templates/${tenant.slug}/${templateId}`,
+      loginUrl: defaultLoginUrl,
+      ctaUrl: 'https://app.supademo.com/demo/cmnfm5mti3vb0u98h2p8donwr?utm_source=link',
       ctaLabel: 'Take the Tour',
-      secondaryCtaUrl: `https://app.keyskillset.com/client-admin/${tenant.slug}/users-roles`,
+      secondaryCtaUrl: `https://app.keyskillset.com/client-admin/${tenantPathSlug}/users-roles`,
       secondaryCtaLabel: 'Review account access',
       courseTitle: 'Compliance Foundations 101',
       completionDate: '22 Apr 2026',
-      certificateNumber: `KSS-${tenant.slug.toUpperCase()}-20260422-014`,
-      certificateUrl: `https://app.keyskillset.com/certificates/${tenant.slug}/preview`,
-      assignmentSummary: 'Your organisation has assigned a structured onboarding and compliance journey tailored to your role.',
+      certificateNumber: `KSS-${tenantPathSlug.toUpperCase()}-20260422-014`,
+      certificateUrl: defaultCertificateUrl,
       programName: 'Client Admin Launch Path',
-      teamName: 'Operations Enablement',
-      introEyebrow: 'White-label onboarding',
-      heroTitle: 'Your learning workspace is ready.',
-      heroSubtitle: 'Review the guided tour, set up your access, and move confidently into your first actions.',
-      completionSummary: 'You completed the required learning path and unlocked your completion credentials.',
       issuedDate: '22 Apr 2026',
       privacyUrl: 'https://www.keyskillset.com/privacy',
       termsUrl: 'https://www.keyskillset.com/terms',
@@ -411,21 +374,25 @@ export function buildPreviewPayload(
   if (templateId === 'client-admin-onboarding') {
     return {
       ...basePayload,
+      branding: {
+        ...basePayload.branding,
+        companyName: 'Akash Institute',
+        companyLogoUrl: 'https://placehold.co/280x84/F5F3FF/6D28D9?text=Akash+Institute',
+      },
       recipient: {
-        fullName: tenant.slug === 'akash' ? 'Rahul Sharma' : 'Priya Nair',
-        email: tenant.slug === 'akash' ? 'rahul.sharma@akash.example.com' : 'priya.nair@techcorp.example.com',
+        fullName: 'Rahul Sharma',
+        email: 'rahul.sharma@akash.example.com',
       },
       context: {
         ...basePayload.context,
         roleLabel: 'Client Admin',
+        featureModeLabel: 'Full Creator',
+        loginUrl: 'https://app.keyskillset.com/client-admin/akash/dashboard',
+        ctaUrl: 'https://app.supademo.com/demo/cmnfm5mti3vb0u98h2p8donwr?utm_source=link',
         ctaLabel: 'Take the Tour',
+        secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/akash/users-roles',
         secondaryCtaLabel: 'Open admin workspace',
-        assignmentSummary: 'Your Super Admin has set up your organisation workspace. Your first job is to review people, catalog access, and rollout readiness.',
         programName: 'Client Admin Launch Path',
-        teamName: tenant.displayName,
-        introEyebrow: 'Client Admin onboarding',
-        heroTitle: `${tenant.displayName} is live on keySkillset.`,
-        heroSubtitle: 'Your admin workspace is ready with a guided first-run flow for setup, invites, and reporting.',
       },
     }
   }
@@ -433,6 +400,11 @@ export function buildPreviewPayload(
   if (templateId === 'content-creator-full') {
     return {
       ...basePayload,
+      branding: {
+        ...basePayload.branding,
+        companyName: 'Akash Institute',
+        companyLogoUrl: 'https://placehold.co/280x84/F5F3FF/6D28D9?text=Akash+Institute',
+      },
       recipient: {
         fullName: 'Asha Verma',
         email: 'asha.verma@example.com',
@@ -440,38 +412,13 @@ export function buildPreviewPayload(
       context: {
         ...basePayload.context,
         roleLabel: 'Content Creator',
+        featureModeLabel: 'Full Creator',
+        loginUrl: 'https://app.keyskillset.com/client-admin/akash/dashboard',
+        ctaUrl: 'https://app.supademo.com/demo/cmnfm5mti3vb0u98h2p8donwr?utm_source=link',
         ctaLabel: 'Take the Tour',
         secondaryCtaLabel: 'Open content bank',
-        secondaryCtaUrl: `https://app.keyskillset.com/client-admin/${tenant.slug}/content-bank`,
-        assignmentSummary: 'You can create and manage organisation-private content, review drafts, and coordinate launches with the Client Admin.',
+        secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/akash/content-bank',
         programName: 'Content Creator Enablement',
-        teamName: 'Learning Content',
-        introEyebrow: 'Content Creator onboarding',
-        heroTitle: 'Your private content workspace is ready.',
-        heroSubtitle: 'Start with the guided tour, then move into the content bank to manage tenant-private learning assets.',
-      },
-    }
-  }
-
-  if (templateId === 'content-creator-run-only') {
-    return {
-      ...basePayload,
-      recipient: {
-        fullName: 'Nisha Kapoor',
-        email: 'nisha.kapoor@example.com',
-      },
-      context: {
-        ...basePayload.context,
-        roleLabel: 'Content Contact',
-        ctaLabel: 'Take the Tour',
-        secondaryCtaLabel: 'Review support path',
-        secondaryCtaUrl: `mailto:${tenant.supportEmail}`,
-        assignmentSummary: 'This tenant is operating in Run-Only mode. Your access focuses on visibility, coordination, and support routing rather than private content authoring.',
-        programName: 'Run-Only Access Guide',
-        teamName: 'Programme Coordination',
-        introEyebrow: 'Run-Only access',
-        heroTitle: 'Here is how content works for your tenant.',
-        heroSubtitle: 'You can track the experience, but keySkillset manages the content supply model for this workspace.',
       },
     }
   }
@@ -479,17 +426,24 @@ export function buildPreviewPayload(
   if (templateId === 'client-admin-deactivated') {
     return {
       ...basePayload,
+      branding: {
+        ...basePayload.branding,
+        companyName: 'Akash Institute',
+        companyLogoUrl: 'https://placehold.co/280x84/F5F3FF/6D28D9?text=Akash+Institute',
+      },
       recipient: {
-        fullName: tenant.slug === 'akash' ? 'Rahul Sharma' : 'Priya Nair',
-        email: tenant.slug === 'akash' ? 'rahul.sharma@akash.example.com' : 'priya.nair@techcorp.example.com',
+        fullName: 'Rahul Sharma',
+        email: 'rahul.sharma@akash.example.com',
       },
       context: {
         ...basePayload.context,
         roleLabel: 'Client Admin',
-        teamName: tenant.displayName,
-        introEyebrow: 'Account status change',
-        heroTitle: `${tenant.displayName} admin access deactivated.`,
-        heroSubtitle: 'Your administrator access to the portal has been suspended. Contact support to reactivate.',
+        featureModeLabel: 'Full Creator',
+        loginUrl: 'https://app.keyskillset.com/client-admin/akash/dashboard',
+        ctaUrl: undefined,
+        ctaLabel: undefined,
+        secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/akash/users-roles',
+        secondaryCtaLabel: 'Review account access',
       },
     }
   }
@@ -497,19 +451,24 @@ export function buildPreviewPayload(
   if (templateId === 'client-admin-reactivated') {
     return {
       ...basePayload,
+      branding: {
+        ...basePayload.branding,
+        companyName: 'Akash Institute',
+        companyLogoUrl: 'https://placehold.co/280x84/F5F3FF/6D28D9?text=Akash+Institute',
+      },
       recipient: {
-        fullName: tenant.slug === 'akash' ? 'Rahul Sharma' : 'Priya Nair',
-        email: tenant.slug === 'akash' ? 'rahul.sharma@akash.example.com' : 'priya.nair@techcorp.example.com',
+        fullName: 'Rahul Sharma',
+        email: 'rahul.sharma@akash.example.com',
       },
       context: {
         ...basePayload.context,
         roleLabel: 'Client Admin',
+        featureModeLabel: 'Full Creator',
+        loginUrl: 'https://app.keyskillset.com/client-admin/akash/dashboard',
         ctaLabel: 'Log In to Admin Portal',
-        ctaUrl: `https://app.keyskillset.com/client-admin/${tenant.slug}/dashboard`,
-        teamName: tenant.displayName,
-        introEyebrow: 'Account restored',
-        heroTitle: `${tenant.displayName} admin access restored.`,
-        heroSubtitle: 'Your Client Admin access is fully restored. Log in to continue managing your organisation.',
+        ctaUrl: 'https://app.keyskillset.com/client-admin/akash/dashboard',
+        secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/akash/users-roles',
+        secondaryCtaLabel: 'Review account access',
       },
     }
   }
@@ -517,6 +476,11 @@ export function buildPreviewPayload(
   if (templateId === 'learner-onboarding-invite') {
     return {
       ...basePayload,
+      branding: {
+        ...basePayload.branding,
+        companyName: 'Akash Institute',
+        companyLogoUrl: 'https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute',
+      },
       recipient: {
         fullName: 'Ananya Krishnan',
         email: 'ananya.krishnan@example.com',
@@ -524,16 +488,16 @@ export function buildPreviewPayload(
       context: {
         ...basePayload.context,
         roleLabel: 'Learner',
+        featureModeLabel: 'Run Only',
+        loginUrl: 'https://app.keyskillset.com/client-admin/b2b-learner/dashboard',
+        ctaUrl: 'https://app.supademo.com/demo/cmnfm5mti3vb0u98h2p8donwr?utm_source=link',
         ctaLabel: 'Take the Tour',
         secondaryCtaLabel: 'Set up your access',
-        secondaryCtaUrl: basePayload.context.loginUrl,
+        secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/b2b-learner/dashboard',
         courseTitle: 'Client Admin Compliance Foundations',
-        assignmentSummary: 'You have been invited to complete role-based learning assigned by your organisation.',
+        certificateNumber: 'KSS-B2B-LEARNER-20260422-014',
+        certificateUrl: 'https://app.keyskillset.com/certificates/b2b-learner/preview',
         programName: 'Learner Welcome Journey',
-        teamName: 'Assigned Learning',
-        introEyebrow: 'Learner onboarding',
-        heroTitle: 'Your assigned learning is ready.',
-        heroSubtitle: 'Preview the workspace, activate your access, and begin with the first required learning activity.',
       },
     }
   }
@@ -541,6 +505,11 @@ export function buildPreviewPayload(
   if (templateId === 'course-completion') {
     return {
       ...basePayload,
+      branding: {
+        ...basePayload.branding,
+        companyName: 'Akash Institute',
+        companyLogoUrl: 'https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute',
+      },
       recipient: {
         fullName: 'Rohan Mehta',
         email: 'rohan.mehta@example.com',
@@ -548,19 +517,17 @@ export function buildPreviewPayload(
       context: {
         ...basePayload.context,
         roleLabel: 'Learner',
+        featureModeLabel: 'Run Only',
+        loginUrl: 'https://app.keyskillset.com/client-admin/b2b-learner/dashboard',
         ctaLabel: 'View certificate',
-        ctaUrl: basePayload.context.certificateUrl,
+        ctaUrl: 'https://app.keyskillset.com/certificates/b2b-learner/preview',
         secondaryCtaLabel: 'Continue learning',
-        secondaryCtaUrl: basePayload.context.loginUrl,
+        secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/b2b-learner/dashboard',
         courseTitle: 'Data Privacy Essentials',
         completionDate: '22 Apr 2026',
-        assignmentSummary: 'Your required learning is now complete and recorded in your tenant workspace.',
+        certificateNumber: 'KSS-B2B-LEARNER-20260422-014',
+        certificateUrl: 'https://app.keyskillset.com/certificates/b2b-learner/preview',
         programName: 'Completion milestone',
-        teamName: 'Learning Record',
-        introEyebrow: 'Course completion',
-        heroTitle: 'You completed your course.',
-        heroSubtitle: 'Your result has been recorded and your completion credentials are ready to review.',
-        completionSummary: 'All required modules are complete and your final status has been marked as achieved.',
       },
     }
   }
@@ -568,6 +535,11 @@ export function buildPreviewPayload(
   if (templateId === 'b2b-learner-ca-deactivated') {
     return {
       ...basePayload,
+      branding: {
+        ...basePayload.branding,
+        companyName: 'Akash Institute',
+        companyLogoUrl: 'https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute',
+      },
       recipient: {
         fullName: 'Ananya Krishnan',
         email: 'ananya.krishnan@akash.example.com',
@@ -575,10 +547,15 @@ export function buildPreviewPayload(
       context: {
         ...basePayload.context,
         roleLabel: 'Learner',
-        teamName: tenant.displayName,
-        introEyebrow: 'Account access suspended',
-        heroTitle: 'Your access to the learning portal has been suspended.',
-        heroSubtitle: `${tenant.displayName}'s admin account has been deactivated. Your courses, assessments, and certificates are temporarily inaccessible.`,
+        featureModeLabel: 'Run Only',
+        loginUrl: undefined,
+        ctaUrl: undefined,
+        ctaLabel: undefined,
+        secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/b2b-learner/users-roles',
+        secondaryCtaLabel: 'Review account access',
+        courseTitle: 'Compliance Foundations 101',
+        certificateNumber: 'KSS-B2B-LEARNER-20260422-014',
+        certificateUrl: 'https://app.keyskillset.com/certificates/b2b-learner/preview',
       },
     }
   }
@@ -586,14 +563,26 @@ export function buildPreviewPayload(
   if (templateId === 'b2b-learner-report-card') {
     return {
       ...basePayload,
+      branding: {
+        ...basePayload.branding,
+        companyName: 'Akash Institute',
+        companyLogoUrl: 'https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute',
+      },
       recipient: {
         fullName: 'Ananya Krishnan',
         email: 'ananya.krishnan@akash.example.com',
       },
       context: {
         ...basePayload.context,
-        heroTitle: 'Assessment Report Card — SAT Full Mock Test 1',
-        heroSubtitle: 'Attempt 2 · 22 Apr 2026 · Akash Institute — powered by keySkillset',
+        roleLabel: 'Client Admin',
+        featureModeLabel: 'Run Only',
+        loginUrl: 'https://app.keyskillset.com/client-admin/b2b-learner/dashboard',
+        ctaUrl: undefined,
+        ctaLabel: undefined,
+        secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/b2b-learner/users-roles',
+        secondaryCtaLabel: 'Review account access',
+        certificateNumber: 'KSS-B2B-LEARNER-20260422-014',
+        certificateUrl: 'https://app.keyskillset.com/certificates/b2b-learner/preview',
         unsubscribeUrl: 'https://www.keyskillset.com/unsubscribe',
       },
       extraContext: {
@@ -617,6 +606,11 @@ export function buildPreviewPayload(
 
   return {
     ...basePayload,
+    branding: {
+      ...basePayload.branding,
+      companyName: 'keySkillset',
+      companyLogoUrl: KEYSKILLSET_LOGO_URL,
+    },
     recipient: {
       fullName: 'Preethi Nair',
       email: 'preethi.nair@example.com',
@@ -624,19 +618,17 @@ export function buildPreviewPayload(
     context: {
       ...basePayload.context,
       roleLabel: 'Learner',
+      featureModeLabel: templateId === 'b2c-access-restored' ? undefined : 'Run Only',
+      loginUrl: 'https://app.keyskillset.com/client-admin/keyskillset/dashboard',
       ctaLabel: 'View certificate',
-      ctaUrl: basePayload.context.certificateUrl,
+      ctaUrl: 'https://app.keyskillset.com/certificates/keyskillset/preview',
       secondaryCtaLabel: 'Open learning record',
-      secondaryCtaUrl: basePayload.context.loginUrl,
+      secondaryCtaUrl: 'https://app.keyskillset.com/client-admin/keyskillset/dashboard',
       courseTitle: 'Client Admin Excellence Programme',
       completionDate: '22 Apr 2026',
-      assignmentSummary: 'This certificate verifies completion within a white-label tenant experience on keySkillset.',
+      certificateNumber: 'KSS-KEYSKILLSET-20260422-014',
+      certificateUrl: 'https://app.keyskillset.com/certificates/keyskillset/preview',
       programName: 'Certificate issue',
-      teamName: tenant.displayName,
-      introEyebrow: 'Certificate of completion',
-      heroTitle: 'Certificate preview',
-      heroSubtitle: 'Printable completion certificate with tenant-first branding and stable delivery tokens.',
-      completionSummary: 'Completion has been verified and certificate issue details have been recorded.',
     },
   }
 }

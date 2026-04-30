@@ -1,0 +1,490 @@
+I need you to fix so many things in emails that we have created as in HTML template. I will list out the emails below that needs to be changed - the change is intended in the HTML templates we have created and also the render in the UI and the elements in the files. Follow your role in CLAUDE.md file and refine the HTML template and our codebase that it reflects in the personas as well. Modify the HTML with regard to the hardcoded values of the emails.
+
+---
+
+(1) Client Admin Onboarding: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyName": "Akash Institute",
+    "companyLogoUrl": "https://placehold.co/280x84/F5F3FF/6D28D9?text=Akash+Institute",
+  },
+  "recipient": {
+    "fullName": "Rahul Sharma",
+    "email": "rahul.sharma@akash.example.com"
+  },
+  "context": {
+    "programName": "Client Admin Launch Path",
+    "featureModeLabel": "Full Creator",
+    "loginUrl": "https://app.keyskillset.com/client-admin/akash/dashboard",
+    "ctaUrl": "https://app.supademo.com/demo/cmnfm5mti3vb0u98h2p8donwr?utm_source=link",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/akash/users-roles",
+    "courseTitle": "Compliance Foundations 101",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-AKASH-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/akash/preview",
+    "teamName": "Akash Institute",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Hardcoded values:
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"roleLabel": "Client Admin",
+"ctaLabel": "Take the Tour",
+"secondaryCtaLabel": "Open admin workspace",
+"assignmentSummary": "Your Super Admin has set up your organisation workspace. Your first job is to review people, catalog access, and rollout readiness.",
+"introEyebrow": "Client Admin onboarding",
+"heroTitle": "{companyName} is live on keySkillset.", --here only companyName is dynamic.
+"heroSubtitle": "Your admin workspace is ready with a guided first-run flow for setup, invites, and reporting.",
+"completionSummary": "You completed the required learning path and unlocked your completion credentials.",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+
+---
+
+(2) Content Creator Onboarding - Full Creator: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyName": "Akash Institute",
+    "companyLogoUrl": "https://placehold.co/280x84/F5F3FF/6D28D9?text=Akash+Institute",
+
+  },
+  "recipient": {
+    "fullName": "Asha Verma",
+    "email": "asha.verma@example.com"
+  },
+  "context": {
+    "programName": "Content Creator Enablement",
+    "featureModeLabel": "Full Creator",
+    "loginUrl": "https://app.keyskillset.com/client-admin/akash/dashboard",
+    "ctaUrl": "https://app.supademo.com/demo/cmnfm5mti3vb0u98h2p8donwr?utm_source=link",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/akash/content-bank",
+    "courseTitle": "Compliance Foundations 101",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-AKASH-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/akash/preview",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Hardcoded values:
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"roleLabel": "Content Creator",
+"ctaLabel": "Take the Tour",
+"secondaryCtaLabel": "Open content bank",
+"assignmentSummary": "You can create and manage organisation-private content, review drafts, and coordinate launches with the Client Admin.",
+"introEyebrow": "Content Creator onboarding",
+"heroTitle": "Your private content workspace is ready.",
+"heroSubtitle": "Start with the guided tour, then move into the content bank to manage tenant-private learning assets.",
+"completionSummary": "You completed the required learning path and unlocked your completion credentials.",
+
+Why are we having this? If no impact, then remove:
+"teamName": "Learning Content",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+
+---
+(3) Client Admin Account Deactivated: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyName": "Akash Institute",
+    "companyLogoUrl": "https://placehold.co/280x84/F5F3FF/6D28D9?text=Akash+Institute",
+  },
+  "recipient": {
+    "fullName": "Rahul Sharma",
+    "email": "rahul.sharma@akash.example.com"
+  },
+  "context": {
+    "programName": "Client Admin Launch Path",
+    "roleLabel": "Client Admin",
+    "featureModeLabel": "Full Creator",
+    "loginUrl": "https://app.keyskillset.com/client-admin/akash/dashboard",
+    "ctaUrl": "https://app.supademo.com/demo/cmnfm5mti3vb0u98h2p8donwr?utm_source=link",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/akash/users-roles",
+    "courseTitle": "Compliance Foundations 101",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-AKASH-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/akash/preview",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Hardcoded values:
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"secondaryCtaLabel": "Review account access",
+"assignmentSummary": "Your organisation has assigned a structured onboarding and compliance journey tailored to your role.",
+"introEyebrow": "Account status change",
+"heroTitle": "Akash Institute admin access deactivated.",
+"heroSubtitle": "Your administrator access to the portal has been suspended. Contact support to reactivate.",
+"completionSummary": "You completed the required learning path and unlocked your completion credentials.",
+
+Why are we even storing these? Do an impact analysis and remove it:
+"teamName": "Akash Institute",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+---
+
+(4) Client Admin Account Reactivated: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyName": "Akash Institute",
+    "companyLogoUrl": "https://placehold.co/280x84/F5F3FF/6D28D9?text=Akash+Institute",
+  },
+  "recipient": {
+    "fullName": "Rahul Sharma",
+    "email": "rahul.sharma@akash.example.com"
+  },
+  "context": {
+    "programName": "Client Admin Launch Path",
+    "roleLabel": "Client Admin",
+    "featureModeLabel": "Full Creator",
+    "loginUrl": "https://app.keyskillset.com/client-admin/akash/dashboard",
+    "ctaUrl": "https://app.keyskillset.com/client-admin/akash/dashboard",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/akash/users-roles",
+    "courseTitle": "Compliance Foundations 101",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-AKASH-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/akash/preview",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Hardcoded values:
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"ctaLabel": "Log In to Admin Portal",
+"secondaryCtaLabel": "Review account access",
+"assignmentSummary": "Your organisation has assigned a structured onboarding and compliance journey tailored to your role.",
+"introEyebrow": "Account restored",
+"heroTitle": "Akash Institute admin access restored.",
+"heroSubtitle": "Your Client Admin access is fully restored. Log in to continue managing your organisation.",
+"completionSummary": "You completed the required learning path and unlocked your completion credentials.",
+
+Why do we even have this? Do an impact analysis and remove it:
+"teamName": "Akash Institute",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+---
+
+All the above emails and the decisions we made is for both client - full creator and run only access.
+
+---
+(5) B2C End User Account Suspended: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyLogoUrl": "https://uqweguyeaqkbxgtpkhez.supabase.co/storage/v1/object/public/Company%20Logos/New%20Upscaled%20keySkillset%20Logo.png",
+  },
+  "recipient": {
+    "fullName": "Preethi Nair",
+    "email": "preethi.nair@example.com"
+  },
+  "context": {
+    "programName": "Certificate issue",
+    "roleLabel": "Learner",
+    "featureModeLabel": "Run Only",
+    "loginUrl": "https://app.keyskillset.com/client-admin/keyskillset/dashboard",
+    "ctaUrl": "https://app.keyskillset.com/certificates/keyskillset/preview",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/keyskillset/dashboard",
+    "courseTitle": "Client Admin Excellence Programme",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-KEYSKILLSET-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/keyskillset/preview",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Harcoded values:
+"companyName": "keySkillset",
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"ctaLabel": "View certificate",
+"secondaryCtaLabel": "Open learning record",
+"assignmentSummary": "This certificate verifies completion within a white-label tenant experience on keySkillset.",
+"teamName": "keySkillset",
+"introEyebrow": "Certificate of completion",
+"heroTitle": "Certificate preview",
+"heroSubtitle": "Printable completion certificate with tenant-first branding and stable delivery tokens.",
+"completionSummary": "Completion has been verified and certificate issue details have been recorded.",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+---
+
+(6) B2C End User Access Restored Email: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyLogoUrl": "https://uqweguyeaqkbxgtpkhez.supabase.co/storage/v1/object/public/Company%20Logos/New%20Upscaled%20keySkillset%20Logo.png",
+  },
+  "recipient": {
+    "fullName": "Preethi Nair",
+    "email": "preethi.nair@example.com"
+  },
+  "context": {
+    "programName": "Certificate issue",
+    "roleLabel": "Learner",
+    "loginUrl": "https://app.keyskillset.com/client-admin/keyskillset/dashboard",
+    "ctaUrl": "https://app.keyskillset.com/certificates/keyskillset/preview",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/keyskillset/dashboard",
+    "courseTitle": "Client Admin Excellence Programme",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-KEYSKILLSET-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/keyskillset/preview",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Harcoded values:
+"companyName": "keySkillset",
+"ctaLabel": "View certificate",
+"secondaryCtaLabel": "Open learning record",
+"assignmentSummary": "This certificate verifies completion within a white-label tenant experience on keySkillset.",
+"introEyebrow": "Certificate of completion",
+"heroTitle": "Certificate preview",
+"heroSubtitle": "Printable completion certificate with tenant-first branding and stable delivery tokens.",
+"completionSummary": "Completion has been verified and certificate issue details have been recorded.",
+
+
+WHy do we even have this? Remove it by doing impact analysis.
+"featureModeLabel": "Run Only",
+"teamName": "keySkillset",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+
+---
+(7) B2B Learner Onboarding invite: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyName": "Akash Institute",
+    "companyLogoUrl": "https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute",
+  },
+  "recipient": {
+    "fullName": "Ananya Krishnan",
+    "email": "ananya.krishnan@example.com"
+  },
+  "context": {
+    "programName": "Learner Welcome Journey",
+    "roleLabel": "Learner",
+    "featureModeLabel": "Run Only",
+    "loginUrl": "https://app.keyskillset.com/client-admin/b2b-learner/dashboard",
+    "ctaUrl": "https://app.supademo.com/demo/cmnfm5mti3vb0u98h2p8donwr?utm_source=link",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/b2b-learner/dashboard",
+    "courseTitle": "Client Admin Compliance Foundations",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-B2B-LEARNER-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/b2b-learner/preview",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Harcoded values:
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"ctaLabel": "Take the Tour",
+"secondaryCtaLabel": "Set up your access",
+"assignmentSummary": "You have been invited to complete role-based learning assigned by your organisation.",
+"introEyebrow": "Learner onboarding",
+"heroTitle": "Your assigned learning is ready.",
+"heroSubtitle": "Preview the workspace, activate your access, and begin with the first required learning activity.",
+"completionSummary": "You completed the required learning path and unlocked your completion credentials.",
+
+Why do we even have this? Do an impact analysis and remove:
+"teamName": "Assigned Learning",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+---
+(8) B2B Course Completion Email: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyName": "Akash Institute",
+    "companyLogoUrl": "https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute",
+  },
+  "recipient": {
+    "fullName": "Rohan Mehta",
+    "email": "rohan.mehta@example.com"
+  },
+  "context": {
+    "roleLabel": "Learner",
+    "featureModeLabel": "Run Only",
+    "loginUrl": "https://app.keyskillset.com/client-admin/b2b-learner/dashboard",
+    "ctaUrl": "https://app.keyskillset.com/certificates/b2b-learner/preview",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/b2b-learner/dashboard",
+    "courseTitle": "Data Privacy Essentials",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-B2B-LEARNER-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/b2b-learner/preview",
+    "programName": "Completion milestone",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Harcoded values:
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"ctaLabel": "View certificate",
+"secondaryCtaLabel": "Continue learning",
+"assignmentSummary": "Your required learning is now complete and recorded in your tenant workspace.",
+"introEyebrow": "Course completion",
+"heroTitle": "You completed your course.",
+"heroSubtitle": "Your result has been recorded and your completion credentials are ready to review.",
+"completionSummary": "All required modules are complete and your final status has been marked as achieved.",
+
+Why do we even have this? Do an impact analysis and remove:
+"teamName": "Learning Record",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+---
+
+(9) B2B Learner Access Suspended (CA Deactivated): I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyName": "Akash Institute",
+    "companyLogoUrl": "https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute",
+  },
+  "recipient": {
+    "fullName": "Ananya Krishnan",
+    "email": "ananya.krishnan@akash.example.com"
+  },
+  "context": {
+    "roleLabel": "Learner",
+    "featureModeLabel": "Run Only",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/b2b-learner/users-roles",
+    "courseTitle": "Compliance Foundations 101",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-B2B-LEARNER-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/b2b-learner/preview",
+    "programName": "Client Admin Launch Path",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  }
+}
+
+Harcoded values:
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"secondaryCtaLabel": "Review account access",
+"assignmentSummary": "Your organisation has assigned a structured onboarding and compliance journey tailored to your role.",
+"introEyebrow": "Account access suspended",
+"heroTitle": "Your access to the learning portal has been suspended.",
+"heroSubtitle": "B2B Learner's admin account has been deactivated. Your courses, assessments, and certificates are temporarily inaccessible.",
+"completionSummary": "You completed the required learning path and unlocked your completion credentials.",
+
+
+
+Why do we even have this for deactivated user? Do impact analysis and remove it:
+"loginUrl": "https://app.keyskillset.com/client-admin/b2b-learner/dashboard",
+"ctaUrl": "https://app.keyskillset.com/email-templates/b2b-learner/b2b-learner-ca-deactivated",
+"ctaLabel": "Take the Tour",
+"teamName": "B2B Learner",
+
+Fix these - ask me clarification questions and follow your role as per CLAUDE.md file.
+
+---
+
+(10) B2B Learner Assessment Report Card: I have provided a refined payload for this email. Please let it reflect in the email. I have also provided what should be hardcoded in the HTML.
+
+Retain dynamic payload->
+{
+  "branding": {
+    "companyName": "Akash Institute",
+    "companyLogoUrl": "https://placehold.co/280x84/F0FDF4/166534?text=Akash+Institute",
+  },
+  "recipient": {
+    "fullName": "Ananya Krishnan",
+    "email": "ananya.krishnan@akash.example.com"
+  },
+  "context": {
+    "roleLabel": "Client Admin",
+    "featureModeLabel": "Run Only",
+    "loginUrl": "https://app.keyskillset.com/client-admin/b2b-learner/dashboard",
+    "secondaryCtaUrl": "https://app.keyskillset.com/client-admin/b2b-learner/users-roles",
+    "courseTitle": "Compliance Foundations 101",
+    "completionDate": "22 Apr 2026",
+    "certificateNumber": "KSS-B2B-LEARNER-20260422-014",
+    "certificateUrl": "https://app.keyskillset.com/certificates/b2b-learner/preview",
+    "programName": "Client Admin Launch Path",
+    "issuedDate": "22 Apr 2026",
+    "privacyUrl": "https://www.keyskillset.com/privacy",
+    "termsUrl": "https://www.keyskillset.com/terms",
+    "unsubscribeUrl": "https://www.keyskillset.com/unsubscribe"
+  },
+  "extraContext": {
+    "assessment_title": "SAT Full Mock Test 1",
+    "attempt_number": "2",
+    "score_pct": "72",
+    "passed": "PASS",
+    "time_taken_display": "90 min 0 sec",
+    "attempted_at": "22 Apr 2026, 10:45 AM",
+    "avg_time_per_question_display": "2 min 15 sec",
+    "slowest_question_display": "7 min 0 sec",
+    "fastest_question_display": "18 sec",
+    "average_score_pct": "65",
+    "best_score_pct": "72",
+    "certificate_eligible": "Yes",
+    "certificate_number": "KSS-2026-0042",
+    "certificate_status_display": "Certificate Earned"
+  }
+}
+
+Harcoded values:
+"platformName": "keySkillset",
+"supportEmail": "contact@keyskillset.com"
+"secondaryCtaLabel": "Review account access",
+"assignmentSummary": "Your organisation has assigned a structured onboarding and compliance journey tailored to your role.",
+"heroTitle": "Assessment Report Card — {assessment_title}",
+"heroSubtitle": "{attempt_number} · {attempted_at} · {companyName} — powered by keySkillset",
+
+Why do we even have this for B2B Learner Report emails? Do impact analysis and remove it:
+"ctaUrl": "https://app.keyskillset.com/email-templates/b2b-learner/b2b-learner-report-card",
+"ctaLabel": "Take the Tour",
+"teamName": "Operations Enablement",
+"introEyebrow": "White-label onboarding",
+"completionSummary": "You completed the required learning path and unlocked your completion credentials.",
+
+----
+In all these, understand the criteria and the purpose of the emails, and then rewrite the HTML files for these emails. Right now, the HTML feels empty with too many dynamic fields. Check, self critique, recheck, follow CLAUDE-RULES.md and CLAUDE-PLATFORM.md and follow your role in CLAUDE.md file.

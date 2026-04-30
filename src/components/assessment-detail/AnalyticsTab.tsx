@@ -128,6 +128,11 @@ interface AnalyticsTabProps {
   userTier: string;
 }
 
+type QuestionOption = {
+  key?: string | null;
+  text: unknown;
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sectionBarClass(pct: number): string {
@@ -139,9 +144,31 @@ function sectionBarClass(pct: number): string {
 /** Returns the display string for a question's correct answer key(s). */
 function getCorrectDisplay(q: DbQuestion): string {
   if (q.question_type === 'NUMERIC') {
-    return q.acceptable_answers?.[0] ?? '—';
+    if (Array.isArray(q.acceptable_answers) && q.acceptable_answers.length > 0) {
+      return q.acceptable_answers[0];
+    }
+    return '—';
   }
-  return q.correct_answer?.join(', ') ?? '—';
+  if (Array.isArray(q.correct_answer) && q.correct_answer.length > 0) {
+    return q.correct_answer.join(', ');
+  }
+  return '—';
+}
+
+function getOptionMeta(opt: QuestionOption, index: number) {
+  const trimmedKey = typeof opt.key === 'string' ? opt.key.trim() : '';
+  if (trimmedKey) {
+    return {
+      optionKey: trimmedKey,
+      optionLabel: trimmedKey,
+    };
+  }
+
+  const fallbackKey = `option-${index + 1}`;
+  return {
+    optionKey: fallbackKey,
+    optionLabel: `${index + 1}`,
+  };
 }
 
 /** Collapsed-row status badge: always shows outcome + answer summary. */
@@ -701,12 +728,13 @@ export default function AnalyticsTab({
             {/* Options */}
             {q.options && q.options.length > 0 && (
               <div className="space-y-1.5">
-                {q.options.map((opt) => {
-                  const isCorrectOpt = correctKeys.includes(opt.key);
-                  const isUserChoice = userAns === opt.key;
+                {q.options.map((opt, index) => {
+                  const { optionKey, optionLabel } = getOptionMeta(opt, index);
+                  const isCorrectOpt = correctKeys.includes(optionKey);
+                  const isUserChoice = userAns === optionKey;
                   return (
                     <div
-                      key={opt.key}
+                      key={`${q.id}-${optionKey}-${index}`}
                       className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${
                         isCorrectOpt
                           ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
@@ -715,7 +743,7 @@ export default function AnalyticsTab({
                           : 'bg-white border-zinc-200 text-zinc-700'
                       }`}
                     >
-                      <span className="font-medium shrink-0">{opt.key}.</span>
+                      <span className="font-medium shrink-0">{optionLabel}.</span>
                       <span>{tiptapToPlainText(opt.text)}</span>
                       {isCorrectOpt && (
                         <span className="ml-auto text-xs text-emerald-600 shrink-0">
@@ -1060,10 +1088,7 @@ export default function AnalyticsTab({
                                 const userAns = ans?.user_answer ?? null;
                                 const isCorrect = ans?.is_correct ?? false;
                                 const isSkipped = ans?.is_skipped ?? false;
-                                const correctDisplay =
-                                  q.question_type === 'NUMERIC'
-                                    ? (q.acceptable_answers?.[0] ?? '—')
-                                    : (q.correct_answer?.join(', ') || '—');
+                                const correctDisplay = getCorrectDisplay(q);
                                 return (
                                   <QuestionStatusBadge
                                     userAns={userAns}
@@ -1106,15 +1131,16 @@ export default function AnalyticsTab({
                             {/* Options */}
                             {q.options && q.options.length > 0 && (
                               <div className="space-y-1.5">
-                                {q.options.map((opt) => {
-                                  const correctKeys = q.correct_answer ?? [];
+                                {q.options.map((opt, index) => {
+                                  const correctKeys = Array.isArray(q.correct_answer) ? q.correct_answer : [];
                                   const ans = getAnswerForQuestion(q.id);
                                   const userAns = ans?.user_answer ?? null;
-                                  const isCorrectOpt = correctKeys.includes(opt.key);
-                                  const isUserChoice = userAns === opt.key;
+                                  const { optionKey, optionLabel } = getOptionMeta(opt, index);
+                                  const isCorrectOpt = correctKeys.includes(optionKey);
+                                  const isUserChoice = userAns === optionKey;
                                   return (
                                     <div
-                                      key={opt.key}
+                                      key={`${q.id}-${optionKey}-${index}`}
                                       className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${
                                         isCorrectOpt
                                           ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
@@ -1124,7 +1150,7 @@ export default function AnalyticsTab({
                                       }`}
                                     >
                                       <span className="font-medium shrink-0">
-                                        {opt.key}.
+                                        {optionLabel}.
                                       </span>
                                       <span>{tiptapToPlainText(opt.text)}</span>
                                       {isCorrectOpt && (

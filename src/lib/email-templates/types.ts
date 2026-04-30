@@ -1,7 +1,6 @@
 export type EmailTemplateId =
   | 'client-admin-onboarding'
   | 'content-creator-full'
-  | 'content-creator-run-only'
   | 'learner-onboarding-invite'
   | 'course-completion'
   | 'certificate-of-completion'
@@ -28,23 +27,17 @@ export interface EmailRecipient {
 
 export interface EmailTemplateContext {
   roleLabel: string
-  featureModeLabel: string
-  loginUrl: string
-  ctaUrl: string
-  ctaLabel: string
-  secondaryCtaUrl: string
-  secondaryCtaLabel: string
+  featureModeLabel?: string
+  loginUrl?: string
+  ctaUrl?: string
+  ctaLabel?: string
+  secondaryCtaUrl?: string
+  secondaryCtaLabel?: string
   courseTitle: string
   completionDate: string
   certificateNumber: string
   certificateUrl: string
-  assignmentSummary: string
   programName: string
-  teamName: string
-  introEyebrow: string
-  heroTitle: string
-  heroSubtitle: string
-  completionSummary: string
   issuedDate: string
   privacyUrl: string
   termsUrl: string
