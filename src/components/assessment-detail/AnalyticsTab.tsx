@@ -461,6 +461,8 @@ export default function AnalyticsTab({
       setSectionCache((prev) => new Map(prev).set(sectionName, 'loading'));
 
       // Questions for this section
+      // concept_tag column does not exist on questions table (it's concept_tag_id uuid);
+      // omitting it prevents a PostgREST 400 that silently nulls the entire result.
       const { data: qData } = await supabase
         .from('assessment_question_map')
         .select(
@@ -468,7 +470,7 @@ export default function AnalyticsTab({
            questions (
              id, question_type, question_text, passage_text,
              options, correct_answer, acceptable_answers,
-             explanation, concept_tag
+             explanation
            )`,
         )
         .eq('assessment_id', assessmentId)
@@ -479,6 +481,7 @@ export default function AnalyticsTab({
         .filter((row) => row.questions)
         .map((row) => ({
           ...(row.questions as unknown as Omit<DbQuestion, 'section_name' | 'order_index'>),
+          concept_tag: null,
           section_name: row.section_name,
           order_index: row.order_index,
         }));
