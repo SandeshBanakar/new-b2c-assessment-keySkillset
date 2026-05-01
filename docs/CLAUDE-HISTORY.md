@@ -6,6 +6,63 @@
 
 ## COMPLETED WORK LOG
 
+### May 1, 2026 - KSS-CA-EML-DYN-001: Client Admin Email Dynamic Company Name (COMPLETE)
+
+**Build:** PASSED
+
+**Issue fixed:**
+- Two Client Admin email templates (`client-admin-deactivated.html`, `client-admin-reactivated.html`) had hardcoded "Akash Institute" company names in hero headers.
+
+**Implementation details:**
+- Updated `client-admin-deactivated.html` hero: `"{{company_name}} admin access deactivated."`
+- Updated `client-admin-reactivated.html` hero: `"{{company_name}} admin access restored."`
+- Variables were already declared in template definitions (`src/lib/email-templates/data.ts`)
+
+**Result:**
+- Both templates now render with tenant-specific company branding in hero sections. `npm run build` passes. Mobile-responsive layouts preserved.
+
+---
+
+### May 1, 2026 - KSS-CLEANUP-001: Remove Dead Template — Content Creator Run-Only (COMPLETE)
+
+**Build:** PASSED
+
+**Dead code removed:**
+- `content-creator-run-only` template was orphaned logic — RUN_ONLY tenants have no content creators by definition, making the template nonsensical. Never triggered or used.
+
+**Implementation details:**
+- Deleted: `src/email-templates/html/content-creator-run-only.html`
+- Removed: `'content-creator-run-only'` from `EmailTemplateId` union in `src/lib/email-templates/types.ts`
+- Removed: Template definition object (~14 lines) from `src/lib/email-templates/data.ts`
+- Removed: Preview payload function (~11 lines) from `src/lib/email-templates/data.ts`
+
+**Result:**
+- Dead code completely purged. TypeScript compilation clean. `npm run build` passes. No orphaned references remain.
+
+---
+
+### April 30, 2026 - KSS-B2C-EML-SUSP-001: B2C User Suspension/Restoration Email Templates (COMPLETE)
+
+**Build:** PASSED · **PRD:** `prds/end-user/PRD-B2C-EML-001-SUSPEND-REVOKE-EMAILS.md`
+
+**Issue fixed:**
+- B2C suspension and restoration email templates were copy-pasted from certificate templates, containing irrelevant certificate messaging instead of account status communication.
+- Variables didn't align with PRD contract (action, email, firstName, lastName, reason).
+- Hardcoded certificate fields, missing suspension reason display, no support contact path.
+
+**Implementation details:**
+- `b2c-user-suspended.html`: Rebuilt with rose-700 danger theme, suspension reason display in highlighted box, "What You Cannot Access" bullet list, mailto support link (no button CTA)
+- `b2c-access-restored.html`: Rebuilt with emerald-700 success theme, "Rewalk the Path" CTA button, welcome-back messaging, restoration confirmation
+- Updated variable contracts in `src/lib/email-templates/data.ts`:
+  - Suspended: `{{full_name}}, {{company_logo_url}}, {{reason}}, {{privacy_url}}, {{terms_url}}, {{unsubscribe_url}}`
+  - Restored: `{{full_name}}, {{company_logo_url}}, {{cta_url}}, {{privacy_url}}, {{terms_url}}, {{unsubscribe_url}}`
+- Removed: `recipient_email, company_name, cta_url/secondary_cta_url, course_title, certificate_number` (not applicable to account status emails)
+
+**Result:**
+- Email templates now convey clear account status messaging with appropriate color theming, proper support paths, and Salesforce payload alignment. `npm run build` passes. Mobile-first responsive design implemented.
+
+---
+
 ### April 30, 2026 - KSS-EMAIL-FIX-002: Hardcoded Purpose Copy in Email HTML (COMPLETE)
 
 **Build:** PASSED

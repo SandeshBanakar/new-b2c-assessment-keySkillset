@@ -1,5 +1,5 @@
 # TODO Backlog — keySkillset Platform
-# Last updated: Apr 30 2026 — KSS-B2C-EML-SUSP-001 COMPLETE. B2C user suspension/restoration email templates rebuilt with proper messaging, color theming, and corrected variables. Build PASSED.
+# Last updated: May 1 2026 — KSS-CA-EML-DYN-001 + KSS-CLEANUP-001 COMPLETE. Client Admin emails now use dynamic {{company_name}}, content-creator-run-only dead template purged. Build PASSED.
 
 ---
 
@@ -48,6 +48,34 @@
 | SUSP-4 | Update template variables in data.ts — remove certificate/tenant fields, add `reason`, align to Salesforce payload contract | `src/lib/email-templates/data.ts` | [x] COMPLETE |
 | SUSP-5 | Run `npm run build` and verify no errors | — | [x] COMPLETE |
 | SUSP-6 | Document changes and move to history | `docs/CLAUDE-HISTORY.md` (pending) | [x] COMPLETE |
+
+---
+
+## [COMPLETE] KSS-CA-EML-DYN-001 — Client Admin Email Dynamic Company Name
+
+**Source:** User follow-up to KSS-B2C-EML-SUSP-001  
+**Context:** Two Client Admin templates had hardcoded "Akash Institute" company names in hero headers. Made dynamic using `{{company_name}}` variable already declared in data.ts.
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| CA-1 | Make `client-admin-deactivated.html` hero header dynamic | `src/email-templates/html/client-admin-deactivated.html` | [x] COMPLETE |
+| CA-2 | Make `client-admin-reactivated.html` hero header dynamic | `src/email-templates/html/client-admin-reactivated.html` | [x] COMPLETE |
+| CA-3 | Verify build passes | — | [x] COMPLETE |
+
+---
+
+## [COMPLETE] KSS-CLEANUP-001 — Remove Dead Template: Content Creator Run-Only
+
+**Source:** User cleanup request  
+**Context:** `content-creator-run-only` template is dead code — RUN_ONLY tenants have no content creators, making the template nonsensical. Removed completely from codebase.
+
+| # | Task | File | Status |
+|---|------|------|--------|
+| CLEANUP-1 | Delete HTML file | `src/email-templates/html/content-creator-run-only.html` | [x] COMPLETE |
+| CLEANUP-2 | Remove from EmailTemplateId union | `src/lib/email-templates/types.ts` | [x] COMPLETE |
+| CLEANUP-3 | Remove template definition object | `src/lib/email-templates/data.ts` | [x] COMPLETE |
+| CLEANUP-4 | Remove preview payload function | `src/lib/email-templates/data.ts` | [x] COMPLETE |
+| CLEANUP-5 | Verify build passes | — | [x] COMPLETE |
 
 ---
 
